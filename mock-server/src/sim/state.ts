@@ -9,6 +9,7 @@ import type {
   RobotState,
   TankState,
 } from '@ecocycle/shared';
+import { SETTING_DEFS } from '../fixtures/settings';
 
 // 현재 값 저장소. 값은 sim/ 의 시뮬레이터가 바꾸고, routes/ 와 stream 은 여기서 읽는다.
 
@@ -18,10 +19,24 @@ const nowIso = () => new Date().toISOString();
  * 탱크 상태 판정. 이상 기준은 서버 설정이다(실서버에서는 서버가 정한다).
  * 모의 서버의 임시 기준: 적재율 80% 이상 caution, 95% 이상 alarm.
  */
-export function judgeTankStatus(fillPercent: number): DeviceStatus {
+export function judgeTankStatus(fillPercent: number, cautionThresholdPercent = 80): DeviceStatus {
   if (fillPercent >= 95) return 'alarm';
-  if (fillPercent >= 80) return 'caution';
+  if (fillPercent >= cautionThresholdPercent) return 'caution';
   return 'normal';
+}
+
+// update_setting으로 바뀐 값. 없으면 SETTING_DEFS의 기본값을 쓴다.
+const settings = new Map<string, number>();
+
+export function getSetting(deviceId: DeviceId, key: string): number {
+  const stored = settings.get(`${deviceId}.${key}`);
+  if (stored !== undefined) return stored;
+  const type = deviceId.split('-')[0] as DeviceState['type'];
+  return SETTING_DEFS[type].find((d) => d.key === key)?.default ?? 0;
+}
+
+export function setSetting(deviceId: DeviceId, key: string, value: number): void {
+  settings.set(`${deviceId}.${key}`, value);
 }
 
 function tank(id: TankState['id'], section: TankState['section'], fill: number, moisture: number): TankState {

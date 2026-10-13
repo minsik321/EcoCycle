@@ -2,7 +2,7 @@ import type { Alarm, CompressorState, ConveyorState, DeviceStatus, TankId, TankS
 import { TANK_IDS } from '@ecocycle/shared';
 import { publish } from './bus';
 import { publishDevice, publishSummary } from './publish';
-import { alarms, devices, judgeTankStatus } from './state';
+import { alarms, devices, getSetting, judgeTankStatus } from './state';
 
 const rnd = (min: number, max: number) => min + Math.random() * (max - min);
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
@@ -35,24 +35,25 @@ function nextAlarmId(): string {
 }
 
 /** 탱크 상태가 caution/alarm이면 알람을 열고, normal로 돌아오면 해제한다. */
-function syncTankAlarm(t: TankState): void {
-  const active = alarms.find((a) => a.deviceId === t.id && a.state === 'active');
+function syncTankAlarm(t: TankState, cautionThreshold: number): void {
+  // 확인 처리(acknowledged)된 알람도 아직 열려 있는 알람이다. 상태가 정상으로 돌아와야 해제된다.
+  const open = alarms.find((a) => a.deviceId === t.id && (a.state === 'active' || a.state === 'acknowledged'));
   if (t.status === 'caution' || t.status === 'alarm') {
-    if (active) return;
+    if (open) return;
     const alarm: Alarm = {
       id: nextAlarmId(),
       level: t.status,
       deviceId: t.id,
-      message: t.status === 'alarm' ? '적재율 95% 초과' : '적재율 80% 초과',
+      message: t.status === 'alarm' ? '적재율 95% 초과' : `적재율 ${cautionThreshold}% 초과`,
       state: 'active',
       ts: new Date().toISOString(),
     };
     alarms.push(alarm);
     publish({ type: 'alarm', alarm: { ...alarm } });
-  } else if (active) {
-    active.state = 'cleared';
-    active.ts = new Date().toISOString();
-    publish({ type: 'alarm', alarm: { ...active } });
+  } else if (open) {
+    open.state = 'cleared';
+    open.ts = new Date().toISOString();
+    publish({ type: 'alarm', alarm: { ...open } });
   }
 }
 
@@ -69,9 +70,10 @@ export function tickPlant(): void {
     t.fillPercent = round1(fill);
     t.volumeM3 = round1((t.capacityM3 * fill) / 100);
     t.moisturePercent = round1(moisture);
-    const status: DeviceStatus = judgeTankStatus(t.fillPercent);
+    const cautionThreshold = getSetting(id, 'cautionThresholdPercent');
+    const status: DeviceStatus = judgeTankStatus(t.fillPercent, cautionThreshold);
     t.status = status;
-    syncTankAlarm(t);
+    syncTankAlarm(t, cautionThreshold);
     publishDevice(t);
   }
 

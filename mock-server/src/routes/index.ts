@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../auth';
 import { alarmsRouter } from './alarms';
 import { camerasRouter } from './cameras';
+import { commandsRouter } from './commands';
 import { devicesRouter } from './devices';
 import { robotsRouter } from './robots';
 
@@ -13,3 +14,4 @@ queryRouter.use(devicesRouter);
 queryRouter.use(robotsRouter);
 queryRouter.use(alarmsRouter);
 queryRouter.use(camerasRouter);
+queryRouter.use(commandsRouter);
