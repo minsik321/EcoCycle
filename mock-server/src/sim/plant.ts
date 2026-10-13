@@ -2,7 +2,7 @@ import type { CompressorState, ConveyorState, DeviceStatus, TankId, TankState } 
 import { TANK_IDS } from '@ecocycle/shared';
 import { clearAlarm, raiseAlarm, updateAlarm } from './alarmOps';
 import { publishDevice, publishSummary } from './publish';
-import { alarms, devices, getSetting, judgeTankStatus } from './state';
+import { alarms, devices, getSetting, judgeTankStatus, press, production } from './state';
 
 const rnd = (min: number, max: number) => min + Math.random() * (max - min);
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
@@ -22,6 +22,14 @@ export function removeFromTank(id: TankId, percent: number): void {
   fillRaw.set(id, clamp((fillRaw.get(id) ?? 0) - percent, 0, 100));
 }
 
+/** 차량이 섹터에 파지를 내렸을 때 (공정 흐름 시뮬레이터가 호출) */
+export function addToTank(id: TankId, percent: number): void {
+  fillRaw.set(id, clamp((fillRaw.get(id) ?? 0) + percent, 0, 100));
+}
+
+/** 자동 사이클과 배합 계획이 건너뛰는 탱크 (시나리오용) */
+export const excludedTanks = new Set<TankId>();
+
 /** 컨베이어에 파지를 올렸을 때 (로봇 시뮬레이터가 호출) */
 export function addToConveyor(percent: number): void {
   loadRaw = clamp(loadRaw + percent, 0, 100);
@@ -34,7 +42,7 @@ export function setTankFill(id: TankId, percent: number): void {
 
 const fillRateFactor = new Map<TankId, number>();
 
-/** 시나리오용: 탱크에 파지가 들어오는 속도를 배수로 바꾼다 (기본 1) */
+/** 시나리오용: 차량과 무관하게 탱크에 파지가 계속 들어오게 한다 (기본 0: 파지는 차량이 내릴 때만 늘어난다) */
 export function setFillRateFactor(id: TankId, factor: number): void {
   fillRateFactor.set(id, factor);
 }
@@ -58,8 +66,7 @@ function syncTankAlarm(t: TankState, cautionThreshold: number): void {
 export function tickPlant(): void {
   for (const id of TANK_IDS) {
     const t = tank(id);
-    // 파지가 천천히 들어온다 (초당 약 0.02%)
-    const fill = clamp((fillRaw.get(id) ?? 0) + rnd(0.005, 0.035) * (fillRateFactor.get(id) ?? 1), 0, 100);
+    const fill = clamp((fillRaw.get(id) ?? 0) + rnd(0.005, 0.035) * (fillRateFactor.get(id) ?? 0), 0, 100);
     fillRaw.set(id, fill);
     const moisture = clamp((moistureRaw.get(id) ?? 10) + rnd(-0.05, 0.05), 6, 16);
     moistureRaw.set(id, moisture);
@@ -82,9 +89,13 @@ export function tickPlant(): void {
   const comp = compressor();
   if (comp.running) {
     const t = Date.now() / 1000;
-    comp.pressureMpa = round1(28.7 + Math.sin(t / 20) * 0.6 + rnd(-0.1, 0.1));
+    // 압축 중에는 배치의 목표 압력까지 오르고, 아니면 대기 압력으로 내려간다
+    const goal = press.targetMpa ?? 22.5;
+    comp.pressureMpa = round1(comp.pressureMpa + (goal - comp.pressureMpa) * 0.5 + rnd(-0.1, 0.1));
     comp.temperatureC = round1(42.3 + Math.sin(t / 45) * 2 + rnd(-0.1, 0.1));
   }
+  production.totalSec += 1;
+  if (comp.running) production.runSec += 1;
   publishDevice(comp);
 
   publishSummary();

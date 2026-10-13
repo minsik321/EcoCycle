@@ -2,6 +2,7 @@ export * from './http';
 export * from './tokens';
 export * from './auth';
 export * from './devices';
+export * from './process';
 export * from './alarms';
 export * from './cameras';
 export * from './push';

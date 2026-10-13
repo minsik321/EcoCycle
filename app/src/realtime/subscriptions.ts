@@ -1,7 +1,7 @@
 import type { Topic } from '@ecocycle/shared';
 
 /** 로그인 동안 항상 구독하는 주제 */
-export const BASE_TOPICS: readonly Topic[] = ['plant', 'devices', 'alarms'];
+export const BASE_TOPICS: readonly Topic[] = ['plant', 'devices', 'alarms', 'process'];
 /** 로봇 관절 값: 홈과 로봇 확대 화면에 있을 때만 구독한다 (양이 많다) */
 export const ROBOT_JOINTS_TOPIC: Topic = 'robot-1.joints';
 

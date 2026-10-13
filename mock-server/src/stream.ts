@@ -5,11 +5,12 @@ import { consumeWsTicket } from './auth';
 import type { Account } from './fixtures/accounts';
 import { streamGate } from './scenarios/gate';
 import { onMessage } from './sim/bus';
+import { processState } from './sim/process';
 import { listDevices, summarize } from './sim/state';
 
 const STREAM_PATH = '/ws/v1/stream';
 const HEARTBEAT_MS = 5000;
-const TOPICS: readonly string[] = ['plant', 'devices', 'alarms', 'robot-1.joints'];
+const TOPICS: readonly string[] = ['plant', 'devices', 'alarms', 'process', 'robot-1.joints'];
 
 interface Client {
   ws: WebSocket;
@@ -32,6 +33,10 @@ function topicOf(message: ServerMessage): Topic | null {
       return 'alarms';
     case 'robot.joints':
       return `${message.deviceId}.joints`;
+    case 'process.vehicle':
+    case 'process.batch':
+    case 'process.bale':
+      return 'process';
     case 'command.result':
     case 'heartbeat':
       return null;
@@ -79,6 +84,12 @@ function sendSnapshot(client: Client, topic: Topic): void {
   if (topic === 'plant') send(client, { type: 'plant.summary', summary: summarize() });
   if (topic === 'devices') {
     for (const state of listDevices()) send(client, { type: 'device.state', state: structuredClone(state) });
+  }
+  if (topic === 'process') {
+    const state = processState();
+    for (const vehicle of state.vehicles) send(client, { type: 'process.vehicle', vehicle });
+    for (const batch of state.batches) send(client, { type: 'process.batch', batch });
+    for (const bale of state.bales) send(client, { type: 'process.bale', bale });
   }
 }
 

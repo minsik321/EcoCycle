@@ -4,11 +4,15 @@ import type { Phase, RobotMode, RobotStatus } from './robot';
 
 export type TankSection = 'A1' | 'A2' | 'B1' | 'B2';
 
+/** 섹터(탱크)의 등급. ⚠ 등급 종류는 가정이다 (`docs/questions.md` A8). */
+export type SectorGrade = 'A' | 'C';
+
 /** GET /devices/tank-a1/state — 무게는 쓰지 않고 부피·용량만 쓴다. */
 export interface TankState {
   id: TankId;
   type: 'tank';
   section: TankSection;
+  grade: SectorGrade;
   status: DeviceStatus;
   /** 수위·적재율 % (0~100) */
   fillPercent: number;
@@ -72,6 +76,10 @@ export type DeviceListResponse = DeviceState[];
 export interface PlantSummary {
   averageMoisturePercent: number;
   totalFillPercent: number;
+  /** 오늘 처리량(베일 수) */
+  balesToday: number;
+  /** 압축기 가동률 % (0~100) */
+  compressorUptimePercent: number;
   status: DeviceStatus;
   updatedAt: IsoTimestamp;
 }
@@ -83,6 +91,15 @@ export interface PlantSummary {
 export interface HistoryPoint {
   ts: IsoTimestamp;
   value: number;
+}
+
+/** GET /plant/history?metric=...&from=...&to=...&interval=... — 요약 값의 이력. 형식은 기기 이력과 같다. */
+export interface PlantHistoryResponse {
+  metric: string;
+  interval: string;
+  from: IsoTimestamp;
+  to: IsoTimestamp;
+  points: HistoryPoint[];
 }
 
 export interface HistoryResponse {

@@ -39,12 +39,19 @@ export function setSetting(deviceId: DeviceId, key: string, value: number): void
   settings.set(`${deviceId}.${key}`, value);
 }
 
-function tank(id: TankState['id'], section: TankState['section'], fill: number, moisture: number): TankState {
+function tank(
+  id: TankState['id'],
+  section: TankState['section'],
+  grade: TankState['grade'],
+  fill: number,
+  moisture: number,
+): TankState {
   const capacityM3 = 8.0;
   return {
     id,
     type: 'tank',
     section,
+    grade,
     status: judgeTankStatus(fill),
     fillPercent: fill,
     volumeM3: Math.round(((capacityM3 * fill) / 100) * 10) / 10,
@@ -55,10 +62,10 @@ function tank(id: TankState['id'], section: TankState['section'], fill: number, 
 }
 
 export const devices: Record<DeviceId, DeviceState> = {
-  'tank-a1': tank('tank-a1', 'A1', 72.4, 11.8),
-  'tank-a2': tank('tank-a2', 'A2', 45.0, 10.2),
-  'tank-b1': tank('tank-b1', 'B1', 30.5, 12.6),
-  'tank-b2': tank('tank-b2', 'B2', 58.8, 9.7),
+  'tank-a1': tank('tank-a1', 'A1', 'A', 62.4, 11.8),
+  'tank-a2': tank('tank-a2', 'A2', 'A', 45.0, 10.2),
+  'tank-b1': tank('tank-b1', 'B1', 'C', 30.5, 12.6),
+  'tank-b2': tank('tank-b2', 'B2', 'C', 58.8, 9.7),
   'robot-1': {
     id: 'robot-1',
     type: 'robot',
@@ -87,6 +94,12 @@ export const devices: Record<DeviceId, DeviceState> = {
     updatedAt: nowIso(),
   } satisfies CompressorState,
 };
+
+/** 오늘 처리량과 압축기 가동 시간. 가동률은 서버가 집계해 보내는 값이다 (시작 값은 예시) */
+export const production = { balesToday: 411, runSec: 6 * 3600 * 0.92, totalSec: 6 * 3600 };
+
+/** 압축 중인 배치의 목표 압력. 압축 중이 아니면 null (sim/process가 정하고 sim/plant가 압력에 반영한다) */
+export const press: { targetMpa: number | null } = { targetMpa: null };
 
 export const alarms: Alarm[] = [
   {
@@ -138,6 +151,8 @@ export function summarize(): PlantSummary {
   return {
     averageMoisturePercent: round1(tanks.reduce((s, t) => s + t.moisturePercent, 0) / tanks.length),
     totalFillPercent: round1((totalVolume / totalCapacity) * 100),
+    balesToday: production.balesToday,
+    compressorUptimePercent: round1((production.runSec / production.totalSec) * 100),
     status: worst(statuses),
     updatedAt: nowIso(),
   };

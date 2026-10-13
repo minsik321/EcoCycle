@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Alarm, DeviceState, PlantSummary } from '@ecocycle/shared';
+import type { Alarm, DeviceState, PlantSummary, ProcessState } from '@ecocycle/shared';
 import * as api from '../api';
 import { createAppStore } from './index';
 import { createStoreSink } from './realtimeSink';
@@ -9,11 +9,14 @@ vi.mock('../api', async (importOriginal) => ({
   getPlantSummary: vi.fn(),
   getDevices: vi.fn(),
   getAlarms: vi.fn(),
+  getProcessState: vi.fn(),
 }));
 
 const summary: PlantSummary = {
   averageMoisturePercent: 11,
   totalFillPercent: 50,
+  balesToday: 412,
+  compressorUptimePercent: 92,
   status: 'normal',
   updatedAt: '2026-10-13T05:00:00.000Z',
 };
@@ -34,7 +37,25 @@ const alarm = (id: string, state: Alarm['state']): Alarm => ({
   ts: '2026-10-13T05:00:00.000Z',
 });
 
+const processState: ProcessState = {
+  vehicles: [
+    {
+      id: 'veh-20261013-031',
+      stage: 'identified',
+      plate: '12가 3456',
+      companyName: '한빛자원',
+      sectorId: 'tank-a1',
+      stageTimes: { arrived: '2026-10-13T05:00:00.000Z', identified: '2026-10-13T05:00:06.000Z' },
+      updatedAt: '2026-10-13T05:00:06.000Z',
+    },
+  ],
+  batches: [],
+  bales: [],
+  updatedAt: '2026-10-13T05:00:06.000Z',
+};
+
 beforeEach(() => {
+  vi.mocked(api.getProcessState).mockResolvedValue(processState);
   vi.mocked(api.getPlantSummary).mockResolvedValue(summary);
   vi.mocked(api.getDevices).mockResolvedValue([device]);
   vi.mocked(api.getAlarms).mockImplementation(async (q) =>
@@ -72,6 +93,17 @@ describe('store sink', () => {
     expect(Object.keys(s.alarms.byId).sort()).toEqual(['a1', 'a2']);
     expect(api.getAlarms).toHaveBeenCalledWith({ state: 'active' });
     expect(api.getAlarms).toHaveBeenCalledWith({ state: 'acknowledged' });
+    expect(s.process.vehicles.map((v) => v.id)).toEqual(['veh-20261013-031']);
+  });
+
+  it('공정 흐름은 대상 전체 상태로 받고, 더 오래된 값으로 덮어쓰지 않는다', () => {
+    const store = createAppStore();
+    const sink = createStoreSink(store.dispatch);
+    const vehicle = processState.vehicles[0]!;
+    sink.onVehicle({ ...vehicle, stage: 'unloading', updatedAt: '2026-10-13T05:00:22.000Z' });
+    sink.onVehicle(vehicle);
+    expect(store.getState().process.vehicles).toHaveLength(1);
+    expect(store.getState().process.vehicles[0]?.stage).toBe('unloading');
   });
 
   it('REST가 실패하면 reject해서 realtime이 다시 시도하게 하고 store는 그대로 둔다', async () => {

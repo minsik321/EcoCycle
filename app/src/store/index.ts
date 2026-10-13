@@ -6,9 +6,10 @@ import commands from './slices/commands';
 import connection from './slices/connection';
 import devices from './slices/devices';
 import plant from './slices/plant';
+import process from './slices/process';
 import ui, { saveHomeView, saveQualityMode } from './slices/ui';
 
-const appReducer = combineReducers({ auth, plant, devices, alarms, connection, commands, ui });
+const appReducer = combineReducers({ auth, plant, process, devices, alarms, connection, commands, ui });
 
 /** 로그아웃하거나 세션이 끝나면 모든 슬라이스를 처음 상태로 되돌린다. auth는 이어서 loggedOut이 된다. */
 const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: UnknownAction) =>
@@ -51,4 +52,5 @@ export * from './slices/commands';
 export * from './slices/connection';
 export * from './slices/devices';
 export * from './slices/plant';
+export * from './slices/process';
 export * from './slices/ui';

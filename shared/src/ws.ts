@@ -3,12 +3,13 @@ import type { Alarm } from './alarms';
 import type { CommandStatus } from './commands';
 import type { DeviceState, Gripper, PlantSummary } from './devices';
 import type { RobotId, TankId } from './ids';
+import type { Bale, Batch, Vehicle } from './process';
 import type { Phase } from './robot';
 
 /**
  * 구독 주제. 관절 값은 양이 많아 홈과 로봇 확대 화면에 있을 때만 구독하고 나머지 화면에서는 해제한다.
  */
-export type Topic = 'plant' | 'devices' | 'alarms' | `${RobotId}.joints`;
+export type Topic = 'plant' | 'devices' | 'alarms' | 'process' | `${RobotId}.joints`;
 
 /** 클라이언트 → 서버 */
 export type ClientMessage =
@@ -62,6 +63,24 @@ export interface HeartbeatMessage {
   ts: IsoTimestamp;
 }
 
+/** 공정 흐름: 차량의 stage나 값이 바뀔 때 차량 하나의 전체 상태 */
+export interface ProcessVehicleMessage {
+  type: 'process.vehicle';
+  vehicle: Vehicle;
+}
+
+/** 공정 흐름: 배치의 stage나 값이 바뀔 때 배치 하나의 전체 상태 */
+export interface ProcessBatchMessage {
+  type: 'process.batch';
+  batch: Batch;
+}
+
+/** 공정 흐름: 베일의 stage가 바뀔 때 베일 하나의 전체 상태 */
+export interface ProcessBaleMessage {
+  type: 'process.bale';
+  bale: Bale;
+}
+
 /** 서버 → 클라이언트. `type`으로 구분되어 switch에서 빠진 경우가 컴파일 오류가 된다. */
 export type ServerMessage =
   | PlantSummaryMessage
@@ -69,4 +88,7 @@ export type ServerMessage =
   | RobotJointsMessage
   | AlarmMessage
   | CommandResultMessage
+  | ProcessVehicleMessage
+  | ProcessBatchMessage
+  | ProcessBaleMessage
   | HeartbeatMessage;

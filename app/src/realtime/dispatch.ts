@@ -21,7 +21,7 @@ export interface DispatcherOptions {
 /**
  * 저빈도 값은 sink(store)로, 고빈도 robot.joints는 jointBuffer로 보낸다.
  * plant.summary와 device.state는 batchMs 동안 모아서 한 번에 보낸다 (같은 기기는 마지막 값만).
- * alarm과 command.result는 드물고 바로 보여야 해서 모으지 않는다.
+ * alarm, command.result, process.*는 드물고 바로 보여야 해서 모으지 않는다.
  */
 export function createDispatcher({ sink, jointBuffer, batchMs = STORE_BATCH_MS }: DispatcherOptions): Dispatcher {
   const devices = new Map<string, DeviceState>();
@@ -70,6 +70,15 @@ export function createDispatcher({ sink, jointBuffer, batchMs = STORE_BATCH_MS }
             status: message.status,
             reason: message.reason,
           });
+          return;
+        case 'process.vehicle':
+          sink.onVehicle(message.vehicle);
+          return;
+        case 'process.batch':
+          sink.onBatch(message.batch);
+          return;
+        case 'process.bale':
+          sink.onBale(message.bale);
           return;
         case 'heartbeat':
           return;

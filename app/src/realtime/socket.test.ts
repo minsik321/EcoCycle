@@ -60,6 +60,9 @@ function setup(resync: () => Promise<void> = async () => undefined) {
     onDeviceStates: vi.fn(),
     onAlarm: vi.fn(),
     onCommandResult: vi.fn(),
+    onVehicle: vi.fn(),
+    onBatch: vi.fn(),
+    onBale: vi.fn(),
     resync: vi.fn(resync),
   };
   client = createRealtimeClient({
@@ -101,7 +104,7 @@ describe('연결', () => {
 
     last().serverOpen();
     await flush();
-    expect(last().sent).toEqual([{ type: 'subscribe', topics: ['plant', 'devices', 'alarms'] }]);
+    expect(last().sent).toEqual([{ type: 'subscribe', topics: ['plant', 'devices', 'alarms', 'process'] }]);
     expect(client.getStatus()).toBe('connecting'); // 소켓이 열렸을 뿐 아직 아무것도 못 받았다
     expect(sink.resync).not.toHaveBeenCalled();
 
@@ -241,7 +244,7 @@ describe('끊김', () => {
     await flush();
 
     expect(client.getStatus()).toBe('online');
-    expect(last().sent).toEqual([{ type: 'subscribe', topics: ['plant', 'devices', 'alarms'] }]);
+    expect(last().sent).toEqual([{ type: 'subscribe', topics: ['plant', 'devices', 'alarms', 'process'] }]);
     expect(sink.resync).toHaveBeenCalledTimes(2);
 
     last().serverClose();
@@ -294,7 +297,7 @@ describe('관절 값 구독', () => {
   it('연결되기 전에 정한 구독도 연결되면 함께 보낸다', async () => {
     client.setJointsWanted(true);
     await startAndOpen();
-    expect(last().sent).toEqual([{ type: 'subscribe', topics: ['plant', 'devices', 'alarms', 'robot-1.joints'] }]);
+    expect(last().sent).toEqual([{ type: 'subscribe', topics: ['plant', 'devices', 'alarms', 'process', 'robot-1.joints'] }]);
   });
 
   it('재연결하면 관절 구독도 다시 보낸다', async () => {

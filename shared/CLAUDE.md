@@ -14,15 +14,16 @@ shared/
     ├── common.ts       IsoTimestamp, DeviceStatus, 단위 규칙(주석)
     ├── robot.ts        Phase, RobotStatus, RobotMode, RobotModel(제안안)
     ├── auth.ts         Role, Permission, Me, 로그인·리프레시·로그아웃·ws-ticket 요청/응답, PushRegisterRequest
-    ├── devices.ts      TankState·RobotState·ConveyorState·CompressorState, DeviceState(type으로 구분), PlantSummary·HistoryResponse(제안안)
+    ├── devices.ts      TankState(등급 grade 포함)·RobotState·ConveyorState·CompressorState, DeviceState(type으로 구분), PlantSummary·HistoryResponse·PlantHistoryResponse(제안안)
+    ├── process.ts      공정 흐름: Vehicle·Batch·Bale(stage와 stageTimes), ProcessState, PLANT_METRICS (제안안, 서버 합의 전)
     ├── alarms.ts       Alarm, AlarmLevel, AlarmState
     ├── cameras.ts      Camera, StreamInfo
     ├── commands.ts     Command(type으로 구분), COMMAND_RULES(위험도·필요 권한·대상·confirm), CommandStatus, 202·조회 응답
-    ├── ws.ts           Topic, ClientMessage, ServerMessage(6종)
+    ├── ws.ts           Topic, ClientMessage, ServerMessage(9종, process.* 포함)
     └── errors.ts       ApiErrorBody(code는 문자열), 클라이언트가 구분하는 상태 코드
 ```
 
-명세에 JSON 예시가 없어 이름을 정한 곳은 코드 주석에 ⚠로 표시했고 서버 담당 질문(`docs/questions.md` B11~B17)에 올려 두었다.
+명세에 JSON 예시가 없어 이름을 정한 곳은 코드 주석에 ⚠로 표시했고 서버 담당 질문(`docs/questions.md` B11~B17, 공정 흐름은 B23~B27)에 올려 두었다.
 
 ## 규칙
 

@@ -16,15 +16,15 @@ describe('diffTopics', () => {
 });
 
 describe('subscriptions', () => {
-  it('기본 주제는 plant, devices, alarms이고 관절 값은 따로다', () => {
-    expect([...BASE_TOPICS]).toEqual(['plant', 'devices', 'alarms']);
+  it('기본 주제는 plant, devices, alarms, process이고 관절 값은 따로다', () => {
+    expect([...BASE_TOPICS]).toEqual(['plant', 'devices', 'alarms', 'process']);
     expect(ROBOT_JOINTS_TOPIC).toBe('robot-1.joints');
   });
 
   it('보낸 뒤에는 변화분만 남는다', () => {
     const s = createSubscriptions();
     s.setDesired(BASE_TOPICS);
-    expect(s.pending().subscribe).toEqual(['plant', 'devices', 'alarms']);
+    expect(s.pending().subscribe).toEqual(['plant', 'devices', 'alarms', 'process']);
     s.markSent();
     expect(s.pending()).toEqual({ subscribe: [], unsubscribe: [] });
 
@@ -41,6 +41,6 @@ describe('subscriptions', () => {
     s.setDesired(BASE_TOPICS);
     s.markSent();
     s.reset();
-    expect(s.pending().subscribe).toEqual(['plant', 'devices', 'alarms']);
+    expect(s.pending().subscribe).toEqual(['plant', 'devices', 'alarms', 'process']);
   });
 });

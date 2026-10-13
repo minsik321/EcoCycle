@@ -19,6 +19,7 @@ const tank = (id: 'tank-a1' | 'tank-a2' | 'tank-b1' | 'tank-b2', fill: number, s
   id,
   type: 'tank',
   section: id.slice(-2).toUpperCase() as 'A1',
+  grade: 'A',
   status,
   fillPercent: fill,
   volumeM3: Math.round(fill) / 10,
@@ -37,7 +38,7 @@ const compressorState = (running = true): DeviceState => ({
   updatedAt: NOW,
 });
 
-const summary: PlantSummary = { averageMoisturePercent: 11.1, totalFillPercent: 51.6, status: 'normal', updatedAt: NOW };
+const summary: PlantSummary = { averageMoisturePercent: 11.1, totalFillPercent: 51.6, balesToday: 412, compressorUptimePercent: 92, status: 'normal', updatedAt: NOW };
 
 const all = (): DeviceState[] => [
   tank('tank-a1', 72.4),

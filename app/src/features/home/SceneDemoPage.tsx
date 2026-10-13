@@ -22,6 +22,7 @@ function fakeDevices(tSec: number): Partial<Record<DeviceId, DeviceState>> {
       id,
       type: 'tank',
       section,
+      grade: section.startsWith('A') ? 'A' : 'C',
       status: fill >= 95 ? 'alarm' : fill >= 80 ? 'caution' : 'normal',
       fillPercent: fill,
       volumeM3: Math.round(fill * 0.8) / 10,

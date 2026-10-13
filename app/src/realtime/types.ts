@@ -1,4 +1,4 @@
-import type { Alarm, CommandStatus, DeviceState, PlantSummary } from '@ecocycle/shared';
+import type { Alarm, Bale, Batch, CommandStatus, DeviceState, PlantSummary, Vehicle } from '@ecocycle/shared';
 
 /** online: 연결됨, connecting: 처음 연결 중, offline: 끊김(재연결 시도 중 포함) */
 export type ConnectionStatus = 'online' | 'connecting' | 'offline';
@@ -28,8 +28,12 @@ export interface RealtimeSink {
   onDeviceStates(states: DeviceState[]): void;
   onAlarm(alarm: Alarm): void;
   onCommandResult(result: CommandResult): void;
+  /** 공정 흐름: stage가 바뀔 때만 오므로 모으지 않고 바로 보낸다 */
+  onVehicle(vehicle: Vehicle): void;
+  onBatch(batch: Batch): void;
+  onBale(bale: Bale): void;
   /**
-   * 연결(재연결 포함)이 되면 REST로 요약·기기 상태·활성 알람을 다시 받아 맞춘다.
+   * 연결(재연결 포함)이 되면 REST로 요약·기기 상태·활성 알람·공정 흐름을 다시 받아 맞춘다.
    * 실패하면 reject하고, realtime이 몇 번 다시 시도한다.
    */
   resync(): Promise<void>;

@@ -8,6 +8,7 @@ const tank = (fill: number, id: TankState['id'] = 'tank-a1'): TankState => ({
   id,
   type: 'tank',
   section: 'A1',
+  grade: 'A',
   status: 'normal',
   fillPercent: fill,
   volumeM3: 1,
@@ -19,6 +20,8 @@ const tank = (fill: number, id: TankState['id'] = 'tank-a1'): TankState => ({
 const summary = (fill: number): PlantSummary => ({
   averageMoisturePercent: 10,
   totalFillPercent: fill,
+  balesToday: 412,
+  compressorUptimePercent: 92,
   status: 'normal',
   updatedAt: '2026-10-13T05:00:00.000Z',
 });
@@ -39,6 +42,9 @@ function makeSink() {
     onDeviceStates: vi.fn(),
     onAlarm: vi.fn(),
     onCommandResult: vi.fn(),
+    onVehicle: vi.fn(),
+    onBatch: vi.fn(),
+    onBale: vi.fn(),
     resync: vi.fn(async () => undefined),
   };
   return sink;

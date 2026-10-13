@@ -14,11 +14,13 @@ mock-server/
     ├── auth.ts           로그인(시도 제한 429), 리프레시(사용할 때마다 교체), 로그아웃, ws-ticket(30초, 1회용), /me, requireAuth
     ├── errors.ts         {"error":{"code","message"}} 응답
     ├── stream.ts         WebSocket: 티켓 검증, 구독 관리, heartbeat 5초, 시나리오 침묵·지연 반영
-    ├── routes/           devices(요약·기기·이력), robots(모델), alarms, cameras, commands(202·멱등성·403/409/422)
+    ├── routes/           devices(요약·기기·이력), process(공정 흐름 상태·요약 이력), robots(모델), alarms, cameras, commands(202·멱등성·403/409/422)
     ├── sim/              state(현재 값), plant(탱크·컨베이어·압축기·알람), robot(사이클·관절 15Hz), commands(접수→결과),
+    │                     process(차량·배치·베일: 회사·배정 섹터·배합비·목표 압력을 예시로 정함, 로봇이 집을 섹터도 여기서),
     │                     alarmOps, publish(변할 때·5초마다), history(가짜 이력), bus(sim → stream)
     ├── scenarios/        index(시나리오 5종), gate(침묵·지연 스위치)
-    └── fixtures/         accounts(역할별 계정·권한 표), robotModel(범용 6축), cameras, settings(설정 키·범위)
+    └── fixtures/         accounts(역할별 계정·권한 표), robotModel(범용 6축), cameras, settings(설정 키·범위),
+                      process(가상의 회사·번호판·배정 섹터, 배합비·압력 범위, 단계별 시간)
 ```
 
 시나리오: `normal`, `tank-alarm`, `disconnect`, `robot-error`, `token-expiry`, `slow-network` (`npm run mock -- --scenario=이름`).
@@ -31,6 +33,7 @@ mock-server/
 - 테스트 계정은 역할별로 하나씩: `admin` / `operator` / `viewer` (비밀번호는 fixtures에, 실제 비밀번호처럼 보이지 않게).
 - `robot.joints`는 구독한 연결에만 보낸다. 다른 메시지는 변할 때 + 최소 5초마다.
 - 시나리오로 재현할 것: 적재율 80% 초과 알람, 15초 이상 무응답(연결 끊김), 로봇 `error`, 액세스 토큰 만료(401 → 리프레시), 느린 네트워크.
+- 공정 흐름은 모든 시나리오에서 함께 돈다. 탱크 적재율은 차량이 내릴 때 늘고 로봇이 집을 때 준다. 회사·번호판은 가상의 것만 쓴다.
 - 시각은 항상 UTC ISO 문자열, 단위는 명세 그대로.
 - 서버 쪽 "진짜" 기능(FCM 발송, RTSP 변환, 실제 보안)은 흉내만 낸다. CCTV는 고정 샘플 영상이나 정지 이미지로 대체한다.
 - 명세에 없는 엔드포인트를 앱 편의를 위해 추가하지 않는다. 필요하면 명세 수정안부터 제안한다.

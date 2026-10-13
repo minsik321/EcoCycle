@@ -3,6 +3,7 @@ export * from './common';
 export * from './robot';
 export * from './auth';
 export * from './devices';
+export * from './process';
 export * from './alarms';
 export * from './cameras';
 export * from './errors';

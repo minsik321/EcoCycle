@@ -20,6 +20,7 @@ const tank = (id: 'tank-a1' | 'tank-a2' | 'tank-b1' | 'tank-b2', fill: number, s
   id,
   type: 'tank',
   section: 'A1',
+  grade: 'A',
   status,
   fillPercent: fill,
   volumeM3: 5.8,

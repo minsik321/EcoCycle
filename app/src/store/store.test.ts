@@ -37,6 +37,7 @@ const tank = (id: TankState['id'], fill: number, updatedAt: string): TankState =
   id,
   type: 'tank',
   section: 'A1',
+  grade: 'A',
   status: 'normal',
   fillPercent: fill,
   volumeM3: 1,
@@ -57,6 +58,8 @@ const alarm = (id: string, state: Alarm['state'], ts: string, deviceId: Alarm['d
 const summary = (fill: number, updatedAt: string): PlantSummary => ({
   averageMoisturePercent: 10,
   totalFillPercent: fill,
+  balesToday: 412,
+  compressorUptimePercent: 92,
   status: 'normal',
   updatedAt,
 });

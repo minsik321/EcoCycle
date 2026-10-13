@@ -41,6 +41,7 @@ export const tankState = (): DeviceState => ({
   id: 'tank-a1',
   type: 'tank',
   section: 'A1',
+  grade: 'A',
   status: 'normal',
   fillPercent: 72.4,
   volumeM3: 5.8,
