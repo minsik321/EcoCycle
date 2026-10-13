@@ -20,9 +20,11 @@ export interface AuthState {
   me: Me | null;
   loginPending: boolean;
   loginError: LoginError | null;
+  /** 토큰 갱신이 거부되어 로그인이 풀렸다 (로그인 화면에서 이유를 알려 준다) */
+  sessionExpired: boolean;
 }
 
-const initialState: AuthState = { status: 'unknown', me: null, loginPending: false, loginError: null };
+const initialState: AuthState = { status: 'unknown', me: null, loginPending: false, loginError: null, sessionExpired: false };
 
 function toLoginError(error: unknown): LoginError {
   if (error instanceof api.ApiError) {
@@ -65,6 +67,7 @@ const slice = createSlice({
     sessionLost(state) {
       state.status = 'loggedOut';
       state.me = null;
+      state.sessionExpired = true;
     },
     clearLoginError(state) {
       state.loginError = null;
@@ -80,6 +83,7 @@ const slice = createSlice({
         state.loginPending = false;
         state.status = 'loggedIn';
         state.me = action.payload;
+        state.sessionExpired = false;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loginPending = false;

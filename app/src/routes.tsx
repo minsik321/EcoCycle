@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { NAV_ITEMS } from './config/navigation';
+import { LoginPage, RequireAuth } from './features/auth';
 
 // 화면(features)을 하나씩 만들면서 아래 Placeholder를 실제 화면으로 바꾼다.
 function Placeholder({ title }: { title: string }) {
@@ -15,11 +16,19 @@ function Placeholder({ title }: { title: string }) {
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route element={<AppShell />}>
-        {NAV_ITEMS.map((item) => (
-          <Route key={item.id} path={item.path === '/' ? undefined : `${item.path}/*`} index={item.path === '/'} element={<Placeholder title={item.label} />} />
-        ))}
-        <Route path="*" element={<Placeholder title="찾을 수 없는 화면" />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<RequireAuth />}>
+        <Route element={<AppShell />}>
+          {NAV_ITEMS.map((item) => (
+            <Route
+              key={item.id}
+              path={item.path === '/' ? undefined : `${item.path}/*`}
+              index={item.path === '/'}
+              element={<Placeholder title={item.label} />}
+            />
+          ))}
+          <Route path="*" element={<Placeholder title="찾을 수 없는 화면" />} />
+        </Route>
       </Route>
     </Routes>
   );

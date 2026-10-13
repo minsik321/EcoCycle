@@ -3,7 +3,7 @@ import type { ReactElement } from 'react';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import type { DeviceState, Me } from '@ecocycle/shared';
-import { connectionChanged, createAppStore, devicesReceived, loginUser } from '../store';
+import { connectionChanged, createAppStore, devicesReceived, loginUser, restoreUserSession } from '../store';
 
 export const OPERATOR: Me = { id: 'operator', name: '작업자', role: 'operator', permissions: ['robot.control', 'alarm.ack'] };
 export const ADMIN: Me = {
@@ -50,7 +50,8 @@ export const tankState = (): DeviceState => ({
 });
 
 export interface StoreOptions {
-  me?: Me | null;
+  /** Me: 로그인됨, null: 로그아웃 상태, 'unknown': 저장된 세션을 확인하는 중(앱 시작 직후) */
+  me?: Me | null | 'unknown';
   connection?: 'online' | 'offline' | 'connecting';
   lastReceivedAt?: string | null;
   devices?: DeviceState[];
@@ -61,7 +62,8 @@ export interface StoreOptions {
 /** 로그인·연결·기기 상태가 정해진 store를 만든다 (서버 호출 없이 액션으로 바로 채운다) */
 export function makeStore({ me = OPERATOR, connection = 'online', lastReceivedAt = NOW, devices = [] }: StoreOptions = {}) {
   const store = createAppStore();
-  if (me) store.dispatch(loginUser.fulfilled(me, 'test', { id: me.id, password: '' }));
+  if (me === null) store.dispatch(restoreUserSession.fulfilled(null, 'test'));
+  else if (me !== 'unknown') store.dispatch(loginUser.fulfilled(me, 'test', { id: me.id, password: '' }));
   store.dispatch(connectionChanged({ status: connection, lastReceivedAt }));
   if (devices.length > 0) store.dispatch(devicesReceived(devices));
   return store;
