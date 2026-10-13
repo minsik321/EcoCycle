@@ -17,7 +17,8 @@
     "mock": "npm run dev -w @ecocycle/mock-server --",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build:android": "npm run build:android -w @ecocycle/app"
+    "build:android": "npm run build:android -w @ecocycle/app",
+    "test:integration": "npm run test:integration -w @ecocycle/app"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",

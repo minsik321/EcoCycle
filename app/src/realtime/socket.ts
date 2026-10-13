@@ -170,18 +170,15 @@ export function createRealtimeClient(options: RealtimeClientOptions): RealtimeCl
     const ws = createSocket(`${wsBase}?ticket=${encodeURIComponent(ticket)}`);
     socket = ws;
 
+    // 소켓이 열린 것만으로는 연결됨이 아니다. 서버가 열어 두고 침묵하는 경우가 있어서(예: 장애, disconnect 시나리오)
+    // 첫 메시지를 실제로 받았을 때 online으로 바꾸고 REST로 맞춘다. 그 전까지는 끊김 표시를 유지한다.
+    let receivedFirstMessage = false;
+
     ws.onopen = () => {
       if (gen !== generation) return;
-      everOnline = true;
-      backoffMs = RECONNECT_BASE_MS;
-      lastReceivedMs = now();
-      // 서버가 다시 시작하면 seq가 처음으로 돌아가므로 새 연결마다 버퍼를 비운다
-      jointBuffer.clear();
       subscriptions.reset();
       syncSubscriptions();
       watchdog.start();
-      setStatus('online');
-      void runResync(gen);
     };
 
     ws.onmessage = (event) => {
@@ -196,6 +193,16 @@ export function createRealtimeClient(options: RealtimeClientOptions): RealtimeCl
         return;
       }
       if (typeof message !== 'object' || message === null || typeof message.type !== 'string') return;
+      if (!receivedFirstMessage) {
+        receivedFirstMessage = true;
+        // 서버가 다시 시작하면 seq가 처음으로 돌아가므로 새 연결의 첫 메시지에서 버퍼를 비운다.
+        // 그 전(끊겨 있는 동안)에는 마지막 자세를 남겨 두어 로봇팔이 그 자세로 멈춰 있게 한다.
+        jointBuffer.clear();
+        everOnline = true;
+        backoffMs = RECONNECT_BASE_MS;
+        setStatus('online');
+        void runResync(gen);
+      }
       dispatcher.handle(message, at);
     };
 

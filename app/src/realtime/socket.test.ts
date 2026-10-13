@@ -74,6 +74,7 @@ async function startAndOpen() {
   client.start();
   await flush();
   last().serverOpen();
+  last().serverSend(heartbeat()); // 열린 것만으로는 연결됨이 아니고, 첫 메시지를 받아야 online이다
   await flush();
 }
 
@@ -90,7 +91,7 @@ afterEach(() => {
 });
 
 describe('연결', () => {
-  it('티켓을 받아 연결하고, 열리면 online이 되어 기본 주제를 구독하고 REST로 맞춘다', async () => {
+  it('티켓을 받아 연결하고, 기본 주제를 구독하고, 첫 메시지를 받으면 online이 되어 REST로 맞춘다', async () => {
     client.start();
     expect(client.getStatus()).toBe('connecting');
     await flush();
@@ -100,11 +101,48 @@ describe('연결', () => {
 
     last().serverOpen();
     await flush();
-
-    expect(client.getStatus()).toBe('online');
     expect(last().sent).toEqual([{ type: 'subscribe', topics: ['plant', 'devices', 'alarms'] }]);
+    expect(client.getStatus()).toBe('connecting'); // 소켓이 열렸을 뿐 아직 아무것도 못 받았다
+    expect(sink.resync).not.toHaveBeenCalled();
+
+    last().serverSend(heartbeat());
+    await flush();
+    expect(client.getStatus()).toBe('online');
     expect(sink.resync).toHaveBeenCalledTimes(1);
     expect(connections.map((c) => c.status)).toEqual(['connecting', 'online']);
+  });
+
+  it('소켓은 열렸는데 서버가 침묵하면 online이 되지 않고, 15초 뒤 끊김으로 표시하고 다시 연결한다', async () => {
+    client.start();
+    await flush();
+    last().serverOpen();
+    await vi.advanceTimersByTimeAsync(14_000);
+    expect(client.getStatus()).toBe('connecting');
+    expect(sink.resync).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(client.getStatus()).toBe('offline');
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(FakeSocket.instances).toHaveLength(2);
+  });
+
+  it('끊겼다가 다시 연결되어도 첫 메시지를 받기 전에는 끊김을 유지하고, 마지막 수신 시각은 실제 마지막 메시지의 것이다', async () => {
+    await startAndOpen();
+    const lastMessageAt = new Date(Date.now()).toISOString();
+    last().serverClose();
+    expect(client.getStatus()).toBe('offline');
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    last().serverOpen(); // 서버가 소켓은 열어 주지만 아직 침묵
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(client.getStatus()).toBe('offline');
+    expect(connections.at(-1)).toEqual({ status: 'offline', lastReceivedAt: lastMessageAt });
+    expect(sink.resync).toHaveBeenCalledTimes(1); // 처음 연결 때뿐
+
+    last().serverSend(heartbeat());
+    await flush();
+    expect(client.getStatus()).toBe('online');
+    expect(sink.resync).toHaveBeenCalledTimes(2);
   });
 
   it('받은 메시지는 type별로 나뉘어 sink로 간다', async () => {
@@ -199,6 +237,7 @@ describe('끊김', () => {
     last().serverClose();
     await vi.advanceTimersByTimeAsync(2_000);
     last().serverOpen();
+    last().serverSend(heartbeat());
     await flush();
 
     expect(client.getStatus()).toBe('online');
@@ -216,6 +255,7 @@ describe('끊김', () => {
     old.serverClose();
     await vi.advanceTimersByTimeAsync(1_000);
     last().serverOpen();
+    last().serverSend(heartbeat());
     await flush();
 
     old.serverSend({ type: 'command.result', commandId: 'late', status: 'completed', reason: null });
@@ -281,7 +321,7 @@ describe('관절 값 구독', () => {
     expect(sink.resync).toHaveBeenCalledTimes(2);
   });
 
-  it('재연결할 때 버퍼를 비워 서버가 다시 시작해도 seq가 처음부터 받아들여진다', async () => {
+  it('끊겨 있는 동안에는 마지막 관절 자세를 남겨 두고, 새 연결의 첫 메시지에서 비워 서버가 다시 시작해도 seq가 처음부터 받아들여진다', async () => {
     client.setJointsWanted(true);
     await startAndOpen();
     const send = (seq: number, ts: string) =>
@@ -302,6 +342,9 @@ describe('관절 값 구독', () => {
     await vi.advanceTimersByTimeAsync(1_000);
     last().serverOpen();
     await flush();
+    // 다시 연결을 시도하는 동안에도 마지막 자세는 그대로 있다 (로봇팔이 그 자세로 멈춰 있다)
+    expect(client.getStatus()).toBe('offline');
+    expect(client.jointBuffer.sample(Date.now())!.joints).toEqual([900]);
     send(1, '2026-10-13T05:00:10.000Z');
     expect(client.jointBuffer.sample(Date.now())!.joints).toEqual([1]);
   });

@@ -49,6 +49,7 @@ store ─► api, realtime, shared        api, realtime ─► shared (store를 
 
 - 단위: Vitest — 리듀서, 선택자, 권한 판단, 관절 보간, 끊김 감지 타이머.
 - 화면: React Testing Library — 권한별 버튼 표시, 연결 끊김 표시, 위험 조작 확인 단계.
+- 통합: `npm run test:integration` — 모의 서버를 `disconnect` 시나리오로 띄워 앱 전체를 붙이고 연결 끊김(15초 감지, 화면·조작·관절 값 정지, 명령 결과 조회, 복구 후 재동기화)을 약 1분간 점검한다. 오래 걸려 기본 `npm test`에는 넣지 않는다.
 - 실기기: 가장 낮은 사양 태블릿에서 30분 이상(2단계), 하루 이상(4단계) 구동. 프레임, 발열, 메모리, 재연결을 기록한다.
 
 ## 하지 말 것
