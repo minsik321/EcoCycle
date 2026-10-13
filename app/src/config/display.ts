@@ -1,4 +1,4 @@
-import type { DeviceId, DeviceStatus, Phase, RobotMode, RobotStatus } from '@ecocycle/shared';
+import type { DeviceId, DeviceStatus, Phase, RobotMode, RobotStatus, Role } from '@ecocycle/shared';
 
 // 표시용 문구·기호·형식. 상태 색은 styles/index.css의 토큰(--color-status-*)을 쓴다.
 // 상태 판정(status)은 서버가 하고 화면은 표시만 한다. 색만으로 구분하지 않도록 기호와 글자를 함께 쓴다.
@@ -39,6 +39,13 @@ export const ROBOT_STATUS_TONE: Record<RobotStatus, DeviceStatus> = {
 export const ROBOT_MODE_TEXT: Record<RobotMode, string> = {
   auto: '자동',
   manual: '수동',
+};
+
+// 권한 종류는 대표님과 확정 전이다 (docs/questions.md A4). 표시 이름만 둔다. 화면 분기에는 쓰지 않는다.
+export const ROLE_TEXT: Record<Role, string> = {
+  admin: '관리자',
+  operator: '작업자',
+  viewer: '열람자',
 };
 
 export const DEVICE_NAMES: Record<DeviceId, string> = {

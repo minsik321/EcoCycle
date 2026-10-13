@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import type { DeviceState, Me } from '@ecocycle/shared';
 import { connectionChanged, createAppStore, devicesReceived, loginUser } from '../store';
 
@@ -53,6 +54,8 @@ export interface StoreOptions {
   connection?: 'online' | 'offline' | 'connecting';
   lastReceivedAt?: string | null;
   devices?: DeviceState[];
+  /** 화면의 현재 주소 (기본 /) */
+  route?: string;
 }
 
 /** 로그인·연결·기기 상태가 정해진 store를 만든다 (서버 호출 없이 액션으로 바로 채운다) */
@@ -66,6 +69,10 @@ export function makeStore({ me = OPERATOR, connection = 'online', lastReceivedAt
 
 export function renderWithStore(ui: ReactElement, options: StoreOptions = {}) {
   const store = makeStore(options);
-  const utils = render(<Provider store={store}>{ui}</Provider>);
+  const utils = render(
+    <Provider store={store}>
+      <MemoryRouter initialEntries={[options.route ?? '/']}>{ui}</MemoryRouter>
+    </Provider>,
+  );
   return { store, ...utils };
 }
