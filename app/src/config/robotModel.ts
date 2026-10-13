@@ -19,10 +19,25 @@ export const DEFAULT_ROBOT_MODEL: RobotModel = {
 };
 
 /**
- * 관절별 회전축 (3D 장면용, 2단계에서 사용). 서버 모델에는 없는 앱 쪽 가정이다.
- * 관절 순서는 모델의 `joints` 순서와 같다.
+ * 관절별 3D 그리기 정의 (장면은 Y가 위). 서버 모델에는 없는 앱 쪽 가정이고 관절 순서는 모델의 `joints` 순서와 같다.
+ *   axis: 회전축, sign: 관절 값이 커질 때 도는 방향(1 또는 -1). 그릴 때 sign × (값 − 영점)도만큼 돈다.
+ * 기본값은 범용 6축: 밑동 좌우 회전(Y), 어깨·팔꿈치 앞뒤 기울기(Z), 손목1 비틀기(Y), 손목2 기울기(Z), 손목3 비틀기(Y).
+ * 어깨는 값이 커질수록 앞으로 기울고, 팔꿈치·손목2는 값이 커질수록 앞쪽 팔이 아래로 접힌다.
+ * 실제 로봇의 축 방향과 다르면(질문 B5) 이 표를 고친다.
  */
-export const DEFAULT_JOINT_AXES: ReadonlyArray<'x' | 'y' | 'z'> = ['z', 'y', 'y', 'x', 'y', 'x'];
+export interface JointRender {
+  axis: 'x' | 'y' | 'z';
+  sign: 1 | -1;
+}
+
+export const DEFAULT_JOINT_RENDER: readonly JointRender[] = [
+  { axis: 'y', sign: 1 },
+  { axis: 'z', sign: -1 },
+  { axis: 'z', sign: 1 },
+  { axis: 'y', sign: 1 },
+  { axis: 'z', sign: 1 },
+  { axis: 'y', sign: 1 },
+];
 
 /**
  * 서버가 준 모델로 기본값을 덮어쓴다. 서버 값이 없거나 축 수와 관절 목록이 맞지 않으면 기본값을 그대로 쓴다.

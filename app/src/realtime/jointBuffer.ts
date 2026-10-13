@@ -28,6 +28,11 @@ export interface JointBuffer {
    * 마지막 프레임보다 뒤이면 마지막 값을 그대로 유지한다(예측해서 움직이지 않는다). 비어 있으면 null.
    */
   sample(nowMs: number): JointSample | null;
+  /**
+   * sample과 같은 값을 받아 온 객체에 채워 넣는다(새 객체를 만들지 않는다). 3D 장면이 매 프레임 부른다.
+   * 비어 있으면 out을 건드리지 않고 false를 돌려준다.
+   */
+  sampleInto(nowMs: number, out: JointSample): boolean;
   /** 마지막 프레임을 받은 뒤 지난 시간(ms). 받은 적이 없으면 null */
   ageMs(nowMs: number): number | null;
   /**
@@ -38,13 +43,6 @@ export interface JointBuffer {
   /** 재연결·구독 해제 때 비운다. 서버가 다시 시작하면 seq가 처음으로 돌아가므로 새 연결마다 비워야 한다. */
   clear(): void;
 }
-
-const copySample = (f: JointSample): JointSample => ({
-  joints: [...f.joints],
-  gripper: { ...f.gripper },
-  phase: f.phase,
-  targetTankId: f.targetTankId,
-});
 
 export function createJointBuffer(options: { delaySec?: number } = {}): JointBuffer {
   const delayMs = (options.delaySec ?? JOINT_DELAY_SEC) * 1000;
@@ -58,6 +56,46 @@ export function createJointBuffer(options: { delaySec?: number } = {}): JointBuf
   let lastLagMs: number | null = null;
 
   const offset = () => minOffset;
+
+  /** a 프레임의 값을 out에 옮긴다. b가 있으면 관절 각도를 a→b 사이 k(0~1)로 보간한다. */
+  function write(out: JointSample, a: Frame, b: Frame | null, k: number): void {
+    const n = a.joints.length;
+    out.joints.length = n;
+    const blend = b !== null && b.joints.length === n;
+    for (let j = 0; j < n; j += 1) {
+      const v = a.joints[j]!;
+      out.joints[j] = blend ? v + (b.joints[j]! - v) * k : v;
+    }
+    out.gripper.closed = a.gripper.closed;
+    out.gripper.holding = a.gripper.holding;
+    out.phase = a.phase;
+    out.targetTankId = a.targetTankId;
+  }
+
+  function fill(nowMs: number, out: JointSample): boolean {
+    const first = frames[0];
+    const last = frames[frames.length - 1];
+    if (!first || !last) return false;
+
+    const target = nowMs - offset() - delayMs;
+    if (target <= first.serverMs) {
+      write(out, first, null, 0);
+      return true;
+    }
+    if (target >= last.serverMs) {
+      write(out, last, null, 0);
+      return true;
+    }
+    for (let i = 0; i < frames.length - 1; i += 1) {
+      const a = frames[i]!;
+      const b = frames[i + 1]!;
+      if (target < a.serverMs || target >= b.serverMs) continue;
+      write(out, a, b, (target - a.serverMs) / (b.serverMs - a.serverMs));
+      return true;
+    }
+    write(out, last, null, 0);
+    return true;
+  }
 
   return {
     push(message, receivedAtMs) {
@@ -86,27 +124,11 @@ export function createJointBuffer(options: { delaySec?: number } = {}): JointBuf
     },
 
     sample(nowMs) {
-      const first = frames[0];
-      const last = frames[frames.length - 1];
-      if (!first || !last) return null;
-
-      const target = nowMs - offset() - delayMs;
-      if (target <= first.serverMs) return copySample(first);
-      if (target >= last.serverMs) return copySample(last);
-
-      for (let i = 0; i < frames.length - 1; i += 1) {
-        const a = frames[i]!;
-        const b = frames[i + 1]!;
-        if (target < a.serverMs || target >= b.serverMs) continue;
-        const sample = copySample(a);
-        if (a.joints.length === b.joints.length) {
-          const k = (target - a.serverMs) / (b.serverMs - a.serverMs);
-          sample.joints = a.joints.map((v, j) => v + (b.joints[j]! - v) * k);
-        }
-        return sample;
-      }
-      return copySample(last);
+      const out: JointSample = { joints: [], gripper: { closed: false, holding: false }, phase: 'idle', targetTankId: null };
+      return fill(nowMs, out) ? out : null;
     },
+
+    sampleInto: (nowMs, out) => fill(nowMs, out),
 
     ageMs(nowMs) {
       return lastReceivedMs === null ? null : nowMs - lastReceivedMs;

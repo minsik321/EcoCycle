@@ -6,7 +6,7 @@ import commands from './slices/commands';
 import connection from './slices/connection';
 import devices from './slices/devices';
 import plant from './slices/plant';
-import ui, { saveQualityMode } from './slices/ui';
+import ui, { saveHomeView, saveQualityMode } from './slices/ui';
 
 const appReducer = combineReducers({ auth, plant, devices, alarms, connection, commands, ui });
 
@@ -21,13 +21,18 @@ export function createAppStore() {
     reducer: rootReducer,
     middleware: (getDefault) => getDefault({ serializableCheck: true, immutableCheck: true }),
   });
-  // 화질 모드가 바뀌면 기기에 기억해 둔다
+  // 화질 모드와 홈 표시 모드가 바뀌면 기기에 기억해 둔다
   let savedMode = store.getState().ui.qualityMode;
+  let savedView = store.getState().ui.homeView;
   store.subscribe(() => {
-    const mode = store.getState().ui.qualityMode;
-    if (mode !== savedMode) {
-      savedMode = mode;
-      saveQualityMode(mode);
+    const { qualityMode, homeView } = store.getState().ui;
+    if (qualityMode !== savedMode) {
+      savedMode = qualityMode;
+      saveQualityMode(qualityMode);
+    }
+    if (homeView !== savedView) {
+      savedView = homeView;
+      saveHomeView(homeView);
     }
   });
   return store;

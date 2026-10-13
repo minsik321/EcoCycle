@@ -1,24 +1,32 @@
 # app/src/scene — 홈 3D 장면 (react-three-fiber)
 
 밝은 저폴리 아이소메트릭 장면이다. **화려한 연출이 아니라 저사양 태블릿에서 끊김 없이 도는 것**이 목표다.
-2단계(3D 홈 시안)에서 시작한다. 1단계는 2D 홈으로 먼저 완성한다.
+2단계(3D 홈 시안)에서 만들었다. 실제 태블릿 측정은 `/scene-demo`(features/home/SceneDemoPage)로 한다.
 
 ## 장면 구성 (명세 1절)
 
 벽 한쪽을 잘라낸 방 안에 탱크 4개(A1, A2, B1, B2), 중앙 로봇팔, 로봇 옆에서 압축기까지 이어지는 긴 컨베이어 하나(Section Z), 압축기.
 위치·카메라 프리셋은 `config/sceneLayout.ts`에서 읽는다.
 
-## 예정 구조
+## 구조
 
 ```
 scene/
-├── HomeScene.tsx       Canvas, 조명, frameloop 제어, 화질 모드 적용
-├── camera/             고정 아이소메트릭 카메라, 기기별 프리셋으로 부드럽게 이동
-├── objects/            Room, Tank(수위 → 파지 조각 수), Conveyor, Compressor, RobotArm
-├── robot/              JointSource 인터페이스와 구현: fixed(정지), demo(정해진 동작), progress(단계+진행률), live(jointBuffer)
-├── pins/               기기 핀과 탭 처리 → ui.selectedDevice
-└── materials.ts        공용 불투명 재질 몇 개(재사용)
+├── HomeScene.tsx       Canvas(직교 카메라, frameloop="demand"), 조명, 화질 모드 적용. 데이터는 모두 props
+├── frame.tsx           FrameDriver: 움직임이 있을 때만, 초당 maxFps번까지만 그리기를 요청. paused면 요청하지 않음
+├── stats.ts            그린 횟수(프레임 측정용). 3D 라이브러리를 import하지 않는다
+├── layout.ts           설정값 → 장면 좌표 (탱크 위치, 핀·카메라 기준점, 전체 보기 확대)
+├── materials.ts        공용 불투명 재질·지오메트리, 바닥 그림자 텍스처(미리 그림)
+├── camera/CameraRig    고정 아이소메트릭 카메라, 기기별 위치로 부드럽게 이동
+├── objects/            Room, Tank(수위 → 파지 조각 수), Conveyor, Compressor, RobotArm, chunks(조각 자리 계산)
+├── robot/              chain(관절 사슬 정의, three 미사용), kinematics(끝점 위치), jointSource(fixed·demo·live)
+├── pins/PinProjector   기기 위치를 화면 좌표로 바꿔 HTML 핀(features/home/ScenePins)에 써 넣음
+├── scene.logic.test.ts     계산 로직 테스트
+└── scene.objects.test.tsx  RobotArm·Tank를 그래픽 없이 만들어 보는 테스트
 ```
+
+- 처음 화면 묶음에 3D 라이브러리가 딸려 오지 않게 한다: `features`가 정적으로 import해도 되는 것은 `stats.ts`, `robot/chain.ts`, `robot/jointSource.ts`와 타입뿐이다. 나머지는 `HomeScene`을 lazy로 불러올 때 함께 온다. 고친 뒤 `npm run build`로 메인 묶음 크기를 확인한다.
+- `JointSource`의 progress(단계+진행률) 방식은 아직 없다. 서버가 진행률을 주는 형식이 명세에 없어서다(`docs/decisions.md`).
 
 ## 성능 원칙 (명세 4절, 반드시 지킬 것)
 
@@ -39,7 +47,7 @@ scene/
 - `RobotArm`은 **입력과 분리**한다: `JointSource`에서 관절 각도·그리퍼를 받아 그리기만 한다. 입력을 바꿔도 그리기 코드는 그대로.
 - 링크 길이·축 방향·영점·각도 범위는 `config/robotModel`(서버 `/robots/{id}/model`로 덮어씀)에서.
 - 관절 값은 `useFrame`에서 `realtime/jointBuffer.sample()`로 읽는다. Redux 구독으로 받지 않는다.
-- 연결 끊김(`connection.status === 'offline'`)이면 팔을 마지막 자세에서 멈추고 끊김 표시를 띄운다. 추측으로 움직이지 않는다.
+- 연결 끊김(`connection.status === 'offline'`)이면 팔을 마지막 자세에서 멈추고 끊김 표시를 띄운다. 추측으로 움직이지 않는다. `RobotArm`은 `frozen`이면 다시 그려지더라도(카메라 이동 등) 관절 값을 새로 읽지 않는다.
 - 후퇴 순서: live → progress → demo. demo는 실제와 어긋날 수 있으니 화면에 "시연 동작"임을 표시한다.
 
 ## 기타

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { RobotModel } from '@ecocycle/shared';
-import { DEFAULT_JOINT_AXES, DEFAULT_ROBOT_MODEL, mergeRobotModel } from './robotModel';
+import { DEFAULT_JOINT_RENDER, DEFAULT_ROBOT_MODEL, mergeRobotModel } from './robotModel';
 
 describe('robotModel', () => {
   it('기본 모델은 6축이고 관절 수·링크·회전축이 서로 맞다', () => {
     expect(DEFAULT_ROBOT_MODEL.axisCount).toBe(6);
     expect(DEFAULT_ROBOT_MODEL.joints).toHaveLength(6);
-    expect(DEFAULT_JOINT_AXES).toHaveLength(DEFAULT_ROBOT_MODEL.axisCount);
+    expect(DEFAULT_JOINT_RENDER).toHaveLength(DEFAULT_ROBOT_MODEL.axisCount);
     for (const j of DEFAULT_ROBOT_MODEL.joints) expect(j.minDeg).toBeLessThan(j.maxDeg);
   });
 

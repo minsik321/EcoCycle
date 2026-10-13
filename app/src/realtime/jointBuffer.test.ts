@@ -128,3 +128,33 @@ describe('jointBuffer', () => {
     expect(b.ageMs(T0 + 1234)).toBe(1234);
   });
 });
+
+describe('sampleInto (매 프레임용: 새 객체를 만들지 않는다)', () => {
+  it('sample과 같은 값을 받아 온 객체에 채우고, 같은 배열을 다시 쓴다', () => {
+    const b = createJointBuffer({ delaySec: 0.15 });
+    b.push(frame(1, 0, [0, 100], { phase: 'pick' }), T0);
+    b.push(frame(2, 100, [10, 90], { phase: 'move', gripper: { closed: true, holding: true } }), T0 + 100);
+
+    const out = { joints: [9, 9, 9, 9], gripper: { closed: false, holding: false }, phase: 'idle' as const, targetTankId: null };
+    const jointsArray = out.joints;
+    const gripperObject = out.gripper;
+
+    expect(b.sampleInto(T0 + 200, out)).toBe(true);
+    expect(out.joints).toEqual(b.sample(T0 + 200)!.joints);
+    expect(out.joints).toEqual([5, 95]);
+    expect(out.joints).toBe(jointsArray); // 배열을 새로 만들지 않았다
+    expect(out.gripper).toBe(gripperObject);
+    expect(out.phase).toBe('pick');
+
+    expect(b.sampleInto(T0 + 5000, out)).toBe(true);
+    expect(out.joints).toEqual([10, 90]);
+    expect(out.gripper.holding).toBe(true);
+  });
+
+  it('비어 있으면 out을 건드리지 않고 false를 돌려준다', () => {
+    const out = { joints: [1, 2], gripper: { closed: true, holding: true }, phase: 'move' as const, targetTankId: 'tank-a1' as const };
+    expect(createJointBuffer().sampleInto(T0, out)).toBe(false);
+    expect(out.joints).toEqual([1, 2]);
+    expect(out.phase).toBe('move');
+  });
+});
