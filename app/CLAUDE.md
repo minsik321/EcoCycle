@@ -25,9 +25,10 @@ app/
 ```
 features ─► components ─► (store, api 훅)
 features/home ─► scene ─► config, realtime(jointBuffer), store(선택자)
-api, realtime ─► store, shared        store ─► shared
+store ─► api, realtime, shared        api, realtime ─► shared (store를 import하지 않는다)
 ```
 
+- `api`·`realtime`은 값을 콜백(`setAuthLostHandler`)과 `RealtimeSink`로 내보내고, `store`가 이를 구현해 연결한다 (`docs/decisions.md`).
 - `scene`은 `features`를 import하지 않는다. `api`·`realtime`은 React 컴포넌트를 import하지 않는다.
 - 서버 주소·모의 여부는 `config/env.ts`에서만 읽는다(`import.meta.env`를 여기저기서 읽지 않는다).
 

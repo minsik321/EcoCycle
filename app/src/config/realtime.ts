@@ -18,3 +18,9 @@ export const STORE_BATCH_MS = 250;
 
 /** 로봇 관절 값을 구독하는 화면: 홈과 로봇 확대 화면에 있을 때만 구독하고 나머지에서는 해제한다. */
 export const JOINT_SUBSCRIBE_VIEWS = ['home', 'robotZoom'] as const;
+
+/** 명령을 보낸 뒤 WebSocket `command.result`를 이 시간 안에 못 받으면 GET /commands/{id}로 조회하기 시작한다 (ms) */
+export const COMMAND_RESULT_WAIT_MS = 5_000;
+/** 조회 간격과, 결과가 안 나올 때 포기하는 시간 (ms). 수동 집기처럼 오래 걸리는 명령도 있다. */
+export const COMMAND_POLL_INTERVAL_MS = 2_000;
+export const COMMAND_POLL_GIVE_UP_MS = 60_000;

@@ -30,6 +30,11 @@ export interface JointBuffer {
   sample(nowMs: number): JointSample | null;
   /** 마지막 프레임을 받은 뒤 지난 시간(ms). 받은 적이 없으면 null */
   ageMs(nowMs: number): number | null;
+  /**
+   * 마지막 프레임이 가장 빨리 온 경우보다 얼마나 늦게 왔는지(ms, 서버 `ts`와 받은 시각으로 계산). 받은 적이 없으면 null.
+   * 지연이 재생 지연(기본 150ms)보다 크게 늘어나면 보간 대신 멈칫할 수 있어 진단에 쓴다.
+   */
+  lagMs(): number | null;
   /** 재연결·구독 해제 때 비운다. 서버가 다시 시작하면 seq가 처음으로 돌아가므로 새 연결마다 비워야 한다. */
   clear(): void;
 }
@@ -48,8 +53,11 @@ export function createJointBuffer(options: { delaySec?: number } = {}): JointBuf
   let lastReceivedMs: number | null = null;
   // 서버와 내 시계가 다르므로 (받은 시각 - 서버 시각)의 최솟값으로 가장 빨리 온 경우의 차이를 추정한다.
   let offsets: number[] = [];
+  // 매 프레임(30fps)마다 sample을 부르므로 최솟값은 push할 때 한 번만 계산해 둔다
+  let minOffset = 0;
+  let lastLagMs: number | null = null;
 
-  const offset = () => (offsets.length > 0 ? Math.min(...offsets) : 0);
+  const offset = () => minOffset;
 
   return {
     push(message, receivedAtMs) {
@@ -60,8 +68,11 @@ export function createJointBuffer(options: { delaySec?: number } = {}): JointBuf
 
       lastSeq = message.seq;
       lastReceivedMs = receivedAtMs;
-      offsets.push(receivedAtMs - serverMs);
+      const thisOffset = receivedAtMs - serverMs;
+      offsets.push(thisOffset);
       if (offsets.length > OFFSET_WINDOW) offsets.shift();
+      minOffset = Math.min(...offsets);
+      lastLagMs = thisOffset - minOffset;
 
       frames.push({
         serverMs,
@@ -101,9 +112,13 @@ export function createJointBuffer(options: { delaySec?: number } = {}): JointBuf
       return lastReceivedMs === null ? null : nowMs - lastReceivedMs;
     },
 
+    lagMs: () => lastLagMs,
+
     clear() {
       frames = [];
       offsets = [];
+      minOffset = 0;
+      lastLagMs = null;
       lastSeq = -Infinity;
       lastReceivedMs = null;
     },

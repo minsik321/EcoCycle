@@ -107,6 +107,21 @@ describe('jointBuffer', () => {
     expect(b.push(frame(1, 5000, [2]), T0 + 5000)).toBe(true);
   });
 
+  it('서버 ts로 가장 빨리 온 경우보다 얼마나 늦었는지(지연)를 알려 준다', () => {
+    const b = make();
+    expect(b.lagMs()).toBeNull();
+    b.push(frame(1, 0, [0]), T0 + 30); // 기준: 30ms
+    expect(b.lagMs()).toBe(0);
+    b.push(frame(2, 100, [1]), T0 + 100 + 30); // 같은 속도
+    expect(b.lagMs()).toBe(0);
+    b.push(frame(3, 200, [2]), T0 + 200 + 130); // 100ms 늦게 도착
+    expect(b.lagMs()).toBe(100);
+    b.push(frame(4, 300, [3]), T0 + 300 + 10); // 더 빨리 온 경우가 생기면 기준이 바뀐다
+    expect(b.lagMs()).toBe(0);
+    b.clear();
+    expect(b.lagMs()).toBeNull();
+  });
+
   it('마지막 수신 뒤 지난 시간을 알려 준다', () => {
     const b = make();
     b.push(frame(1, 0, [1]), T0);
