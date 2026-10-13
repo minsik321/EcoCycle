@@ -98,7 +98,7 @@ function spawnVehicle(now: number): void {
   if (activeRuns.length >= 2) return;
   if (activeRuns.some((r) => r.vehicle.stage === 'arrived' || r.vehicle.stage === 'identified')) return;
   const busy = new Set(activeRuns.map((r) => r.company.sectorId));
-  const candidates = COMPANIES.filter((c) => !busy.has(c.sectorId) && tank(c.sectorId).fillPercent < 70);
+  const candidates = COMPANIES.filter((c) => !busy.has(c.sectorId) && tank(c.sectorId).fillPercent < 60);
   if (candidates.length === 0) return;
   const lowest = Math.min(...candidates.map((c) => tank(c.sectorId).fillPercent));
   const company = pick(candidates.filter((c) => tank(c.sectorId).fillPercent === lowest));

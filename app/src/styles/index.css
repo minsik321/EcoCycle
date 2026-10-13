@@ -1,12 +1,56 @@
 @import "tailwindcss";
+/* 글꼴은 Pretendard 하나만 쓴다. 필요한 글자 묶음만 내려받는 동적 서브셋 파일을 styles/fonts에 넣어 두어 오프라인(APK)에서도 동작한다 (OFL 라이선스). */
+@import "./fonts/pretendard/pretendard.css";
 
-/* 상태 색 토큰: 앱 전체에서 normal / caution / alarm / offline 네 가지만 쓴다.
-   색만으로 구분하지 않도록 화면에서는 아이콘·글자를 함께 쓴다. */
+/*
+ * 디자인 토큰 — 색·모서리·그림자·글꼴은 여기 한 곳에서만 정한다.
+ * 화면 코드는 이 토큰으로 만든 Tailwind 클래스(bg-paper, text-ink, rounded-card, shadow-soft-2 …)와
+ * 공용 컴포넌트(components/)를 쓰고, 임의의 색·그림자 값을 직접 적지 않는다.
+ *
+ * 글자 크기: 본문 text-base(16px), 보조 text-sm, 주석 text-xs, 화면 제목 text-xl, 지표 숫자 text-3xl.
+ * 간격: Tailwind 기본 4px 단위. 패널 안쪽 p-4, 패널 사이 gap-3, 화면 가장자리 p-4.
+ */
 @theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Noto Sans KR", "Malgun Gothic", sans-serif;
+
+  /* 바탕: 따뜻한 미색. 강조색은 파랑 하나만 쓴다. */
+  --color-paper: #f6f4ef;
+  --color-paper-deep: #ece8df;
+  --color-surface: #ffffff;
+  --color-line: #e4dfd4;
+  --color-ink: #1f2430;
+  --color-ink-soft: #586173;
+  --color-ink-faint: #8a92a1;
+
+  --color-accent: #2563eb;
+  --color-accent-strong: #1d4ed8;
+  --color-accent-soft: #e6eefe;
+
+  /* 장면과 맞춘 보조색: 파지(크라프트), 로봇·지게차(안전 노랑) */
+  --color-kraft: #c9a26b;
+  --color-kraft-soft: #f3e9d8;
+  --color-safety: #f5b301;
+
+  /* 상태 색: 앱 전체에서 normal / caution / alarm / offline 네 가지만 쓴다.
+     뜻이 있는 색이라 강조색과 섞어 쓰지 않는다. 색만으로 구분하지 않도록 화면에서는 기호·글자를 함께 쓴다. */
   --color-status-normal: #2e7d32;
   --color-status-caution: #b26a00;
   --color-status-alarm: #c62828;
   --color-status-offline: #616161;
+  --color-status-normal-soft: #e7f4e8;
+  --color-status-caution-soft: #fdf1dc;
+  --color-status-alarm-soft: #fde8e8;
+  --color-status-offline-soft: #eeeeee;
+
+  /* 모서리 */
+  --radius-control: 0.75rem;
+  --radius-card: 1.125rem;
+  --radius-panel: 1.5rem;
+
+  /* 부드러운 그림자 3단계: 1 카드, 2 떠 있는 패널, 3 대화상자·알림 */
+  --shadow-soft-1: 0 1px 2px rgb(31 36 48 / 0.04), 0 4px 12px rgb(31 36 48 / 0.05);
+  --shadow-soft-2: 0 2px 4px rgb(31 36 48 / 0.05), 0 12px 28px rgb(31 36 48 / 0.1);
+  --shadow-soft-3: 0 4px 8px rgb(31 36 48 / 0.06), 0 24px 56px rgb(31 36 48 / 0.18);
 }
 
 html,
@@ -17,7 +61,48 @@ body,
 
 body {
   margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  -webkit-font-smoothing: antialiased;
+  /* 숫자가 바뀔 때 폭이 흔들리지 않게 */
+  font-variant-numeric: tabular-nums;
   /* 터치 기기: 더블탭 확대·당겨서 새로고침으로 화면이 튀지 않게 */
   touch-action: manipulation;
   overscroll-behavior: none;
+}
+
+/*
+ * 유리 패널. 화질 단계(html의 data-quality)에 따라 달라진다.
+ *   high      모든 패널이 블러 유리
+ *   standard  주요 패널(.glass)만 블러, 보조 패널(.glass-minor)은 단색
+ *   low       블러 없음 — 흰 단색 + 그림자 (저사양 태블릿에서도 읽기 쉬워야 한다)
+ * backdrop-filter를 지원하지 않는 브라우저도 단색으로 떨어진다.
+ */
+/* 컴포넌트 층에 둔다: 유틸리티 클래스(상태 띠 색 등)가 이 규칙을 덮을 수 있어야 한다 */
+@layer components {
+  .glass,
+  .glass-minor {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    box-shadow: var(--shadow-soft-2);
+  }
+
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root[data-quality="high"] .glass,
+    :root[data-quality="high"] .glass-minor,
+    :root[data-quality="standard"] .glass {
+      background: rgb(255 255 255 / 0.68);
+      border-color: rgb(255 255 255 / 0.7);
+      -webkit-backdrop-filter: blur(18px) saturate(1.5);
+      backdrop-filter: blur(18px) saturate(1.5);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

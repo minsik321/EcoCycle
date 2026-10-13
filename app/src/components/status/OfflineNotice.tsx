@@ -13,13 +13,13 @@ export function OfflineNotice({ className = '' }: { className?: string }) {
 
   if (status === 'connecting') {
     return (
-      <div role="status" className={`rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm text-slate-700 ${className}`}>
+      <div role="status" className={`rounded-control border border-line bg-surface px-4 py-2 text-sm text-ink-soft shadow-soft-1 ${className}`}>
         서버에 연결하는 중…
       </div>
     );
   }
   return (
-    <div role="alert" className={`flex flex-wrap items-center gap-x-3 rounded-lg border-2 px-4 py-2 text-base font-semibold ${TONE_CLASS.offline} ${className}`}>
+    <div role="alert" className={`flex flex-wrap items-center gap-x-3 rounded-control border-2 px-4 py-2 shadow-soft-1 text-base font-semibold ${TONE_CLASS.offline} ${className}`}>
       <span aria-hidden="true">–</span>
       <span>연결 끊김</span>
       <span className="font-normal">

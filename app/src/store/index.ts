@@ -22,14 +22,16 @@ export function createAppStore() {
     reducer: rootReducer,
     middleware: (getDefault) => getDefault({ serializableCheck: true, immutableCheck: true }),
   });
-  // 화질 모드와 홈 표시 모드가 바뀌면 기기에 기억해 둔다
+  // 화질 단계와 홈 표시 모드가 바뀌면 기기에 기억해 둔다 (자동으로 고르는 중이면 기억한 값을 지운다)
   let savedMode = store.getState().ui.qualityMode;
+  let savedAuto = store.getState().ui.qualityAuto;
   let savedView = store.getState().ui.homeView;
   store.subscribe(() => {
-    const { qualityMode, homeView } = store.getState().ui;
-    if (qualityMode !== savedMode) {
+    const { qualityMode, qualityAuto, homeView } = store.getState().ui;
+    if (qualityMode !== savedMode || qualityAuto !== savedAuto) {
       savedMode = qualityMode;
-      saveQualityMode(qualityMode);
+      savedAuto = qualityAuto;
+      saveQualityMode(qualityAuto ? null : qualityMode);
     }
     if (homeView !== savedView) {
       savedView = homeView;

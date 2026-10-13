@@ -11,10 +11,10 @@
 | `env.ts` | `API_BASE`, `WS_BASE`, `USE_MOCK` — `import.meta.env`를 읽는 유일한 곳 | 실서버 연동(3단계) |
 | `robotModel.ts` | 범용 6축 로봇팔 기본값: 관절 순서, 링크 길이, 축 방향, 각도 범위, 영점, 단위 | 로봇 기종 확정 시 `/robots/{id}/model` 값으로 덮어씀 |
 | `sceneLayout.ts` | 방·로봇팔·컨베이어 Section Z·압축기 위치와 치수, 탱크가 놓이는 관절 각도(`TANK_BASE_DEG`), 시연 동작 주기, 카메라 방향·기기별 확대 배율, 핀 높이 | 장면 구성 변경 |
-| `quality.ts` | 화질 모드(기본/저사양): 최대 fps, 해상도 배율, 계단 현상 줄이기, 탱크 안 파지 조각 수 상한, 벨트 판 수 | 실기기 테스트 결과 |
+| `quality.ts` | 화질 3단계(high/standard/low): 최대 fps, 해상도 배율, 그림자 방식, 빛 번짐, 패널 블러, 소품 수준, 파지 조각 수 상한, 자동 선택 기준(`tierFromProbe`) | 실기기 테스트 결과 |
 | `controls.ts` | 화면에 보일 조작 목록과 위치(홈/기기 페이지) — 위험도·권한 표는 `shared/commands.ts`를 참조 | 대표님 조작 목록 확정 |
 | `display.ts` | 상태 문구·기호, 표시 형식(소수점 자리, 단위 표기), 기기 표시 이름, 단계 바 구성 (색 토큰은 `styles/index.css`) | 디자인 피드백 |
-| `navigation.ts` | 사이드바 메뉴와 메뉴별 필요 권한(`requires`) | 대표님 권한별 화면 확정 |
+| `navigation.ts` | 사이드바 메뉴와 메뉴별 필요 권한(`requires`), 여백 없이 가득 쓰는 화면(`fullBleed`) | 대표님 권한별 화면 확정 |
 | `realtime.ts` | 끊김 감지 15초, 관절 지연 버퍼 0.15초, store 반영 묶음 주기 | 실서버 특성 |
 
 ## 규칙

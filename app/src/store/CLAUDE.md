@@ -13,6 +13,8 @@ store/
 ├── realtimeSink.ts     realtime → store 연결, resync(REST로 요약·기기·열린 알람·공정 흐름 재동기화)
 ├── realtimeClient.ts   앱 전체에 하나뿐인 실시간 연결, 관절 값 구독 요청(acquireJoints), getJointBuffer
 ├── useRealtime.ts      useRealtime(앱 최상단), useRobotJointsSubscription(홈·로봇 확대 화면)
+├── useQualityTier.ts   앱 최상단: 화질 단계를 html의 data-quality에 적고, 고른 적이 없으면 qualityProbe로 재서 자동 선택
+├── qualityProbe.ts     짧은 프레임 측정(3D 라이브러리 없이 작은 캔버스로)
 └── bootstrap.ts        initApp: 세션 상실 핸들러 연결, 저장된 세션 복원
 ```
 
@@ -25,7 +27,7 @@ store/
 | `alarms` | 활성 알람 목록, 확인 처리 상태 |
 | `connection` | `online / connecting / offline`, 마지막 수신 시각 |
 | `commands` | 보낸 명령(Idempotency-Key로 구분), 상태(sending/accepted/rejected/completed/failed/unknown), 이유, HTTP 오류 코드 — 홈에서도 결과 표시. `sendDeviceCommand`가 WebSocket 결과를 기다리다 5초 뒤부터 조회한다 |
-| `ui` | 선택된 기기(확대 대상), CCTV 열림 여부, 화질 모드 |
+| `ui` | 선택된 기기(확대 대상), CCTV 열림 여부, 화질 단계(`qualityMode`)와 자동 선택 여부(`qualityAuto`), 홈 표시 모드 |
 
 ## 규칙
 

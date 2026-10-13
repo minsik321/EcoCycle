@@ -15,6 +15,8 @@ export interface NavItem {
   whenDenied?: 'hide' | 'disable';
   /** 메뉴 옆에 숫자 배지를 붙일 값. activeAlarms: 활성 알람 수 */
   badge?: 'activeAlarms';
+  /** 화면을 여백 없이 가득 쓴다 (3D 화면 위에 패널을 띄우는 홈) */
+  fullBleed?: boolean;
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -53,4 +55,9 @@ export function devicePagePath(id: DeviceId): string {
     case 'compressor':
       return '/compressor';
   }
+}
+
+/** 이 주소의 화면이 여백 없이 가득 쓰는 화면인가 */
+export function isFullBleedPath(pathname: string, items: readonly NavItem[] = NAV_ITEMS): boolean {
+  return items.some((item) => item.fullBleed === true && item.path === pathname);
 }

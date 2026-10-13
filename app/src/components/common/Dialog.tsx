@@ -61,7 +61,7 @@ export function Dialog({ open, title, onClose, dismissible = true, children, act
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && dismissible) onClose();
       }}
@@ -73,12 +73,12 @@ export function Dialog({ open, title, onClose, dismissible = true, children, act
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className={`w-full ${size === 'xl' ? 'max-w-4xl' : 'max-w-md'} rounded-xl bg-white p-5 shadow-xl outline-none`}
+        className={`w-full ${size === 'xl' ? 'max-w-4xl' : 'max-w-md'} rounded-panel bg-surface p-6 shadow-soft-3 outline-none`}
       >
-        <h2 id={titleId} className="mb-2 text-lg font-semibold text-slate-900">
+        <h2 id={titleId} className="mb-2 text-lg font-bold text-ink">
           {title}
         </h2>
-        <div className="text-base text-slate-700">{children}</div>
+        <div className="text-base text-ink-soft">{children}</div>
         {actions && <div className="mt-5 flex justify-end gap-3">{actions}</div>}
       </div>
     </div>,

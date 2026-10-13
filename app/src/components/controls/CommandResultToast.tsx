@@ -5,7 +5,7 @@ import { DEVICE_NAMES } from '../../config/display';
 import { useAppSelector } from '../../store/hooks';
 import { selectRecentCommands } from '../../store/selectors';
 import type { CommandEntry, CommandEntryStatus } from '../../store';
-import { Button } from '../common/Button';
+import { ToastCard } from '../common/ToastCard';
 import { StatusBadge } from '../status/StatusBadge';
 
 /** 끝난 결과를 보여 주는 시간(ms). 오류·거부는 읽을 시간이 필요해서 더 길게 둔다. */
@@ -61,21 +61,19 @@ export function CommandResultToast({ className = '' }: { className?: string }) {
 function Toast({ entry, onDismiss }: { entry: CommandEntry; onDismiss: () => void }) {
   const view = VIEW[entry.status];
   return (
-    <div role="status" className="pointer-events-auto flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-slate-900">
+    <ToastCard
+      tone={view.tone}
+      title={
+        <>
+          <span>
             {DEVICE_NAMES[entry.deviceId]} · {CONTROL_TEXT[entry.type].label}
           </span>
           <StatusBadge status={view.tone} symbol={view.symbol} label={view.text} size="sm" />
-        </div>
-        {entry.reason && <p className="text-sm text-slate-700">{entry.reason}</p>}
-      </div>
-      {!isPending(entry.status) && (
-        <Button variant="quiet" onClick={onDismiss} aria-label="알림 닫기" className="px-2">
-          ✕
-        </Button>
-      )}
-    </div>
+        </>
+      }
+      {...(isPending(entry.status) ? {} : { onDismiss })}
+    >
+      {entry.reason}
+    </ToastCard>
   );
 }

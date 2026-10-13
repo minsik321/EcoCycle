@@ -107,7 +107,7 @@ npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 
 ```bash
 # Vercel: 프로젝트 루트 폴더 app, 빌드 npm run build, 출력 dist
-#   환경 변수: VITE_USE_MOCK=false, VITE_API_BASE=https://<render주소>/api/v1, VITE_WS_BASE=wss://<render주소>/ws/v1/stream
+#   환경 변수: VITE_USE_MOCK=true(값이 모의 서버에서 오는 동안 "예시 데이터" 표시, 실서버로 바꾸면 false), VITE_API_BASE=https://<render주소>/api/v1, VITE_WS_BASE=wss://<render주소>/ws/v1/stream
 # Render: 루트에서 npm install 후 mock-server 빌드·실행 (shared 함께 설치)
 #   환경 변수: CORS_ORIGINS=https://<vercel주소>
 # APK 단계(예정): build:android → app 빌드 → cap sync android → Android Studio/Gradle로 APK

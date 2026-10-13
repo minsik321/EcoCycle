@@ -6,6 +6,7 @@ import { AlarmsPage } from './features/alarms';
 import { CctvButton, CctvOverlay } from './features/cctv';
 import { CompressorPage } from './features/compressor';
 import { ConveyorPage } from './features/conveyor';
+import { DesignPage } from './features/design/DesignPage';
 import { HomePage, SceneDemoPage } from './features/home';
 import { RobotPage } from './features/robot';
 import { SettingsPage } from './features/settings';
@@ -30,6 +31,8 @@ export default function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       {/* 서버·로그인 없이 3D 장면만 보여 주는 시연·측정 페이지 (값은 모두 가짜) */}
       <Route path="/scene-demo" element={<SceneDemoPage />} />
+      {/* 디자인 토큰과 공용 컴포넌트 미리 보기 (개발용, 값은 모두 예시) */}
+      <Route path="/design" element={<DesignPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell headerExtra={<CctvButton />} overlays={<CctvOverlay />} />}>
           {NAV_ITEMS.filter((item) => !IMPLEMENTED.has(item.id)).map((item) => (

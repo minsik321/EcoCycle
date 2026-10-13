@@ -10,9 +10,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 // 터치 대상은 최소 48px. 호버에 의존하지 않는다.
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: 'bg-slate-800 text-white border-slate-800 active:bg-slate-900 disabled:bg-slate-300 disabled:border-slate-300',
-  secondary: 'bg-white text-slate-900 border-slate-400 active:bg-slate-100 disabled:text-slate-400 disabled:border-slate-300',
-  quiet: 'bg-transparent text-slate-800 border-transparent active:bg-slate-100 disabled:text-slate-400',
+  primary: 'bg-accent text-white border-accent shadow-soft-1 active:bg-accent-strong disabled:bg-ink-faint/50 disabled:border-transparent disabled:shadow-none',
+  secondary: 'bg-surface text-ink border-line shadow-soft-1 active:bg-paper-deep disabled:text-ink-faint disabled:shadow-none',
+  quiet: 'bg-transparent text-ink border-transparent active:bg-paper-deep disabled:text-ink-faint',
 };
 
 export function Button({ variant = 'secondary', loading = false, disabled, className = '', children, type, ...rest }: ButtonProps) {
@@ -21,7 +21,7 @@ export function Button({ variant = 'secondary', loading = false, disabled, class
       type={type ?? 'button'}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex min-h-12 min-w-12 items-center justify-center gap-2 rounded-lg border px-4 text-base font-medium select-none disabled:cursor-not-allowed ${VARIANT[variant]} ${className}`}
+      className={`inline-flex min-h-12 min-w-12 items-center justify-center gap-2 rounded-control border px-4 text-base font-semibold select-none disabled:cursor-not-allowed ${VARIANT[variant]} ${className}`}
       {...rest}
     >
       {loading && <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />}
