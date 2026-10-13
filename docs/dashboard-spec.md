@@ -288,6 +288,96 @@ Oct 13, 2026 · @민식
 
 영상 변환은 서버 쪽 작업이고 프론트는 발급받은 주소를 `<video>`로 재생하기만 한다. 영상 주소도 로그인 검증을 거친 사용자에게만 발급해야 한다. 로봇 조작과 함께 볼 때는 지연이 짧은 WebRTC를 쓰고 HLS는 수 초 지연이 있어 참고용으로만 쓴다.
 
+### 공정 흐름 (제안안 · 승인 전 · 2026-10-13)
+
+> 이 절은 홈 3D 재설계(입고 → 차량 인식 → 하역 → 배합 → 압축 → 출하)를 위한 **제안안**이다. 사용자 승인 전이며 `shared/` 타입·모의 서버·앱에는 아직 반영하지 않았다. 서버 담당과 합의된 내용도 아니다.
+
+원칙은 세 가지다.
+
+1. 번호판 → 회사, 회사 → 섹터 배정, 섹터 등급·수분, 배합비, 압축 압력은 모두 서버가 정한다. 프론트에는 이 값들을 정하는 로직이 없고 받은 값을 표시하고 움직임으로 옮기기만 한다.
+2. 사건(event)만 흘리지 않고 **대상 전체 상태를 보낸다**(`device.state`와 같은 방식). 차량·배치·베일마다 `stage`가 바뀔 때 그 대상의 전체 값을 다시 보내므로, 메시지를 하나 놓쳐도 다음 메시지나 조회로 맞춰진다. 연결 복구 뒤에는 `GET /process/state` 한 번으로 현재 상태를 받는다.
+3. 무게 필드는 없다. 계중대에서는 "계량 중·완료" 같은 진행 표시만 하고 숫자는 보여 주지 않는다(대표님 확인 전까지).
+
+| 메서드와 경로 | 설명 |
+| --- | --- |
+| GET `/process/state` | 공정 흐름 현재 상태: 진행 중인 차량·배치·베일과 최근 목록(표·검색용, 종류별 최근 20건 가정) |
+| GET `/plant/history?metric=...&from=...&to=...&interval=...` | 요약 값의 이력(지표 카드의 작은 추이선용). 응답은 기기 이력과 같은 `points: [{ts, value}]` |
+
+실시간은 구독 주제 `process`를 추가하고 메시지 세 가지를 받는다.
+
+| 서버 -> 클라이언트 메시지 | 보내는 시점 | 내용 |
+| --- | --- | --- |
+| `process.vehicle` | 차량의 `stage`나 값이 바뀔 때 | 차량 하나의 전체 상태 |
+| `process.batch` | 배치의 `stage`나 값이 바뀔 때 | 배치 하나의 전체 상태 |
+| `process.bale` | 베일의 `stage`가 바뀔 때 | 베일 하나의 전체 상태 |
+
+```json
+// process.vehicle — stage: arrived(계중대 도착) → identified → unloading → unloaded → departed
+{
+  "type": "process.vehicle",
+  "vehicle": {
+    "id": "veh-20261013-031", "stage": "identified",
+    "plate": "12가 3456", "companyName": "한빛자원", "sectorId": "tank-a1",
+    "stageTimes": { "arrived": "2026-10-13T05:20:02.000Z", "identified": "2026-10-13T05:20:09.500Z" },
+    "updatedAt": "2026-10-13T05:20:09.500Z"
+  }
+}
+
+// process.batch — stage: planned → mixing → compressing → completed
+{
+  "type": "process.batch",
+  "batch": {
+    "id": "batch-0412", "stage": "compressing",
+    "mix": [ { "sectorId": "tank-a1", "percent": 40 }, { "sectorId": "tank-b2", "percent": 60 } ],
+    "avgMoisturePercent": 11.8,
+    "targetPressureMpa": 28.5,
+    "stageTimes": { "planned": "...", "mixing": "...", "compressing": "..." },
+    "updatedAt": "..."
+  }
+}
+
+// process.bale — stage: created(결속 후 배출) → shipped
+{
+  "type": "process.bale",
+  "bale": {
+    "id": "BL-20261013-0412", "batchId": "batch-0412", "stage": "created",
+    "stageTimes": { "created": "..." },
+    "updatedAt": "..."
+  }
+}
+
+// GET /process/state
+{ "vehicles": [ ... ], "batches": [ ... ], "bales": [ ... ], "updatedAt": "..." }
+```
+
+- `plate`, `companyName`, `sectorId`는 `arrived` 단계에서는 `null`이고 `identified`부터 채워진다. `sectorId`는 기존 탱크 기기 ID(`tank-a1` 등)를 그대로 쓴다. 섹터와 탱크는 같은 대상이다.
+- `targetPressureMpa`는 이 배치에 서버가 지정한 목표 압력이다. 실제 압력은 기존 압축기 상태의 `pressureMpa`를 그대로 쓴다.
+- 로봇이 어느 섹터에서 집는지는 기존 `robot.joints`와 로봇 상태의 `targetTankId`를 따른다. 화면이 배합비로 집는 순서를 계산하지 않는다.
+- 요청에서 예로 든 사건 이름은 `stage` 전이로 대응한다.
+
+| 사건 이름 (요청의 예) | 이 제안에서 |
+| --- | --- |
+| `vehicle.arrived` / `vehicle.identified` | `process.vehicle`의 `stage`: `arrived` / `identified` |
+| `unload.started` / `unload.completed` | `process.vehicle`의 `stage`: `unloading` / `unloaded` (출차는 `departed`) |
+| `batch.planned` | `process.batch`의 `stage`: `planned` (배합 시작은 `mixing`) |
+| `compress.started` / `compress.completed` | `process.batch`의 `stage`: `compressing` / `completed` |
+| `bale.created` / `bale.shipped` | `process.bale`의 `stage`: `created` / `shipped` |
+
+기존 형식에는 필드 세 개를 더한다.
+
+| 대상 | 추가 필드 | 설명 |
+| --- | --- | --- |
+| 탱크 상태 | `grade`: `"A"` 또는 `"C"` | 섹터의 등급. 수분은 기존 `moisturePercent` |
+| `plant.summary` | `balesToday` | 오늘 처리량(베일 수) |
+| `plant.summary` | `compressorUptimePercent` | 압축기 가동률 % |
+
+화면에서의 약속은 다음과 같다.
+
+- 트럭·지게차·작업자의 경로와 속도는 화면 연출이고 센서 값이 아니다. 움직임은 받은 `stage`를 따라가기만 하며, 다음 `stage`가 먼저 오면 연출을 줄여 맞춘다.
+- 연결 끊김(15초)에는 로봇뿐 아니라 트럭·지게차·컨베이어·압축기·작업자까지 모두 멈추고, 복구되면 `GET /process/state`로 받은 상태에 맞춰 다시 놓는다(지나간 구간을 재생하지 않는다).
+- 하단 공정 추적(입고 → 차량 인식 → 하역 → 배합 → 압축 → 출하)의 시각은 `stageTimes`를 표시만 한다. 차량·배치·베일을 하나의 사이클로 묶는 값은 서버에 없으므로 "출차하지 않은 가장 최근 차량, 진행 중인 배치, 가장 최근 베일"을 나란히 보여 준다.
+- 값이 모의 서버나 로컬 시연 소스에서 오면 화면에 "예시 데이터" 표시를 띄운다.
+
 ## 확인 상태와 프로토타입 가정
 
 대표님과 현장 책임자와 대화하기 전까지는 아래 가정으로 프로토타입을 만들고, 답을 받는 대로 고친다. 확인된 항목은 체크했고, 가장 먼저 필요한 것은 서버 담당과 API 명세 합의다.
@@ -334,6 +424,12 @@ Oct 13, 2026 · @민식
 | 접속 | 현장 밖 포함, 로그인으로 보호 | 서버 보안 설정, VPN 병행 여부 |
 | 카메라 | 카메라 1대 이상, HLS 우선 | 영상 방식 |
 | 알림 | 앱이 켜져 있으면 WebSocket, 닫혀 있으면 FCM | 서버가 FCM을 못 보내면 앱이 켜져 있을 때만 알림 |
+| 수납 섹터 (제안안) | 섹터는 A1, A2, B1, B2 네 개이고 기존 탱크 4개와 같은 대상(기기 ID 그대로) | 기기 ID 목록, 장면 배치 |
+| 섹터 등급 (제안안) | 등급은 A와 C 두 가지, 섹터마다 서버가 등급과 수분을 알려 준다 | `shared/`의 등급 타입, 표시 문구 |
+| 계중대와 무게 (제안안) | 장면에 계중대는 있지만 "무게는 쓰지 않는다" 규칙과 충돌하므로 확인 전까지 무게 숫자를 표시하지 않고 계량 진행 표시만 한다 | 무게 필드 추가 여부(명세 → `shared/` 순서), 계중대 표시판 |
+| 차량·회사·섹터 배정 (제안안) | 번호판 → 회사 → 배정 섹터는 서버가 정해 보낸다. 모의 서버는 가상의 회사(한빛자원, 동해페이퍼, 새솔리싸이클)와 가상의 번호판을 쓴다 | 모의 서버 예시 데이터 |
+| 배합과 압력 (제안안) | 배치별 배합비·평균 수분·목표 압력은 서버가 정해 보낸다 | 모의 서버 예시 데이터 |
+| 공정 흐름 형식 (제안안) | 6절 "공정 흐름"의 `process.*` 메시지와 `GET /process/state` | API 경로와 값 형식 |
 
 ## 위험과 대응
 
