@@ -4,7 +4,7 @@ import { TONE_CLASS } from '../../components/status/tone';
 import { PHASE_STEPS, ROBOT_STATUS_TEXT, ROBOT_STATUS_TONE } from '../../config/display';
 import { useAppSelector } from '../../store/hooks';
 import { selectDevice } from '../../store/selectors';
-import { useDisplayStatus } from './useDisplayStatus';
+import { useDisplayStatus } from '../../components/status/useDisplayStatus';
 
 /**
  * 홈 하단 단계 바: 집기 → 이동 → 놓기 → 압축.

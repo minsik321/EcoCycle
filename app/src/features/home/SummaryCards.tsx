@@ -5,7 +5,7 @@ import { Timestamp } from '../../components/status/Timestamp';
 import { formatPercent } from '../../config/display';
 import { useAppSelector } from '../../store/hooks';
 import { selectPlantSummary } from '../../store/selectors';
-import { useDisplayStatus } from './useDisplayStatus';
+import { useDisplayStatus } from '../../components/status/useDisplayStatus';
 
 /** 홈 상단 카드: 함수율(수분), 전체 적재율, 시스템 상태. 숫자는 카드마다 하나만 크게 보여 준다. */
 export function SummaryCards() {

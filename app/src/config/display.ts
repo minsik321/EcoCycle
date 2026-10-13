@@ -1,4 +1,4 @@
-import type { DeviceId, DeviceStatus, Phase, RobotMode, RobotStatus, Role } from '@ecocycle/shared';
+import type { DeviceId, DeviceStatus, DeviceType, Phase, RobotMode, RobotStatus, Role } from '@ecocycle/shared';
 
 // 표시용 문구·기호·형식. 상태 색은 styles/index.css의 토큰(--color-status-*)을 쓴다.
 // 상태 판정(status)은 서버가 하고 화면은 표시만 한다. 색만으로 구분하지 않도록 기호와 글자를 함께 쓴다.
@@ -95,3 +95,54 @@ export function formatLocalTime(iso: string | null | undefined, withSeconds = tr
     hour12: false,
   }).format(date);
 }
+
+// --- 이력 그래프 (기기 페이지) ---
+// 센서값을 그때그때 보는 용도라 상세할 필요가 없다. 한 번에 한 구간만 요청하고, 구간마다 점이 수백 개 이하로 유지된다.
+
+export type HistoryUnitKey = 'day' | 'week' | 'month';
+
+export interface HistoryUnit {
+  label: string;
+  /** 구간 길이(ms) */
+  spanMs: number;
+  /** 서버에 요청할 간격 */
+  interval: string;
+  /** 구간 안의 점 수(참고) */
+  points: number;
+  /** x축 눈금 형식: 시각 또는 날짜 */
+  tick: 'time' | 'date';
+}
+
+export const HISTORY_UNIT_ORDER: readonly HistoryUnitKey[] = ['day', 'week', 'month'];
+
+export const HISTORY_UNITS: Record<HistoryUnitKey, HistoryUnit> = {
+  day: { label: '일', spanMs: 24 * 3_600_000, interval: '10m', points: 144, tick: 'time' },
+  week: { label: '주', spanMs: 7 * 24 * 3_600_000, interval: '1h', points: 168, tick: 'date' },
+  month: { label: '월', spanMs: 30 * 24 * 3_600_000, interval: '6h', points: 120, tick: 'date' },
+};
+
+export interface HistoryMetric {
+  /** 서버 `metric` 값. 이름은 서버와 확정 전이다 (docs/questions.md B12). */
+  key: string;
+  label: string;
+  unit: string;
+  /** y축 범위. 퍼센트는 0~100으로 고정하고 나머지는 자동 */
+  domain: readonly [number, number] | 'auto';
+}
+
+export const HISTORY_METRICS: Record<DeviceType, readonly HistoryMetric[]> = {
+  tank: [
+    { key: 'level', label: '적재율', unit: '%', domain: [0, 100] },
+    { key: 'moisture', label: '수분', unit: '%', domain: [0, 100] },
+    { key: 'volume', label: '부피', unit: 'm³', domain: 'auto' },
+  ],
+  robot: [],
+  conveyor: [{ key: 'load', label: '적재 정도', unit: '%', domain: [0, 100] }],
+  compressor: [
+    { key: 'pressure', label: '압력', unit: 'MPa', domain: 'auto' },
+    { key: 'temperature', label: '온도', unit: '°C', domain: 'auto' },
+  ],
+};
+
+/** 점이 하나도 없는 구간에 보여 줄 안내 */
+export const HISTORY_EMPTY_TEXT = '이 구간에는 기록된 값이 없습니다.';

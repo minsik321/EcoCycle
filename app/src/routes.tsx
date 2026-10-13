@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell';
 import { NAV_ITEMS } from './config/navigation';
 import { LoginPage, RequireAuth } from './features/auth';
 import { HomePage } from './features/home';
+import { TankListPage, TankPage } from './features/tank';
 
 // 화면(features)을 하나씩 만들면서 아래 Placeholder를 실제 화면으로 바꾼다.
 function Placeholder({ title }: { title: string }) {
@@ -20,7 +21,7 @@ export default function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.filter((item) => item.id !== 'tanks').map((item) => (
             <Route
               key={item.id}
               path={item.path === '/' ? undefined : `${item.path}/*`}
@@ -28,6 +29,8 @@ export default function AppRoutes() {
               element={item.id === 'home' ? <HomePage /> : <Placeholder title={item.label} />}
             />
           ))}
+          <Route path="/tanks" element={<TankListPage />} />
+          <Route path="/tanks/:id" element={<TankPage />} />
           <Route path="*" element={<Placeholder title="찾을 수 없는 화면" />} />
         </Route>
       </Route>

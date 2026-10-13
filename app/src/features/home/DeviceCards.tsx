@@ -22,7 +22,7 @@ import {
 } from '../../config/display';
 import { deviceSelected } from '../../store';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { useDisplayStatus } from './useDisplayStatus';
+import { useDisplayStatus } from '../../components/status/useDisplayStatus';
 
 // 홈의 기기 카드. 한 기기당 숫자는 2개 정도로 제한하고, 누르면 오른쪽에 확대(상세) 화면이 열린다.
 

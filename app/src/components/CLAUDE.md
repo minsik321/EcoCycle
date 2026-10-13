@@ -31,4 +31,4 @@ components/
 - 상태 표시는 색 + 아이콘 + 글자를 함께. 색 토큰은 `config/display.ts`.
 - 터치 대상 최소 48dp, 호버 의존 금지.
 - 컴포넌트는 props와 선택자로만 데이터를 받는다. API를 직접 호출하지 않고, 명령은 `api/commands`를 쓰는 훅을 통해 보낸다.
-- 차트는 가벼운 라이브러리 하나로 통일하고 홈 3D 장면과 같은 화면에서 무거운 애니메이션을 켜지 않는다.
+- 차트는 Recharts로 통일한다. `HistoryChart`는 받은 점만 그리는 표시 전용이고, 구간 이동·요청은 `features`의 `useHistoryWindow`가 맡는다(규칙은 `features/CLAUDE.md`의 이력 그래프 절). 홈 3D 장면과 같은 화면에서는 차트 애니메이션을 끈다.

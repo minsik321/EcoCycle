@@ -21,7 +21,7 @@ import { devicePagePath } from '../../config/navigation';
 import { deviceSelected } from '../../store';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { selectAlarmsForDevice, selectDevice } from '../../store/selectors';
-import { useDisplayStatus } from './useDisplayStatus';
+import { useDisplayStatus } from '../../components/status/useDisplayStatus';
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
