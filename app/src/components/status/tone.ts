@@ -8,3 +8,11 @@ export const TONE_CLASS: Record<DeviceStatus, string> = {
   alarm: 'border-status-alarm bg-red-50 text-status-alarm',
   offline: 'border-status-offline bg-gray-100 text-status-offline',
 };
+
+/** 수위 막대 등 채워지는 부분의 색 */
+export const BAR_CLASS: Record<DeviceStatus, string> = {
+  normal: "bg-status-normal",
+  caution: "bg-status-caution",
+  alarm: "bg-status-alarm",
+  offline: "bg-status-offline",
+};

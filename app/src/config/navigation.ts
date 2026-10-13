@@ -1,4 +1,5 @@
-import type { Permission } from '@ecocycle/shared';
+import { deviceTypeOf } from '@ecocycle/shared';
+import type { DeviceId, Permission } from '@ecocycle/shared';
 
 // 사이드바 메뉴. 순서는 명세 기준: 홈, 탱크, 로봇팔, 컨베이어, 압축기, 알람, 설정.
 // `requires`가 있으면 그 권한이 없을 때 `whenDenied`에 따라 메뉴를 숨기거나(hide) 비활성화(disable)한다.
@@ -38,4 +39,18 @@ export function resolveNavItems(permissions: readonly Permission[], items: reado
     if (allowed) return [{ ...item, enabled: true }];
     return item.whenDenied === 'disable' ? [{ ...item, enabled: false }] : [];
   });
+}
+
+/** 기기 하나의 상세 페이지 주소. 탱크는 기기마다, 나머지는 종류당 한 페이지다. */
+export function devicePagePath(id: DeviceId): string {
+  switch (deviceTypeOf(id)) {
+    case 'tank':
+      return `/tanks/${id}`;
+    case 'robot':
+      return '/robot';
+    case 'conveyor':
+      return '/conveyor';
+    case 'compressor':
+      return '/compressor';
+  }
 }

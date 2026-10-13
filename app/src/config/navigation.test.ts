@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_ITEMS, resolveNavItems } from './navigation';
+import { DEVICE_IDS } from '@ecocycle/shared';
+import { NAV_ITEMS, devicePagePath, resolveNavItems } from './navigation';
 import type { NavItem } from './navigation';
 
 describe('navigation', () => {
@@ -32,5 +33,15 @@ describe('navigation', () => {
       ['b', true],
       ['c', true],
     ]);
+  });
+
+  it("모든 기기에 상세 페이지 주소가 있고 메뉴 주소 아래에 있다", () => {
+    const paths = NAV_ITEMS.map((i) => i.path);
+    for (const id of DEVICE_IDS) {
+      const p = devicePagePath(id);
+      expect(paths.some((base) => base !== "/" && p.startsWith(base))).toBe(true);
+    }
+    expect(devicePagePath("tank-a2")).toBe("/tanks/tank-a2");
+    expect(devicePagePath("robot-1")).toBe("/robot");
   });
 });
