@@ -2,8 +2,17 @@ import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { NAV_ITEMS } from './config/navigation';
 import { LoginPage, RequireAuth } from './features/auth';
+import { AlarmsPage } from './features/alarms';
+import { CctvButton, CctvOverlay } from './features/cctv';
+import { CompressorPage } from './features/compressor';
+import { ConveyorPage } from './features/conveyor';
 import { HomePage } from './features/home';
+import { RobotPage } from './features/robot';
+import { SettingsPage } from './features/settings';
 import { TankListPage, TankPage } from './features/tank';
+
+// 별도 라우트를 가진 화면. 나머지는 아래 Placeholder로 이어진다.
+const IMPLEMENTED = new Set(['tanks', 'robot', 'conveyor', 'compressor', 'alarms', 'settings']);
 
 // 화면(features)을 하나씩 만들면서 아래 Placeholder를 실제 화면으로 바꾼다.
 function Placeholder({ title }: { title: string }) {
@@ -20,8 +29,8 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
-          {NAV_ITEMS.filter((item) => item.id !== 'tanks').map((item) => (
+        <Route element={<AppShell headerExtra={<CctvButton />} overlays={<CctvOverlay />} />}>
+          {NAV_ITEMS.filter((item) => !IMPLEMENTED.has(item.id)).map((item) => (
             <Route
               key={item.id}
               path={item.path === '/' ? undefined : `${item.path}/*`}
@@ -31,6 +40,11 @@ export default function AppRoutes() {
           ))}
           <Route path="/tanks" element={<TankListPage />} />
           <Route path="/tanks/:id" element={<TankPage />} />
+          <Route path="/alarms" element={<AlarmsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/robot" element={<RobotPage />} />
+          <Route path="/conveyor" element={<ConveyorPage />} />
+          <Route path="/compressor" element={<CompressorPage />} />
           <Route path="*" element={<Placeholder title="찾을 수 없는 화면" />} />
         </Route>
       </Route>

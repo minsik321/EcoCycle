@@ -12,6 +12,8 @@ export interface DialogProps {
   children: ReactNode;
   /** 하단 버튼 영역 */
   actions?: ReactNode;
+  /** md: 확인 대화상자 크기, xl: 영상처럼 넓은 내용 */
+  size?: 'md' | 'xl';
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -20,7 +22,7 @@ const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select
  * 모달 대화상자. 열리면 `data-autofocus`가 붙은 요소(없으면 첫 버튼)로 초점을 옮기고,
  * Tab이 대화상자 밖으로 나가지 않게 하며, 닫히면 열기 전 위치로 초점을 돌려준다.
  */
-export function Dialog({ open, title, onClose, dismissible = true, children, actions }: DialogProps) {
+export function Dialog({ open, title, onClose, dismissible = true, children, actions, size = 'md' }: DialogProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -71,7 +73,7 @@ export function Dialog({ open, title, onClose, dismissible = true, children, act
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl outline-none"
+        className={`w-full ${size === 'xl' ? 'max-w-4xl' : 'max-w-md'} rounded-xl bg-white p-5 shadow-xl outline-none`}
       >
         <h2 id={titleId} className="mb-2 text-lg font-semibold text-slate-900">
           {title}

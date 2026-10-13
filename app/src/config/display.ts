@@ -1,4 +1,4 @@
-import type { DeviceId, DeviceStatus, DeviceType, Phase, RobotMode, RobotStatus, Role } from '@ecocycle/shared';
+import type { DeviceId, DeviceStatus, DeviceType, Permission, Phase, RobotMode, RobotStatus, Role } from '@ecocycle/shared';
 
 // 표시용 문구·기호·형식. 상태 색은 styles/index.css의 토큰(--color-status-*)을 쓴다.
 // 상태 판정(status)은 서버가 하고 화면은 표시만 한다. 색만으로 구분하지 않도록 기호와 글자를 함께 쓴다.
@@ -146,3 +146,11 @@ export const HISTORY_METRICS: Record<DeviceType, readonly HistoryMetric[]> = {
 
 /** 점이 하나도 없는 구간에 보여 줄 안내 */
 export const HISTORY_EMPTY_TEXT = '이 구간에는 기록된 값이 없습니다.';
+
+/** 권한을 사용자가 읽을 수 있는 말로. 권한 종류는 대표님과 확정 전이다 (docs/questions.md A4). */
+export const PERMISSION_TEXT: Record<Permission, string> = {
+  'robot.control': '시작·일시정지·재개·정지',
+  'robot.manual': '수동 모드, 탱크 지정 집기',
+  'settings.write': '설정값 변경',
+  'alarm.ack': '알람 확인 처리',
+};

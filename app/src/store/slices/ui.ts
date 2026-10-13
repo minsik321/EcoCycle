@@ -12,7 +12,27 @@ export interface UiState {
   qualityMode: QualityMode;
 }
 
-const initialState: UiState = { selectedDeviceId: null, cctvOpen: false, qualityMode: 'standard' };
+const QUALITY_KEY = 'ecocycle.qualityMode';
+
+/** 화질 모드는 기기마다 기억해 둔다 (표시 설정일 뿐 토큰 같은 비밀이 아니다). 저장소를 못 쓰면 기본값. */
+export function loadQualityMode(): QualityMode {
+  try {
+    return localStorage.getItem(QUALITY_KEY) === 'low' ? 'low' : 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
+export function saveQualityMode(mode: QualityMode): void {
+  try {
+    localStorage.setItem(QUALITY_KEY, mode);
+  } catch {
+    // 저장소를 못 써도 앱은 동작한다
+  }
+}
+
+// 로그아웃으로 초기화될 때도 기억해 둔 화질 모드를 그대로 쓰도록 함수로 만든다
+const initialState = (): UiState => ({ selectedDeviceId: null, cctvOpen: false, qualityMode: loadQualityMode() });
 
 const slice = createSlice({
   name: 'ui',

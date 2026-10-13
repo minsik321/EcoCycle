@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Outlet } from 'react-router-dom';
 import { ROLE_TEXT } from '../../config/display';
 import { logoutUser } from '../../store';
@@ -12,7 +13,14 @@ import { Sidebar } from './Sidebar';
  * 로그인한 뒤의 공통 틀: 메뉴, 상단 사용자 줄, 연결 끊김 안내, 조작 결과 알림, 화면 내용(Outlet).
  * 연결 끊김 안내는 어느 화면에서나 보이도록 틀에 둔다 (값이 멈춘 화면을 정상처럼 보여 주지 않는다).
  */
-export function AppShell() {
+export interface AppShellProps {
+  /** 상단 줄에 더 둘 것(예: CCTV 버튼). 틀은 화면(features)을 직접 알지 못하므로 위에서 끼워 넣는다. */
+  headerExtra?: ReactNode;
+  /** 화면 위에 겹쳐 뜨는 것(예: CCTV 화면) */
+  overlays?: ReactNode;
+}
+
+export function AppShell({ headerExtra, overlays }: AppShellProps = {}) {
   const me = useAppSelector(selectMe);
   const dispatch = useAppDispatch();
 
@@ -24,6 +32,7 @@ export function AppShell() {
           <div className="text-lg font-bold tracking-tight">EcoCycle</div>
           {me && (
             <div className="flex items-center gap-3">
+              {headerExtra}
               <span className="text-sm text-slate-700">
                 {me.name} <span className="text-slate-500">({ROLE_TEXT[me.role]})</span>
               </span>
@@ -39,6 +48,7 @@ export function AppShell() {
         </main>
       </div>
       <CommandResultToast />
+      {overlays}
     </div>
   );
 }
