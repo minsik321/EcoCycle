@@ -33,7 +33,15 @@
 | B8 | CCTV RTSP를 HLS나 WebRTC로 변환하고 서명 주소를 발급해 줄 수 있나요? | 앱은 발급받은 주소를 `video` 태그로 재생하기만 한다. | HLS 우선, 가능하면 WebRTC | CCTV 구현 |
 | B9 | 상태 종류(`status`, `phase`)와 기준값 정의, 시각의 기준(UTC 여부)은? | 화면은 서버가 판정한 `status`를 표시만 한다. | `status`: normal/caution/alarm/offline, `phase`: idle/pick/move/place, 시각은 UTC | `shared/` 타입, 표시 형식 |
 | B10 | 현장에 물리 비상정지 버튼이 있나요? | 비상정지는 앱의 일이 아니다. 앱 화면에서 안전 수단처럼 보이게 하지 않기 위해 확인한다. | 있다고 가정, 앱에는 비상정지를 만들지 않는다 | 화면 문구, 안내 |
+| B11 | 상단 카드용 `GET /plant/summary`와 WebSocket `plant.summary`의 필드는 무엇인가요? | 명세에 JSON 예시가 없다. 앱은 평균 수분, 전체 적재율, 시스템 상태를 표시한다. | `{ averageMoisturePercent, totalFillPercent, status, updatedAt }`, 메시지는 `{ type, summary }` | `shared/devices.ts`, `shared/ws.ts` |
+| B12 | `GET /devices/{id}/history` 응답 형식과 `metric` 이름은? | 이력 그래프를 그린다. 명세에 `metric=level` 예시만 있다. | `{ deviceId, metric, interval, from, to, points: [{ ts, value }] }` | `shared/devices.ts`, 기기 페이지 그래프 |
+| B13 | `GET /robots/{id}/model` 응답 형식은? 관절 순서·각도 범위·영점·링크 길이를 어떤 필드로 주나요? | 관절 값을 3D 로봇팔에 맞추는 데 쓴다. 명세에 예시가 없다. | `{ deviceId, axisCount, joints: [{ name, minDeg, maxDeg, zeroDeg }], linkLengthsM }` | `shared/robot.ts`, `config/robotModel.ts` |
+| B14 | WebSocket `device.state`, `heartbeat` 메시지의 필드는? | 명세에 메시지 예시가 없다. | `device.state`는 `{ type, state }`, `heartbeat`는 `{ type, ts }` | `shared/ws.ts` |
+| B15 | `GET /commands/{commandId}` 응답 형식은? | WebSocket으로 결과를 못 받았을 때 조회한다. 명세에 예시가 없다. | `command.result`와 같은 `{ commandId, status, reason }` | `shared/commands.ts` |
+| B16 | `ack_alarm`은 어떤 경로로 보내나요? 알람은 기기가 아닌데 `POST /devices/{id}/commands`를 쓰나요? | 명세 명령 표의 대상이 "알람"인데 경로 규칙은 기기 기준이다. | 알람의 `deviceId` 경로로 `{ type: 'ack_alarm', alarmId }` 전송 | `shared/commands.ts`, 알람 화면 |
+| B17 | 알람의 `level`과 `state` 값 목록은? `update_setting`에서 쓰는 설정 `key` 목록은? | 명세 예시에는 `level: caution`, `state: active`만 있고 설정 키는 없다. | `level`: caution/alarm, `state`: active/acknowledged/cleared, `key`는 자유 문자열 | `shared/alarms.ts`, `shared/commands.ts`, 설정 화면 |
 
 ## 변경 기록
 
 - 2026-10-13 초안 작성 (미확인 항목 대표님 7개, 서버 담당자 10개)
+- 2026-10-13 서버 담당자 질문 B11~B17 추가 (shared 타입 작성 중 명세에 없어 임의로 정한 형식)
