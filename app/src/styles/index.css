@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+/* 상태 색 토큰: 앱 전체에서 normal / caution / alarm / offline 네 가지만 쓴다.
+   색만으로 구분하지 않도록 화면에서는 아이콘·글자를 함께 쓴다. */
+@theme {
+  --color-status-normal: #2e7d32;
+  --color-status-caution: #b26a00;
+  --color-status-alarm: #c62828;
+  --color-status-offline: #616161;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  /* 터치 기기: 더블탭 확대·당겨서 새로고침으로 화면이 튀지 않게 */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}

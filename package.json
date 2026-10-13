@@ -1,0 +1,26 @@
+{
+  "name": "ecocycle",
+  "private": true,
+  "version": "0.0.0",
+  "description": "EcoCycle 스마트 폐지 처리 대시보드",
+  "workspaces": [
+    "shared",
+    "mock-server",
+    "app"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n mock,app -c blue,green \"npm run mock\" \"npm run dev:app\"",
+    "dev:app": "npm run dev -w @ecocycle/app",
+    "mock": "npm run dev -w @ecocycle/mock-server --",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build:android": "npm run build:android -w @ecocycle/app"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "typescript": "^5.6.0"
+  }
+}
