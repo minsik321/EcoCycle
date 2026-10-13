@@ -66,3 +66,9 @@ export const selectRecentCommands = createSelector(
 
 export const selectCommandByKey = (key: string | null | undefined) => (state: RootState) =>
   key ? state.commands.byKey[key] : undefined;
+
+/** 이 기기의 이 명령이 처리 중인가(전송 중이거나 접수됐지만 결과가 아직 없다). 중복 클릭을 막는 데 쓴다. */
+export const selectIsCommandPending = (deviceId: DeviceId, type: CommandType) => (state: RootState): boolean =>
+  Object.values(state.commands.byKey).some(
+    (e) => e.deviceId === deviceId && e.type === type && (e.status === "sending" || e.status === "accepted"),
+  );

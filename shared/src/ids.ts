@@ -14,3 +14,8 @@ export type CompressorId = (typeof COMPRESSOR_IDS)[number];
 export type DeviceId = (typeof DEVICE_IDS)[number];
 
 export type DeviceType = 'tank' | 'robot' | 'conveyor' | 'compressor';
+
+/** 기기 ID로 기기 종류를 알아낸다 (`tank-a1` → `tank`). 상태를 아직 받지 못한 기기에도 쓸 수 있다. */
+export function deviceTypeOf(id: DeviceId): DeviceType {
+  return id.split('-')[0] as DeviceType;
+}
