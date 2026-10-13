@@ -16,6 +16,6 @@ export default defineConfig({
     globals: false,
     setupFiles: ['src/test/setup.ts'],
     // 실제 모의 서버가 필요하고 오래 걸리는 통합 테스트는 `npm run test:integration`으로 따로 돌린다
-    exclude: process.env.ECOCYCLE_INTEGRATION ? configDefaults.exclude : [...configDefaults.exclude, '**/*.integration.test.tsx'],
+    exclude: process.env.ECOCYCLE_INTEGRATION ? configDefaults.exclude : [...configDefaults.exclude, '**/*.integration.test.{ts,tsx}'],
   },
 });

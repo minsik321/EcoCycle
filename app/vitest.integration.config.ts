@@ -6,7 +6,7 @@ export default mergeConfig(
   base,
   defineConfig({
     test: {
-      include: ['src/integration/**/*.integration.test.tsx'],
+      include: ['src/integration/**/*.integration.test.{ts,tsx}'],
       testTimeout: 150_000,
       hookTimeout: 30_000,
     },
