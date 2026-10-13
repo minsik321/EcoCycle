@@ -3,23 +3,26 @@
 `docs/dashboard-spec.md` 6절(API 명세)을 TypeScript 타입으로 옮긴 곳이다. `app`과 `mock-server`가 둘 다 여기서 import한다.
 이 폴더가 곧 "프론트가 이해한 서버 계약"이다.
 
-## 예정 파일
+## 파일
 
 ```
 shared/
-├── package.json        name: @ecocycle/shared
+├── package.json        name: @ecocycle/shared (소스를 그대로 내보낸다, 빌드 없음)
 └── src/
     ├── index.ts        재수출
-    ├── ids.ts          DeviceId, RobotId, CameraId 리터럴 유니온
-    ├── auth.ts         LoginRequest/Response, Me, Role, Permission
-    ├── devices.ts      TankState, RobotState, ConveyorState, CompressorState, DeviceState(type으로 구분), PlantSummary
-    ├── robot.ts        RobotModel(축 수, 관절 순서, 링크 길이, 각도 범위, 영점), Phase
-    ├── ws.ts           ClientMessage(subscribe/unsubscribe), ServerMessage(plant.summary, device.state, robot.joints, alarm, command.result, heartbeat), Topic
-    ├── commands.ts     Command(type으로 구분된 유니온), CommandStatus, CommandRisk 표
-    ├── alarms.ts       Alarm, AlarmLevel
+    ├── ids.ts          기기 ID 7개(상수 배열)와 DeviceId·TankId 등, deviceTypeOf
+    ├── common.ts       IsoTimestamp, DeviceStatus, 단위 규칙(주석)
+    ├── robot.ts        Phase, RobotStatus, RobotMode, RobotModel(제안안)
+    ├── auth.ts         Role, Permission, Me, 로그인·리프레시·로그아웃·ws-ticket 요청/응답, PushRegisterRequest
+    ├── devices.ts      TankState·RobotState·ConveyorState·CompressorState, DeviceState(type으로 구분), PlantSummary·HistoryResponse(제안안)
+    ├── alarms.ts       Alarm, AlarmLevel, AlarmState
     ├── cameras.ts      Camera, StreamInfo
-    └── errors.ts       ApiErrorCode, 오류 응답 형식
+    ├── commands.ts     Command(type으로 구분), COMMAND_RULES(위험도·필요 권한·대상·confirm), CommandStatus, 202·조회 응답
+    ├── ws.ts           Topic, ClientMessage, ServerMessage(6종)
+    └── errors.ts       ApiErrorBody(code는 문자열), 클라이언트가 구분하는 상태 코드
 ```
+
+명세에 JSON 예시가 없어 이름을 정한 곳은 코드 주석에 ⚠로 표시했고 서버 담당 질문(`docs/questions.md` B11~B17)에 올려 두었다.
 
 ## 규칙
 

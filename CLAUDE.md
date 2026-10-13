@@ -74,11 +74,11 @@ EcoCycle/
 | 4. 장시간·현장 테스트 | realtime, app(빌드·배포) | 하루 이상 구동해도 느려짐·멈춤 없음 |
 | 5. 확장 | scene, features | 2단계에서 여유 확인된 경우만 |
 
-**현재 단계: 0 → 1 시작 전.** 단계가 바뀌면 이 줄과 `docs/decisions.md`를 갱신한다.
+**현재 단계: 1 (핵심 기능) 구현·점검 완료, 프로토타입 전달본 정리 중. 다음은 2 (3D 홈 시안).** 단계가 바뀌면 이 줄과 `docs/decisions.md`를 갱신한다.
 
 로봇팔 동기화 후퇴 순서: ① 관절 값 실시간 → ② 단계+진행률 → ③ 정해진 동작 반복(최후).
 
-## 명령어 (1단계에서 만들 예정)
+## 명령어
 
 npm workspaces로 `shared`, `mock-server`, `app`을 묶는다.
 
@@ -87,11 +87,34 @@ npm install                 # 루트에서 한 번
 npm run dev                 # mock-server + app 동시 실행
 npm run dev:app             # app만 (VITE_API_BASE로 실서버 지정)
 npm run mock -- --scenario=disconnect   # 시나리오 지정해 모의 서버 실행
-npm run typecheck && npm run test
-npm run build:android       # app 빌드 → cap sync android
+npm run typecheck && npm run test       # 타입 검사 + 단위·화면 테스트 (서버 불필요, 약 1분)
+npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403 점검 (약 1분, 서버를 스스로 띄움)
+npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```
 
+`build:android`(app 빌드 → `cap sync android`)는 Capacitor를 붙이는 안드로이드 빌드 단계에서 만든다. 아직 없다.
 스크립트를 추가·변경하면 이 표도 함께 고친다.
+
+## 배포
+
+자세한 이유와 주의점은 `docs/decisions.md`의 "배포 방식" 항목.
+
+| 대상 | 프로토타입 (지금) | 이후 |
+| --- | --- | --- |
+| 프론트 (`app`) | Vercel — 정적 파일 배포, 웹 브라우저로 접속 | Capacitor APK (직접 설치 또는 Firebase App Distribution), Vercel은 웹 버전으로 유지 |
+| 목서버 (`mock-server`) | Render — Node로 REST + WebSocket 실행 | 실서버 준비되면 내림 |
+| 실서버 | 없음 | 서버 담당이 배포, 프론트는 주소만 교체 |
+
+```bash
+# Vercel: 프로젝트 루트 폴더 app, 빌드 npm run build, 출력 dist
+#   환경 변수: VITE_USE_MOCK=false, VITE_API_BASE=https://<render주소>/api/v1, VITE_WS_BASE=wss://<render주소>/ws/v1/stream
+# Render: 루트에서 npm install 후 mock-server 빌드·실행 (shared 함께 설치)
+#   환경 변수: CORS_ORIGINS=https://<vercel주소>
+# APK 단계(예정): build:android → app 빌드 → cap sync android → Android Studio/Gradle로 APK
+```
+
+- `VITE_*` 값은 빌드할 때 들어간다. 서버 주소를 바꾸면 Vercel 재배포, APK 재빌드가 필요하다.
+- 정확한 빌드·실행 명령은 배포 설정을 만들 때 이 절에 채워 넣는다.
 
 ## 작업 방식
 

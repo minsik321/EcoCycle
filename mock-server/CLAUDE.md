@@ -3,23 +3,26 @@
 실제 서버가 준비되기 전, `docs/dashboard-spec.md`의 API를 **그대로 흉내 내는** Node 서버다.
 앱은 이 서버와 실서버를 주소만 바꿔 오갈 수 있어야 한다. 운영용이 아니다.
 
-## 예정 구조
+## 구조
 
 ```
 mock-server/
-├── package.json
+├── package.json          dev(감시 실행), start(Render 등 배포 실행), typecheck
 └── src/
-    ├── index.ts          Express + ws 시작, --scenario 인자 처리
-    ├── auth.ts           로그인·리프레시(사용할 때마다 교체)·로그아웃·ws-ticket(30초, 1회용)·/me
-    ├── routes/           /plant, /devices, /robots, /alarms, /cameras, /commands, /push
-    ├── stream.ts         WebSocket: 티켓 검증, 구독 관리, heartbeat 5초
-    ├── sim/
-    │   ├── plant.ts      탱크 적재·수분 변화, 압축기 압력·온도
-    │   ├── robot.ts      집기→이동→놓기 사이클, 관절 값 15Hz(seq, ts 포함)
-    │   └── commands.ts   명령 접수(202) → 지연 후 command.result
-    ├── scenarios/        normal, tank-alarm, disconnect, robot-error, token-expiry, slow-network
-    └── fixtures/         테스트 계정, 로봇 모델(범용 6축), 카메라 목록
+    ├── index.ts          Express + WebSocket 서버 시작, 시뮬레이터·시나리오 시작
+    ├── config.ts         포트, CORS_ORIGINS, --scenario 인자, 토큰 유효 시간
+    ├── auth.ts           로그인(시도 제한 429), 리프레시(사용할 때마다 교체), 로그아웃, ws-ticket(30초, 1회용), /me, requireAuth
+    ├── errors.ts         {"error":{"code","message"}} 응답
+    ├── stream.ts         WebSocket: 티켓 검증, 구독 관리, heartbeat 5초, 시나리오 침묵·지연 반영
+    ├── routes/           devices(요약·기기·이력), robots(모델), alarms, cameras, commands(202·멱등성·403/409/422)
+    ├── sim/              state(현재 값), plant(탱크·컨베이어·압축기·알람), robot(사이클·관절 15Hz), commands(접수→결과),
+    │                     alarmOps, publish(변할 때·5초마다), history(가짜 이력), bus(sim → stream)
+    ├── scenarios/        index(시나리오 5종), gate(침묵·지연 스위치)
+    └── fixtures/         accounts(역할별 계정·권한 표), robotModel(범용 6축), cameras, settings(설정 키·범위)
 ```
+
+시나리오: `normal`, `tank-alarm`, `disconnect`, `robot-error`, `token-expiry`, `slow-network` (`npm run mock -- --scenario=이름`).
+이 서버 자체의 단위 테스트는 없다. 동작은 `app`의 통합 테스트(`npm run test:integration`: 연결 끊김, 권한 403)와 `app` 화면 테스트가 확인한다.
 
 ## 규칙
 

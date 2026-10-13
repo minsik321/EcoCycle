@@ -2,16 +2,18 @@
 
 두 곳 이상에서 쓰는 UI만 둔다. 한 화면에서만 쓰면 그 화면의 `features/<화면>/` 안에 둔다.
 
-## 예정 구성
+## 구성
 
 ```
 components/
-├── status/        StatusBadge(normal/caution/alarm/offline), OfflineNotice(“연결 끊김 · 마지막 수신 HH:MM:SS”), Timestamp
-├── controls/      DeviceControls, CommandButton, ConfirmDialog, CommandResultToast
-├── layout/        Sidebar, AppShell, TopCards 틀
-├── charts/        TrendSparkline(확대 화면 짧은 추이), HistoryChart(기기 페이지 이력)
-└── common/        Button, Card, Dialog, Spinner 등 기본 요소
+├── common/        Button(48px, 처리 중 비활성), Card, Dialog(초점 가두기·Esc·초점 복귀)
+├── status/        StatusBadge(색+기호+글자), OfflineNotice, Timestamp, useDisplayStatus(끊기면 모든 상태를 "연결 끊김"으로), tone(색 클래스)
+├── controls/      DeviceControls, CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
+├── layout/        Sidebar, AppShell(슬롯: headerExtra·overlays), TopCards
+└── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
 ```
+
+짧은 추이 그래프(TrendSparkline)는 아직 만들지 않았다.
 
 ## 조작 컴포넌트 규칙 (`controls/`)
 
