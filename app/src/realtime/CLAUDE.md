@@ -2,20 +2,25 @@
 
 WebSocket 하나로 실시간 값을 받는다. 저빈도 값은 store로, 고빈도 관절 값은 store 밖의 버퍼로 보낸다.
 
-## 예정 파일
+## 파일
 
 ```
 realtime/
-├── socket.ts         연결: ws-ticket 발급 → wss://…/ws/v1/stream?ticket= 연결 → 재연결(지수 백오프)
+├── types.ts          RealtimeSink(store가 연결할 출력 인터페이스), ConnectionState
+├── socket.ts         createRealtimeClient: ws-ticket 발급 → 연결 → 구독 → 감시 → 재연결(1초부터 두 배씩, 최대 15초) → REST 재동기화(sink.resync)
 ├── subscriptions.ts  주제 구독 관리: 화면이 원하는 주제 집합을 받아 subscribe/unsubscribe 차이만 전송
 ├── dispatch.ts       메시지 type별 분기: plant.summary, device.state, alarm, command.result, heartbeat → store / robot.joints → jointBuffer
 ├── watchdog.ts       마지막 수신 시각 추적, 15초 무수신 → 연결 끊김
 ├── jointBuffer.ts    관절 값 링 버퍼 + 0.1~0.2초 지연 보간
-└── useRealtime.ts    앱 최상단에서 한 번 쓰는 훅
+├── index.ts          재수출
+└── useRealtime.ts    앱 최상단에서 한 번 쓰는 훅 (store 연결 단계(D-17)에서 만든다)
 ```
 
 ## 규칙
 
+- realtime은 store를 import하지 않는다. 값은 `RealtimeSink`로 내보내고 store 쪽(useRealtime)이 이것을 구현해 연결한다.
+- 소켓이 닫히면 15초를 기다리지 않고 바로 offline으로 표시한다. 연결은 열려 있어도 15초 무수신이면 끊긴 것으로 보고 닫은 뒤 새 티켓으로 다시 연결한다.
+- 새 연결마다 jointBuffer를 비운다 (서버가 다시 시작하면 seq가 처음으로 돌아간다).
 - 연결은 앱 전체에 **하나**. 화면마다 새로 열지 않는다.
 - 토큰을 주소에 넣지 않는다. 매 연결(재연결 포함)마다 새 티켓을 받는다(30초 유효, 1회용).
 - 구독: `plant`, `devices`, `alarms`는 로그인 동안 항상. `robot-1.joints`는 **홈 화면과 로봇 확대 화면에 있을 때만** 구독하고 나가면 해제한다.

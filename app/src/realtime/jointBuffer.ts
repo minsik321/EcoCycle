@@ -1,0 +1,111 @@
+import type { Gripper, Phase, RobotJointsMessage, TankId } from '@ecocycle/shared';
+import { JOINT_DELAY_SEC } from '../config/realtime';
+
+// 로봇 관절 값 버퍼. 초당 10~20회 들어오는 값을 store(Redux)에 넣으면 리렌더가 계속 일어나므로 store 밖에 둔다.
+// 화면(scene)은 매 프레임 sample(now)로 보간된 값을 읽는다.
+// 값을 그대로 저장한다: 관절 순서·단위·영점 변환은 여기서 하지 않는다 (/robots/{id}/model 또는 config/robotModel).
+
+export interface JointSample {
+  joints: number[];
+  gripper: Gripper;
+  phase: Phase;
+  targetTankId: TankId | null;
+}
+
+interface Frame extends JointSample {
+  /** 서버 시각(ms). 순서는 seq와 같다. */
+  serverMs: number;
+}
+
+const CAPACITY = 64; // 15Hz에서 약 4초
+const OFFSET_WINDOW = 60; // 시계 차이를 추정할 최근 수신 수
+
+export interface JointBuffer {
+  /** 새 프레임을 넣는다. seq가 이전보다 작거나 같거나 시각이 거꾸로면 버리고 false를 돌려준다. */
+  push(message: RobotJointsMessage, receivedAtMs: number): boolean;
+  /**
+   * 지금 그려야 할 값. 지연(기본 0.15초)만큼 과거 시점을 기준으로 앞뒤 프레임을 보간한다.
+   * 마지막 프레임보다 뒤이면 마지막 값을 그대로 유지한다(예측해서 움직이지 않는다). 비어 있으면 null.
+   */
+  sample(nowMs: number): JointSample | null;
+  /** 마지막 프레임을 받은 뒤 지난 시간(ms). 받은 적이 없으면 null */
+  ageMs(nowMs: number): number | null;
+  /** 재연결·구독 해제 때 비운다. 서버가 다시 시작하면 seq가 처음으로 돌아가므로 새 연결마다 비워야 한다. */
+  clear(): void;
+}
+
+const copySample = (f: JointSample): JointSample => ({
+  joints: [...f.joints],
+  gripper: { ...f.gripper },
+  phase: f.phase,
+  targetTankId: f.targetTankId,
+});
+
+export function createJointBuffer(options: { delaySec?: number } = {}): JointBuffer {
+  const delayMs = (options.delaySec ?? JOINT_DELAY_SEC) * 1000;
+  let frames: Frame[] = [];
+  let lastSeq = -Infinity;
+  let lastReceivedMs: number | null = null;
+  // 서버와 내 시계가 다르므로 (받은 시각 - 서버 시각)의 최솟값으로 가장 빨리 온 경우의 차이를 추정한다.
+  let offsets: number[] = [];
+
+  const offset = () => (offsets.length > 0 ? Math.min(...offsets) : 0);
+
+  return {
+    push(message, receivedAtMs) {
+      const serverMs = Date.parse(message.ts);
+      if (message.seq <= lastSeq || Number.isNaN(serverMs)) return false;
+      const last = frames[frames.length - 1];
+      if (last && serverMs <= last.serverMs) return false;
+
+      lastSeq = message.seq;
+      lastReceivedMs = receivedAtMs;
+      offsets.push(receivedAtMs - serverMs);
+      if (offsets.length > OFFSET_WINDOW) offsets.shift();
+
+      frames.push({
+        serverMs,
+        joints: [...message.joints],
+        gripper: { ...message.gripper },
+        phase: message.phase,
+        targetTankId: message.targetTankId,
+      });
+      if (frames.length > CAPACITY) frames.shift();
+      return true;
+    },
+
+    sample(nowMs) {
+      const first = frames[0];
+      const last = frames[frames.length - 1];
+      if (!first || !last) return null;
+
+      const target = nowMs - offset() - delayMs;
+      if (target <= first.serverMs) return copySample(first);
+      if (target >= last.serverMs) return copySample(last);
+
+      for (let i = 0; i < frames.length - 1; i += 1) {
+        const a = frames[i]!;
+        const b = frames[i + 1]!;
+        if (target < a.serverMs || target >= b.serverMs) continue;
+        const sample = copySample(a);
+        if (a.joints.length === b.joints.length) {
+          const k = (target - a.serverMs) / (b.serverMs - a.serverMs);
+          sample.joints = a.joints.map((v, j) => v + (b.joints[j]! - v) * k);
+        }
+        return sample;
+      }
+      return copySample(last);
+    },
+
+    ageMs(nowMs) {
+      return lastReceivedMs === null ? null : nowMs - lastReceivedMs;
+    },
+
+    clear() {
+      frames = [];
+      offsets = [];
+      lastSeq = -Infinity;
+      lastReceivedMs = null;
+    },
+  };
+}
