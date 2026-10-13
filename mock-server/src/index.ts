@@ -5,6 +5,7 @@ import { authRouter } from './auth';
 import { config } from './config';
 import { sendError } from './errors';
 import { queryRouter } from './routes';
+import { restDelayMs, startScenario } from './scenarios';
 import { startSim } from './sim';
 import { attachStream } from './stream';
 
@@ -12,6 +13,13 @@ const app = express();
 
 app.use(cors({ origin: config.corsOrigins.length > 0 ? config.corsOrigins : true }));
 app.use(express.json());
+
+// slow-network 시나리오에서만 응답이 늦어진다
+app.use((_req, _res, next) => {
+  const delay = restDelayMs();
+  if (delay > 0) setTimeout(() => next(), delay);
+  else next();
+});
 
 // 기본 주소: /api/v1
 app.use('/api/v1', authRouter);
@@ -23,6 +31,7 @@ app.use((_req, res) => sendError(res, 503, 'NOT_IMPLEMENTED', '아직 구현되�
 const server = createServer(app);
 attachStream(server);
 startSim();
+startScenario();
 
 server.listen(config.port, () => {
   console.log(`[mock-server] http://localhost:${config.port}/api/v1  시나리오: ${config.scenario}`);

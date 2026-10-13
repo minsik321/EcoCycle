@@ -41,14 +41,25 @@ let lastTickAt = Date.now();
 let picked = false;
 let placed = false;
 let pendingTank: TankId | null = null;
+const excludedTanks = new Set<TankId>();
+
+/** 시나리오용: 자동 사이클이 이 탱크를 건너뛰게 한다 */
+export function excludeFromRotation(id: TankId): void {
+  excludedTanks.add(id);
+}
 
 function startCycle(tankId?: TankId): void {
   const r = robot();
   if (tankId) {
     r.targetTankId = tankId;
   } else {
-    r.targetTankId = TANK_IDS[nextTankIndex % TANK_IDS.length] ?? 'tank-a1';
+    let next = TANK_IDS[nextTankIndex % TANK_IDS.length] ?? 'tank-a1';
     nextTankIndex += 1;
+    for (let i = 0; i < TANK_IDS.length && excludedTanks.has(next); i += 1) {
+      next = TANK_IDS[nextTankIndex % TANK_IDS.length] ?? 'tank-a1';
+      nextTankIndex += 1;
+    }
+    r.targetTankId = next;
   }
   r.phase = 'pick';
   elapsedSec = 0;

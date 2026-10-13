@@ -1,6 +1,6 @@
-import type { Alarm, CompressorState, ConveyorState, DeviceStatus, TankId, TankState } from '@ecocycle/shared';
+import type { CompressorState, ConveyorState, DeviceStatus, TankId, TankState } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
-import { publish } from './bus';
+import { clearAlarm, raiseAlarm, updateAlarm } from './alarmOps';
 import { publishDevice, publishSummary } from './publish';
 import { alarms, devices, getSetting, judgeTankStatus } from './state';
 
@@ -27,33 +27,30 @@ export function addToConveyor(percent: number): void {
   loadRaw = clamp(loadRaw + percent, 0, 100);
 }
 
-let alarmSeq = 3300;
-
-function nextAlarmId(): string {
-  alarmSeq += 1;
-  return `al-${alarmSeq}`;
+/** 시나리오용: 탱크 적재율을 바로 정한다 */
+export function setTankFill(id: TankId, percent: number): void {
+  fillRaw.set(id, clamp(percent, 0, 100));
 }
 
-/** 탱크 상태가 caution/alarm이면 알람을 열고, normal로 돌아오면 해제한다. */
+const fillRateFactor = new Map<TankId, number>();
+
+/** 시나리오용: 탱크에 파지가 들어오는 속도를 배수로 바꾼다 (기본 1) */
+export function setFillRateFactor(id: TankId, factor: number): void {
+  fillRateFactor.set(id, factor);
+}
+
+/** 탱크 상태가 caution/alarm이면 알람을 열고, 더 심해지면 단계를 올리고, normal로 돌아오면 해제한다. */
 function syncTankAlarm(t: TankState, cautionThreshold: number): void {
   // 확인 처리(acknowledged)된 알람도 아직 열려 있는 알람이다. 상태가 정상으로 돌아와야 해제된다.
   const open = alarms.find((a) => a.deviceId === t.id && (a.state === 'active' || a.state === 'acknowledged'));
   if (t.status === 'caution' || t.status === 'alarm') {
-    if (open) return;
-    const alarm: Alarm = {
-      id: nextAlarmId(),
-      level: t.status,
-      deviceId: t.id,
-      message: t.status === 'alarm' ? '적재율 95% 초과' : `적재율 ${cautionThreshold}% 초과`,
-      state: 'active',
-      ts: new Date().toISOString(),
-    };
-    alarms.push(alarm);
-    publish({ type: 'alarm', alarm: { ...alarm } });
+    if (!open) {
+      raiseAlarm(t.id, t.status, t.status === 'alarm' ? '적재율 95% 초과' : `적재율 ${cautionThreshold}% 초과`);
+    } else if (t.status === 'alarm' && open.level !== 'alarm') {
+      updateAlarm(open, 'alarm', '적재율 95% 초과');
+    }
   } else if (open) {
-    open.state = 'cleared';
-    open.ts = new Date().toISOString();
-    publish({ type: 'alarm', alarm: { ...open } });
+    clearAlarm(open);
   }
 }
 
@@ -62,7 +59,7 @@ export function tickPlant(): void {
   for (const id of TANK_IDS) {
     const t = tank(id);
     // 파지가 천천히 들어온다 (초당 약 0.02%)
-    const fill = clamp((fillRaw.get(id) ?? 0) + rnd(0.005, 0.035), 0, 100);
+    const fill = clamp((fillRaw.get(id) ?? 0) + rnd(0.005, 0.035) * (fillRateFactor.get(id) ?? 1), 0, 100);
     fillRaw.set(id, fill);
     const moisture = clamp((moistureRaw.get(id) ?? 10) + rnd(-0.05, 0.05), 6, 16);
     moistureRaw.set(id, moisture);

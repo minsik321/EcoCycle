@@ -3,6 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import type { ClientMessage, ServerMessage, Topic } from '@ecocycle/shared';
 import { consumeWsTicket } from './auth';
 import type { Account } from './fixtures/accounts';
+import { streamGate } from './scenarios/gate';
 import { onMessage } from './sim/bus';
 import { listDevices, summarize } from './sim/state';
 
@@ -14,6 +15,8 @@ interface Client {
   ws: WebSocket;
   account: Account;
   topics: Set<Topic>;
+  /** 지연 시나리오에서 순서를 지키기 위한 마지막 전달 예정 시각 */
+  lastDeliverAt: number;
 }
 
 const clients = new Set<Client>();
@@ -36,7 +39,17 @@ function topicOf(message: ServerMessage): Topic | null {
 }
 
 function send(client: Client, message: ServerMessage): void {
-  if (client.ws.readyState === WebSocket.OPEN) client.ws.send(JSON.stringify(message));
+  // disconnect 시나리오: 연결은 열려 있지만 아무것도 보내지 않는다
+  if (streamGate.muted) return;
+  const text = JSON.stringify(message);
+  const deliver = () => {
+    if (client.ws.readyState === WebSocket.OPEN) client.ws.send(text);
+  };
+  if (streamGate.latencyMs <= 0) return deliver();
+  // slow-network 시나리오: 지연을 주되 보낸 순서는 유지한다
+  const at = Math.max(Date.now() + streamGate.latencyMs + Math.random() * streamGate.jitterMs, client.lastDeliverAt + 1);
+  client.lastDeliverAt = at;
+  setTimeout(deliver, at - Date.now());
 }
 
 /** 구독한 연결에만 보낸다. `robot.joints`는 구독한 연결에만 간다. */
@@ -82,7 +95,7 @@ export function attachStream(server: Server): void {
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
-      const client: Client = { ws, account, topics: new Set() };
+      const client: Client = { ws, account, topics: new Set(), lastDeliverAt: 0 };
       clients.add(client);
 
       ws.on('message', (data) => {
