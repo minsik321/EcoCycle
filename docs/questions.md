@@ -40,8 +40,12 @@
 | B15 | `GET /commands/{commandId}` 응답 형식은? | WebSocket으로 결과를 못 받았을 때 조회한다. 명세에 예시가 없다. | `command.result`와 같은 `{ commandId, status, reason }` | `shared/commands.ts` |
 | B16 | `ack_alarm`은 어떤 경로로 보내나요? 알람은 기기가 아닌데 `POST /devices/{id}/commands`를 쓰나요? | 명세 명령 표의 대상이 "알람"인데 경로 규칙은 기기 기준이다. | 알람의 `deviceId` 경로로 `{ type: 'ack_alarm', alarmId }` 전송 | `shared/commands.ts`, 알람 화면 |
 | B17 | 알람의 `level`과 `state` 값 목록은? `update_setting`에서 쓰는 설정 `key` 목록은? | 명세 예시에는 `level: caution`, `state: active`만 있고 설정 키는 없다. | `level`: caution/alarm, `state`: active/acknowledged/cleared, `key`는 자유 문자열 | `shared/alarms.ts`, `shared/commands.ts`, 설정 화면 |
+| B18 | 설정 화면에 보여 줄 현재 설정값(기준 수위, 속도 등)은 어떤 API로 읽나요? 설정 키 목록과 허용 범위는? | 기기 페이지에서 `update_setting`으로 값을 바꾸는데, 현재 값을 읽는 조회가 명세에 없다. | 기기 상태 응답과 별도의 설정 조회가 생긴다고 가정, 모의 서버는 값만 저장하고 읽는 API는 없음 | 조회 API, `shared/`, 기기 페이지 설정 화면 |
+| B19 | WebSocket `command.result`는 명령을 보낸 사용자에게만 가나요, 연결된 모두에게 가나요? | 홈에서도 조작 결과를 바로 보여 주는데, 다른 사용자의 명령 결과를 받으면 혼동될 수 있다. | 연결된 모두에게 가고 앱은 자신이 보낸 `commandId`만 표시 | `realtime`, 명령 결과 표시 |
+| B20 | 홈 단계 바의 "압축" 단계는 어떤 값에 연결하나요? 로봇 `phase`에는 `idle/pick/move/place`뿐입니다. | 명세 홈 단계 바가 집기, 이동, 놓기, 압축이다. | 압축기 `running`으로 대신 표시, 값이 없으면 압축 칸은 표시만 하고 상태 연결 안 함 | `config/display.ts`의 `PHASE_STEPS`, 홈 단계 바 |
 
 ## 변경 기록
 
 - 2026-10-13 초안 작성 (미확인 항목 대표님 7개, 서버 담당자 10개)
 - 2026-10-13 서버 담당자 질문 B11~B17 추가 (shared 타입 작성 중 명세에 없어 임의로 정한 형식)
+- 2026-10-13 서버 담당자 질문 B18~B20 추가 (설정 현재값 조회, command.result 전달 대상, 단계 바 압축 단계)
