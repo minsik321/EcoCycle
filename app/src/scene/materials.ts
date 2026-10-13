@@ -1,26 +1,29 @@
-import { BoxGeometry, CanvasTexture, CylinderGeometry, DoubleSide, MeshLambertMaterial, PlaneGeometry } from 'three';
+import { BoxGeometry, CylinderGeometry, MeshBasicMaterial, MeshLambertMaterial, PlaneGeometry } from 'three';
 import type { DeviceStatus } from '@ecocycle/shared';
-import { COMPRESSOR, CONVEYOR, ROBOT, ROOM, TANK } from '../config/sceneLayout';
+import { PALETTE } from './palette';
 
 // 공용 재질과 지오메트리. 모두 불투명·저폴리이고 여기서 한 번만 만들어 장면 전체가 함께 쓴다.
-// (투명·발광·유리 재질과 실시간 그림자는 쓰지 않는다. 그림자는 바닥 텍스처에 미리 그린다.)
+// (투명·유리 재질은 쓰지 않는다. 그림자는 화질 단계에 따라 실시간이거나 바닥 텍스처에 미리 그린 것이다.)
 
 const lambert = (color: string, extra: object = {}) => new MeshLambertMaterial({ color, flatShading: true, ...extra });
 
+/** 고정물 전체(조각마다 꼭짓점 색)를 그리는 재질 하나 */
+export const WORLD_MATERIAL = new MeshLambertMaterial({ vertexColors: true, flatShading: true });
+
 export const MATERIALS = {
-  wall: lambert('#cbd5e1'),
-  tankBody: lambert('#94a3b8', { side: DoubleSide }),
-  chunk: lambert('#d9c9a3'),
-  conveyorFrame: lambert('#64748b'),
-  belt: lambert('#334155'),
-  slat: lambert('#475569'),
-  bale: lambert('#c8ac7a'),
-  machine: lambert('#64748b'),
-  machineDark: lambert('#475569'),
-  pedestal: lambert('#475569'),
-  robotArm: lambert('#f59e0b'),
-  robotJoint: lambert('#1e293b'),
-  gripper: lambert('#334155'),
+  /** 파지 조각: 조각마다 색을 따로 준다(instanceColor) */
+  chunk: lambert('#ffffff'),
+  slat: lambert(PALETTE.slat),
+  bale: lambert(PALETTE.bale),
+  ram: lambert(PALETTE.steel),
+  rod: lambert(PALETTE.cabinet),
+  pedestal: lambert(PALETTE.steelDark),
+  robotArm: lambert(PALETTE.robotArm),
+  robotJoint: lambert(PALETTE.robotJoint),
+  gripper: lambert(PALETTE.belt),
+  grass: lambert(PALETTE.grass),
+  /** 누르는 영역만 잡는 보이지 않는 재질 */
+  hit: new MeshBasicMaterial({ visible: false }),
 } as const;
 
 /** 상태 색. styles/index.css의 --color-status-* 와 같은 값이다. */
@@ -43,60 +46,12 @@ export const GEOMETRY = {
   box: new BoxGeometry(1, 1, 1),
   /** 반지름 1, 높이 1인 원통 (옆면 12각) */
   cylinder: new CylinderGeometry(1, 1, 1, 12),
-  /** 위아래가 뚫린 원통 (탱크 몸통) */
-  tube: new CylinderGeometry(1, 1, 1, 16, 1, true),
-  floor: new PlaneGeometry(ROOM.maxX - ROOM.minX, ROOM.maxZ - ROOM.minZ),
+  /** 한 변이 1인 판 (바닥) */
+  plane: new PlaneGeometry(1, 1),
 } as const;
 
-export const BACKGROUND = '#f1f5f9';
-const FLOOR_COLOR = '#e2e8f0';
+/** 바닥 판 밖으로 보이는 배경. 잔디색과 같게 두어 경계가 보이지 않게 한다 */
+export const BACKGROUND = PALETTE.grass;
 
-/**
- * 바닥 텍스처: 바닥색 위에 기기 아래의 그림자를 미리 그려 둔다 (실시간 그림자 대신).
- * 캔버스를 쓸 수 없는 환경(테스트 등)에서는 null을 돌려주고 바닥은 단색으로 그린다.
- */
-export function createFloorTexture(tanks: ReadonlyArray<readonly [number, number, number]>): CanvasTexture | null {
-  try {
-    const pxPerM = 48;
-    const width = ROOM.maxX - ROOM.minX;
-    const depth = ROOM.maxZ - ROOM.minZ;
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(width * pxPerM);
-    canvas.height = Math.round(depth * pxPerM);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-
-    ctx.fillStyle = FLOOR_COLOR;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const toPx = (x: number, z: number): [number, number] => [(x - ROOM.minX) * pxPerM, (z - ROOM.minZ) * pxPerM];
-
-    // 그림자는 빛이 오는 반대쪽(-X, -Z)으로 조금 밀어 그린다
-    const shadow = (x: number, z: number, rx: number, rz: number) => {
-      const [cx, cy] = toPx(x - 0.18, z - 0.18);
-      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, rz) * pxPerM);
-      gradient.addColorStop(0, 'rgba(15, 23, 42, 0.30)');
-      gradient.addColorStop(0.7, 'rgba(15, 23, 42, 0.16)');
-      gradient.addColorStop(1, 'rgba(15, 23, 42, 0)');
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.scale(rx / Math.max(rx, rz), rz / Math.max(rx, rz));
-      ctx.translate(-cx, -cy);
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(cx, cy, Math.max(rx, rz) * pxPerM, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    };
-
-    for (const [x, , z] of tanks) shadow(x, z, TANK.radius * 1.5, TANK.radius * 1.5);
-    shadow(ROBOT.position[0], ROBOT.position[2], ROBOT.pedestalRadius * 1.7, ROBOT.pedestalRadius * 1.7);
-    shadow((CONVEYOR.startX + CONVEYOR.endX) / 2, CONVEYOR.z, Math.abs(CONVEYOR.startX - CONVEYOR.endX) / 2 + 0.3, CONVEYOR.width);
-    shadow(COMPRESSOR.x, COMPRESSOR.z, COMPRESSOR.width * 0.8, COMPRESSOR.depth * 0.8);
-
-    return new CanvasTexture(canvas);
-  } catch {
-    return null;
-  }
-}
-
-export const FLOOR_FALLBACK_MATERIAL = lambert(FLOOR_COLOR);
+/** 바닥 그림을 만들 수 없을 때(테스트 등) 쓰는 단색 바닥 */
+export const GROUND_FALLBACK_MATERIAL = lambert(PALETTE.concrete);

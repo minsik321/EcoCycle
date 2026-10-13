@@ -90,6 +90,8 @@ export function RobotArm({ spec, source, frozen, onSelect }: RobotArmProps) {
   return (
     <group
       position={[ROBOT.position[0], 0, ROBOT.position[2]]}
+      // 장면에서 키워 그리는 배율 (링크 길이는 모델 값 그대로다)
+      scale={ROBOT.scale}
       onClick={(event) => {
         event.stopPropagation();
         onSelect();

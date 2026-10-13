@@ -27,6 +27,8 @@ export interface QualityProfile {
   maxChunksPerTank: number;
   /** 컨베이어 벨트 위에 움직이는 줄무늬 수 */
   beltSlats: number;
+  /** 바닥 그림(도로·표시선)의 해상도: 장면 1m당 픽셀 수 */
+  groundPxPerM: number;
 }
 
 export const QUALITY_PROFILES: Record<QualityTier, QualityProfile> = {
@@ -42,6 +44,7 @@ export const QUALITY_PROFILES: Record<QualityTier, QualityProfile> = {
     particles: true,
     maxChunksPerTank: 140,
     beltSlats: 28,
+    groundPxPerM: 48,
   },
   standard: {
     maxFps: 30,
@@ -55,6 +58,7 @@ export const QUALITY_PROFILES: Record<QualityTier, QualityProfile> = {
     particles: true,
     maxChunksPerTank: 96,
     beltSlats: 24,
+    groundPxPerM: 40,
   },
   low: {
     maxFps: 20,
@@ -68,6 +72,7 @@ export const QUALITY_PROFILES: Record<QualityTier, QualityProfile> = {
     particles: false,
     maxChunksPerTank: 36,
     beltSlats: 12,
+    groundPxPerM: 30,
   },
 };
 

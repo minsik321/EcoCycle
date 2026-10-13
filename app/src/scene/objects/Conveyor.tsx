@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { Object3D } from 'three';
 import type { InstancedMesh } from 'three';
 import type { DeviceStatus } from '@ecocycle/shared';
@@ -7,8 +7,8 @@ import { BELT, CONVEYOR } from '../../config/sceneLayout';
 import { conveyorCenter, conveyorLength } from '../layout';
 import { GEOMETRY, MATERIALS, STATUS_MATERIAL } from '../materials';
 
-const MAX_BALES = 6;
-const BALE_SIZE = 0.3;
+const MAX_LUMPS = 6;
+const LUMP_SIZE = 0.32;
 const dummy = new Object3D();
 
 export interface ConveyorProps {
@@ -23,19 +23,14 @@ export interface ConveyorProps {
 }
 
 /**
- * 컨베이어(Section Z): 로봇 옆에서 압축기까지 이어지는 긴 벨트 하나.
- * 가동 중이면 벨트 줄무늬와 그 위의 파지 묶음이 압축기 쪽(-X)으로 흐른다. 줄무늬와 묶음은 각각 InstancedMesh 하나다.
+ * 컨베이어(Section Z)의 움직이는 부분: 벨트 줄무늬와 그 위의 파지 뭉치, 상태 색 띠. 틀과 다리는 고정물(world)이 그린다.
+ * 가동 중이면 줄무늬와 뭉치가 압축기 쪽(-X)으로 흐른다. 줄무늬와 뭉치는 각각 InstancedMesh 하나다.
  */
 export function Conveyor({ running, loadPercent, status, slatCount, frozen, onSelect }: ConveyorProps) {
   const slats = useRef<InstancedMesh>(null);
-  const bales = useRef<InstancedMesh>(null);
+  const lumps = useRef<InstancedMesh>(null);
   const offset = useRef(0);
-  const legs = useMemo(() => {
-    const xs: number[] = [];
-    for (let x = CONVEYOR.startX - 0.3; x > CONVEYOR.endX; x -= CONVEYOR.legSpacing) xs.push(x);
-    return xs;
-  }, []);
-  const baleCount = Math.round((Math.min(100, Math.max(0, loadPercent)) / 100) * MAX_BALES);
+  const lumpCount = Math.round((Math.min(100, Math.max(0, loadPercent)) / 100) * MAX_LUMPS);
 
   // 벨트 위의 것들을 지금 offset에 맞춰 놓는다
   const place = () => {
@@ -52,19 +47,19 @@ export function Conveyor({ running, loadPercent, status, slatCount, frozen, onSe
       }
       slatMesh.instanceMatrix.needsUpdate = true;
     }
-    const baleMesh = bales.current;
-    if (baleMesh) {
-      const gap = conveyorLength / MAX_BALES;
-      for (let i = 0; i < MAX_BALES; i += 1) {
+    const lumpMesh = lumps.current;
+    if (lumpMesh) {
+      const gap = conveyorLength / MAX_LUMPS;
+      for (let i = 0; i < MAX_LUMPS; i += 1) {
         const along = (offset.current + i * gap) % conveyorLength;
-        dummy.position.set(CONVEYOR.startX - along, CONVEYOR.topY + BALE_SIZE / 2, CONVEYOR.z);
+        dummy.position.set(CONVEYOR.startX - along, CONVEYOR.topY + LUMP_SIZE * 0.35, CONVEYOR.z);
         dummy.rotation.set(0, i * 0.7, 0);
-        dummy.scale.setScalar(BALE_SIZE);
+        dummy.scale.set(LUMP_SIZE * 1.3, LUMP_SIZE * 0.7, LUMP_SIZE);
         dummy.updateMatrix();
-        baleMesh.setMatrixAt(i, dummy.matrix);
+        lumpMesh.setMatrixAt(i, dummy.matrix);
       }
-      baleMesh.count = baleCount;
-      baleMesh.instanceMatrix.needsUpdate = true;
+      lumpMesh.count = lumpCount;
+      lumpMesh.instanceMatrix.needsUpdate = true;
     }
   };
 
@@ -83,25 +78,23 @@ export function Conveyor({ running, loadPercent, status, slatCount, frozen, onSe
         onSelect();
       }}
     >
-      <mesh geometry={GEOMETRY.box} material={MATERIALS.belt} position={[conveyorCenter[0], conveyorCenter[1], conveyorCenter[2]]} scale={[conveyorLength, CONVEYOR.thickness, CONVEYOR.width]} />
-      {/* 옆 테두리: 상태 색 */}
+      {/* 카메라 쪽 옆 테두리: 상태 색 */}
       <mesh
         geometry={GEOMETRY.box}
         material={STATUS_MATERIAL[status]}
-        position={[conveyorCenter[0], CONVEYOR.topY - 0.03, CONVEYOR.z + CONVEYOR.width / 2 + 0.03]}
-        scale={[conveyorLength, 0.1, 0.06]}
+        position={[conveyorCenter[0], CONVEYOR.topY + 0.01, CONVEYOR.z - CONVEYOR.width / 2 - 0.03]}
+        scale={[conveyorLength, 0.14, 0.06]}
       />
-      {legs.map((x) => (
-        <mesh
-          key={x}
-          geometry={GEOMETRY.box}
-          material={MATERIALS.conveyorFrame}
-          position={[x, (CONVEYOR.topY - CONVEYOR.thickness) / 2, CONVEYOR.z]}
-          scale={[0.12, CONVEYOR.topY - CONVEYOR.thickness, CONVEYOR.width * 0.8]}
-        />
-      ))}
       <instancedMesh ref={slats} args={[GEOMETRY.box, MATERIALS.slat, slatCount]} frustumCulled={false} />
-      <instancedMesh ref={bales} args={[GEOMETRY.box, MATERIALS.bale, MAX_BALES]} frustumCulled={false} />
+      <instancedMesh ref={lumps} args={[GEOMETRY.box, MATERIALS.bale, MAX_LUMPS]} frustumCulled={false} />
+      {/* 누르는 영역 */}
+      <mesh
+        geometry={GEOMETRY.box}
+        material={MATERIALS.hit}
+        position={[conveyorCenter[0], CONVEYOR.topY / 2 + 0.2, CONVEYOR.z]}
+        scale={[conveyorLength, CONVEYOR.topY + 0.4, CONVEYOR.width + 0.1]}
+        userData={{ castShadow: false }}
+      />
     </group>
   );
 }

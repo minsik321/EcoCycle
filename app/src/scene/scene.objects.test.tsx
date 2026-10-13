@@ -2,10 +2,11 @@ import ReactThreeTestRenderer from '@react-three/test-renderer';
 import type { Group, InstancedMesh, Object3D } from 'three';
 import { describe, expect, it } from 'vitest';
 import { QUALITY_PROFILES } from '../config/quality';
-import { TANK } from '../config/sceneLayout';
+import { ROBOT } from '../config/sceneLayout';
+import { sectorBay } from './layout';
 import { RobotArm } from './objects/RobotArm';
-import { Tank } from './objects/Tank';
-import { chunkSlots, visibleChunkCount } from './objects/chunks';
+import { Sector } from './objects/Sector';
+import { visibleChunkCount } from './objects/chunks';
 import { chainSpecFor } from './robot/chain';
 import type { JointSource } from './robot/jointSource';
 
@@ -96,21 +97,22 @@ describe('RobotArm: 입력(JointSource)에서 받은 값을 그대로 그린다'
   });
 });
 
-describe('Tank: 수위에 맞춰 보이는 파지 조각 수만 바꾼다', () => {
+describe('Sector: 적재율에 맞춰 보이는 파지 조각 수만 바꾼다', () => {
   const maxChunks = QUALITY_PROFILES.standard.maxChunksPerTank;
-  const slotCount = chunkSlots(TANK.radius - TANK.wallThickness, TANK.height - 0.08, 0.16, maxChunks).length;
 
   const chunksOf = (root: Object3D) => root.children.find((child) => (child as InstancedMesh).isInstancedMesh) as InstancedMesh;
 
-  it('조각은 InstancedMesh 하나이고 수위가 바뀌면 개수만 달라진다', async () => {
-    const renderer = await ReactThreeTestRenderer.create(<Tank id="tank-a1" fillPercent={50} status="normal" maxChunks={maxChunks} onSelect={() => {}} />);
+  it('더미는 InstancedMesh 하나이고 적재율이 바뀌면 개수만 달라진다', async () => {
+    const renderer = await ReactThreeTestRenderer.create(<Sector id="tank-a1" fillPercent={50} status="normal" maxChunks={maxChunks} onSelect={() => {}} />);
     const root = renderer.scene.children[0]!.instance as Object3D;
     const chunks = chunksOf(root);
+    const slotCount = chunks.instanceMatrix.count;
 
     expect(root.children.filter((child) => (child as InstancedMesh).isInstancedMesh)).toHaveLength(1);
+    expect(slotCount).toBeLessThanOrEqual(maxChunks);
     expect(chunks.count).toBe(visibleChunkCount(50, slotCount));
 
-    await renderer.update(<Tank id="tank-a1" fillPercent={90} status="caution" maxChunks={maxChunks} onSelect={() => {}} />);
+    await renderer.update(<Sector id="tank-a1" fillPercent={90} status="caution" maxChunks={maxChunks} onSelect={() => {}} />);
     expect(chunksOf(root)).toBe(chunks);
     expect(chunks.count).toBe(visibleChunkCount(90, slotCount));
     expect(chunks.count).toBeGreaterThan(visibleChunkCount(50, slotCount));
@@ -118,12 +120,31 @@ describe('Tank: 수위에 맞춰 보이는 파지 조각 수만 바꾼다', () =
 
   it('비어 있으면 조각을 그리지 않고, 화질 모드의 상한을 넘지 않는다', async () => {
     const low = QUALITY_PROFILES.low.maxChunksPerTank;
-    const renderer = await ReactThreeTestRenderer.create(<Tank id="tank-b2" fillPercent={0} status="normal" maxChunks={low} onSelect={() => {}} />);
+    const renderer = await ReactThreeTestRenderer.create(<Sector id="tank-b2" fillPercent={0} status="normal" maxChunks={low} onSelect={() => {}} />);
     const chunks = chunksOf(renderer.scene.children[0]!.instance as Object3D);
     expect(chunks.count).toBe(0);
 
-    await renderer.update(<Tank id="tank-b2" fillPercent={100} status="alarm" maxChunks={low} onSelect={() => {}} />);
+    await renderer.update(<Sector id="tank-b2" fillPercent={100} status="alarm" maxChunks={low} onSelect={() => {}} />);
     expect(chunks.count).toBeGreaterThan(0);
     expect(chunks.count).toBeLessThanOrEqual(low);
+  });
+
+  it('칸은 설정한 자리(섹터 칸 한가운데)에 놓인다', async () => {
+    const renderer = await ReactThreeTestRenderer.create(<Sector id="tank-b1" fillPercent={10} status="normal" maxChunks={maxChunks} onSelect={() => {}} />);
+    const root = renderer.scene.children[0]!.instance as Object3D;
+    const bay = sectorBay('tank-b1');
+    near(root.position.x, (bay.minX + bay.maxX) / 2);
+    near(root.position.z, (bay.minZ + bay.maxZ) / 2);
+  });
+});
+
+describe('RobotArm: 장면에서 키워 그린다', () => {
+  it('배율은 받침대와 팔 전체에 한 번만 곱한다 (관절 값은 그대로)', async () => {
+    const { source } = mutableSource([40, 0, 0, 0, 0, 0]);
+    const renderer = await ReactThreeTestRenderer.create(<RobotArm spec={spec} source={source} frozen={false} onSelect={() => {}} />);
+    const root = renderer.scene.children[0]!.instance as Object3D;
+    near(root.scale.x, ROBOT.scale);
+    near(root.scale.y, ROBOT.scale);
+    near(jointGroups(root)[0]!.rotation.y, 40 * DEG);
   });
 });

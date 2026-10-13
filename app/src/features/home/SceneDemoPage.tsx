@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DeviceId, DeviceState } from '@ecocycle/shared';
 import { Button } from '../../components/common/Button';
-import { QUALITY_PROFILES } from '../../config/quality';
+import { QUALITY_PROFILES, QUALITY_TEXT, QUALITY_TIERS } from '../../config/quality';
 import { sceneStats } from '../../scene/stats';
 import { demoPose, demoSource } from '../../scene/robot/jointSource';
 import type { QualityMode } from '../../store';
@@ -114,9 +114,9 @@ export function SceneDemoPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div role="group" aria-label="화질 모드" className="flex gap-2">
-            {(['standard', 'low'] as const).map((mode) => (
+            {QUALITY_TIERS.map((mode) => (
               <Button key={mode} variant={quality === mode ? 'primary' : 'secondary'} aria-pressed={quality === mode} onClick={() => setQuality(mode)}>
-                {mode === 'standard' ? '기본' : '저사양'}
+                {QUALITY_TEXT[mode].label}
               </Button>
             ))}
           </div>
