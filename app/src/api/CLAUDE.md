@@ -2,18 +2,19 @@
 
 서버와의 REST 통신을 한곳에 모은다. 화면 코드는 `fetch`를 직접 부르지 않고 이 폴더의 함수·훅만 쓴다.
 
-## 예정 파일
+## 파일
 
 ```
 api/
 ├── http.ts         기본 요청 함수: 기본 주소, Bearer 헤더, JSON, 오류 형식 변환, 401 처리
-├── tokens.ts       액세스 토큰(메모리), 리프레시 토큰(보안 저장소) 보관
-├── auth.ts         login, refresh, logout, getMe, getWsTicket
+├── tokens.ts       액세스 토큰(메모리), 리프레시 토큰(교체 가능한 저장소, 기본 메모리) 보관
+├── auth.ts         login, logout, getMe, getWsTicket, restoreSession (refresh는 http.ts가 401 때 자동 실행)
 ├── devices.ts      getPlantSummary, getDevices, getDeviceState, getHistory, getRobotModel
 ├── alarms.ts       getAlarms
-├── cameras.ts      getCameras, getStreamUrl, getSnapshotUrl
+├── cameras.ts      getCameras, getStreamInfo, getSnapshotBlob (이미지는 토큰을 주소에 넣을 수 없어 Blob으로 받음)
 ├── push.ts         registerPush, unregisterPush
-└── commands.ts     sendCommand(Idempotency-Key 생성), getCommand
+├── commands.ts     sendCommand(Idempotency-Key 생성), getCommand
+└── index.ts        재수출
 ```
 
 ## 규칙
@@ -24,7 +25,9 @@ api/
   - 401 → 리프레시로 재발급 후 원래 요청 1회 재시도. 동시에 여러 요청이 401이면 **리프레시는 한 번만** 실행하고 나머지는 기다린다. 리프레시도 실패하면 로그아웃 → 로그인 화면.
   - 리프레시 토큰은 사용할 때마다 교체되므로 응답의 새 토큰으로 즉시 바꾼다.
   - 403 조작 거부 / 409 이유 표시 / 422 입력 오류 / 429 잠시 대기 후 재시도 / 503 연결 끊김 표시.
-  - 오류는 `{ code, message, status }` 형태의 `ApiError`로 통일해 던진다.
+  - 오류는 `{ code, message, status }` 형태의 `ApiError`로 통일해 던진다. 서버에 닿지 못하면 status 0(`NETWORK_ERROR`), `isUnavailable(error)`로 0·503을 연결 끊김으로 판단한다.
+  - 429는 GET과 Idempotency-Key가 있는 명령만 `Retry-After`만큼 기다렸다가 최대 2번 다시 시도하고, 대기가 5초를 넘으면(로그인 시도 제한 등) 바로 오류를 낸다.
+  - 리프레시가 서버에 거부(4xx)되면 토큰을 지우고 `setAuthLostHandler`로 등록된 곳(store)에 알린다. api는 store를 import하지 않는다. 네트워크 오류·5xx로는 로그아웃하지 않는다.
 - 토큰 보관: 액세스 토큰은 메모리에만. 리프레시 토큰은 Capacitor 보안 저장소(웹 개발 중에는 대체 구현). localStorage·URL에 두지 않는다. (보관 방식은 서버 담당과 확인 필요)
 - 명령 전송:
   - 요청마다 새 `Idempotency-Key`(UUID). 같은 버튼 재시도는 같은 키를 재사용한다.
