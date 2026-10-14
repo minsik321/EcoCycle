@@ -10,11 +10,11 @@ app/
 ├── vite.config.ts
 ├── capacitor.config.ts
 ├── .env.example          VITE_API_BASE, VITE_WS_BASE, VITE_USE_MOCK
-├── public/               아이콘, 장면용 작은 텍스처(미리 그린 바닥 그림자 등)
+├── public/               아이콘, 장면용 작은 텍스처(미리 그린 바닥 그림자 등), `models/`(스튜디오 탭의 glTF 모델과 라이선스)
 ├── android/              `npx cap add android`로 생성 — 미리 만들지 않는다
 └── src/
     ├── main.tsx, App.tsx, routes.tsx
-    ├── api/  realtime/  store/  config/  components/  features/  scene/
+    ├── api/  realtime/  store/  config/  components/  features/  scene/  studio/
     └── styles/
 ```
 
@@ -25,6 +25,7 @@ app/
 ```
 features ─► components ─► (store, api 훅)
 features/home ─► scene ─► config, realtime(jointBuffer), store(선택자)
+features/home ─(lazy)─► studio ─► store, api, components/controls, config/display, scene/robot (모양에 관한 것은 가져다 쓰지 않는다)
 store ─► api, realtime, shared        api, realtime ─► shared (store를 import하지 않는다)
 ```
 

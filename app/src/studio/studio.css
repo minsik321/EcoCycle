@@ -1,0 +1,1088 @@
+/*
+ * 스튜디오 탭 전용 스타일. 앱의 디자인 토큰·Tailwind 클래스를 쓰지 않고 여기서 따로 정한다 (studio/CLAUDE.md).
+ * 이 파일은 스튜디오 묶음과 함께만 내려받는다.
+ */
+.st-root {
+  --st-ink: #1c2434;
+  --st-soft: #5d6880;
+  --st-faint: #8f98ab;
+  --st-blue: #2f6bff;
+  --st-blue-soft: #e4ecff;
+  --st-yellow: #ffc31f;
+  --st-kraft: #c9995f;
+  --st-normal: #1f9d68;
+  --st-caution: #d98200;
+  --st-alarm: #e5484d;
+  --st-offline: #7d8697;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  overflow: hidden;
+  background: #e9edf2;
+  color: var(--st-ink);
+  font-size: 13px;
+  line-height: 1.35;
+  user-select: none;
+  container-type: inline-size;
+}
+
+.st-root *,
+.st-root *::before {
+  box-sizing: border-box;
+}
+
+.st-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.st-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--st-soft);
+  font-size: 15px;
+}
+
+.st-glass {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.78), rgb(255 255 255 / 0.6));
+  border: 1px solid rgb(255 255 255 / 0.85);
+  border-radius: 22px;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.9) inset,
+    0 18px 44px -12px rgb(38 58 110 / 0.22),
+    0 2px 6px rgb(38 58 110 / 0.06);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7);
+  backdrop-filter: blur(22px) saturate(1.7);
+}
+
+.st-root button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.st-root button:focus-visible {
+  outline: 2px solid var(--st-blue);
+  outline-offset: 2px;
+}
+
+.st-muted {
+  margin: 0;
+  color: var(--st-faint);
+  font-size: 12px;
+}
+
+.st-stale {
+  opacity: 0.5;
+}
+
+/* ── 상단 바 ── */
+.st-top {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px 0 12px;
+  z-index: 30;
+}
+
+.st-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.st-brand div {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.st-brand strong {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.st-brand span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--st-blue);
+}
+
+.st-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 68% 30%, #fff 0 14%, transparent 15%),
+    linear-gradient(140deg, #5b8cff, #2456e6);
+  box-shadow: 0 6px 14px -4px rgb(47 107 255 / 0.6);
+}
+
+.st-tabs-slot {
+  display: flex;
+  align-items: center;
+}
+
+.st-views,
+.st-seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 14px;
+  background: rgb(30 45 80 / 0.07);
+}
+
+.st-views {
+  margin: 0 auto;
+}
+
+.st-views button,
+.st-seg button {
+  min-width: 52px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 11px;
+  font-weight: 600;
+  color: var(--st-soft);
+  transition:
+    background 0.18s,
+    color 0.18s;
+}
+
+.st-views button[aria-pressed='true'],
+.st-seg button[aria-selected='true'] {
+  background: #fff;
+  color: var(--st-blue);
+  box-shadow: 0 2px 8px rgb(38 58 110 / 0.14);
+}
+
+.st-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.st-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: rgb(30 45 80 / 0.07);
+  color: var(--st-soft);
+}
+
+.st-chip i {
+  font-style: normal;
+  font-size: 11px;
+}
+
+.st-chip-quiet {
+  font-weight: 600;
+}
+
+.st-chip-example {
+  background: #fff4cf;
+  color: #8a5a00;
+  box-shadow: 0 0 0 1px #f2c94c inset;
+}
+
+.st-chip-blue {
+  background: var(--st-blue-soft);
+  color: var(--st-blue);
+}
+
+.st-chip-kraft {
+  background: #f4e6d2;
+  color: #8a5a22;
+}
+
+.st-tone-normal {
+  background: #dff5ea;
+  color: var(--st-normal);
+}
+
+.st-tone-caution {
+  background: #fdefd3;
+  color: var(--st-caution);
+}
+
+.st-tone-alarm {
+  background: #fde3e4;
+  color: var(--st-alarm);
+}
+
+.st-tone-offline {
+  background: #e6e9ee;
+  color: var(--st-offline);
+}
+
+/* ── 연결 끊김 ── */
+.st-offline {
+  position: absolute;
+  top: 86px;
+  left: calc(50% + 130px);
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 22px 12px 16px;
+  border-radius: 18px;
+  background: rgb(36 42 54 / 0.86);
+  border-color: rgb(255 255 255 / 0.18);
+  color: #fff;
+}
+
+.st-offline strong {
+  display: block;
+  font-size: 16px;
+}
+
+.st-offline span {
+  font-size: 12.5px;
+  color: #c9d0dd;
+}
+
+.st-offline-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #aab2c0;
+  box-shadow: 0 0 0 5px rgb(170 178 192 / 0.25);
+}
+
+/* ── 지표 카드 ── */
+.st-kpis {
+  position: absolute;
+  top: 86px;
+  left: 14px;
+  display: flex;
+  gap: 10px;
+  z-index: 20;
+}
+
+.st-kpi {
+  position: relative;
+  width: 186px;
+  height: 104px;
+  padding: 13px 15px;
+  overflow: hidden;
+  transition: opacity 0.3s;
+}
+
+.st-kpi p {
+  margin: 0;
+}
+
+.st-kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--st-soft);
+}
+
+.st-kpi-value {
+  margin-top: 2px !important;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.st-kpi-value span {
+  margin-left: 3px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--st-soft);
+}
+
+.st-kpi-note {
+  position: absolute;
+  left: 15px;
+  bottom: 10px;
+  font-size: 11px;
+  color: var(--st-faint);
+}
+
+.st-spark {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+}
+
+/* ── 상세 패널 ── */
+.st-detail {
+  position: absolute;
+  top: 86px;
+  right: 14px;
+  width: 318px;
+  max-height: calc(100% - 86px - 274px);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  overflow: auto;
+  z-index: 20;
+  user-select: text;
+}
+
+.st-detail > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.st-detail h2 {
+  margin: 1px 0 0;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.st-detail h3 {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--st-soft);
+}
+
+.st-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--st-blue);
+}
+
+.st-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px !important;
+  background: rgb(30 45 80 / 0.07) !important;
+  color: var(--st-soft) !important;
+  flex: none;
+}
+
+.st-detail-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.st-detail-hero strong {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.st-rows {
+  margin: 0;
+}
+
+.st-rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgb(30 45 80 / 0.08);
+}
+
+.st-rows > div:last-child {
+  border-bottom: 0;
+}
+
+.st-rows dt {
+  color: var(--st-soft);
+}
+
+.st-rows dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+
+.st-meter {
+  display: inline-block;
+  vertical-align: middle;
+  width: 100%;
+  height: 8px;
+  border-radius: 99px;
+  background: rgb(30 45 80 / 0.1);
+  overflow: hidden;
+}
+
+.st-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--st-blue);
+  transition: width 0.6s;
+}
+
+.st-meter-caution i {
+  background: var(--st-caution);
+}
+
+.st-meter-alarm i {
+  background: var(--st-alarm);
+}
+
+.st-meter-offline i {
+  background: var(--st-offline);
+}
+
+.st-mix {
+  display: flex;
+  gap: 3px;
+  height: 30px;
+  margin-bottom: 6px;
+}
+
+.st-mix span {
+  display: grid;
+  place-items: center;
+  min-width: 58px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.st-mix-a {
+  background: var(--st-blue);
+}
+
+.st-mix-b {
+  background: var(--st-kraft);
+}
+
+.st-sectors {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.st-sectors button {
+  display: grid;
+  grid-template-columns: 26px 1fr 52px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 9px;
+  text-align: left;
+}
+
+.st-sectors button:hover {
+  background: rgb(47 107 255 / 0.08);
+}
+
+.st-sectors span:last-child {
+  text-align: right;
+  font-weight: 700;
+}
+
+.st-alarms {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.st-alarms li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.st-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(30 45 80 / 0.08);
+}
+
+/* ── 공정 추적 ── */
+.st-tracker {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  right: 520px;
+  padding: 10px;
+  z-index: 20;
+}
+
+.st-tracker ol {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.st-tracker li {
+  position: relative;
+  min-width: 0;
+}
+
+.st-tracker li + li::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  top: 24px;
+  width: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgb(30 45 80 / 0.16);
+}
+
+.st-tracker button {
+  display: flex;
+  gap: 9px;
+  width: 100%;
+  height: 100%;
+  padding: 9px 10px;
+  border-radius: 15px;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.st-tracker button:disabled {
+  cursor: default;
+}
+
+.st-tracker button:not(:disabled):hover {
+  background: rgb(47 107 255 / 0.07);
+}
+
+.st-step-no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-weight: 800;
+  background: rgb(30 45 80 / 0.08);
+  color: var(--st-soft);
+}
+
+.st-step-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.st-step-body b {
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.st-step-body em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--st-faint);
+}
+
+.st-step-detail {
+  margin-top: 5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-step-body time {
+  font-size: 11px;
+  color: var(--st-faint);
+}
+
+.st-step-live button {
+  background: #fff;
+  box-shadow: 0 6px 18px -6px rgb(47 107 255 / 0.45);
+}
+
+.st-step-live .st-step-no {
+  background: var(--st-blue);
+  color: #fff;
+  box-shadow: 0 0 0 5px rgb(47 107 255 / 0.18);
+}
+
+.st-step-live em {
+  color: var(--st-blue);
+}
+
+.st-tracker-offline {
+  filter: grayscale(1);
+}
+
+.st-tracker-offline .st-step-detail,
+.st-tracker-offline time {
+  opacity: 0.5;
+}
+
+/* ── 표 ── */
+.st-table {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 494px;
+  height: 248px;
+  padding: 10px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 20;
+}
+
+.st-seg {
+  align-self: flex-start;
+}
+
+.st-seg button {
+  height: 30px;
+}
+
+.st-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  transition: opacity 0.3s;
+}
+
+.st-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.st-table th {
+  position: sticky;
+  top: 0;
+  padding: 5px 8px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--st-faint);
+  background: rgb(246 248 251 / 0.92);
+}
+
+.st-table td {
+  padding: 6px 8px;
+  border-top: 1px solid rgb(30 45 80 / 0.07);
+  white-space: nowrap;
+}
+
+.st-table td .st-meter {
+  width: 64px;
+  margin-right: 4px;
+}
+
+.st-table tr[tabindex] {
+  cursor: pointer;
+}
+
+.st-table tr[tabindex]:hover td,
+.st-row-on td {
+  background: rgb(47 107 255 / 0.08);
+}
+
+.st-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgb(30 45 80 / 0.07);
+  color: var(--st-soft);
+}
+
+.st-tag-on {
+  background: var(--st-blue-soft);
+  color: var(--st-blue);
+}
+
+.st-tag-kraft {
+  background: #f4e6d2;
+  color: #8a5a22;
+}
+
+.st-plate {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 6px;
+  border: 1.5px solid #1c2434;
+  background: #fff;
+  color: #1c2434;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ── 지도식 핀 ── */
+.st-pins {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.st-pin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 0 0 12px !important;
+  pointer-events: auto;
+  will-change: transform;
+}
+
+.st-pin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2.5px solid var(--st-blue);
+  box-shadow: 0 2px 6px rgb(38 58 110 / 0.3);
+}
+
+.st-pin::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 2px;
+  height: 7px;
+  margin-left: -1px;
+  background: var(--st-blue);
+  opacity: 0.55;
+}
+
+.st-pin-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.94);
+  box-shadow:
+    0 8px 20px -6px rgb(38 58 110 / 0.35),
+    0 0 0 1px rgb(255 255 255 / 0.9);
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  transform-origin: 50% 100%;
+}
+
+.st-pin:hover .st-pin-card {
+  transform: scale(1.05);
+}
+
+.st-pin[aria-pressed='true'] .st-pin-card {
+  transform: scale(1.1);
+  background: var(--st-blue);
+  color: #fff;
+  box-shadow: 0 12px 26px -6px rgb(47 107 255 / 0.65);
+}
+
+.st-pin[aria-pressed='true'] small {
+  color: rgb(255 255 255 / 0.8);
+}
+
+.st-pin-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.12;
+}
+
+.st-pin-text small {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--st-faint);
+}
+
+.st-pin-text strong {
+  font-size: 13.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.st-pin-dot {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-style: normal;
+  font-weight: 800;
+  color: #fff;
+  background: var(--st-normal);
+}
+
+.st-pin-caution .st-pin-dot {
+  background: var(--st-caution);
+}
+
+.st-pin-alarm .st-pin-dot {
+  background: var(--st-alarm);
+}
+
+.st-pin-offline .st-pin-dot {
+  background: var(--st-offline);
+}
+
+/* 섹터 핀: 적재율 고리 */
+.st-ring {
+  --c: var(--st-blue);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: conic-gradient(var(--c) calc(var(--p) * 1%), rgb(30 45 80 / 0.12) 0);
+}
+
+.st-ring::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.st-ring b {
+  position: relative;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--st-ink);
+}
+
+.st-pin-caution .st-ring {
+  --c: var(--st-caution);
+}
+
+.st-pin-alarm .st-ring {
+  --c: var(--st-alarm);
+}
+
+.st-pin-offline .st-ring {
+  --c: var(--st-offline);
+}
+
+.st-pin-vehicle .st-pin-card {
+  padding-left: 7px;
+}
+
+.st-pin-vehicle::after {
+  border-color: var(--st-yellow);
+}
+
+.st-pin-vehicle::before {
+  background: var(--st-yellow);
+  opacity: 1;
+}
+
+.st-pin-bale .st-pin-card {
+  padding: 4px 11px;
+  background: rgb(250 240 224 / 0.96);
+}
+
+.st-pin-bale::after {
+  border-color: var(--st-kraft);
+}
+
+.st-pin-bale::before {
+  background: var(--st-kraft);
+  opacity: 1;
+}
+
+.st-pins-offline .st-pin {
+  filter: grayscale(1);
+  opacity: 0.8;
+}
+
+/* 좁은 영역(사이드바가 있는 홈, 태블릿): 패널을 줄여 3D를 가리지 않게 한다 */
+@container (max-width: 1320px) {
+  .st-table {
+    width: 440px;
+  }
+  .st-tracker {
+    right: 466px;
+    padding: 8px;
+  }
+  .st-tracker button {
+    gap: 7px;
+    padding: 8px 6px;
+  }
+  .st-step-no {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+  .st-tracker li + li::before {
+    display: none;
+  }
+  .st-kpi {
+    width: 168px;
+  }
+}
+
+@container (max-width: 1100px) {
+  .st-views {
+    display: none;
+  }
+  .st-kpi {
+    width: 150px;
+  }
+  .st-spark {
+    display: none;
+  }
+  .st-table {
+    width: 400px;
+  }
+  .st-tracker {
+    right: 426px;
+  }
+  .st-tracker ol {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-root * {
+    transition: none !important;
+  }
+}
+
+.st-demo-note {
+  position: absolute;
+  left: 18px;
+  bottom: 138px;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.8);
+  color: var(--st-soft);
+  font-size: 11.5px;
+  font-weight: 600;
+  z-index: 15;
+  pointer-events: none;
+}
+
+.st-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--st-blue);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 8px 18px -8px rgb(47 107 255 / 0.7);
+}
+
+/* 스튜디오 상단 바 안에 들어온 탭 전환(기본/스튜디오)과 시연 화면의 보조 버튼 */
+.st-tabs-slot [role='tablist'] {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 0;
+  border-radius: 14px;
+  background: rgb(30 45 80 / 0.07);
+}
+
+.st-tabs-slot [role='tab'] {
+  min-height: 0;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--st-soft);
+  background: none;
+}
+
+.st-tabs-slot [role='tab'][aria-selected='true'] {
+  background: var(--st-ink);
+  color: #fff;
+}
+
+.st-tabs-slot {
+  gap: 8px;
+}
+
+.st-tabs-slot .st-aux {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 11px;
+  background: rgb(30 45 80 / 0.07);
+  font-weight: 700;
+  color: var(--st-soft);
+}
+
+.st-tabs-slot .st-aux[aria-pressed='true'] {
+  background: #2a3140;
+  color: #fff;
+}
+
+.st-tabs-slot .st-fps {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--st-soft);
+  white-space: nowrap;
+}
+
+/* 멀리서 볼 때: 섹터 핀은 고리만, 나머지는 작게 */
+.st-pins[data-zoom='far'] .st-pin-sector:not([aria-pressed='true']):not(:hover) .st-pin-text {
+  display: none;
+}
+
+.st-pins[data-zoom='far'] .st-pin-sector:not([aria-pressed='true']):not(:hover) .st-pin-card {
+  padding: 3px;
+}
+
+.st-pins[data-zoom='far'] .st-pin-sector:not([aria-pressed='true']):not(:hover) .st-ring {
+  width: 28px;
+  height: 28px;
+}
+
+.st-pins[data-zoom='far'] .st-pin-bale .st-pin-text small {
+  display: none;
+}

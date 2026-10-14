@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import type { DeviceId, DeviceState } from '@ecocycle/shared';
 import { Button } from '../../components/common/Button';
 import { QUALITY_PROFILES, QUALITY_TEXT, QUALITY_TIERS } from '../../config/quality';
 import { sceneStats } from '../../scene/stats';
 import { demoPose, demoSource } from '../../scene/robot/jointSource';
 import type { QualityMode } from '../../store';
+import { HomeTabs } from './HomeTabs';
 import { SceneView } from './SceneView';
+import { useHomeTab } from './homeTab';
 import { supportsWebGL, useDocumentVisible } from './sceneSupport';
 
 // 서버·로그인 없이 3D 장면만 보여 주는 시연·측정 페이지 (/scene-demo).
@@ -13,6 +15,9 @@ import { supportsWebGL, useDocumentVisible } from './sceneSupport';
 //  - 실제 태블릿에서 프레임(초당 그리는 횟수)을 재는 데 쓴다. 2단계 완료 기준: 초당 30프레임 안정, 30분 이상 끊김·발열 없음.
 
 const NOW = () => new Date().toISOString();
+
+// 스튜디오 탭은 탭을 열 때만 불러온다 (홈과 같다)
+const DemoStudio = lazy(() => import('../../studio').then((m) => ({ default: m.DemoStudio })));
 
 /** 시연용 기기 상태. 탱크 수위는 천천히 오르내려 파지 조각 수가 바뀌는 것을 볼 수 있다. */
 function fakeDevices(tSec: number): Partial<Record<DeviceId, DeviceState>> {
@@ -91,7 +96,10 @@ export function SceneDemoPage() {
   const visible = useDocumentVisible();
   const startedAt = useRef(Date.now());
   const jointSource = useMemo(() => demoSource(startedAt.current), []);
-  const measure = useFrameMeasure(quality);
+  const [tab, setTab] = useHomeTab();
+  const [studioFailed, setStudioFailed] = useState(false);
+  const studio = tab === 'studio' && !studioFailed && supportsWebGL();
+  const measure = useFrameMeasure(`${quality}-${studio}`);
 
   // 저빈도 값은 실제처럼 1초에 한 번만 바꾼다
   useEffect(() => {
@@ -104,6 +112,40 @@ export function SceneDemoPage() {
 
   const elapsed = `${Math.floor(measure.seconds / 60)}분 ${measure.seconds % 60}초`;
   const target = QUALITY_PROFILES[quality].maxFps;
+  const tabs = <HomeTabs tab={tab} onChange={setTab} />;
+
+  if (studio) {
+    // 스튜디오는 화면 전체를 쓴다. 시연용 버튼과 프레임 수치는 스튜디오 상단 바 안에 둔다
+    return (
+      <main className="h-full bg-slate-50 text-slate-900">
+        <h1 className="sr-only">3D 홈 시안 (시연·측정) — 스튜디오</h1>
+        <Suspense
+          fallback={
+            <div role="status" className="flex h-full items-center justify-center text-slate-500">
+              스튜디오를 불러오는 중…
+            </div>
+          }
+        >
+          <DemoStudio
+            disconnected={disconnected}
+            paused={!visible}
+            onFailed={() => setStudioFailed(true)}
+            tabs={
+              <>
+                {tabs}
+                <button type="button" className="st-aux" aria-pressed={disconnected} onClick={() => setDisconnected((v) => !v)}>
+                  연결 끊김 흉내
+                </button>
+                <span className="st-fps" role="status" aria-label="프레임 측정">
+                  {measure.fps}fps · 평균 {measure.avg} · 최저 {measure.min} · {measure.heapMb === null ? '메모리 –' : `${measure.heapMb}MB`} · {elapsed}
+                </span>
+              </>
+            }
+          />
+        </Suspense>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-full flex-col gap-3 bg-slate-50 p-4 text-slate-900">
@@ -113,6 +155,7 @@ export function SceneDemoPage() {
           <p className="text-sm text-slate-600">서버 없이 장면만 보여 줍니다. 값은 모두 가짜이고 로봇팔은 정해진 시연 동작입니다.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {supportsWebGL() && !studioFailed && tabs}
           <div role="group" aria-label="화질 모드" className="flex gap-2">
             {QUALITY_TIERS.map((mode) => (
               <Button key={mode} variant={quality === mode ? 'primary' : 'secondary'} aria-pressed={quality === mode} onClick={() => setQuality(mode)}>

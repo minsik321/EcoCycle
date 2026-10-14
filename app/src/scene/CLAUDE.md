@@ -4,6 +4,8 @@
 그 위에서는 **시각 품질도 1차 목표**다(2026-10-13 재설계, `docs/decisions.md` 참조). 둘을 양립시키는 장치가
 화질 3단계(`config/quality.ts`)다. 실제 태블릿 측정은 `/scene-demo`(features/home/SceneDemoPage)로 한다.
 
+이 폴더는 홈의 **"기본" 탭**이다. "스튜디오" 탭(`app/src/studio`)은 별도 시안이고 이 파일의 규칙을 따르지 않는다. 스튜디오가 여기서 가져다 쓰는 것은 `robot/chain`·`jointSource`·`kinematics`와 `stats.ts`뿐이므로, 이 파일들의 내보내는 이름을 바꾸면 스튜디오도 함께 본다.
+
 ## 화질 3단계 (`config/quality.ts`)
 
 | 티어 | 그림자 | bloom | 패널(UI) | 오브젝트 수 | 용도 |

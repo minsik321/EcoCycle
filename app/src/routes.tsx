@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
 import { NAV_ITEMS } from './config/navigation';
@@ -7,10 +8,13 @@ import { CctvButton, CctvOverlay } from './features/cctv';
 import { CompressorPage } from './features/compressor';
 import { ConveyorPage } from './features/conveyor';
 import { DesignPage } from './features/design/DesignPage';
-import { HomePage, SceneDemoPage } from './features/home';
+import { HomePage } from './features/home/HomePage';
 import { RobotPage } from './features/robot';
 import { SettingsPage } from './features/settings';
 import { TankListPage, TankPage } from './features/tank';
+
+// 시연·측정 화면은 점검할 때만 쓰므로 처음 묶음에 넣지 않고 그 주소를 열 때 불러온다
+const SceneDemoPage = lazy(() => import('./features/home/SceneDemoPage').then((m) => ({ default: m.SceneDemoPage })));
 
 // 별도 라우트를 가진 화면. 나머지는 아래 Placeholder로 이어진다.
 const IMPLEMENTED = new Set(['tanks', 'robot', 'conveyor', 'compressor', 'alarms', 'settings']);
@@ -30,7 +34,14 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       {/* 서버·로그인 없이 3D 장면만 보여 주는 시연·측정 페이지 (값은 모두 가짜) */}
-      <Route path="/scene-demo" element={<SceneDemoPage />} />
+      <Route
+        path="/scene-demo"
+        element={
+          <Suspense fallback={null}>
+            <SceneDemoPage />
+          </Suspense>
+        }
+      />
       {/* 디자인 토큰과 공용 컴포넌트 미리 보기 (개발용, 값은 모두 예시) */}
       <Route path="/design" element={<DesignPage />} />
       <Route element={<RequireAuth />}>
