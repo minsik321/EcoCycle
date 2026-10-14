@@ -3,17 +3,25 @@ import { useEffect, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import type { PerspectiveCamera } from 'three';
 import type { Director } from '../sim/director';
+import { useWaker } from './motion';
 import { angleDelta } from '../sim/paths';
-import { SITE, VIEWS } from '../world/layout';
-import type { ViewPreset } from '../world/layout';
+import { DEFAULT_VIEW, SITE, TIER_DISTANCE, WIDE_VIEW, closeDistance, tierOf } from '../world/layout';
+import type { ViewPreset, ViewTier } from '../world/layout';
 
-// 스튜디오 카메라. 끌어서 이동, 휠·핀치로 확대, 오른쪽 버튼(또는 Shift)으로 회전한다.
-// 지역 프리셋이나 선택한 대상으로 부드럽게 미끄러져 가고, 움직이는 대상은 계속 따라간다.
+// 스튜디오 카메라. 거리는 세 단계(wide 부지 전체 / mid 한 구역 / close 대상 하나)이고 그 사이를 부드럽게 미끄러져 간다.
+// 끌어서 이동, 휠·핀치로 확대, 오른쪽 버튼(또는 Shift)으로 회전한다. 고른 대상은 close 거리에서 계속 따라간다.
+// 처음에는 부지 전체(wide)에서 시작해 기본 구역(mid)으로 들어온다.
 // 카메라는 월드 시계와 무관하다: 연결이 끊겨 장면이 멈춰도 둘러볼 수 있다.
 
 export interface RigApi {
   view(preset: ViewPreset): void;
+  /** 거리 단계를 한 칸 옮긴다 (+1 가까이, -1 멀리). 지역 프리셋이 바뀌면 그 프리셋을 돌려준다 */
+  zoom(dir: 1 | -1): ViewPreset | null;
+  /** 방위각을 돌린다 (도) */
+  rotate(deg: number): void;
 }
+
+const TIERS: readonly ViewTier[] = ['wide', 'mid', 'close'];
 
 export interface RigProps {
   director: Director;
@@ -38,11 +46,12 @@ const MIN_DIST = 11;
 const MAX_DIST = 150;
 const MIN_POL = 24;
 const MAX_POL = 74;
-const GLIDE = 3.1;
+const GLIDE = 2.3;
+/** 대상을 볼 때의 천정각 */
+const FOCUS_POLAR = 52;
 
-const FOCUS_DIST: Record<string, number> = { dev: 46, veh: 38, bale: 34, forklift: 36 };
 /** 프리셋 거리는 이 가로세로 비(패널을 뺀 빈 영역)에 맞춘 값이다. 더 좁은 화면에서는 그만큼 물러난다 */
-const REFERENCE_ASPECT = (1440 - 334) / 900;
+const REFERENCE_ASPECT = (1440 - 320) / 900;
 
 const fromPreset = (p: ViewPreset): View => ({ x: p.target[0], y: p.target[1], z: p.target[2], dist: p.distance, az: p.azimuth, pol: p.polar });
 
@@ -50,10 +59,10 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const gl = useThree((s) => s.gl);
   const size = useThree((s) => s.size);
-  const home = useRef<ViewPreset>(VIEWS[0]!);
-  const goal = useRef<View>(fromPreset(VIEWS[0]!));
-  // 처음에는 조금 멀고 비스듬한 곳에서 시작해 제자리로 미끄러져 들어온다
-  const cur = useRef<View>({ ...fromPreset(VIEWS[0]!), dist: VIEWS[0]!.distance * 1.45, az: VIEWS[0]!.azimuth - 24, pol: VIEWS[0]!.polar + 9 });
+  const home = useRef<ViewPreset>(DEFAULT_VIEW);
+  const goal = useRef<View>(fromPreset(DEFAULT_VIEW));
+  // 처음에는 부지 전체(wide)에서 시작해 기본 구역(mid)으로 미끄러져 들어온다
+  const cur = useRef<View>({ ...fromPreset(WIDE_VIEW), az: WIDE_VIEW.azimuth - 14 });
   const follow = useRef(false);
   const anchor = useRef({ x: 0, y: 0, z: 0 });
   const insetRef = useRef(inset);
@@ -65,6 +74,26 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
         home.current = preset;
         follow.current = false;
         goal.current = fromPreset(preset);
+      },
+      zoom(dir) {
+        const g = goal.current;
+        const tier = tierOf(g.dist);
+        const next = TIERS[TIERS.indexOf(tier) + dir];
+        if (!next) {
+          // 끝 단계에서는 조금씩만 더 움직인다
+          g.dist = Math.min(MAX_DIST, Math.max(MIN_DIST, g.dist * (dir > 0 ? 0.82 : 1.2)));
+          return null;
+        }
+        if (next === 'wide' || tier === 'wide') {
+          const preset = next === 'wide' ? WIDE_VIEW : home.current.tier === 'wide' ? DEFAULT_VIEW : home.current;
+          this.view(preset);
+          return preset;
+        }
+        g.dist = TIER_DISTANCE[next];
+        return null;
+      },
+      rotate(deg) {
+        goal.current.az += deg;
       },
     };
     return () => {
@@ -79,8 +108,8 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
       return;
     }
     follow.current = true;
-    goal.current.dist = FOCUS_DIST[focusKey.split(':')[0] ?? ''] ?? 26;
-    goal.current.pol = 55;
+    goal.current.dist = closeDistance(focusKey);
+    goal.current.pol = FOCUS_POLAR;
   }, [focusKey]);
 
   useEffect(() => {
@@ -154,6 +183,13 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
     };
   }, [gl, camera]);
 
+  // 필요할 때만 그리기: 카메라가 목표에 아직 닿지 않았으면 깨운다
+  useWaker(() => {
+    const g = goal.current;
+    const c = cur.current;
+    return Math.abs(g.x - c.x) + Math.abs(g.y - c.y) + Math.abs(g.z - c.z) + Math.abs(g.dist - c.dist) * 0.2 + Math.abs(g.pol - c.pol) * 0.05 + Math.abs(angleDelta(c.az * DEG, g.az * DEG)) > 0.003;
+  });
+
   useFrame((_, delta) => {
     const g = goal.current;
     const c = cur.current;
@@ -172,7 +208,8 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
 
     const a = c.az * DEG;
     const p = c.pol * DEG;
-    const fit = Math.max(1, REFERENCE_ASPECT / Math.max(0.3, (size.width - insetRef.current.right) / Math.max(1, size.height)));
+    // 세로 화면에서는 위아래가 남으므로 다 물러나지 않는다 (최대 1.3배)
+    const fit = Math.min(1.3, Math.max(1, REFERENCE_ASPECT / Math.max(0.3, (size.width - insetRef.current.right) / Math.max(1, size.height))));
     const dist = c.dist * fit;
     // 패널에 가려지지 않게 보는 점을 화면에서 왼쪽·위로 민다
     const upp = (2 * dist * Math.tan((camera.fov * DEG) / 2)) / Math.max(1, size.height);

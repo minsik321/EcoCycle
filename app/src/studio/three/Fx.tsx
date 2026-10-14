@@ -1,20 +1,39 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import type { MutableRefObject } from 'react';
-import { Color, DoubleSide, Matrix4, MeshBasicMaterial, PMREMGenerator, Quaternion, RingGeometry, Vector3 } from 'three';
-import type { InstancedMesh, Mesh, PerspectiveCamera } from 'three';
+import {
+  BoxGeometry,
+  CircleGeometry,
+  Color,
+  ConeGeometry,
+  CylinderGeometry,
+  DoubleSide,
+  EdgesGeometry,
+  LineBasicMaterial,
+  Matrix4,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  PMREMGenerator,
+  Quaternion,
+  RingGeometry,
+  SphereGeometry,
+  Vector3,
+} from 'three';
+import type { Group, InstancedMesh, LineSegments, Mesh, PerspectiveCamera } from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { sceneStats } from '../../scene/stats';
 import type { Director } from '../sim/director';
 import { samplePath } from '../sim/paths';
 import { C } from '../theme';
-import { chunkGeometry } from './kit';
-import { studioStats } from './stats';
+import { useClockWaker } from './motion';
+import { frameStats, studioStats } from './stats';
 
-// 장면의 연출 요소: 시간 진행, 환경광, 선택 고리, 경로 점선, 핀 투영.
+// 장면의 연출 요소: 시간 진행, 환경광, 선택 고리·선 상자, 경로 점선과 목적지 핀, 핀 투영.
 
-/** 월드 시계를 돌린다. 끊기면(frozen) 돌리지 않아 모든 움직임이 멈춘다 */
-export function Sim({ director, frozen }: { director: Director; frozen: boolean }) {
+/**
+ * 그린 장 수와 그린 양을 센다 (측정 화면용). 월드 시계는 Stage의 Pacer가 돌린다
+ * (필요할 때만 그리므로, 그리는 횟수와 시계가 따로 간다. 끊기면 Pacer가 시계를 돌리지 않는다).
+ */
+export function Sim() {
   const gl = useThree((s) => s.gl);
   useEffect(() => {
     // 후처리가 여러 번 나눠 그리므로 프레임 단위로 직접 합산한다
@@ -25,16 +44,15 @@ export function Sim({ director, frozen }: { director: Director; frozen: boolean 
       info.autoReset = before;
     };
   }, [gl]);
-  useFrame((_, delta) => {
-    sceneStats.frames += 1;
-    sceneStats.lastFrameMs = performance.now();
+  useFrame(() => {
+    frameStats.frames += 1;
+    frameStats.lastFrameMs = performance.now();
     // 지난 프레임에 그린 양을 적어 두고 다시 센다
     studioStats.calls = gl.info.render.calls;
     studioStats.triangles = gl.info.render.triangles;
     studioStats.geometries = gl.info.memory.geometries;
     studioStats.textures = gl.info.memory.textures;
     gl.info.reset();
-    if (!frozen) director.step(delta);
   }, -1);
   return null;
 }
@@ -62,7 +80,7 @@ export function EnvLight({ intensity = 0.55 }: { intensity?: number }) {
 /** 선택한 대상 아래에서 퍼지는 고리 */
 export function SelectionRing({ director, focusKey }: { director: Director; focusKey: string | null }) {
   const rings = useRef<Array<Mesh | null>>([]);
-  const geometry = useMemo(() => new RingGeometry(0.86, 1, 64).rotateX(-Math.PI / 2), []);
+  const geometry = useMemo(() => new RingGeometry(0.93, 1, 72).rotateX(-Math.PI / 2), []);
   const materials = useMemo(() => [0, 1, 2].map(() => new MeshBasicMaterial({ color: new Color(C.blue).multiplyScalar(1.6), transparent: true, depthWrite: false, toneMapped: false, side: DoubleSide })), []);
   const anchor = useMemo(() => ({ x: 0, y: 0, z: 0 }), []);
   useEffect(
@@ -73,9 +91,10 @@ export function SelectionRing({ director, focusKey }: { director: Director; focu
     [geometry, materials],
   );
 
+  useClockWaker(director, () => focusKey !== null);
   useFrame(() => {
     const found = focusKey !== null && director.anchor(focusKey, anchor, 'focus');
-    const base = focusKey?.startsWith('dev:tank') ? 1.55 : focusKey?.startsWith('dev:compressor') ? 1.9 : focusKey?.startsWith('dev:conveyor') ? 1.7 : focusKey?.startsWith('bale') ? 0.9 : 1.35;
+    const base = focusKey?.startsWith('dev:tank') ? 1.55 : focusKey?.startsWith('dev:compressor') ? 1.9 : focusKey?.startsWith('dev:conveyor') ? 1.7 : focusKey?.startsWith('bale') ? 0.8 : focusKey === 'forklift' ? 1.0 : 1.7;
     rings.current.forEach((ring, i) => {
       if (!ring) return;
       ring.visible = found;
@@ -83,8 +102,8 @@ export function SelectionRing({ director, focusKey }: { director: Director; focu
       // 고리 하나는 제자리, 둘은 시간차로 퍼지며 옅어진다 (월드 시계를 쓰므로 끊기면 멈춘다)
       const u = i === 0 ? 0 : (director.t * 0.55 + (i - 1) * 0.5) % 1;
       ring.position.set(anchor.x, 0.1 + i * 0.004, anchor.z);
-      ring.scale.setScalar(base * (1 + u * 0.75));
-      materials[i]!.opacity = i === 0 ? 0.95 : (1 - u) * 0.6;
+      ring.scale.setScalar(base * (1 + u * 0.45));
+      materials[i]!.opacity = i === 0 ? 0.55 : (1 - u) * 0.35;
     });
   });
 
@@ -97,15 +116,102 @@ export function SelectionRing({ director, focusKey }: { director: Director; focu
   );
 }
 
-const DASHES = 160;
-const DASH_GAP = 0.55;
+const DOTS = 120;
+const DOT_GAP = 0.42;
 
-/** 움직이는 차량의 남은 경로를 흐르는 점선으로 그린다 */
+/**
+ * 고른 차량(또는 지게차)이 가는 남은 길을 흐르는 점선으로, 목적지를 지도식 핀으로 그린다 (참고 화면 10).
+ * 점이 흐르는 것과 핀이 떠 있는 것은 월드 시계를 쓰므로 끊기면 멈춘다.
+ */
 export function Routes({ director, keys }: { director: Director; keys: MutableRefObject<string[]> }) {
   const ref = useRef<InstancedMesh>(null);
-  const geometry = useMemo(() => chunkGeometry(0.3, 0.02, 0.085, 0.009), []);
-  const material = useMemo(() => new MeshBasicMaterial({ color: new Color(C.blue).multiplyScalar(1.35), toneMapped: false }), []);
-  const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(1, 1, 1), up: new Vector3(0, 1, 0), pose: { x: 0, z: 0, heading: 0 } }), []);
+  const pin = useRef<Group>(null);
+  const geometry = useMemo(() => new CylinderGeometry(0.075, 0.075, 0.02, 16), []);
+  const material = useMemo(() => new MeshBasicMaterial({ color: new Color(C.blue).multiplyScalar(1.25), toneMapped: false, transparent: true, opacity: 0.9 }), []);
+  const pinParts = useMemo(() => {
+    const blue = new MeshStandardMaterial({ color: C.blue, roughness: 0.35, metalness: 0 });
+    const white = new MeshStandardMaterial({ color: '#ffffff', roughness: 0.5 });
+    const halo = new MeshBasicMaterial({ color: new Color(C.blue), transparent: true, opacity: 0.22, depthWrite: false, toneMapped: false });
+    return {
+      head: new SphereGeometry(0.24, 28, 20),
+      tip: new ConeGeometry(0.155, 0.36, 24).rotateX(Math.PI),
+      dot: new SphereGeometry(0.09, 18, 12),
+      disc: new CircleGeometry(0.32, 40).rotateX(-Math.PI / 2),
+      blue,
+      white,
+      halo,
+    };
+  }, []);
+  const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(1, 1, 1), pose: { x: 0, z: 0, heading: 0 } }), []);
+  useEffect(
+    () => () => {
+      geometry.dispose();
+      material.dispose();
+      Object.values(pinParts).forEach((part) => part.dispose());
+    },
+    [geometry, material, pinParts],
+  );
+
+  useClockWaker(director, () => keys.current.length > 0);
+  useFrame(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    let n = 0;
+    let end: { x: number; z: number } | null = null;
+    const flow = (director.t * 0.8) % DOT_GAP;
+    for (const key of keys.current) {
+      const route = director.route(key);
+      if (!route) continue;
+      for (let s = route.from + 1.7 + (DOT_GAP - flow); s < route.path.total - 0.5 && n < DOTS; s += DOT_GAP) {
+        samplePath(route.path, s, tmp.pose);
+        mesh.setMatrixAt(n, tmp.m.compose(tmp.p.set(tmp.pose.x, 0.05, tmp.pose.z), tmp.q.identity(), tmp.s));
+        n += 1;
+      }
+      samplePath(route.path, route.path.total, tmp.pose);
+      end = { x: tmp.pose.x, z: tmp.pose.z };
+    }
+    mesh.count = n;
+    mesh.instanceMatrix.needsUpdate = true;
+    const p = pin.current;
+    if (p) {
+      p.visible = end !== null;
+      if (end) p.position.set(end.x, 0, end.z);
+      const head = p.children[0];
+      if (head) head.position.y = 0.85 + Math.sin(director.t * 2.4) * 0.05;
+    }
+  });
+
+  return (
+    <>
+      <instancedMesh ref={ref} args={[geometry, material, DOTS]} frustumCulled={false} renderOrder={4} />
+      <group ref={pin} visible={false}>
+        <group>
+          <mesh geometry={pinParts.head} material={pinParts.blue} castShadow />
+          <mesh geometry={pinParts.tip} material={pinParts.blue} position={[0, -0.26, 0]} castShadow />
+          <mesh geometry={pinParts.dot} material={pinParts.white} position={[0, 0.03, 0.18]} scale={[1, 1, 0.5]} />
+        </group>
+        <mesh geometry={pinParts.disc} material={pinParts.halo} position={[0, 0.04, 0]} renderOrder={4} />
+      </group>
+    </>
+  );
+}
+
+/** 고른 대상을 감싸는 가는 선 상자 (참고 화면 06·10). 차량은 방향을 따라 돈다 */
+const BOX_SIZE: Record<string, [number, number, number]> = {
+  veh: [3.2, 1.95, 1.45],
+  forklift: [1.55, 1.85, 1.0],
+  bale: [1.1, 0.8, 0.9],
+  'dev:robot-1': [2.4, 3.6, 2.4],
+  'dev:conveyor-z': [8.1, 1.1, 1.4],
+  'dev:compressor-1': [2.3, 2.1, 5.4],
+  dev: [3.7, 2.1, 1.6],
+};
+
+export function SelectionBox({ director, focusKey }: { director: Director; focusKey: string | null }) {
+  const ref = useRef<LineSegments>(null);
+  const geometry = useMemo(() => new EdgesGeometry(new BoxGeometry(1, 1, 1)), []);
+  const material = useMemo(() => new LineBasicMaterial({ color: new Color(C.blue).multiplyScalar(1.2), transparent: true, opacity: 0.75, toneMapped: false }), []);
+  const anchor = useMemo(() => ({ x: 0, y: 0, z: 0 }), []);
   useEffect(
     () => () => {
       geometry.dispose();
@@ -113,35 +219,21 @@ export function Routes({ director, keys }: { director: Director; keys: MutableRe
     },
     [geometry, material],
   );
-
+  useClockWaker(director, () => focusKey !== null);
   useFrame(() => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    let n = 0;
-    const flow = (director.t * 0.9) % DASH_GAP;
-    for (const key of keys.current) {
-      const route = director.route(key);
-      if (!route) continue;
-      for (let s = route.from + 1.9 + (DASH_GAP - flow); s < route.path.total - 0.2 && n < DASHES; s += DASH_GAP) {
-        samplePath(route.path, s, tmp.pose);
-        tmp.q.setFromAxisAngle(tmp.up, tmp.pose.heading);
-        mesh.setMatrixAt(n, tmp.m.compose(tmp.p.set(tmp.pose.x, 0.05, tmp.pose.z), tmp.q, tmp.s));
-        n += 1;
-      }
-      // 목적지 표시
-      if (n < DASHES) {
-        samplePath(route.path, route.path.total, tmp.pose);
-        tmp.q.setFromAxisAngle(tmp.up, director.t * 1.5);
-        mesh.setMatrixAt(n, tmp.m.compose(tmp.p.set(tmp.pose.x, 0.05, tmp.pose.z), tmp.q, tmp.s.set(1.3, 1, 3.6)));
-        tmp.s.set(1, 1, 1);
-        n += 1;
-      }
-    }
-    mesh.count = n;
-    mesh.instanceMatrix.needsUpdate = true;
+    const box = ref.current;
+    if (!box) return;
+    const found = focusKey !== null && director.anchor(focusKey, anchor, 'focus');
+    box.visible = found;
+    if (!found || !focusKey) return;
+    const kind = focusKey.split(':')[0] ?? '';
+    const size = BOX_SIZE[focusKey] ?? BOX_SIZE[kind] ?? BOX_SIZE.dev!;
+    box.scale.set(...size);
+    box.position.set(anchor.x, size[1] / 2 + 0.03, anchor.z);
+    box.rotation.y = director.heading(focusKey);
+    material.opacity = 0.55 + Math.sin(director.t * 3) * 0.2;
   });
-
-  return <instancedMesh ref={ref} args={[geometry, material, DASHES]} frustumCulled={false} />;
+  return <lineSegments ref={ref} geometry={geometry} material={material} visible={false} renderOrder={5} />;
 }
 
 export type PinElements = Record<string, HTMLElement | null>;
@@ -156,7 +248,7 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
   useFrame(() => {
     // 멀리서 볼 때는 핀을 작게 줄인다 (바닥 1m가 화면에서 몇 픽셀인지로 판단)
     const pxPerUnit = (size.height / (2 * Math.tan(((camera as PerspectiveCamera).fov * Math.PI) / 360))) / Math.max(1, camera.position.length());
-    const level = pxPerUnit < 36 ? 'far' : 'near';
+    const level = pxPerUnit < 22 ? 'far' : pxPerUnit < 60 ? 'mid' : 'near';
     if (level !== zoom.current) {
       const first = Object.values(pins.current).find((el) => el);
       const holder = first?.parentElement;

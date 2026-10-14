@@ -1,9 +1,12 @@
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { isFullBleedPath } from '../../config/navigation';
 import { CommandResultToast } from '../controls/CommandResultToast';
 import { OfflineNotice } from '../status/OfflineNotice';
 import { Sidebar } from './Sidebar';
+import { ShellChromeContext } from './shellChrome';
+import type { ShellChrome } from './shellChrome';
 import { TopBar } from './TopBar';
 
 /**
@@ -22,16 +25,22 @@ export interface AppShellProps {
 
 export function AppShell({ headerCenter, headerExtra, overlays }: AppShellProps = {}) {
   const bleed = isFullBleedPath(useLocation().pathname);
+  // 홈의 스튜디오 탭처럼 자기 상단 바 하나로 화면 전체를 쓰는 화면이 있으면 메뉴·상단 바·끊김 안내를 그 화면에 맡긴다 (shellChrome.tsx)
+  const [immersive, setImmersive] = useState(false);
+  const chrome = useMemo<ShellChrome>(() => ({ setImmersive, extra: headerExtra }), [headerExtra]);
 
   return (
     <div className="flex h-full flex-col bg-paper text-ink md:flex-row">
-      <Sidebar className="order-last md:order-first" />
+      {!immersive && <Sidebar className="order-last md:order-first" />}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <TopBar center={headerCenter} extra={headerExtra} />
+        {!immersive && <TopBar center={headerCenter} extra={headerExtra} />}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <OfflineNotice className={bleed ? 'absolute inset-x-4 top-3 z-20' : 'mx-4 mt-3'} />
-          <main className={`min-h-0 flex-1 ${bleed ? 'overflow-hidden' : 'overflow-auto p-4'}`}>
-            <Outlet />
+          {!immersive && <OfflineNotice className={bleed ? 'absolute inset-x-4 top-3 z-20' : 'mx-4 mt-3'} />}
+          {/* 틀을 넘겨받은 화면은 스스로 가득 채운다(홈은 안쪽 여백을 음수 여백으로 지운다). 스크롤만 막는다 */}
+          <main className={`min-h-0 flex-1 ${bleed ? 'overflow-hidden' : immersive ? 'overflow-hidden p-4' : 'overflow-auto p-4'}`}>
+            <ShellChromeContext.Provider value={chrome}>
+              <Outlet />
+            </ShellChromeContext.Provider>
           </main>
         </div>
       </div>

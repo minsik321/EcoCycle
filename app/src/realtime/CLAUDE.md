@@ -32,7 +32,7 @@ realtime/
 - `robot.joints`:
   - store(Redux)에 넣지 않는다. 초당 10~20회 상태 갱신은 리렌더를 일으킨다.
   - `seq`가 이전보다 작거나 같으면 버린다. `ts`로 지연을 확인한다.
-  - `jointBuffer.sample(now)`가 지연 버퍼 기준으로 보간된 관절 각도·그리퍼를 돌려주고, `scene`의 `useFrame`에서 이것을 읽는다.
+  - `jointBuffer.sample(now)`가 지연 버퍼 기준으로 보간된 관절 각도·그리퍼를 돌려주고, 3D 홈(`studio`)의 로봇팔이 매 프레임 이것을 읽는다.
   - 관절 순서·단위·영점은 `/robots/{id}/model`(없으면 `config/robotModel`)을 따른다. 여기서 변환하지 않고 원래 값을 그대로 저장한다.
 - 앱이 백그라운드로 가면(visibilitychange, Capacitor 앱 상태) 관절 구독을 해제하고, 돌아오면 다시 구독 + REST 재동기화.
 - 단위 테스트: 보간, seq 역순 처리, 15초 감시 타이머, 구독 차이 계산은 가짜 타이머로 테스트한다.

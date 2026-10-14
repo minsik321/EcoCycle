@@ -10,7 +10,8 @@ components/
 │                  KpiCard + Sparkline(지표 카드와 작은 추이선), Tabs, DataTable, ToastCard(알림 카드 한 장)
 ├── status/        StatusBadge(색+기호+글자), OfflineNotice, Timestamp, useDisplayStatus(끊기면 모든 상태를 "연결 끊김"으로), tone(색 클래스)
 ├── controls/      DeviceControls, CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
-├── layout/        Sidebar, TopBar(로고·시계·알람 수·연결 상태·화질·사용자), AppShell(슬롯: headerCenter·headerExtra·overlays), TopCards
+├── layout/        Sidebar, TopBar(로고·시계·알람 수·연결 상태·화질·사용자), AppShell(슬롯: headerCenter·headerExtra·overlays), TopCards,
+│                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 메뉴·상단 바·끊김 안내를 숨기고 headerExtra를 넘긴다. 3D 홈만 쓴다)
 ├── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
 └── device/        기기 페이지 틀: DevicePage(배치), DeviceHero(이름·큰 상태 칩·지금 하는 일·그림), KeyTile/KeyTiles(최대 4개, 작은 추이선),
                    NowNext(지금/다음), ActionBar·DeviceActionBar(위험도 낮은 조작 + 알람 확인), DetailsSection("자세히", 처음엔 닫힘), live(연결 상태)

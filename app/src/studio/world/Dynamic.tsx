@@ -9,16 +9,22 @@ import { buildLump } from '../actors/build';
 import type { Director } from '../sim/director';
 import { C } from '../theme';
 import { Kit, MAT, chunkGeometry, disposeTree } from '../three/kit';
-import { BALER, BAY, BAY_Z, CONVEYOR, GATE, HALL, ROAD, deviceCenter } from './layout';
+import { useClockWaker } from '../three/motion';
+import { BALER, BAY, BAY_Z, CONVEYOR, GATE, HALL, ROAD, SITE, deviceCenter } from './layout';
+import { bakeGroundShadow, disposeBaked } from '../three/bakedShadow';
 import { buildWorld } from './buildWorld';
 
 // 월드의 고정물과, 기기 값에 따라 움직이는 부분(벨트·램·더미·차단기).
 
 const HIT = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 
-/** 고정물. 카메라 쪽을 향한 본관 벽은 숨겨 안이 보이게 한다 */
-export function World() {
+/** 고정물. 카메라 쪽을 향한 본관 벽은 숨겨 안이 보이게 한다. baked면 미리 구운 바닥 그림자를 얹는다 (low 단계) */
+export function World({ baked = false }: { baked?: boolean }) {
   const world = useMemo(buildWorld, []);
+  const shadow = useMemo(() => (baked ? bakeGroundShadow(world.footprints, { minX: SITE.minX - 6, maxX: SITE.maxX + 6, minZ: SITE.minZ - 6, maxZ: SITE.maxZ + 6 }) : null), [baked, world]);
+  useEffect(() => () => {
+    if (shadow) disposeBaked(shadow);
+  }, [shadow]);
   const camera = useThree((s) => s.camera);
   useEffect(
     () => () => {
@@ -37,6 +43,7 @@ export function World() {
   return (
     <>
       <primitive object={world.base} />
+      {shadow && <primitive object={shadow} />}
       {world.walls.map((w) => (
         <primitive key={w.group.name} object={w.group} />
       ))}
@@ -49,9 +56,13 @@ export function World() {
 const PER_BAY = 300;
 const PILE_TONES: Record<SectorGrade, string[]> = {
   // 등급은 서버 값이다. 화면은 등급에 따라 색 섞임만 달리한다
-  A: [C.paper, C.paper, C.paperGrey, C.kraftLight, '#ffffff', C.paper],
-  C: [C.kraft, C.kraftLight, C.kraftDark, C.kraft, C.paperGrey, C.kraftLight],
+  A: [C.kraftLight, C.paper, C.kraft, C.kraftLight, C.paperGrey, C.paper],
+  C: [C.kraft, C.kraftLight, C.kraftDark, C.kraft, C.paperGrey, C.kraftDark],
 };
+/** 칸 바닥의 등급 색과 입구 띠 색 */
+const GRADE_FLOOR: Record<SectorGrade, string> = { A: C.gradeA, C: C.gradeC };
+const GRADE_EDGE: Record<SectorGrade, string> = { A: '#b8cdf6', C: '#f3cf8f' };
+const NO_GRADE = C.concreteDark;
 
 interface Chunk {
   x: number;
@@ -98,8 +109,16 @@ export function Piles({ director, grades }: { director: Director; grades: Partia
   const geometry = useMemo(() => chunkGeometry(0.34, 0.2, 0.27, 0.05), []);
   const chunks = useMemo(() => TANK_IDS.map((id, i) => pileChunks(id, 11 + i * 101)), []);
   const shown = useRef<number[]>([-1, -1, -1, -1]);
+  const tints = useRef<InstancedMesh>(null);
+  const slab = useMemo(() => chunkGeometry(1, 1, 1, 0.002), []);
   const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(), e: new Color() }), []);
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(
+    () => () => {
+      geometry.dispose();
+      slab.dispose();
+    },
+    [geometry, slab],
+  );
 
   const gradeKey = TANK_IDS.map((id) => grades[id] ?? '-').join('');
   useEffect(() => {
@@ -110,6 +129,26 @@ export function Piles({ director, grades }: { director: Director; grades: Partia
       for (let i = 0; i < PER_BAY; i += 1) mesh.setColorAt(b * PER_BAY + i, tmp.e.set(tones[(i * 7 + b) % tones.length]!));
     });
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    // 칸 바닥(옅은 등급 색), 입구 띠, 칸막이 안쪽 띠 두 장 (칸마다 네 장)
+    const floor = tints.current;
+    if (floor) {
+      TANK_IDS.forEach((id, b) => {
+        const grade = grades[id];
+        const [z0, z1] = BAY_Z[id];
+        const zc = (z0 + z1) / 2;
+        floor.setMatrixAt(b * 4, tmp.m.compose(tmp.p.set((BAY.minX + BAY.maxX) / 2, 0.087, zc), tmp.q.identity(), tmp.s.set(BAY.maxX - BAY.minX - 0.1, 0.012, z1 - z0 - 0.22)));
+        floor.setColorAt(b * 4, tmp.e.set(grade ? GRADE_FLOOR[grade] : NO_GRADE));
+        floor.setMatrixAt(b * 4 + 1, tmp.m.compose(tmp.p.set(BAY.maxX - 0.12, 0.094, zc), tmp.q.identity(), tmp.s.set(0.16, 0.012, z1 - z0 - 0.22)));
+        floor.setColorAt(b * 4 + 1, tmp.e.set(grade ? GRADE_EDGE[grade] : NO_GRADE));
+        // 칸막이 안쪽 면의 아래 띠 (중간 거리에서도 등급 색이 보이게)
+        for (const [j, z] of [[2, z0 + 0.112], [3, z1 - 0.112]] as const) {
+          floor.setMatrixAt(b * 4 + j, tmp.m.compose(tmp.p.set((BAY.minX + BAY.maxX) / 2, 0.36, z), tmp.q.identity(), tmp.s.set(BAY.maxX - BAY.minX - 0.12, 0.5, 0.02)));
+          floor.setColorAt(b * 4 + j, tmp.e.set(grade ? GRADE_EDGE[grade] : NO_GRADE));
+        }
+      });
+      floor.instanceMatrix.needsUpdate = true;
+      if (floor.instanceColor) floor.instanceColor.needsUpdate = true;
+    }
     // gradeKey(등급 묶음)가 바뀔 때만 다시 칠한다
   }, [gradeKey, tmp]);
 
@@ -135,7 +174,12 @@ export function Piles({ director, grades }: { director: Director; grades: Partia
     if (changed) mesh.instanceMatrix.needsUpdate = true;
   });
 
-  return <instancedMesh ref={ref} args={[geometry, MAT.clay, PER_BAY * TANK_IDS.length]} castShadow receiveShadow frustumCulled={false} />;
+  return (
+    <>
+      <instancedMesh ref={ref} args={[geometry, MAT.clay, PER_BAY * TANK_IDS.length]} castShadow receiveShadow frustumCulled={false} />
+      <instancedMesh ref={tints} args={[slab, MAT.clay, TANK_IDS.length * 4]} receiveShadow frustumCulled={false} />
+    </>
+  );
 }
 
 // ── 컨베이어 벨트와 뭉치 ──────────────────────────────────────────────
@@ -148,7 +192,7 @@ export function Belt({ director }: { director: Director }) {
   const slats = useRef<InstancedMesh>(null);
   const body = useMemo(() => {
     const k = new Kit('clay');
-    k.box('#434b5a', [length, 0.07, CONVEYOR.width], [(CONVEYOR.startX + CONVEYOR.endX) / 2, CONVEYOR.topY - 0.075, CONVEYOR.z], { r: 0.03 });
+    k.box('#9aa3b1', [length, 0.07, CONVEYOR.width], [(CONVEYOR.startX + CONVEYOR.endX) / 2, CONVEYOR.topY - 0.075, CONVEYOR.z], { r: 0.03 });
     return k.build('belt');
   }, [length]);
   const slatGeometry = useMemo(() => chunkGeometry(0.07, 0.012, CONVEYOR.width - 0.1, 0.004), []);
@@ -165,7 +209,7 @@ export function Belt({ director }: { director: Director }) {
   useEffect(() => {
     const mesh = slats.current;
     if (!mesh) return;
-    const tone = new Color('#5d6676');
+    const tone = new Color('#b9c0cb');
     for (let i = 0; i < count; i += 1) mesh.setColorAt(i, tone);
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [count]);
@@ -211,6 +255,8 @@ const LIGHTS: Array<{ key: Exclude<DeviceStatus, 'offline'>; on: string; y: numb
 ];
 
 export function BalerParts({ director, status }: { director: Director; status: DeviceStatus }) {
+  // 경고등 깜빡임은 경보일 때만 그리기를 깨운다
+  useClockWaker(director, () => status === 'alarm');
   const ram = useRef<Group>(null);
   const paper = useRef<Group>(null);
   const lights = useRef<Array<Mesh | null>>([]);

@@ -2,12 +2,13 @@ import { useFrame } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import { Group } from 'three';
-import type { ChainSpec } from '../../scene/robot/chain';
-import { emptySample } from '../../scene/robot/jointSource';
-import type { JointSource } from '../../scene/robot/jointSource';
+import type { ChainSpec } from '../robot/chain';
+import { emptySample } from '../robot/jointSource';
+import type { JointSource } from '../robot/jointSource';
 import type { Director } from '../sim/director';
 import { C } from '../theme';
 import { Kit, disposeTree } from '../three/kit';
+import { useWaker } from '../three/motion';
 import { ROBOT } from '../world/layout';
 import { buildLump } from './build';
 
@@ -102,6 +103,12 @@ function build(spec: ChainSpec): Built {
   return { root, joints, fingerA, fingerB, lump };
 }
 
+function poseKey(joints: ArrayLike<number>, holding: boolean): number {
+  let k = holding ? 0.5 : 0;
+  for (let i = 0; i < joints.length; i += 1) k += (joints[i] ?? 0) * (i + 1.37);
+  return k;
+}
+
 export interface RobotProps {
   spec: ChainSpec;
   source: JointSource;
@@ -113,6 +120,9 @@ export interface RobotProps {
 export function Robot({ spec, source, frozen, director, onSelect }: RobotProps) {
   const built = useMemo(() => build(spec), [spec]);
   const sample = useMemo(emptySample, []);
+  const peek = useMemo(emptySample, []);
+  /** 마지막으로 그린 자세 (관절 값의 합). 새 값이 이와 다르면 한 장 더 그린다 */
+  const drawnKey = useRef(Number.NaN);
   const posed = useRef(false);
   const holding = useRef(false);
   useEffect(() => () => disposeTree(built.root), [built]);
@@ -135,6 +145,15 @@ export function Robot({ spec, source, frozen, director, onSelect }: RobotProps) 
     // 놓는 순간(놓기 단계에서 잡고 있다가 놓음) 컨베이어 위에 뭉치가 생긴다
     if (holding.current && !sample.gripper.holding && sample.phase !== 'pick' && !frozen) director.robotReleased();
     holding.current = sample.gripper.holding;
+    drawnKey.current = poseKey(sample.joints, sample.gripper.holding);
+  });
+
+  // 필요할 때만 그리기: 관절 값이 마지막으로 그린 자세와 다르거나 손가락이 아직 움직이는 중이면 깨운다
+  useWaker(() => {
+    if (frozen && posed.current) return false;
+    if (!source.read(Date.now(), peek)) return false;
+    const gap = peek.gripper.closed ? FINGER_CLOSED : FINGER_OPEN;
+    return poseKey(peek.joints, peek.gripper.holding) !== drawnKey.current || Math.abs(gap - built.fingerA.position.x) > 0.001;
   });
 
   return (

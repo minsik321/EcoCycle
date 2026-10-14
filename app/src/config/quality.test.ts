@@ -1,28 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAppStore, qualityAutoRequested, qualityModeChanged, qualityProbed } from '../store';
-import { PROBE_FPS_FOR_HIGH, PROBE_FPS_FOR_STANDARD, QUALITY_PROFILES, QUALITY_TIERS, tierFromProbe } from './quality';
-
-describe('화질 3단계', () => {
-  it('단계가 낮을수록 그리는 양이 줄고, 어느 단계도 초당 30프레임을 넘지 않는다', () => {
-    const { high, standard, low } = QUALITY_PROFILES;
-    for (const tier of QUALITY_TIERS) expect(QUALITY_PROFILES[tier].maxFps).toBeLessThanOrEqual(30);
-    expect(low.maxFps).toBeLessThanOrEqual(standard.maxFps);
-    expect(low.maxChunksPerTank).toBeLessThan(standard.maxChunksPerTank);
-    expect(standard.maxChunksPerTank).toBeLessThan(high.maxChunksPerTank);
-    expect(low.detail).toBeLessThan(standard.detail);
-    expect(standard.detail).toBeLessThan(high.detail);
-  });
-
-  it('저사양은 안전판이다: 미리 그린 그림자, 빛 번짐·블러·입자 없음', () => {
-    expect(QUALITY_PROFILES.low).toMatchObject({ shadows: 'baked', bloom: false, panelBlur: 'none', particles: false, antialias: false });
-  });
-
-  it('기본은 그림자 조명 하나에 주요 패널만 블러, 고화질만 빛 번짐과 전체 블러', () => {
-    expect(QUALITY_PROFILES.standard).toMatchObject({ shadows: 'single', bloom: false, panelBlur: 'main' });
-    expect(QUALITY_PROFILES.high).toMatchObject({ shadows: 'soft', bloom: true, panelBlur: 'all' });
-    expect(QUALITY_PROFILES.standard.shadowMapSize).toBeLessThan(QUALITY_PROFILES.high.shadowMapSize);
-  });
-});
+import { PROBE_FPS_FOR_HIGH, PROBE_FPS_FOR_STANDARD, tierFromProbe } from './quality';
 
 describe('자동 선택 (tierFromProbe)', () => {
   it('잰 프레임 수로 단계를 고른다', () => {

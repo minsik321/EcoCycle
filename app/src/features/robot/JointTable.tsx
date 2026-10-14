@@ -36,7 +36,8 @@ export function JointTable() {
                 <th scope="col" className="py-1 font-medium">관절</th>
                 <th scope="col" className="py-1 font-medium">각도</th>
                 <th scope="col" className="py-1 font-medium">범위</th>
-                <th scope="col" className="w-1/3 py-1 font-medium">
+                {/* 폰에서는 칸이 모자라 막대(각도·범위 숫자를 그림으로 보인 것)를 뺀다 */}
+                <th scope="col" className="hidden w-1/3 py-1 font-medium sm:table-cell">
                   <span className="sr-only">범위 안 위치</span>
                 </th>
               </tr>
@@ -51,11 +52,11 @@ export function JointTable() {
                     <th scope="row" className="py-2 pr-3 font-medium text-slate-800">
                       {i + 1}. {joint.name}
                     </th>
-                    <td className="py-2 pr-3 text-lg font-semibold text-slate-900">{value === undefined ? '–' : formatAngleDeg(value)}</td>
-                    <td className="py-2 pr-3 text-sm text-slate-500">
+                    <td className="py-2 pr-3 text-lg font-semibold whitespace-nowrap text-slate-900 tabular-nums">{value === undefined ? '–' : formatAngleDeg(value)}</td>
+                    <td className="py-2 pr-3 text-sm whitespace-nowrap text-slate-500 tabular-nums">
                       {joint.minDeg}° ~ {joint.maxDeg}°
                     </td>
-                    <td className="py-2">
+                    <td className="hidden py-2 sm:table-cell">
                       <div
                         role="meter"
                         aria-label={`${joint.name} 범위 안 위치`}

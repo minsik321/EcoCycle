@@ -5,7 +5,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { act, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RULES } from '@ecocycle/shared';
@@ -25,6 +24,7 @@ import { RobotPage } from './features/robot';
 import { SettingsPage } from './features/settings';
 import { TankPage } from './features/tank';
 import { AppShell } from './components/layout/AppShell';
+import { DeviceControls } from './components/controls/DeviceControls';
 
 vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
@@ -136,19 +136,16 @@ describe.each(ROLES)('역할 %s', (role) => {
   const me = user(role);
   const m = MATRIX[role];
 
-  it('홈: 로봇 확대 화면의 낮은 위험 조작', async () => {
-    renderWithStore(<HomePage />, { me, devices: [robotState(), tankState()] });
-    await userEvent.click(screen.getByRole('button', { name: /^로봇팔/ }));
-    const panel = screen.getByLabelText('로봇팔 확대 화면');
+  it('홈: 3D 홈 상세 패널의 낮은 위험 조작 (3D 홈이 끼우는 조작 컴포넌트와 같다)', () => {
+    renderWithStore(<DeviceControls deviceId="robot-1" context="home" />, { me, devices: [robotState(), tankState()] });
     for (const name of ['시작', '일시정지', '재개', '정지']) {
-      const button = within(panel).queryByRole('button', { name });
+      const button = screen.queryByRole('button', { name });
       if (m.quick) expect(button).toBeEnabled();
       else expect(button).not.toBeInTheDocument(); // 보낼 수 있는 조작이 하나도 없으면 아예 보이지 않는다
     }
     // 위험 조작은 홈에 없다 (어떤 역할이든)
-    expect(within(panel).queryByRole('button', { name: /모드로 전환/ })).not.toBeInTheDocument();
-    expect(within(panel).queryByRole('button', { name: '탱크 지정 집기' })).not.toBeInTheDocument();
-    expect(within(panel).getByRole('link', { name: '상세 보기' })).toBeInTheDocument(); // 조회는 모두 가능
+    expect(screen.queryByRole('button', { name: /모드로 전환/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '탱크 지정 집기' })).not.toBeInTheDocument();
   });
 
   it('홈: 알람 확인 버튼', () => {

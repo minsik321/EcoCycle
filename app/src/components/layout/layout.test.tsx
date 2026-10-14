@@ -1,12 +1,13 @@
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router-dom';
+import { Link, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import * as api from '../../api';
 import { alarmReceived } from '../../store';
 import type { NavItem } from '../../config/navigation';
 import { ADMIN, OPERATOR, VIEWER, renderWithStore } from '../../test/utils';
 import { AppShell } from './AppShell';
+import { useImmersiveShell } from './shellChrome';
 import { Sidebar } from './Sidebar';
 import { TopCards } from './TopCards';
 
@@ -129,6 +130,64 @@ describe('AppShell', () => {
     shell('/');
     const nav = screen.getByRole('navigation', { name: '주 메뉴' });
     expect(nav).toHaveClass('order-last', 'md:order-first');
+  });
+});
+
+/** 틀을 넘겨받는 화면 (홈의 스튜디오 탭처럼): 받은 extra를 자기 자리에 그린다 */
+function Immersive() {
+  const chrome = useImmersiveShell();
+  return <div>몰입 화면 {chrome?.extra}</div>;
+}
+
+describe('AppShell: 화면이 틀을 넘겨받는다 (shellChrome)', () => {
+  it('넘겨받은 화면이 있는 동안에만 메뉴·상단 바·끊김 안내를 숨기고, 틀의 extra를 그 화면에 넘긴다', () => {
+    const { store } = renderWithStore(
+      <Routes>
+        <Route element={<AppShell headerExtra={<button type="button">CCTV</button>} />}>
+          <Route index element={<Immersive />} />
+          <Route path="alarms" element={<div>알람 내용</div>} />
+        </Route>
+      </Routes>,
+      { route: '/', me: OPERATOR },
+    );
+    expect(screen.queryByRole('navigation', { name: '주 메뉴' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('main')).getByRole('button', { name: 'CCTV' })).toBeInTheDocument();
+    // 끊김 안내는 넘겨받은 화면이 스스로 보여 준다 (스튜디오의 "연결 끊김" 알림)
+    act(() => {
+      store.dispatch({ type: 'connection/connectionChanged', payload: { status: 'offline', lastReceivedAt: '2026-10-13T05:23:11.250Z' } });
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('그 화면을 벗어나면 틀이 돌아온다', async () => {
+    renderWithStore(
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route
+            index
+            element={
+              <>
+                <Immersive />
+                <Link to="/alarms">알람으로</Link>
+              </>
+            }
+          />
+          <Route path="alarms" element={<div>알람 내용</div>} />
+        </Route>
+      </Routes>,
+      { route: '/', me: OPERATOR },
+    );
+    expect(screen.queryByRole('navigation', { name: '주 메뉴' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: '알람으로' }));
+    expect(screen.getByRole('main')).toHaveTextContent('알람 내용');
+    expect(screen.getByRole('navigation', { name: '주 메뉴' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument();
+  });
+
+  it('틀 밖에서는 아무 일도 하지 않는다', () => {
+    renderWithStore(<Immersive />, { me: OPERATOR });
+    expect(screen.getByText('몰입 화면')).toBeInTheDocument();
   });
 });
 

@@ -1,7 +1,7 @@
 import type { RobotModel } from '@ecocycle/shared';
 
 // 범용 6축 로봇팔 가정 값 (docs/decisions.md, 질문 B5). 실제 기종이 정해지면 서버 `/robots/{id}/model` 값으로 덮어쓴다.
-// 구조가 크게 다른 로봇(굴착기형 등)이면 설정만으로 해결하지 말고 scene/objects/RobotArm을 새로 만든다.
+// 구조가 크게 다른 로봇(굴착기형 등)이면 설정만으로 해결하지 말고 studio/actors/Robot을 새로 만든다.
 // 단위: 각도는 도, 길이는 m.
 
 export const DEFAULT_ROBOT_MODEL: RobotModel = {

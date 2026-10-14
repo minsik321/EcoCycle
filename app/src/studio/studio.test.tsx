@@ -4,9 +4,9 @@ import userEvent from '@testing-library/user-event';
 import type { Group, Object3D } from 'three';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Bale, Batch, DeviceId, DeviceState, Vehicle } from '@ecocycle/shared';
-import { chainSpecFor } from '../scene/robot/chain';
-import { fixedSource } from '../scene/robot/jointSource';
-import type { JointSource } from '../scene/robot/jointSource';
+import { chainSpecFor } from './robot/chain';
+import { fixedSource } from './robot/jointSource';
+import type { JointSource } from './robot/jointSource';
 import { cctvToggled, connectionChanged, devicesReceived, vehicleReceived } from '../store';
 import { NOW, conveyorState, renderWithStore, robotState, tankState } from '../test/utils';
 import { LiveStudio } from './LiveStudio';
@@ -14,12 +14,17 @@ import type { StageProps } from './Stage';
 import { StudioView } from './StudioView';
 import { Robot } from './actors/Robot';
 import { demoData } from './demo/demoData';
+import { Detail, PhoneSheet, TrackerBar } from './overlay/Panels';
 import { cycleSteps } from './overlay/text';
 import { Director } from './sim/director';
-import { Sim } from './three/Fx';
+import { Pace } from './sim/pace';
+import { STUDIO_PROFILES, deviceClass, studioTier } from './quality';
 import type { StudioData } from './types';
 import { EMPTY_DATA } from './types';
-import { APRON, BALE_REST, SCALE, TRUCK, YARD, bayCenterZ } from './world/layout';
+import { APRON, AREAS, BALE_REST, DEFAULT_VIEW, SCALE, TIER_DISTANCE, TRUCK, VIEWS, WIDE_VIEW, YARD, bayCenterZ, closeDistance, tierOf } from './world/layout';
+import { Route, Routes } from 'react-router-dom';
+import { AppShell } from '../components/layout/AppShell';
+import { ADMIN } from '../test/utils';
 
 // 스튜디오 탭의 고정 규칙을 점검한다: 연결이 끊기면 모든 움직임이 멈추고 "연결 끊김"과 마지막 수신 시각이 보인다,
 // 화면이 숨겨지거나 CCTV가 열리면 그리기를 멈춘다, 움직임은 서버 단계만 따른다, 조작은 기존 컴포넌트만 쓴다.
@@ -178,22 +183,51 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
 });
 
 describe('연결 끊김: 모든 움직임이 멈춘다', () => {
-  it('끊기면 월드 시계가 멈춰 트럭·지게차·벨트·작업자가 제자리에 있고, 복구되면 다시 흐른다', async () => {
+  it('끊기면 월드 시계가 멈춰 트럭·지게차·벨트·작업자가 제자리에 있고, 복구되면 다시 흐른다', () => {
     const d = new Director();
     d.sync(input({ devices: { 'conveyor-z': conveyorState() }, vehicles: [vehicle('v1', 'arrived')], bales: [bale('BL-1', 'created')] }), T0);
-    const renderer = await ReactThreeTestRenderer.create(<Sim director={d} frozen={false} />);
-    await renderer.advanceFrames(60, 1 / 30);
+    const pace = new Pace(d, { needsFrame: () => false }, 30);
+    let now = 0;
+    const beats = (n: number, frozen: boolean) => {
+      let drawn = 0;
+      for (let i = 0; i < n; i += 1) {
+        now += 1000 / 60;
+        if (pace.advance(now, frozen)) drawn += 1;
+      }
+      return drawn;
+    };
+    beats(120, false);
     expect(d.t).toBeGreaterThan(1.5);
 
     const snapshot = () => JSON.stringify({ t: d.t, trucks: d.trucks.map((t) => [t.x, t.z, t.wheel]), fork: [d.forklift.x, d.forklift.z, d.forklift.heading], belt: d.beltOffset, bales: d.bales.map((b) => [b.x, b.z]), workers: d.workers.map((w) => [w.x, w.z, w.stride]) });
     const before = snapshot();
-    await renderer.update(<Sim director={d} frozen />);
-    await renderer.advanceFrames(90, 1 / 30);
+    // 끊긴 동안: 시계가 멈추고, 움직인 것이 없으니 그리지도 않는다 (첫 박자는 끊긴 순간의 한 장)
+    expect(beats(180, true)).toBeLessThanOrEqual(1);
     expect(snapshot()).toBe(before);
 
-    await renderer.update(<Sim director={d} frozen={false} />);
-    await renderer.advanceFrames(30, 1 / 30);
+    expect(beats(60, false)).toBeGreaterThan(20);
     expect(snapshot()).not.toBe(before);
+  });
+
+  it('필요할 때만 그린다: 상한(초당 30)을 넘지 않고, 아무것도 움직이지 않으면 그리지 않는다', () => {
+    const still = { step: () => undefined, motionKey: () => 1 };
+    let wake = false;
+    const pace = new Pace(still, { needsFrame: () => wake }, 30);
+    let now = 0;
+    let drawn = 0;
+    for (let i = 0; i < 60; i += 1) {
+      now += 1000 / 60;
+      if (pace.advance(now, false)) drawn += 1;
+    }
+    expect(drawn).toBe(1); // 처음 한 장뿐
+    wake = true;
+    drawn = 0;
+    for (let i = 0; i < 120; i += 1) {
+      now += 1000 / 60;
+      if (pace.advance(now, false)) drawn += 1;
+    }
+    expect(drawn).toBeGreaterThanOrEqual(58);
+    expect(drawn).toBeLessThanOrEqual(61);
   });
 
   it('로봇팔은 끊긴 동안 관절 값을 새로 읽지 않고, 놓기 연출(컨베이어 뭉치)도 만들지 않는다', async () => {
@@ -232,7 +266,7 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
   });
 
   const view = (over: Partial<Parameters<typeof StudioView>[0]> = {}) => (
-    <StudioView data={demoData(T0, 30)} jointSource={fixedSource()} disconnected={false} lastReceivedAt={NOW} paused={false} example={false} onFailed={() => {}} {...over} />
+    <StudioView data={demoData(T0, 30)} jointSource={fixedSource()} tier="high" disconnected={false} lastReceivedAt={NOW} paused={false} example={false} onFailed={() => {}} {...over} />
   );
 
   it('"연결 끊김"과 마지막 수신 시각을 보여 주고, 무대를 멈추게 하고, 핀은 마지막 값을 감춘다', () => {
@@ -326,6 +360,173 @@ describe('공정 추적: 서버 단계를 여섯 칸에 옮겨 적는다', () =>
   });
 });
 
+describe('참고 화면에 맞춘 화면 구성', () => {
+  const view = (over: Partial<Parameters<typeof StudioView>[0]> = {}) => (
+    <StudioView data={demoData(T0, 30)} jointSource={fixedSource()} tier="high" disconnected={false} lastReceivedAt={NOW} paused={false} example={false} onFailed={() => {}} {...over} />
+  );
+
+  it('카메라 거리는 세 단계다: 부지 전체(wide) > 구역(mid, 기본) > 대상(close)', () => {
+    expect(VIEWS.filter((v) => v.tier === 'wide')).toEqual([WIDE_VIEW]);
+    expect(AREAS.every((v) => v.tier === 'mid')).toBe(true);
+    expect(DEFAULT_VIEW.tier).toBe('mid');
+    expect(tierOf(WIDE_VIEW.distance)).toBe('wide');
+    AREAS.forEach((area) => expect(tierOf(area.distance)).toBe('mid'));
+    ['veh:v1', 'forklift', 'bale:b1', 'dev:compressor-1', 'dev:robot-1', 'dev:tank-a1'].forEach((key) => expect(tierOf(closeDistance(key))).toBe('close'));
+    expect(TIER_DISTANCE.wide).toBeGreaterThan(TIER_DISTANCE.mid);
+    expect(TIER_DISTANCE.mid).toBeGreaterThan(TIER_DISTANCE.close);
+  });
+
+  it('경로 점선은 고른 차량에만 그리고, 대상을 고르면 그 위에 작은 이름표가 뜬다', async () => {
+    const user = userEvent.setup();
+    const data = input({ vehicles: [vehicle('v1', 'identified', 'tank-a1')] });
+    render(view({ data }));
+    expect(stage.last?.routeKeys.current).toEqual([]);
+    const pin = screen.getByLabelText('차량 12가 3456 인식 완료');
+    await user.click(pin);
+    expect(stage.last?.routeKeys.current).toEqual(['veh:v1']);
+    expect(pin).toHaveAttribute('aria-pressed', 'true');
+    expect(within(pin).getByText(/12가 3456/)).toBeInTheDocument();
+  });
+
+  it('상세 패널은 4~5줄만 바로 보이고 나머지는 "자세히" 안에 있다', async () => {
+    const user = userEvent.setup();
+    render(view({ data: input({ vehicles: [vehicle('v1', 'unloading', 'tank-b1')] }) }));
+    await user.click(screen.getByLabelText('차량 12가 3456 하역 중'));
+    const panel = screen.getByRole('complementary', { name: '차량 상세' });
+    const visibleRows = [...panel.querySelectorAll('dl.st-rows > div')].filter((row) => !row.closest('details'));
+    expect(visibleRows.length).toBeLessThanOrEqual(5);
+    expect(within(panel).getByText('자세히')).toBeInTheDocument();
+    expect(within(panel).getByText('출차')).toBeInTheDocument(); // 접혀 있어도 내용은 있다
+  });
+
+  it('검색으로 번호판을 찾아 고른다', async () => {
+    const user = userEvent.setup();
+    render(view({ data: input({ vehicles: [vehicle('v1', 'identified', 'tank-a1')] }) }));
+    await user.type(screen.getByRole('searchbox', { name: '장면에서 찾기' }), '3456');
+    await user.click(screen.getByRole('option', { name: /12가 3456/ }));
+    expect(screen.getByRole('complementary', { name: '차량 상세' })).toBeInTheDocument();
+  });
+
+  it('홈에서 열면 앱의 메뉴·상단 바를 넘겨받아 상단 바 하나만 남고, 알람·사용자·로그아웃·메뉴·CCTV는 그 바에 있다', async () => {
+    const user = userEvent.setup();
+    renderWithStore(
+      <Routes>
+        <Route element={<AppShell headerExtra={<button type="button">CCTV</button>} />}>
+          <Route index element={<LiveStudio onFailed={() => {}} />} />
+        </Route>
+      </Routes>,
+      { devices: [tankState(), robotState(), conveyorState()], me: ADMIN },
+    );
+    expect(screen.queryByRole('navigation', { name: '주 메뉴' })).not.toBeInTheDocument();
+    // 앱 상단 바(로고·로그아웃 버튼)는 없고 스튜디오 상단 바 하나뿐이다
+    expect(screen.getAllByText('EcoCycle')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument();
+    const bar = document.querySelector<HTMLElement>('.st-top')!;
+    expect(within(bar).getByRole('link', { name: /알람 보기/ })).toHaveAttribute('href', '/alarms');
+    expect(within(bar).getByRole('button', { name: 'CCTV' })).toBeInTheDocument();
+    await user.click(within(bar).getByRole('button', { name: '메뉴' }));
+    expect(within(bar).getByRole('menuitem', { name: '설정' })).toHaveAttribute('href', '/settings');
+    await user.click(within(bar).getByRole('button', { name: new RegExp(ADMIN.name) }));
+    expect(within(bar).getByRole('menuitem', { name: '로그아웃' })).toBeInTheDocument();
+  });
+});
+
 /** 기기 ID 형식이 맞는지 컴파일 때 확인 (핀 key는 `dev:<기기 ID>`) */
 const _deviceKey: `dev:${DeviceId}` = 'dev:compressor-1';
 void _deviceKey;
+
+describe('화질 단계: 휴대폰 먼저 (고정 규칙 6)', () => {
+  const hints = (width: number, height: number, coarse = false, gpu = '') => ({ width, height, coarse, gpu });
+
+  it('기기 종류: 390×844는 폰, 820×1180은 태블릿, 1440×900은 데스크톱', () => {
+    expect(deviceClass(hints(390, 844, true))).toBe('phone');
+    expect(deviceClass(hints(844, 390, true))).toBe('phone');
+    expect(deviceClass(hints(820, 1180))).toBe('tablet');
+    expect(deviceClass(hints(1280, 800, true))).toBe('tablet');
+    expect(deviceClass(hints(1280, 800, false, 'Mali-G78'))).toBe('tablet');
+    expect(deviceClass(hints(1440, 900))).toBe('desktop');
+  });
+
+  it('기본은 폰 low · 태블릿 standard · 데스크톱 high이고, 측정값은 한 단계까지만 반영한다', () => {
+    expect(studioTier('phone', null, null)).toBe('low');
+    expect(studioTier('tablet', null, null)).toBe('standard');
+    expect(studioTier('desktop', null, null)).toBe('high');
+    expect(studioTier('phone', 'high', null)).toBe('standard');
+    expect(studioTier('desktop', 'low', null)).toBe('standard');
+    expect(studioTier('tablet', 'low', null)).toBe('low');
+    expect(studioTier('tablet', 'standard', null)).toBe('standard');
+  });
+
+  it('사용자가 직접 고른 단계는 그대로 따른다', () => {
+    expect(studioTier('phone', null, 'high')).toBe('high');
+    expect(studioTier('desktop', 'high', 'low')).toBe('low');
+  });
+
+  it('low는 후처리·실시간 그림자·패널 흐림 없이, standard·low는 초당 30으로 묶는다', () => {
+    expect(STUDIO_PROFILES.low).toMatchObject({ maxDpr: 1, post: false, shadowMap: 0, ao: 'baked', bloom: false, tiltShift: false, panelBlur: 'none', maxFps: 30 });
+    expect(STUDIO_PROFILES.standard).toMatchObject({ maxDpr: 1.5, ao: 'n8ao-half', shadowMap: 2048, tiltShift: false, panelBlur: 'main', maxFps: 30 });
+    expect(STUDIO_PROFILES.high.shadowMap).toBeLessThanOrEqual(2048);
+  });
+
+  it('화면은 단계를 data-tier로 적어 패널 흐림이 단계를 따른다', () => {
+    const { container } = render(<StudioView data={demoData(T0, 30)} jointSource={fixedSource()} tier="low" disconnected={false} lastReceivedAt={NOW} paused={false} example={false} onFailed={() => {}} />);
+    expect(container.querySelector('.st-root')?.getAttribute('data-tier')).toBe('low');
+    expect(stage.last?.tier).toBe('low');
+  });
+});
+
+describe('폰 배치: 아래 시트', () => {
+  it('처음에는 접혀 공정 막대(지금 단계 이름)와 요약 한 줄만 보이고, 펼치면 배치 · 차량 · 섹터 · 베일 탭이 나온다', async () => {
+    const user = userEvent.setup();
+    render(<PhoneSheet data={demoData(T0, 30)} disconnected={false} selection={null} onSelect={() => {}} />);
+    expect(screen.getByRole('group', { name: /^공정 추적/ })).toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: '공정 정보 종류' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: '공정 정보 펼치기' }));
+    const tabs = within(screen.getByRole('tablist', { name: '공정 정보 종류' })).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent?.replace(/\s*\d+$/, ''))).toEqual(['배치', '차량', '섹터', '베일']);
+  });
+
+  it('대상을 고르면 펼쳐서 그 상세를 보여 주고, 닫기는 고르기를 푼다', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<PhoneSheet data={demoData(T0, 30)} disconnected={false} selection="dev:tank-b2" onSelect={onSelect} />);
+    const detail = screen.getByRole('complementary', { name: /상세/ });
+    await user.click(within(detail).getByRole('button', { name: '상세 패널 닫기' }));
+    expect(onSelect).toHaveBeenCalledWith(null);
+  });
+
+  it('연결이 끊기면 공정 막대가 "연결 끊김"으로 읽힌다', () => {
+    render(<TrackerBar data={demoData(T0, 30)} disconnected />);
+    expect(screen.getByRole('group', { name: /연결 끊김/ })).toBeInTheDocument();
+  });
+});
+
+describe('세로 태블릿: 배치 요약 칩', () => {
+  it('아무것도 고르지 않았으면 배치 번호 · 배합 · 현재 압력 한 줄로 접혀 있고, 누르면 펼치고 다시 접을 수 있다', async () => {
+    const user = userEvent.setup();
+    const data = demoData(T0, 30);
+    render(<Detail data={data} disconnected={false} selection={null} onSelect={() => {}} collapsible />);
+    const chip = screen.getByRole('button', { name: /^지금 배치 .*, 펼치기$/ });
+    expect(chip).toHaveAttribute('aria-expanded', 'false');
+    expect(chip).toHaveTextContent(/MPa/);
+    expect(screen.queryByRole('complementary', { name: '공정 요약' })).toBeNull();
+    await user.click(chip);
+    expect(screen.getByRole('complementary', { name: '공정 요약' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '지금 배치 접기' }));
+    expect(screen.getByRole('button', { name: /, 펼치기$/ })).toBeInTheDocument();
+  });
+
+  it('대상을 고르면 접힌 칩 대신 그 상세를 보여 주고, 끊기면 칩의 현재 압력은 "–"', () => {
+    const data = demoData(T0, 30);
+    const { rerender } = render(<Detail data={data} disconnected={false} selection="dev:tank-a1" onSelect={() => {}} collapsible />);
+    expect(screen.getByRole('complementary', { name: /상세/ })).toBeInTheDocument();
+    rerender(<Detail data={data} disconnected selection={null} onSelect={() => {}} collapsible />);
+    expect(screen.getByRole('button', { name: /, 펼치기$/ })).toHaveTextContent(/–/);
+    expect(screen.getByRole('button', { name: /, 펼치기$/ })).not.toHaveTextContent(/MPa/);
+  });
+
+  it('넓은 화면(collapsible 없음)에서는 처음부터 펼쳐 둔다', () => {
+    render(<Detail data={demoData(T0, 30)} disconnected={false} selection={null} onSelect={() => {}} />);
+    expect(screen.getByRole('complementary', { name: '공정 요약' })).toBeInTheDocument();
+  });
+});

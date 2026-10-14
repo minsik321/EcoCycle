@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Bale, Batch, DeviceId, DeviceState, TankId, TankSection, Vehicle } from '@ecocycle/shared';
-import { demoPose } from '../../scene/robot/jointSource';
+import { demoPose } from '../robot/jointSource';
 import type { StudioData } from '../types';
 
 // /scene-demo 용 예시 원본. 서버·로그인 없이 스튜디오를 보여 주고 프레임을 재기 위한 것이다.

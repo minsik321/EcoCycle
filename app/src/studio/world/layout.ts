@@ -1,11 +1,11 @@
 import { TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, TankId } from '@ecocycle/shared';
-import { DEMO_CYCLE, TANK_BASE_DEG } from '../../config/sceneLayout';
-import { chainSpecFor } from '../../scene/robot/chain';
-import { tipPosition } from '../../scene/robot/kinematics';
+import { DEMO_CYCLE, TANK_BASE_DEG } from '../../config/robotCycle';
+import { chainSpecFor } from '../robot/chain';
+import { tipPosition } from '../robot/kinematics';
 import type { P2 } from '../sim/paths';
 
-// 스튜디오 월드의 배치. 기존 장면(config/sceneLayout)과 별개인 새 배치다.
+// 3D 홈(스튜디오) 월드의 배치. 섹터 집는 각도·시연 주기만 config/robotCycle에서 온다.
 // 좌표: Y가 위, 로봇 받침대가 원점. 흐름은 +X(정문) → 계중대 → 하역 마당 → 섹터 4칸 → 로봇 → 컨베이어(-X) → 압축기 → 출하 마당(-Z).
 // 로봇이 집는 자리·놓는 자리만은 서버 관절 값(base 각도, 모의 서버와 같은 down 자세)에서 나온다. 섹터 칸과 컨베이어는 그 자리에 맞춰 놓는다.
 
@@ -44,7 +44,7 @@ export const BAY_Z: Record<TankId, readonly [number, number]> = {
 
 export const bayCenterZ = (id: TankId): number => (BAY_Z[id][0] + BAY_Z[id][1]) / 2;
 
-export const SECTOR_LABEL: Record<TankId, string> = { 'tank-a1': 'A1', 'tank-a2': 'A2', 'tank-b1': 'B1', 'tank-b2': 'B2' };
+export { SECTOR_LABEL } from '../../config/processDisplay';
 
 /** 컨베이어: 놓는 자리 아래에서 시작해 -X로 압축기 투입구까지 */
 export const CONVEYOR = { startX: PLACE[0] + 0.55, endX: -6.7, z: PLACE[2], topY: PLACE[1] - 0.22, width: 0.95 } as const;
@@ -151,21 +151,61 @@ export function devicePin(id: DeviceId): V3 {
   return [BALER.x, 2.6, BALER.z];
 }
 
-/** 카메라 지역 프리셋: target과 거리, 방위각(도) */
+/**
+ * 카메라 거리는 세 단계다 (참고 화면 docs/reference/ 01~10):
+ *  - wide: 부지 전체. 다 보여도 한산하게
+ *  - mid: 한 구역(섹터·로봇·압축기, 정문·계중대 등). 기본 화면
+ *  - close: 대상 하나(기울이는 트럭, 압축기, 베일을 든 지게차). 대상을 고르면 이 거리로 간다
+ */
+export type ViewTier = 'wide' | 'mid' | 'close';
+
+/** 카메라 지역 프리셋: target과 거리, 방위각·천정각(도) */
 export interface ViewPreset {
   key: string;
   label: string;
+  /** 지역 전환 목록의 둘째 줄 */
+  hint: string;
+  tier: ViewTier;
   target: V3;
   distance: number;
   azimuth: number;
   polar: number;
 }
 
-export const VIEWS: readonly ViewPreset[] = [
-  { key: 'all', label: '전체', target: [3.6, 0, -1.6], distance: 75, azimuth: 76, polar: 55 },
-  { key: 'inbound', label: '입고', target: [14.6, 0, -8.2], distance: 40, azimuth: 66, polar: 55 },
-  { key: 'sectors', label: '섹터', target: [4.6, 0.4, 0], distance: 40, azimuth: 40, polar: 52 },
-  { key: 'mixing', label: '배합', target: [-1.4, 1.0, -0.6], distance: 34, azimuth: 70, polar: 56 },
-  { key: 'baling', label: '압축', target: [-7.0, 0.6, -2.4], distance: 32, azimuth: 76, polar: 55 },
-  { key: 'shipping', label: '출하', target: [-4.6, 0.2, -5.6], distance: 38, azimuth: 80, polar: 53 },
+export const WIDE_VIEW: ViewPreset = { key: 'site', label: '부지 전체', hint: '정문부터 출하 마당까지', tier: 'wide', target: [3.8, 0, -1.4], distance: 86, azimuth: 58, polar: 48 };
+
+/** 구역(mid). 첫 번째가 기본 화면이다 */
+export const AREAS: readonly ViewPreset[] = [
+  { key: 'process', label: '섹터·로봇·압축', hint: '섹터 4칸, 로봇팔, 컨베이어, 압축기', tier: 'mid', target: [-1.6, 0.3, -0.9], distance: 47, azimuth: 56, polar: 50 },
+  { key: 'inbound', label: '정문·계중대', hint: '입차, 계량, 번호판 인식', tier: 'mid', target: [14.6, 0, -6.8], distance: 40, azimuth: 52, polar: 50 },
+  { key: 'unload', label: '하역 마당', hint: '섹터 앞 후진·하역', tier: 'mid', target: [7.2, 0, -1.2], distance: 40, azimuth: 40, polar: 50 },
+  { key: 'shipping', label: '출하 마당', hint: '베일 배출, 적치, 지게차', tier: 'mid', target: [-5.4, 0.2, -5.0], distance: 38, azimuth: 64, polar: 50 },
 ];
+
+export const VIEWS: readonly ViewPreset[] = [WIDE_VIEW, ...AREAS];
+export const DEFAULT_VIEW: ViewPreset = AREAS[0]!;
+
+/** 거리 단계별 기준 거리 (확대·축소 버튼이 이 단계를 오간다) */
+export const TIER_DISTANCE: Record<ViewTier, number> = { wide: WIDE_VIEW.distance, mid: DEFAULT_VIEW.distance, close: 22 };
+
+/** 대상을 골랐을 때(close)의 거리. 대상이 화면 폭의 3분의 1쯤 차고 둘레가 조금 보이게 한다 (참고 화면 08~10) */
+export const CLOSE_DISTANCE: Record<string, number> = {
+  'dev:compressor-1': 25,
+  'dev:robot-1': 22,
+  'dev:conveyor-z': 26,
+  dev: 23,
+  veh: 22,
+  bale: 13,
+  forklift: 17,
+};
+
+export function closeDistance(key: string): number {
+  return CLOSE_DISTANCE[key] ?? CLOSE_DISTANCE[key.split(':')[0] ?? ''] ?? TIER_DISTANCE.close;
+}
+
+/** 이 거리는 어느 단계인가 (핀 크기·확대 버튼에 쓴다) */
+export function tierOf(distance: number): ViewTier {
+  if (distance > (TIER_DISTANCE.wide + TIER_DISTANCE.mid) / 2) return 'wide';
+  if (distance > (TIER_DISTANCE.mid + TIER_DISTANCE.close) / 2) return 'mid';
+  return 'close';
+}

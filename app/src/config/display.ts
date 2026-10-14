@@ -96,6 +96,19 @@ export function formatLocalTime(iso: string | null | undefined, withSeconds = tr
   }).format(date);
 }
 
+/**
+ * 짧은 칸에 넣는 시각: 오늘이면 시:분(:초)만, 다른 날이면 월.일 시:분. 표·목록의 좁은 칸에서 두 줄로 꺾이지 않게 쓴다.
+ * now는 테스트용
+ */
+export function formatLocalClock(iso: string | null | undefined, withSeconds = false, now: Date = new Date()): string {
+  if (!iso) return '-';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '-';
+  const sameDay = date.toDateString() === now.toDateString();
+  if (!sameDay) return formatLocalTime(iso, false);
+  return new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', ...(withSeconds ? { second: '2-digit' } : {}), hour12: false }).format(date);
+}
+
 // --- 이력 그래프 (기기 페이지) ---
 // 센서값을 그때그때 보는 용도라 상세할 필요가 없다. 한 번에 한 구간만 요청하고, 구간마다 점이 수백 개 이하로 유지된다.
 

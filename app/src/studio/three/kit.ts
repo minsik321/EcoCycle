@@ -74,7 +74,20 @@ function paint(geometry: BufferGeometry, hex: string, gain = 1): BufferGeometry 
   return geometry;
 }
 
+/** 바닥에 그림자를 드리울 조각의 바닥 투영 (미리 굽는 바닥 그림자용, 월드 좌표) */
+export interface Footprint {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+  /** 아래·위 높이 */
+  y0: number;
+  y1: number;
+}
+
 export class Kit {
+  /** 기록을 켜면(footprints 배열을 주면) 서 있는 조각마다 바닥 투영을 적는다 */
+  footprints: Footprint[] | null = null;
   private readonly parts: Record<MatKey, BufferGeometry[]> = { clay: [], gloss: [], metal: [], glass: [], glow: [] };
   private readonly stack: Matrix4[] = [new Matrix4()];
   private readonly defaultMat: MatKey;
@@ -105,6 +118,11 @@ export class Kit {
     local.multiply(lift.makeTranslation(0, height, 0));
     geometry.applyMatrix4(local.premultiply(this.top));
     const mat = o.mat ?? this.defaultMat;
+    if (this.footprints && mat !== 'glow') {
+      geometry.computeBoundingBox();
+      const b = geometry.boundingBox!;
+      if (b.max.y - b.min.y > 0.22 && b.max.y > 0.3) this.footprints.push({ x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, y0: b.min.y, y1: b.max.y });
+    }
     this.parts[mat].push(paint(geometry, hex, mat === 'glow' ? (o.glow ?? 2.4) : 1));
   }
 

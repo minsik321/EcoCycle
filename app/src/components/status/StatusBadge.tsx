@@ -20,7 +20,7 @@ export function StatusBadge({ status, label, symbol, size = 'md', className = ''
   return (
     <span
       data-status={status}
-      className={`inline-flex items-center gap-1.5 rounded-full border font-semibold ${sizeClass} ${TONE_CLASS[status]} ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border font-semibold whitespace-nowrap ${sizeClass} ${TONE_CLASS[status]} ${className}`}
     >
       <span aria-hidden="true">{symbol ?? STATUS_SYMBOL[status]}</span>
       <span>{text}</span>

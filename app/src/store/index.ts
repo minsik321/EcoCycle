@@ -7,7 +7,7 @@ import connection from './slices/connection';
 import devices from './slices/devices';
 import plant from './slices/plant';
 import process from './slices/process';
-import ui, { saveHomeView, saveQualityMode } from './slices/ui';
+import ui, { saveHomeMode, saveQualityChosen, saveQualityMode } from './slices/ui';
 
 const appReducer = combineReducers({ auth, plant, process, devices, alarms, connection, commands, ui });
 
@@ -25,17 +25,22 @@ export function createAppStore() {
   // 화질 단계와 홈 표시 모드가 바뀌면 기기에 기억해 둔다 (자동으로 고르는 중이면 기억한 값을 지운다)
   let savedMode = store.getState().ui.qualityMode;
   let savedAuto = store.getState().ui.qualityAuto;
-  let savedView = store.getState().ui.homeView;
+  let savedChosen = store.getState().ui.qualityChosen;
+  let savedHome = store.getState().ui.homeMode;
   store.subscribe(() => {
-    const { qualityMode, qualityAuto, homeView } = store.getState().ui;
+    const { qualityMode, qualityAuto, qualityChosen, homeMode } = store.getState().ui;
+    if (qualityChosen !== savedChosen) {
+      savedChosen = qualityChosen;
+      saveQualityChosen(qualityChosen);
+    }
     if (qualityMode !== savedMode || qualityAuto !== savedAuto) {
       savedMode = qualityMode;
       savedAuto = qualityAuto;
       saveQualityMode(qualityAuto ? null : qualityMode);
     }
-    if (homeView !== savedView) {
-      savedView = homeView;
-      saveHomeView(homeView);
+    if (homeMode !== savedHome) {
+      savedHome = homeMode;
+      saveHomeMode(homeMode);
     }
   });
   return store;

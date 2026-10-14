@@ -10,11 +10,11 @@ app/
 ├── vite.config.ts
 ├── capacitor.config.ts
 ├── .env.example          VITE_API_BASE, VITE_WS_BASE, VITE_USE_MOCK
-├── public/               아이콘, 장면용 작은 텍스처(미리 그린 바닥 그림자 등), `models/`(스튜디오 탭의 glTF 모델과 라이선스)
+├── public/               아이콘, 장면용 작은 텍스처(미리 그린 바닥 그림자 등), `models/`(3D 홈의 glTF 모델과 라이선스), `studio/`(3D 홈을 준비하는 동안 덮는 포스터)
 ├── android/              `npx cap add android`로 생성 — 미리 만들지 않는다
 └── src/
     ├── main.tsx, App.tsx, routes.tsx
-    ├── api/  realtime/  store/  config/  components/  features/  scene/  studio/
+    ├── api/  realtime/  store/  config/  components/  features/  studio/
     └── styles/
 ```
 
@@ -24,13 +24,12 @@ app/
 
 ```
 features ─► components ─► (store, api 훅)
-features/home ─► scene ─► config, realtime(jointBuffer), store(선택자)
-features/home ─(lazy)─► studio ─► store, api, components/controls, config/display, scene/robot (모양에 관한 것은 가져다 쓰지 않는다)
+features/home ─(lazy)─► studio ─► store, api, realtime(jointBuffer), components/controls, components/layout/shellChrome, config/display·navigation·robotModel·robotCycle (모양에 관한 것은 가져다 쓰지 않는다)
 store ─► api, realtime, shared        api, realtime ─► shared (store를 import하지 않는다)
 ```
 
 - `api`·`realtime`은 값을 콜백(`setAuthLostHandler`)과 `RealtimeSink`로 내보내고, `store`가 이를 구현해 연결한다 (`docs/decisions.md`).
-- `scene`은 `features`를 import하지 않는다. `api`·`realtime`은 React 컴포넌트를 import하지 않는다.
+- `features/home`은 `studio`를 lazy로만 불러온다(정적 import 금지: 메인 묶음에 three.js가 들어간다). `studio`는 `features`의 화면을 import하지 않는다(로봇 모델 훅 `useRobotModel`만 예외). `api`·`realtime`은 React 컴포넌트를 import하지 않는다.
 - 서버 주소·모의 여부는 `config/env.ts`에서만 읽는다(`import.meta.env`를 여기저기서 읽지 않는다).
 
 ## 화면 기준
@@ -52,6 +51,8 @@ store ─► api, realtime, shared        api, realtime ─► shared (store를 
 - 화면: React Testing Library — 권한별 버튼 표시, 연결 끊김 표시, 위험 조작 확인 단계.
 - 권한: `src/permissions.test.tsx`가 역할(admin·operator·viewer)별로 모든 화면의 버튼 표시·비활성을 한 장의 기준표로 점검한다. 권한 종류가 확정되어 바뀌면 이 표부터 고친다. 화면 코드에서 `role === ...`로 분기하지 않는지도 검사한다.
 - 통합: `npm run test:integration` — 모의 서버를 `disconnect` 시나리오로 띄워 앱 전체를 붙이고 연결 끊김(15초 감지, 화면·조작·관절 값 정지, 명령 결과 조회, 복구 후 재동기화)을 약 1분간 점검하고, 화면이 비활성으로 보여 주는 조작을 서버가 실제로 403으로 막는지(`permissions.integration.test.ts`)도 확인한다. 오래 걸려 기본 `npm test`에는 넣지 않는다.
+- 글 줄바꿈: `npm run test:text`(`scripts/textcheck.mjs`, 점검 함수는 `scripts/textAudit.mjs`) — 모의 서버와 앱을 띄우고 실제 Chromium으로 360×780·390×844·820×1180에서 3D 홈의 펼친 시트(네 탭)·섹터/로봇팔/압축기/컨베이어/차량/베일 상세, 기기 페이지, 대시보드를 열어, 12자 이하의 짧은 글이 두 줄로 꺾이거나 낱말이 중간에서 잘리거나 화면이 옆으로 넘치면 실패한다. 글자 100%와 130%(안드로이드 "글자 크기" 설정처럼 글자만 키움) 두 번. 실패한 화면은 `scripts/.textcheck/`에 찍는다. 브라우저를 내려받지 않으므로 `CHROMIUM_PATH` 또는 Playwright 브라우저 폴더가 필요하다. jsdom은 글자 배치를 계산하지 않아 기본 `npm test`에는 CSS 규칙이 빠지지 않았는지만 본다(`styles/text.test.ts`).
+- 글 규칙(앱 전체, `styles/index.css`): 한국어는 `word-break: keep-all` + `overflow-wrap: break-word`. 이름표·탭·표 머리·버튼·상태 글은 한 줄, 넘치면 말줄임. 이름·값 줄은 `items-baseline`(또는 `.kv-row`)과 고정 폭 숫자. 폰 표는 칸이 모자라면 덜 중요한 칸을 숨긴다(`DataTable`의 `hideOnNarrow`, 3D 홈 시트의 `st-col-opt`). 좁은 칸의 시각은 `formatLocalClock`.
 - 실기기: 가장 낮은 사양 태블릿에서 30분 이상(2단계), 하루 이상(4단계) 구동. 프레임, 발열, 메모리, 재연결을 기록한다.
 
 ## 하지 말 것

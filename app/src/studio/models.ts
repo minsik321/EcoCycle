@@ -1,12 +1,12 @@
 import { Box3, Color, Float32BufferAttribute, Group, Vector3 } from 'three';
 import type { BufferGeometry, Mesh, MeshStandardMaterial, Texture } from 'three';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MAT } from './three/kit';
 
 // 스튜디오가 쓰는 모델 파일(glTF/GLB) 목록과 불러오기.
-//  - 파일은 app/public/models 아래에 둔다. Draco·Meshopt 압축을 모두 읽을 수 있다 (Draco 디코더는 three가 품고 있어 빌드 때 함께 나온다).
+//  - 파일은 app/public/models 아래에 둔다. Meshopt 압축은 늘 읽는다(디코더가 작아 스튜디오 묶음에 들어 있다).
+//    Draco 압축 모델은 목록에 draco: true로 적으며, 그런 모델을 처음 불러올 때만 DRACOLoader와 디코더(glTF용 한 벌)를 내려받는다.
 //  - 모델마다 라이선스·출처·삼각형 수를 적는다. 목록에 없는 파일은 쓰지 않는다.
 //  - 파일을 못 받으면 코드로 만든 모형(절차적 모형)을 그대로 쓴다. 모델이 없어도 화면은 완성되어 있어야 한다.
 //
@@ -28,6 +28,8 @@ export interface ModelEntry {
   triangles: number;
   /** 원본 대비 바꾼 것 */
   note: string;
+  /** Draco로 압축된 파일이면 true (불러올 때 Draco 디코더를 따로 내려받는다) */
+  draco?: boolean;
 }
 
 const KENNEY = {
@@ -53,13 +55,21 @@ export type ModelKey = keyof typeof MODELS;
 const MODEL_BASE = '/models/';
 
 let loader: GLTFLoader | null = null;
+let dracoReady: Promise<void> | null = null;
 
 function gltfLoader(): GLTFLoader {
   if (loader) return loader;
   loader = new GLTFLoader();
-  loader.setDRACOLoader(new DRACOLoader());
   loader.setMeshoptDecoder(MeshoptDecoder);
   return loader;
+}
+
+/** Draco 모델을 처음 불러올 때만 DRACOLoader를 붙인다 (그 전에는 디코더를 내려받지 않는다) */
+function withDraco(gltf: GLTFLoader): Promise<void> {
+  dracoReady ??= import('three/addons/loaders/DRACOLoader.js').then(({ DRACOLoader }) => {
+    gltf.setDRACOLoader(new DRACOLoader());
+  });
+  return dracoReady;
 }
 
 const cache = new Map<ModelKey, Promise<Group>>();
@@ -69,8 +79,9 @@ export function loadModel(key: ModelKey): Promise<Group> {
   let pending = cache.get(key);
   if (!pending) {
     const entry: ModelEntry = MODELS[key];
-    pending = gltfLoader()
-      .loadAsync(MODEL_BASE + entry.file)
+    const gltf = gltfLoader();
+    pending = (entry.draco ? withDraco(gltf) : Promise.resolve())
+      .then(() => gltf.loadAsync(MODEL_BASE + entry.file))
       .then((gltf) => {
         const inner = gltf.scene;
         inner.scale.setScalar(entry.scale);

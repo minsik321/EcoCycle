@@ -25,7 +25,7 @@ export function OfflineNotice({ className = '' }: { className?: string }) {
       <span className="font-normal">
         · 마지막 수신 <Timestamp iso={lastReceivedAt} />
       </span>
-      <span className="font-normal">· 아래 값은 마지막으로 받은 값입니다. 다시 연결하는 중…</span>
+      <span className="font-normal">· 다시 연결하는 중… 연결되면 값을 새로 받습니다.</span>
     </div>
   );
 }

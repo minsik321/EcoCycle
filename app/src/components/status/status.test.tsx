@@ -50,7 +50,7 @@ describe('OfflineNotice', () => {
     expect(alert).toHaveTextContent('연결 끊김');
     expect(alert).toHaveTextContent('마지막 수신');
     expect(alert.querySelector('time')).toHaveAttribute('datetime', '2026-10-13T05:23:11.250Z');
-    expect(alert).toHaveTextContent('마지막으로 받은 값');
+    expect(alert).toHaveTextContent('연결되면 값을 새로 받습니다');
   });
 
   it('한 번도 받은 적이 없으면 시각 자리에 -를 보여 준다', () => {

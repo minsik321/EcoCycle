@@ -5,7 +5,7 @@ import { BALE } from './layout';
 // 여러 곳에 놓는 소품 조립법. 위치만 받아 Kit에 조각을 더한다.
 
 export function tree(k: Kit, x: number, z: number, s = 1, variant = 0): void {
-  const tones = [C.green, C.greenDeep, '#b7dcae'];
+  const tones = [C.green, C.greenDeep, C.greenLight];
   const a = tones[variant % 3]!;
   const b = tones[(variant + 1) % 3]!;
   k.at([x, 0, z], variant * 1.3, () => {
@@ -19,8 +19,8 @@ export function tree(k: Kit, x: number, z: number, s = 1, variant = 0): void {
 
 export function bush(k: Kit, x: number, z: number, variant = 0): void {
   const tone = variant % 2 === 0 ? C.green : C.greenDeep;
-  k.ball(tone, 0.34, [x, 0.22, z], { scale: [1.2, 0.8, 1], seg: 14 });
-  k.ball(variant % 2 === 0 ? C.greenDeep : '#b7dcae', 0.24, [x + 0.3, 0.18, z + 0.12], { seg: 12 });
+  k.ball(tone, 0.32, [x, 0.2, z], { scale: [1.2, 0.8, 1], seg: 14 });
+  k.ball(variant % 2 === 0 ? C.greenDeep : C.greenLight, 0.22, [x + 0.28, 0.16, z + 0.12], { seg: 12 });
 }
 
 export function lamp(k: Kit, x: number, z: number, rotY = 0): void {
@@ -38,13 +38,6 @@ export function pallet(k: Kit, x: number, z: number, rotY = 0, y = 0.02): void {
     for (const dz of [-0.36, 0, 0.36]) k.box(C.kraftDark, [0.9, 0.07, 0.09], [0, 0, dz], { r: 0.015 });
     for (let i = 0; i < 5; i += 1) k.box(C.kraftLight, [0.13, 0.035, 0.84], [-0.38 + i * 0.19, 0.07, 0], { r: 0.012 });
   });
-}
-
-export function drum(k: Kit, x: number, z: number, hex: string): void {
-  k.cyl(hex, 0.21, 0.6, [x, 0.06, z], { seg: 18, mat: 'gloss' });
-  k.cyl(C.steelLight, 0.218, 0.03, [x, 0.24, z], { seg: 18, mat: 'metal' });
-  k.cyl(C.steelLight, 0.218, 0.03, [x, 0.46, z], { seg: 18, mat: 'metal' });
-  k.cyl(C.dark, 0.17, 0.012, [x, 0.66, z], { seg: 18 });
 }
 
 export function cone(k: Kit, x: number, z: number, s = 1): void {

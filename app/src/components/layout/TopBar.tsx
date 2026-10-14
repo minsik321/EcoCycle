@@ -41,7 +41,7 @@ function Logo() {
         <path d="M16 7.5a8.5 8.5 0 1 0 8.2 10.7" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
         <path d="M24.6 9.2v5.4h-5.4" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span className="text-lg font-extrabold tracking-tight text-ink">EcoCycle</span>
+      <span className="hidden text-lg font-extrabold tracking-tight whitespace-nowrap text-ink sm:inline">EcoCycle</span>
     </div>
   );
 }
@@ -71,7 +71,7 @@ export function TopBar({ center, extra, className = '' }: TopBarProps) {
       <Logo />
       {USE_MOCK && (
         <span className="rounded-full border border-kraft/50 bg-kraft-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-ink-soft">
-          예시 데이터
+          예시<span className="hidden sm:inline"> 데이터</span>
         </span>
       )}
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2">{center}</div>
@@ -93,15 +93,15 @@ export function TopBar({ center, extra, className = '' }: TopBarProps) {
             <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${view.dot}`} />
             {view.text}
           </span>
-          <Link to="/settings" aria-label={`화질 ${QUALITY_TEXT[quality].label}, 설정에서 바꾸기`} className={`${CHIP} hidden text-ink-soft active:bg-paper-deep sm:inline-flex`}>
+          <Link to="/settings" aria-label={`화질 ${QUALITY_TEXT[quality].label}, 설정에서 바꾸기`} className={`${CHIP} hidden text-ink-soft active:bg-paper-deep lg:inline-flex`}>
             화질 <span className="font-semibold text-ink">{QUALITY_TEXT[quality].label}</span>
           </Link>
           {extra}
-          <span className="hidden px-1 text-sm whitespace-nowrap text-ink md:inline">
+          <span className="hidden px-1 text-sm whitespace-nowrap text-ink xl:inline">
             {me.name} <span className="text-ink-faint">({ROLE_TEXT[me.role]})</span>
           </span>
-          {/* 좁은 화면에서는 자리가 없어 숨긴다. 로그아웃은 설정 화면에도 있다 */}
-          <span className="hidden sm:inline">
+          {/* 좁은 화면에서는 자리가 없어 숨긴다(글자를 키운 태블릿 포함). 화질·로그아웃은 설정 화면에도 있다 */}
+          <span className="hidden lg:inline">
             <Button variant="quiet" onClick={() => void dispatch(logoutUser())}>
               로그아웃
             </Button>

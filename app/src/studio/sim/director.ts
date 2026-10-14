@@ -62,6 +62,8 @@ export interface TruckSim extends Mover {
   pouring: boolean;
   pourT: number;
   variant: number;
+  /** 서버가 번호판으로 정한 회사 이름 (인식 전 null). 트럭 띠 색에만 쓴다 */
+  company: string | null;
 }
 
 export type BaleState = 'ejecting' | 'chute' | 'carried' | 'stack' | 'gone';
@@ -215,7 +217,7 @@ export class Director {
 
   constructor() {
     for (let i = 0; i < TRUCK_POOL; i += 1) {
-      this.trucks.push({ ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'toScale', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: i });
+      this.trucks.push({ ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'toScale', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: i, company: null });
     }
     for (let i = 0; i < BALE_POOL; i += 1) this.bales.push({ active: false, id: '', state: 'gone', x: 0, y: 0, z: 0, rot: 0, slot: -1, t: 0 });
     for (let i = 0; i < LUMP_POOL; i += 1) this.lumps.push({ active: false, x: 0, drop: 0, seed: i });
@@ -252,6 +254,7 @@ export class Director {
       if (truck) {
         truck.stage = v.stage;
         truck.bay = v.sectorId;
+        truck.company = v.companyName;
       } else if (v.stage !== 'departed') {
         this.spawnTruck(v, nowMs);
       }
@@ -279,6 +282,7 @@ export class Director {
     truck.seq = this.seq;
     truck.stage = v.stage;
     truck.bay = v.sectorId;
+    truck.company = v.companyName;
     truck.bedTilt = 0;
     truck.load = 1;
     truck.pouring = false;
@@ -401,6 +405,30 @@ export class Director {
     }
     this.gateIn += (wantIn - this.gateIn) * Math.min(1, dt * 3.5);
     this.gateOut += (wantOut - this.gateOut) * Math.min(1, dt * 3.5);
+  }
+
+  /**
+   * 지금 장면에서 실제로 움직이는 것들의 위치를 하나의 수로 묶는다. 앞 값과 같으면 아무것도 움직이지 않은 것이다
+   * (화면은 이때 그리기를 쉰다: 필요할 때만 그리기). 작업자의 제자리 몸짓처럼 시계만 따르는 장식은 넣지 않는다.
+   */
+  motionKey(): number {
+    let k = this.beltOffset * 1.7 + this.ram * 3.1 + this.gateIn * 5.3 + this.gateOut * 7.9 + this.hopper * 2.3;
+    for (const id of TANK_IDS) k += this.fill[id] * 0.013;
+    this.trucks.forEach((t, i) => {
+      if (t.active) k += (t.x * 1.3 + t.z * 2.9 + t.heading * 4.1 + t.bedTilt * 6.7 + t.load * 8.3 + (t.pouring ? t.pourT : 0)) * (i + 1);
+    });
+    this.bales.forEach((b, i) => {
+      if (b.active) k += (b.x * 1.1 + b.y * 3.7 + b.z * 2.3 + b.rot) * (i + 11);
+    });
+    this.lumps.forEach((l, i) => {
+      if (l.active) k += (l.x + l.drop * 3) * (i + 31);
+    });
+    const f = this.forklift;
+    k += f.x * 1.9 + f.z * 3.3 + f.heading * 5.1 + f.fork * 7.3;
+    this.workers.forEach((w, i) => {
+      if (w.moving) k += (w.x * 1.7 + w.z * 2.1 + w.heading) * (i + 51);
+    });
+    return k;
   }
 
   // ── 비켜 가기 ───────────────────────────────────────────────────────
@@ -780,6 +808,14 @@ export class Director {
       return true;
     }
     return false;
+  }
+
+  /** 선택 상자용: 대상이 바라보는 방향(라디안). 방향이 없는 대상(기기)은 0 */
+  heading(key: string): number {
+    if (key === 'forklift') return this.forklift.heading;
+    if (key.startsWith('veh:')) return this.trucks.find((x) => x.active && x.id === key.slice(4))?.heading ?? 0;
+    if (key.startsWith('bale:')) return this.baleById(key.slice(5))?.rot ?? 0;
+    return 0;
   }
 
   /** 경로 표시용: 이 대상이 지금 따라가는 경로와 남은 구간의 시작 거리 */

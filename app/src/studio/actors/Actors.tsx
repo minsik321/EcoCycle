@@ -3,8 +3,9 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import { Color, Matrix4, Quaternion, Vector3 } from 'three';
 import type { InstancedMesh } from 'three';
-import { C } from '../theme';
+import { C, companyStripe } from '../theme';
 import { MAT, chunkGeometry, disposeTree } from '../three/kit';
+import { blobShadow } from '../three/bakedShadow';
 import type { Director } from '../sim/director';
 import { buildBale, buildForklift, buildTruck, buildWorker } from './build';
 
@@ -18,6 +19,8 @@ const POUR_PER_TRUCK = 28;
 interface ActorProps {
   director: Director;
   onSelect: (key: string) => void;
+  /** 실시간 그림자가 없는 단계(low): 차량 아래에 둥근 그림자를 단다 */
+  blobs?: boolean;
 }
 
 const stop = (e: ThreeEvent<MouseEvent>, fn: () => void) => {
@@ -25,8 +28,17 @@ const stop = (e: ThreeEvent<MouseEvent>, fn: () => void) => {
   fn();
 };
 
-export function Trucks({ director, onSelect }: ActorProps) {
+export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
   const models = useMemo(() => director.trucks.map((_, i) => buildTruck(i)), [director]);
+  useEffect(() => {
+    if (!blobs) return;
+    const added = models.map((m) => {
+      const b = blobShadow(2.9, 1.16);
+      m.root.add(b);
+      return b;
+    });
+    return () => added.forEach((b) => b.removeFromParent());
+  }, [models, blobs]);
   const pour = useRef<InstancedMesh>(null);
   const geometry = useMemo(() => chunkGeometry(0.2, 0.1, 0.15, 0.03), []);
   const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(), axis: new Vector3(0.6, 0.5, 0.62).normalize(), color: new Color() }), []);
@@ -39,7 +51,10 @@ export function Trucks({ director, onSelect }: ActorProps) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
     return () => {
-      models.forEach((m) => disposeTree(m.root));
+      models.forEach((m) => {
+        disposeTree(m.root);
+        m.stripe.dispose();
+      });
       geometry.dispose();
     };
   }, [models, geometry, tmp]);
@@ -52,6 +67,7 @@ export function Trucks({ director, onSelect }: ActorProps) {
       if (sim.active) {
         model.root.position.set(sim.x, GROUND_Y, sim.z);
         model.root.rotation.y = sim.heading;
+        model.stripe.color.set(companyStripe(sim.company));
         const angle = sim.bedTilt * BED_MAX;
         model.bed.rotation.z = angle;
         model.gate.rotation.z = -angle * 1.3;
@@ -95,9 +111,15 @@ export function Trucks({ director, onSelect }: ActorProps) {
   );
 }
 
-export function Forklift({ director, onSelect }: ActorProps) {
+export function Forklift({ director, onSelect, blobs = false }: ActorProps) {
   const model = useMemo(buildForklift, []);
   useEffect(() => () => disposeTree(model.root), [model]);
+  useEffect(() => {
+    if (!blobs) return;
+    const b = blobShadow(1.3, 0.8);
+    model.root.add(b);
+    return () => void b.removeFromParent();
+  }, [model, blobs]);
 
   useFrame(() => {
     const sim = director.forklift;

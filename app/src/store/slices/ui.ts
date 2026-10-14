@@ -6,8 +6,8 @@ import type { QualityTier } from '../../config/quality';
 
 /** 화질 단계(high/standard/low). 값의 뜻은 config/quality.ts */
 export type QualityMode = QualityTier;
-/** 홈 표시 모드: scene(3D 장면) 또는 cards(2D 카드) */
-export type HomeView = 'scene' | 'cards';
+/** 홈 맨 위 전환: 3d(3D 장면) 또는 dashboard(3D 없는 대시보드) */
+export type HomeMode = '3d' | 'dashboard';
 
 export interface UiState {
   /** 홈에서 확대해서 보고 있는 기기 */
@@ -17,11 +17,32 @@ export interface UiState {
   qualityMode: QualityMode;
   /** 이 기기에서 아직 고른 적이 없다. 접속할 때 짧게 프레임을 재서 자동으로 고른다 */
   qualityAuto: boolean;
-  /** 홈을 3D 장면으로 볼지 2D 카드로 볼지 (기기에 기억). 3D를 그릴 수 없는 기기에서는 값과 상관없이 2D로 보여 준다 */
-  homeView: HomeView;
+  /** 사용자가 설정에서 직접 골랐다 (자동 측정 결과와 구별한다: 3D 홈은 직접 고른 값만 그대로 따르고, 측정값은 기기 종류 기본값에서 한 단계까지만 반영한다) */
+  qualityChosen: boolean;
+  /** 홈을 3D로 볼지 대시보드로 볼지 (기기에 기억, 기본 3D). 3D를 그릴 수 없는 기기에서는 값과 상관없이 대시보드로 보여 준다 */
+  homeMode: HomeMode;
 }
 
 const QUALITY_KEY = 'ecocycle.qualityMode';
+const QUALITY_CHOSEN_KEY = 'ecocycle.qualityChosen';
+
+function loadQualityChosen(): boolean {
+  try {
+    return localStorage.getItem(QUALITY_CHOSEN_KEY) === '1' && loadSavedQuality() !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** 직접 골랐는지 기억한다 */
+export function saveQualityChosen(chosen: boolean): void {
+  try {
+    if (chosen) localStorage.setItem(QUALITY_CHOSEN_KEY, '1');
+    else localStorage.removeItem(QUALITY_CHOSEN_KEY);
+  } catch {
+    // 저장소를 못 써도 앱은 동작한다
+  }
+}
 
 /** 화질 모드는 기기마다 기억해 둔다 (표시 설정일 뿐 토큰 같은 비밀이 아니다). 저장소를 못 쓰면 기본값. */
 function loadSavedQuality(): QualityMode | null {
@@ -45,19 +66,36 @@ export function saveQualityMode(mode: QualityMode | null): void {
   }
 }
 
-const HOME_VIEW_KEY = 'ecocycle.homeView';
+const HOME_MODE_KEY = 'ecocycle.homeMode';
+/** 2026-10-14 이전의 키: 기본/스튜디오 탭(homeTab)과 3D/2D 표시 모드(homeView). 읽어서 새 전환으로 옮긴 뒤 지운다 */
+const OLD_HOME_TAB_KEY = 'ecocycle.homeTab';
+const OLD_HOME_VIEW_KEY = 'ecocycle.homeView';
 
-export function loadHomeView(): HomeView {
+/**
+ * 기억한 홈 모드. 새 키가 없으면 옛 키를 옮긴다: 2D 카드(homeView = cards)를 골랐던 기기는 대시보드,
+ * 그 밖(3D를 골랐거나 기본·스튜디오 탭만 남은 기기)은 3D. 옮긴 뒤 옛 키는 지운다.
+ */
+export function loadHomeMode(): HomeMode {
   try {
-    return localStorage.getItem(HOME_VIEW_KEY) === 'cards' ? 'cards' : 'scene';
+    const saved = localStorage.getItem(HOME_MODE_KEY);
+    if (saved === '3d' || saved === 'dashboard') return saved;
+    const oldView = localStorage.getItem(OLD_HOME_VIEW_KEY);
+    const hadOld = oldView !== null || localStorage.getItem(OLD_HOME_TAB_KEY) !== null;
+    const mode: HomeMode = oldView === 'cards' ? 'dashboard' : '3d';
+    if (hadOld) {
+      localStorage.setItem(HOME_MODE_KEY, mode);
+      localStorage.removeItem(OLD_HOME_VIEW_KEY);
+      localStorage.removeItem(OLD_HOME_TAB_KEY);
+    }
+    return mode;
   } catch {
-    return 'scene';
+    return '3d';
   }
 }
 
-export function saveHomeView(view: HomeView): void {
+export function saveHomeMode(mode: HomeMode): void {
   try {
-    localStorage.setItem(HOME_VIEW_KEY, view);
+    localStorage.setItem(HOME_MODE_KEY, mode);
   } catch {
     // 저장소를 못 써도 앱은 동작한다
   }
@@ -69,7 +107,8 @@ const initialState = (): UiState => ({
   cctvOpen: false,
   qualityMode: loadQualityMode(),
   qualityAuto: loadSavedQuality() === null,
-  homeView: loadHomeView(),
+  qualityChosen: loadQualityChosen(),
+  homeMode: loadHomeMode(),
 });
 
 const slice = createSlice({
@@ -86,6 +125,7 @@ const slice = createSlice({
     qualityModeChanged(state, action: PayloadAction<QualityMode>) {
       state.qualityMode = action.payload;
       state.qualityAuto = false;
+      state.qualityChosen = true;
     },
     /** 자동 측정 결과. 그사이 사용자가 직접 골랐으면 무시한다 */
     qualityProbed(state, action: PayloadAction<QualityMode>) {
@@ -96,12 +136,13 @@ const slice = createSlice({
     /** 자동으로 다시 고르기: 기억한 값을 버리고 다시 잰다 */
     qualityAutoRequested(state) {
       state.qualityAuto = true;
+      state.qualityChosen = false;
     },
-    homeViewChanged(state, action: PayloadAction<HomeView>) {
-      state.homeView = action.payload;
+    homeModeChanged(state, action: PayloadAction<HomeMode>) {
+      state.homeMode = action.payload;
     },
   },
 });
 
-export const { deviceSelected, cctvToggled, qualityModeChanged, qualityProbed, qualityAutoRequested, homeViewChanged } = slice.actions;
+export const { deviceSelected, cctvToggled, qualityModeChanged, qualityProbed, qualityAutoRequested, homeModeChanged } = slice.actions;
 export default slice.reducer;

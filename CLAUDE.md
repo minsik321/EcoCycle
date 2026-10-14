@@ -26,13 +26,12 @@ EcoCycle/
         ├── config/        로봇 모델·장면 배치·화질 모드·환경값 (가정에 의존하는 값)
         ├── components/    공용 UI, 재사용 조작 컴포넌트
         ├── features/      화면 단위: 로그인, 홈, 기기 페이지, 알람, 설정, CCTV
-        ├── scene/         홈 3D 장면 (react-three-fiber) — 홈의 "기본" 탭
-        └── studio/        홈의 "스튜디오" 탭: 처음부터 새로 만든 실험적 고화질 시안 (자체 규칙, 탭을 열 때만 불러옴)
+        └── studio/        3D 홈 (react-three-fiber): 홈의 유일한 3D 장면 (자체 규칙, 3D를 고를 때만 불러옴)
 ```
 
 각 폴더의 `CLAUDE.md`에 그 폴더의 책임과 규칙이 있다. 폴더 안에서 작업할 때는 그 파일을 먼저 읽는다.
 
-**`app/src/studio/`는 예외 구역이다.** 이 파일과 `scene`·`features`·명세의 시각·배치·성능 규칙(공통 규칙 7번, 카메라 조작 제한 포함)을 따르지 않고 `app/src/studio/CLAUDE.md`의 고정 규칙 다섯 가지만 따른다. 권한·위험 조작·비상정지·연결 끊김·값 규칙(공통 규칙 1~6, 8, 9)은 스튜디오에도 그대로 적용된다.
+**`app/src/studio/`는 예외 구역이다.** 이 파일과 `features`·명세의 시각·배치·세부 성능 규칙(카메라 조작 제한 포함)을 따르지 않고 `app/src/studio/CLAUDE.md`의 고정 규칙 여섯 가지만 따른다. 권한·위험 조작·비상정지·연결 끊김·값 규칙(공통 규칙 1~6, 8, 9)과 화질 3단계(7번)는 스튜디오에도 그대로 적용되며, 스튜디오는 휴대폰 → 태블릿 → 데스크톱 순으로 맞춘다.
 
 ## 데이터 흐름
 
@@ -46,7 +45,7 @@ EcoCycle/
         ▼                         ▼            ▼
               app/src/store (Redux)      jointBuffer (store 밖, 보간)
                     │                          │
-          features/ (2D 화면)  ◄──────────►  scene/ (3D 홈, RobotArm)
+          features/ (2D 화면)  ◄──(lazy)──►  studio/ (3D 홈, 로봇팔)
                     │
    조작: components/controls → api 명령(POST + Idempotency-Key) → 202 accepted
          → WebSocket command.result (못 받으면 GET /commands/{id}) → 결과를 홈에서도 표시
@@ -60,7 +59,7 @@ EcoCycle/
 4. **연결 끊김을 숨기지 않는다.** 15초간 메시지가 없으면 "연결 끊김"과 마지막 수신 시각을 표시하고 로봇팔을 멈춘다. 마지막 값을 정상처럼 계속 보여 주지 않는다. 복구되면 REST로 현재 상태를 다시 받는다.
 5. **값 규칙:** 시각은 ISO 8601 UTC 문자열(표시할 때만 현지 시각), 단위는 %·m³·MPa·°C·도. **무게는 쓰지 않는다**(부피·용량만). 상태 판정(`status`)은 서버가 하고 화면은 표시만 한다.
 6. **기기 ID는 고정:** `tank-a1`, `tank-a2`, `tank-b1`, `tank-b2`, `robot-1`, `conveyor-z`, `compressor-1`.
-7. **화질은 3단계(high/standard/low)로 나눈다.** `low`는 저사양 태블릿의 안전판으로, 끊김 없이 도는 것이 그 티어의 유일한 기준이다. `standard`·`high`에서는 시각 품질도 1차 목표이지만, 상위 티어의 연출이 `low`의 무끊김 기준을 깨면 안 된다. 티어는 접속 시 짧은 FPS 프로브로 자동 선택하고 설정에서 바꿀 수 있다. 세부 원칙은 `app/src/scene/CLAUDE.md`, 완화 이유는 `docs/decisions.md`(2026-10-13 "홈 3D 재설계").
+7. **화질은 3단계(high/standard/low)로 나눈다.** `low`는 저사양 태블릿의 안전판으로, 끊김 없이 도는 것이 그 티어의 유일한 기준이다. `standard`·`high`에서는 시각 품질도 1차 목표이지만, 상위 티어의 연출이 `low`의 무끊김 기준을 깨면 안 된다. 티어는 접속 시 짧은 FPS 프로브로 자동 선택하고 설정에서 바꿀 수 있다. 단계별 그리기는 `app/src/studio/CLAUDE.md`의 "성능" 절, 완화 이유는 `docs/decisions.md`(2026-10-13 "홈 3D 재설계").
 8. **가정에 의존하는 값은 설정으로 분리한다.** 권한 종류, 기준값, 조작 목록, 로봇 링크 길이·축 등은 코드에 박지 않고 `app/src/config`에 둔다.
 9. **API 형식이 바뀌면 순서는 명세 → `shared/` 타입 → mock-server → app.** 타입 오류가 나는 곳이 고칠 곳이다.
 
@@ -72,10 +71,10 @@ EcoCycle/
 | --- | --- | --- |
 | 0. 준비 | docs, shared | 가정 표와 프로토타입 전달, 피드백 수집 |
 | 1. 핵심 기능 | shared → mock-server → api, realtime, store → features, components | 권한별 화면 분기와 연결 끊김 표시 동작 |
-| 2. 3D 홈 시안 | scene, config, features/home | 실제 태블릿 30fps 안정, 30분 이상 끊김·발열 없음 |
+| 2. 3D 홈 시안 | studio, config, features/home | 실제 태블릿 30fps 안정, 30분 이상 끊김·발열 없음 |
 | 3. 실서버 연동 | api, realtime, config(env, robotModel) | 실제 값으로 로봇팔 구동, 끊기면 정지·표시 |
 | 4. 장시간·현장 테스트 | realtime, app(빌드·배포) | 하루 이상 구동해도 느려짐·멈춤 없음 |
-| 5. 확장 | scene, features | 2단계에서 여유 확인된 경우만 |
+| 5. 확장 | studio, features | 2단계에서 여유 확인된 경우만 |
 
 **현재 단계: 2 (3D 홈 시안), 범위가 "살아있는 3D 월드"로 확장되어 재작업 중(2026-10-13, 사용자 요청). 실제 태블릿 측정(초당 30프레임·30분)은 재작업 완료 후로 미룬다.** 단계가 바뀌면 이 줄과 `docs/decisions.md`를 갱신한다.
 
@@ -92,6 +91,7 @@ npm run dev:app             # app만 (VITE_API_BASE로 실서버 지정)
 npm run mock -- --scenario=disconnect   # 시나리오 지정해 모의 서버 실행
 npm run typecheck && npm run test       # 타입 검사 + 단위·화면 테스트 (서버 불필요, 약 1분)
 npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403 점검 (약 1분, 서버를 스스로 띄움)
+npm run test:text           # 실제 브라우저로 폰·태블릿 화면의 글 줄바꿈·가로 넘침 점검 (글자 100%·130%, 약 15~25분, 서버를 스스로 띄움, 로컬 Chromium 필요)
 npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```
 
