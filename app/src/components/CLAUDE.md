@@ -11,8 +11,18 @@ components/
 ├── status/        StatusBadge(색+기호+글자), OfflineNotice, Timestamp, useDisplayStatus(끊기면 모든 상태를 "연결 끊김"으로), tone(색 클래스)
 ├── controls/      DeviceControls, CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
 ├── layout/        Sidebar, TopBar(로고·시계·알람 수·연결 상태·화질·사용자), AppShell(슬롯: headerCenter·headerExtra·overlays), TopCards
-└── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
+├── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
+└── device/        기기 페이지 틀: DevicePage(배치), DeviceHero(이름·큰 상태 칩·지금 하는 일·그림), KeyTile/KeyTiles(최대 4개, 작은 추이선),
+                   NowNext(지금/다음), ActionBar·DeviceActionBar(위험도 낮은 조작 + 알람 확인), DetailsSection("자세히", 처음엔 닫힘), live(연결 상태)
 ```
+
+## 기기 페이지 틀 (`device/`)
+
+- 모든 기기 페이지는 `DevicePage`에 다섯 조각(hero, tiles, now, actions, details)을 끼워 만든다. 폰은 한 줄(조작 줄은 주 메뉴 바로 위에 붙음), `md` 이상은 두 줄.
+- 연결 끊김 처리는 조각들이 `useDeviceLive()`로 직접 한다: 값·하는 일·지금/다음은 "–", 상태 칩은 "연결 끊김", 마지막 수신 시각 표시, 그림 영역은 `data-frozen="true"`(CSS 움직임 정지, `styles/index.css`). 캔버스 그림은 `useDeviceLive().disconnected`를 보고 스스로 멈춘다.
+- `DeviceLiveOverride`는 서버 없이 보는 미리 보기(`/design/device`)에서만 쓴다.
+- 조작 줄에는 위험도 낮은 조작만 둔다. 위험 조작(모드 전환·탱크 지정 집기·설정 변경)은 "자세히" 안에서 확인 단계를 거친다.
+- "자세히"의 내용은 열 때 처음 그린다(열기 전에는 이력 요청이 나가지 않는다).
 
 ## 디자인 시스템
 
