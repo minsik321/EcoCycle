@@ -305,11 +305,13 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 }
 
 // 컨베이어: GET /devices/conveyor-z/state
-{ "id": "conveyor-z", "type": "conveyor", "status": "normal", "running": true, "loadPercent": 40, "updatedAt": "..." }
+{ "id": "conveyor-z", "type": "conveyor", "status": "normal", "running": true, "loadPercent": 40, "itemsToBaler": 2, "updatedAt": "..." }
 
 // 압축기: GET /devices/compressor-1/state
-{ "id": "compressor-1", "type": "compressor", "status": "normal", "running": true, "pressureMpa": 28.7, "temperatureC": 42.3, "updatedAt": "..." }
+{ "id": "compressor-1", "type": "compressor", "status": "normal", "running": true, "pressureMpa": 28.7, "temperatureC": 42.3, "cycleStage": "pressing", "updatedAt": "..." }
 ```
+
+컨베이어의 `itemsToBaler`는 로봇이 벨트에 놓았지만 아직 압축기에 닿지 않은 집기 덩어리 수(개, 0 이상 정수)다. 컨베이어가 멈추면 줄지 않는다. 압축기의 `cycleStage`는 압축 사이클의 지금 단계로 `idle`(대기), `filling`(배합 중인 배치의 파지를 받는 중), `pressing`(압축 중), `ejecting`(결속·배출) 중 하나다. 둘 다 서버가 정하고 화면은 표시만 한다(기기 페이지 재설계, 2026-10-15 프론트 제안안 — `docs/questions.md` B32).
 
 섹터의 `cautionThresholdPercent`는 지금 적용 중인 주의 기준 적재율(설정 `cautionThresholdPercent`의 현재값)이다. 서버는 이 값으로 `status`를 판정하고, 화면은 섹터 그림에 주의선으로 그리기만 한다. `update_setting`으로 바뀌면 다음 상태에 새 값이 실린다.
 

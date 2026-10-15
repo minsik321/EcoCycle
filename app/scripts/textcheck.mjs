@@ -1,4 +1,5 @@
 // 글 줄바꿈 화면 점검: 모의 서버와 앱(vite)을 띄우고 실제 브라우저로 폰·태블릿 화면을 열어
+// (3D 홈 시트·상세, 섹터 목록·페이지, 로봇팔·압축기·컨베이어 페이지와 그 "자세히", 로봇 운전 모드 세 칸, 기록 목록, 공정 기록, 배치·베일, 대시보드·KPI 상세)
 // 짧은 이름표가 두 줄로 꺾이거나, 낱말이 중간에서 잘리거나, 화면이 옆으로 넘치는 곳을 찾는다.
 //   npm run test:text            (약 2~3분, 서버를 스스로 띄운다)
 // 브라우저: CHROMIUM_PATH, 없으면 이 컴퓨터의 Playwright 브라우저 폴더(ms-playwright/chromium-*)에서 찾는다. 내려받지 않는다.
@@ -136,30 +137,47 @@ async function run(browser) {
         ['/tanks/tank-a1', '섹터 페이지'],
         ['/robot', '로봇팔 페이지'],
         ['/compressor', '압축기 페이지'],
+        ['/conveyor', '컨베이어 페이지'],
         ['/design/records', '기록 목록'],
         ['/records/batches', '배치·베일 제어'],
       ]) {
         await go(route);
         await page.waitForTimeout(1200);
         await check(page, name, zoom);
+        // 기기 페이지: "자세히"를 펼친 모습 (이력 그래프·설정·알람 이력, 로봇팔은 진단)
+        if (['/robot', '/compressor', '/conveyor'].includes(route)) {
+          await page.getByRole('button', { name: '자세히', exact: true }).click();
+          await page.waitForTimeout(800);
+          await check(page, `${name} 자세히`, zoom);
+          await page.getByRole('button', { name: '자세히', exact: true }).click();
+        }
         if (route === '/robot') {
-          await page.getByRole('button', { name: '수동 모드로 전환', exact: true }).click();
-          await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
-          await page.getByText('현재 모드:', { exact: false }).filter({ hasText: '수동' }).waitFor();
-          await page.getByLabel('집을 섹터').scrollIntoViewIfNeeded();
-          await check(page, '로봇 수동 집기 정렬', zoom);
-          await page.getByRole('checkbox', { name: '섹터 A1', exact: true }).check();
-          await page.getByRole('button', { name: '자동 · 섹터 지정 적용', exact: true }).click();
+          // 운전 모드 세 칸: 자동 · 섹터 지정(칩 + 적용, 확인 대화상자) → 수동(집을 섹터 + 집기 한 줄) → 자동으로 되돌림
+          const mode = page.getByRole('region', { name: '운전 모드', exact: true });
+          const radio = (re) => mode.getByRole('radio').filter({ hasText: re });
+          const current = (re) => mode.locator('[role="radio"]').filter({ hasText: re }).filter({ hasText: '지금' });
+          const apply = async () => {
+            await mode.getByRole('button', { name: '적용', exact: true }).click();
+            await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
+          };
+          await mode.scrollIntoViewIfNeeded();
+          await radio(/^자동 · 섹터 지정/).click();
+          await mode.getByRole('button', { name: '섹터 A1', exact: true }).click();
+          await mode.getByRole('button', { name: '적용', exact: true }).click();
           await check(page, '로봇 지정 자동 확인', zoom);
           await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
-          await page.getByText('지정된 섹터:', { exact: false }).waitFor();
-          await page.getByLabel('조작', { exact: true }).scrollIntoViewIfNeeded();
+          await current(/^자동 · 섹터 지정/).waitFor();
           await check(page, '로봇 지정 자동', zoom);
+          await radio(/^수동/).click();
+          await apply();
+          await current(/^수동/).waitFor();
+          await mode.getByLabel('집을 섹터').scrollIntoViewIfNeeded();
+          await check(page, '로봇 수동 집기 정렬', zoom);
           await page.getByRole('region', { name: '집기 기록', exact: true }).scrollIntoViewIfNeeded();
           await check(page, '로봇 집기 기록', zoom);
-          await page.getByRole('button', { name: '자동 모드로 전환', exact: true }).click();
-          await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
-          await page.getByText('지정된 섹터:', { exact: false }).waitFor({ state: 'hidden' });
+          await radio(/^자동(?! ·)/).click();
+          await apply();
+          await current(/^자동(?! ·)/).waitFor();
         }
       }
       // 공정 기록: 차량·배치 탭과 각각의 상세 (첫 줄을 눌러 연다)

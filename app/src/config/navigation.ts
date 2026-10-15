@@ -68,6 +68,8 @@ export const RECORDS_TABS: readonly RecordsTab[] = ['vehicles', 'batches'];
 export const recordsPath = (tab: RecordsTab = 'vehicles'): string => `/records?tab=${tab}`;
 /** 차량 한 대의 기록 상세 */
 export const vehicleRecordPath = (id: string): string => `/records/vehicles/${encodeURIComponent(id)}`;
+/** 배치·베일 화면 (지금·다음 배치와 수동 제어, 사건 기록) */
+export const batchBalePath = '/records/batches';
 /** 배치 하나의 기록 상세 (베일 상세와 함께 5단위가 채운다) */
 export const batchRecordPath = (id: string): string => `/records/batches/${encodeURIComponent(id)}`;
 

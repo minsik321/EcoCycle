@@ -9,9 +9,9 @@
 | `auth/` | `/login` | 로그인, 로그아웃, 인증 필요 라우트 보호 |
 | `home/` | `/` | 맨 위 전환 "3D | 대시보드": 3D 홈(`studio`) 또는 3D 없는 대시보드 |
 | `tank/` | `/tanks`, `/tanks/:id` | 섹터(표시 이름, 코드·주소는 tank): 칸 그림 목록, 상세(칸 그림·주요 수치·지금/다음·자세히·하역 기록) |
-| `robot/` | `/robot` | 관절 값, 수동 조작, 오류 로그, 사이클 통계 |
-| `conveyor/` | `/conveyor` | 속도 설정, 이력 |
-| `compressor/` | `/compressor` | 압력·온도 그래프, 설정, 점검 이력 |
+| `robot/` | `/robot` | 기기 페이지 틀: 실시간 옆모습, 모드·현재 작업·이번 시간 집기·그리퍼, 운전 모드(세 칸), 자세히(진단·설정·오류 로그), 사이클 통계, 집기 기록 |
+| `conveyor/` | `/conveyor` | 기기 페이지 틀: 흐르는 벨트, 가동·적재 정도·압축기로 가는 중, 자세히(이력·속도 설정·알람 이력) |
+| `compressor/` | `/compressor` | 기기 페이지 틀: 베일러와 원형 압력 게이지, 압력·온도·오늘 베일·사이클 단계, 지금 배치(배치·베일 링크), 자세히(이력·설정·알람·점검 이력) |
 | `alarms/` | `/alarms` | 활성·이력 목록, 확인 처리, 누르면 해당 기기 페이지로 |
 | `records/` | `/records`, `/records/vehicles/:id`, `/records/batches/:id` | 공정 기록: 탭 차량·배치(`?tab=`, 둘 다 `RecordList`), 차량 상세, 배치 상세(5단위가 이어서 채움) |
 | `settings/` | `/settings` | 화질 모드(고화질/기본/저사양, 자동으로 다시 고르기), 계정, 앱 정보 |
@@ -33,9 +33,14 @@
 - 홈 주소에 `?demo=1`을 붙이면 서버 관절 값 대신 정해진 시연 동작을 보여 준다(명세의 최후 수단, "시연 동작" 표시).
 - `tank/`: `SectorBin`(칸 그림 SVG: 크라프트 더미가 적재율만큼, 서버 주의 기준선, 값이 바뀌면 `transform` 전환), `TankListPage`(폰 2개씩), `TankPage`(`DevicePage` 틀, 맨 아래 `SectorUnloads` = `RecordList`로 `GET /devices/{id}/unloads/records`), `sectorText`(그림 설명, 지금/다음 문장). 화면 글은 "섹터", 코드·주소·ID는 tank 그대로.
 - `records/`(4단위): `RecordsPage`(탭은 주소의 `?tab=vehicles|batches`라 홈의 링크가 탭을 골라 열고 뒤로 가기에도 유지), `VehicleRecords`(입차·출차 시각, 번호판, 회사, 섹터, 총중량·공차·순중량 t, 상태 인식·하역·출차, `GET /vehicles/records`), `BatchRecords`(시작·종료, 배합 섹터 %, 평균 수분, 목표→실제 압력, 결과 완료·건너뜀·일시정지됨·진행 중, 만든 베일, `GET /batches/records`), 줄을 누르면 상세(`VehicleDetailPage` = `GET /vehicles/{id}`, `BatchDetailPage` = `GET /batches/{id}`, 둘 다 `useRecord`·`RecordDetail` 틀). 주소 만들기는 `config/navigation.ts`(`recordsPath`, `vehicleRecordPath`, `batchRecordPath`). 폰은 "더 보기" 안의 메뉴. 홈에서 오는 링크: 대시보드 "전체 보기"(지금 배치 카드 → 배치 탭, 최근 차량·베일 카드 → 차량 탭), 3D 홈 "기록 보기"·"이 차량 기록"·"이 배치 상세"(`studio`의 `RecordLink`, 링크 그리기는 `LiveStudio`가 넘긴다).
-추가된 폴더: `history/`(이력 그래프 패널·구간 훅·알람 이력 훅, 탱크·컨베이어·압축기 페이지가 공유), `devices/`(컨베이어·압축기 공통 페이지 틀).
+추가된 폴더: `history/`(이력 그래프 패널·구간 훅·알람 이력 훅·주요 수치 추이선 `useDeviceTrend`, 섹터·컨베이어·압축기 페이지가 공유), `devices/`(로봇팔·컨베이어·압축기 페이지 화면 테스트만. 옛 공통 틀 `MachinePage`는 2026-10-16 기기 페이지 재설계로 지웠다).
 서버가 제공하지 않아 안내 문구만 둔 항목: 로봇팔 사이클 통계, 압축기 점검 이력, 설정의 현재값 (`docs/questions.md` B18, B21, B22).
 - `robot/`(6단위): 자동·수동·자동 섹터 지정(`auto_pinned`), 지정 목록은 서버 상태와 초안을 구분. `set_mode`의 기존 권한·확인 흐름을 확장한다. 사이클 통계 아래 `PickRecords` = 별도 `RecordList`(`GET /robots/robot-1/picks/records`, 시각·모드·섹터·부피 m³·컨베이어 → 배치). `pickRecordsRevision` 변경 시 같은 기간·쪽을 갱신한다. 재현은 `node app/scripts/robotArm.mjs`, 결과는 `docs/screenshots/robot-arm`.
+- 기기 페이지 재설계(2026-10-16): 로봇팔·압축기·컨베이어도 섹터처럼 `DevicePage` 틀이다(맨 위 그림·상태, 주요 수치 2~4칸과 추이선, 지금/다음, 폰은 아래에 붙는 조작 줄, "자세히"는 닫힌 채 시작).
+  - `robot/`: `ArmSilhouette`(관절 값 버퍼를 초당 15번 읽는 SVG 옆모습 + 밑동 방향 다이얼, 끊기면 읽기를 멈춤, 3D와 같은 `DEFAULT_JOINT_RENDER` 규칙), `robotText`(현재 작업·지금 하는 일·지금/다음 문장), `usePicksThisHour`(이번 시간 집기 = 집기 기록 목록에 정각~지금 구간을 한 줄만 요청해 서버 `total`을 그대로). 주요 수치: 모드·현재 작업·이번 시간 집기·그리퍼. 운전 모드는 `components/controls/RobotModeControl`(세 칸: 자동 | 자동 · 섹터 지정 | 수동)을 지금/다음 아래에 둔다. "자세히": 진단(관절 각도 표, `ROBOT_DIAGNOSTICS_PERMISSION`이 있을 때만), 설정, 오류 로그, 일반 정지 안내. 맨 아래 사이클 통계(그대로)와 집기 기록.
+  - `compressor/`: `BalerArt`(베일러 + 원형 압력 게이지: 지금 압력 vs 지금 배치의 목표, 온도. 폰은 옆으로, 태블릿은 위아래로), `compressorText`(지금 배치 고르기: 압축 중 → 배합 중 → 계획). 주요 수치: 압력(/ 목표)·온도·오늘 베일(요약)·사이클 단계(서버 `cycleStage`). 지금/다음에 배치·베일 화면 링크.
+  - `conveyor/`: `BeltStrip`(가동 중이면 벨트 무늬가 흐르고 서버 `itemsToBaler`만큼(최대 6) 덩어리가 압축기로 감, 멈추거나 끊기면 정지). 주요 수치: 가동·적재 정도·압축기로 가는 중.
+  - 재현: `node app/scripts/devicePages.mjs`(두 크기·글자 100/130%, 세 페이지와 로봇 세 모드, 결과 `docs/screenshots/device-pages`).
 
 ## 정보 배치 기준 (명세 3절)
 

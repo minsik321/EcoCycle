@@ -1,4 +1,4 @@
-import type { DeviceId, DeviceStatus, DeviceType, Permission, Phase, RobotMode, RobotStatus, Role } from '@ecocycle/shared';
+import type { CompressorCycleStage, DeviceId, DeviceStatus, DeviceType, Gripper, Permission, Phase, RobotMode, RobotStatus, Role } from '@ecocycle/shared';
 
 // 표시용 문구·기호·형식. 상태 색은 styles/index.css의 토큰(--color-status-*)을 쓴다.
 // 상태 판정(status)은 서버가 하고 화면은 표시만 한다. 색만으로 구분하지 않도록 기호와 글자를 함께 쓴다.
@@ -42,6 +42,39 @@ export const ROBOT_MODE_TEXT: Record<RobotMode, string> = {
   auto_pinned: '자동 · 섹터 지정',
 };
 
+/** 좁은 칸(기기 페이지 주요 수치)에 쓰는 짧은 모드 이름 */
+export const ROBOT_MODE_SHORT_TEXT: Record<RobotMode, string> = {
+  auto: '자동',
+  manual: '수동',
+  auto_pinned: '섹터 지정',
+};
+
+/** 로봇 모드 전환의 세 칸 순서 (자동 | 자동 · 섹터 지정 | 수동) */
+export const ROBOT_MODE_ORDER: readonly RobotMode[] = ['auto', 'auto_pinned', 'manual'];
+
+/** 모드마다 하는 일 한 줄 (모드 전환 아래 안내) */
+export const ROBOT_MODE_HELP: Record<RobotMode, string> = {
+  auto: '배합 중인 배치의 배합비를 따라 서버가 집을 섹터를 고릅니다.',
+  auto_pinned: '고른 섹터만 차례로 돌며 자동으로 집습니다.',
+  manual: '섹터를 골라 "집기"를 누를 때마다 한 번 집습니다.',
+};
+
+export const gripperText = (gripper: Gripper): string => (gripper.holding ? '잡고 있음' : gripper.closed ? '닫힘' : '열림');
+
+/** 압축기 사이클 단계 (서버 `cycleStage`) */
+export const COMPRESSOR_CYCLE_TEXT: Record<CompressorCycleStage, string> = {
+  idle: '대기',
+  filling: '투입',
+  pressing: '압축',
+  ejecting: '결속·배출',
+};
+
+/**
+ * 압축기 원형 게이지의 눈금 범위(MPa). 그림의 눈금일 뿐 판정 기준이 아니다(판정은 서버 status).
+ * ⚠ 설비 최대 압력은 확인 전이라 목표 압력 범위(목업 27~30 MPa)가 오른쪽 끝 근처에 오도록 잡은 가정이다.
+ */
+export const PRESSURE_GAUGE_MPA = { min: 0, max: 35 } as const;
+
 // 권한 종류는 대표님과 확정 전이다 (docs/questions.md A4). 표시 이름만 둔다. 화면 분기에는 쓰지 않는다.
 export const ROLE_TEXT: Record<Role, string> = {
   admin: '관리자',
@@ -83,6 +116,7 @@ export const formatPressureMpa = (value: number): string => `${oneDecimal.format
 export const formatTemperatureC = (value: number): string => `${oneDecimal.format(value)} °C`;
 export const formatAngleDeg = (value: number): string => `${oneDecimal.format(value)}°`;
 export const formatLoadPercent = (value: number): string => `${integer.format(value)}%`;
+export const formatCount = (value: number): string => integer.format(value);
 const twoDecimals = new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** 계중대 무게 (차량·하역 기록에만). 계중대 눈금이 10 kg라 소수 둘째 자리까지 */
 export const formatWeightT = (value: number): string => `${twoDecimals.format(value)} t`;

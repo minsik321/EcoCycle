@@ -1,3 +1,4 @@
+import type { CompressorCycleStage } from '@ecocycle/shared';
 import type {
   Alarm,
   CompressorState,
@@ -85,6 +86,7 @@ export const devices: Record<DeviceId, DeviceState> = {
     status: 'normal',
     running: true,
     loadPercent: 40,
+    itemsToBaler: 0,
     updatedAt: nowIso(),
   } satisfies ConveyorState,
   'compressor-1': {
@@ -94,6 +96,7 @@ export const devices: Record<DeviceId, DeviceState> = {
     running: true,
     pressureMpa: 28.7,
     temperatureC: 42.3,
+    cycleStage: 'idle',
     updatedAt: nowIso(),
   } satisfies CompressorState,
 };
@@ -101,8 +104,11 @@ export const devices: Record<DeviceId, DeviceState> = {
 /** 오늘 처리량과 압축기 가동 시간. 가동률은 서버가 집계해 보내는 값이다 (시작 값은 예시) */
 export const production = { balesToday: 411, runSec: 6 * 3600 * 0.92, totalSec: 6 * 3600 };
 
-/** 압축 중인 배치의 목표 압력. 압축 중이 아니면 null (sim/process가 정하고 sim/plant가 압력에 반영한다) */
-export const press: { targetMpa: number | null } = { targetMpa: null };
+/**
+ * 압축 중인 배치의 목표 압력(압축 중이 아니면 null)과 압축 사이클 단계.
+ * sim/process가 배치 단계로 정하고 sim/plant가 압축기 상태(압력·`cycleStage`)에 옮긴다.
+ */
+export const press: { targetMpa: number | null; stage: CompressorCycleStage } = { targetMpa: null, stage: 'idle' };
 
 export const alarms: Alarm[] = [
   {

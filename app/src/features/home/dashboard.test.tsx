@@ -38,7 +38,7 @@ const tank = (id: 'tank-a1' | 'tank-a2' | 'tank-b1' | 'tank-b2', fill: number, s
   updatedAt: NOW,
 });
 
-const compressor: DeviceState = { id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 22.5, temperatureC: 42.3, updatedAt: NOW };
+const compressor: DeviceState = { id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 22.5, temperatureC: 42.3, cycleStage: 'pressing', updatedAt: NOW };
 
 const summary: PlantSummary = { averageMoisturePercent: 11.1, totalFillPercent: 51.6, balesToday: 412, compressorUptimePercent: 92, status: 'normal', updatedAt: NOW };
 

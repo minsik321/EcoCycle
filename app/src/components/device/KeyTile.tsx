@@ -10,10 +10,12 @@ export interface KeyTileProps {
   sub?: string;
   /** 최근 24시간 추이(오래된 것부터). 숫자가 아닌 값(모드 등)에는 넣지 않는다 */
   trend?: readonly number[];
+  /** 글로 된 값(예: "A2 집기", "결속·배출")은 'text': 숫자보다 작게 적어 반 칸에서 꺾이지 않게 한다 */
+  kind?: 'number' | 'text';
 }
 
 /** 기기 페이지의 주요 수치 한 칸: 값, 단위, 작은 추이선. 연결이 끊기면 값은 "–"이고 추이선은 그리지 않는다. */
-export function KeyTile({ label, value, unit, sub, trend }: KeyTileProps) {
+export function KeyTile({ label, value, unit, sub, trend, kind = 'number' }: KeyTileProps) {
   const { disconnected } = useDeviceLive();
   const shown = disconnected ? null : value;
   return (
@@ -23,10 +25,13 @@ export function KeyTile({ label, value, unit, sub, trend }: KeyTileProps) {
         <p className="truncate text-xs font-medium text-ink-soft">{label}</p>
         {shown !== null && trend && <Sparkline values={trend} width={52} height={20} className="-mt-0.5 shrink-0" />}
       </div>
-      <p className={`min-w-0 text-2xl leading-tight font-bold ${shown === null ? 'text-ink-faint' : 'text-ink'}`}>
+      <p
+        className={`min-w-0 font-bold ${kind === 'text' && shown !== null ? 'truncate text-lg leading-snug md:text-base' : 'text-2xl leading-tight'} ${shown === null ? 'text-ink-faint' : 'text-ink'}`}
+      >
         {shown ?? '–'}
         {shown !== null && unit && <span className="ml-0.5 text-sm font-semibold text-ink-soft">{unit}</span>}
-        {shown !== null && sub && <span className="ml-1 text-xs font-medium whitespace-nowrap text-ink-faint">{sub}</span>}
+        {/* 보조 글: 폰에서는 값 옆, 태블릿의 좁은 반 칸에서는 값 아래 줄 (값과 단위 사이에서 꺾이지 않게) */}
+        {shown !== null && sub && <span className="ml-1 text-xs font-medium whitespace-nowrap text-ink-faint md:ml-0 md:block">{sub}</span>}
       </p>
     </div>
   );

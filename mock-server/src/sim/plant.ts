@@ -17,6 +17,11 @@ const fillRaw = new Map<TankId, number>(TANK_IDS.map((id) => [id, tank(id).fillP
 const moistureRaw = new Map<TankId, number>(TANK_IDS.map((id) => [id, tank(id).moisturePercent]));
 let loadRaw = conveyor().loadPercent;
 
+/** 로봇이 놓은 덩어리가 벨트를 타고 압축기에 닿기까지 걸리는 시간(초, 예시) */
+const BELT_TRAVEL_SEC = 20;
+/** 벨트 위 덩어리마다 압축기까지 남은 시간(초). 컨베이어가 멈추면 줄지 않는다 */
+const beltItems: number[] = [];
+
 /** 탱크에서 파지를 집어 갔을 때 (로봇 시뮬레이터가 호출) */
 export function removeFromTank(id: TankId, percent: number): number {
   const before = fillRaw.get(id) ?? 0;
@@ -33,9 +38,10 @@ export function addToTank(id: TankId, percent: number): void {
 /** 자동 사이클과 배합 계획이 건너뛰는 탱크 (시나리오용) */
 export const excludedTanks = new Set<TankId>();
 
-/** 컨베이어에 파지를 올렸을 때 (로봇 시뮬레이터가 호출) */
+/** 컨베이어에 파지 한 덩어리를 올렸을 때 (로봇 시뮬레이터가 호출) */
 export function addToConveyor(percent: number): void {
   loadRaw = clamp(loadRaw + percent, 0, 100);
+  beltItems.push(BELT_TRAVEL_SEC);
 }
 
 /** 시나리오용: 탱크 적재율을 바로 정한다 */
@@ -88,6 +94,11 @@ export function tickPlant(): void {
   const c = conveyor();
   if (c.running) loadRaw = clamp(loadRaw + (35 - loadRaw) * 0.05 + rnd(-0.5, 0.5), 0, 100);
   c.loadPercent = Math.round(loadRaw);
+  if (c.running) {
+    for (let i = 0; i < beltItems.length; i++) beltItems[i]! -= 1;
+    while (beltItems.length > 0 && beltItems[0]! <= 0) beltItems.shift();
+  }
+  c.itemsToBaler = beltItems.length;
   publishDevice(c);
 
   const comp = compressor();
@@ -98,6 +109,7 @@ export function tickPlant(): void {
     comp.pressureMpa = round1(comp.pressureMpa + (goal - comp.pressureMpa) * 0.5 + rnd(-0.1, 0.1));
     comp.temperatureC = round1(42.3 + Math.sin(t / 45) * 2 + rnd(-0.1, 0.1));
   }
+  comp.cycleStage = comp.running ? press.stage : 'idle';
   production.totalSec += 1;
   if (comp.running) production.runSec += 1;
   publishDevice(comp);

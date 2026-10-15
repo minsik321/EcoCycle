@@ -2,11 +2,12 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../api';
-import { commandResultReceived } from '../../store';
+import { commandResultReceived, devicesReceived } from '../../store';
 import { ADMIN, VIEWER, conveyorState, renderWithStore, robotState, tankState } from '../../test/utils';
 import { AckAlarmButton } from './AckAlarmButton';
 import { CommandResultToast } from './CommandResultToast';
 import { DeviceControls } from './DeviceControls';
+import { RobotModeControl } from './RobotModeControl';
 
 vi.mock('../../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api')>()),
@@ -59,12 +60,9 @@ describe('DeviceControls: 표시', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('기기 페이지에는 위험 조작이 더해지고, 권한이 없는 것은 비활성화하고 이유를 보여 준다 (작업자)', () => {
-    renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()] });
-    expect(screen.getByRole('button', { name: '수동 모드로 전환' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '섹터 지정 집기' })).toBeDisabled();
-    expect(screen.getAllByText('권한이 없습니다').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole('button', { name: '정지' })).toBeEnabled();
+  it('기기 페이지의 버튼 묶음도 버튼 하나로 보내는 조작만 둔다 (모드 전환·수동 집기는 운전 모드, 설정은 설정 폼)', () => {
+    renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()], me: ADMIN });
+    expect(buttonNames()).toEqual(['시작', '일시정지', '재개', '정지']);
   });
 
   it('"비상정지"처럼 보이는 버튼은 없다', () => {
@@ -124,100 +122,152 @@ describe('DeviceControls: 낮은 위험 조작 보내기', () => {
   });
 });
 
-describe('DeviceControls: 위험 조작은 확인 단계를 거친다', () => {
-  it('섹터 지정 자동: 빈 선택은 차단하고 선택·확인 후에만 지정 명령을 보낸다', async () => {
-    const { store } = renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()], me: ADMIN });
-    expect(screen.getByRole('button', { name: '자동 · 섹터 지정 적용' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('checkbox', { name: '섹터 A1' }));
-    await userEvent.click(screen.getByRole('checkbox', { name: '섹터 B1' }));
-    await userEvent.click(screen.getByRole('button', { name: '자동 · 섹터 지정 적용' }));
-    expect(within(screen.getByRole('dialog')).getByText(/섹터 A1, 섹터 B1/)).toBeInTheDocument();
+describe('RobotModeControl: 세 칸 하나와 확인 단계', () => {
+  const card = () => screen.getByRole('region', { name: '운전 모드' });
+  const radio = (name: string) => within(card()).getAllByRole('radio').find((r) => r.firstChild?.textContent === name)!;
+
+  it('세 칸(자동 | 자동 · 섹터 지정 | 수동)이 한 줄이고 서버 모드에 "지금"이 붙는다', () => {
+    renderWithStore(<RobotModeControl />, { devices: [robotState()], me: ADMIN });
+    const radios = within(card()).getAllByRole('radio');
+    expect(radios.map((r) => r.firstChild?.textContent)).toEqual(['자동', '자동 · 섹터 지정', '수동']);
+    expect(radios[0]).toHaveAttribute('aria-checked', 'true');
+    expect(radios[0]).toHaveTextContent('지금');
+    // 지금 모드는 적용할 것이 없다
+    expect(within(card()).getByRole('button', { name: '적용' })).toBeDisabled();
+    expect(within(card()).getByText('지금 적용된 모드입니다')).toBeInTheDocument();
+  });
+
+  it('칸을 고르는 것은 초안이라 명령을 보내지 않는다. 좌우 화살표로도 옮긴다', async () => {
+    renderWithStore(<RobotModeControl />, { devices: [robotState()], me: ADMIN });
+    await userEvent.click(radio('수동'));
+    expect(radio('수동')).toHaveAttribute('aria-checked', 'true');
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(radio('자동 · 섹터 지정')).toHaveAttribute('aria-checked', 'true');
+    expect(radio('자동 · 섹터 지정')).toHaveFocus();
     expect(api.sendCommand).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: '취소' }));
+  });
+
+  it('작업자(위험 조작 권한 없음)에게는 보이지만 비활성이고 이유를 보여 준다', async () => {
+    renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'manual' })] });
+    expect(within(card()).getByRole('button', { name: '집기' })).toBeDisabled();
+    expect(within(card()).getByText('권한이 없습니다')).toBeInTheDocument();
+    await userEvent.click(radio('자동'));
+    expect(within(card()).getByRole('button', { name: '적용' })).toBeDisabled();
+  });
+
+  it('열람자에게는 그리지 않는다', () => {
+    const { container } = renderWithStore(<RobotModeControl />, { devices: [robotState()], me: VIEWER });
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('연결이 끊기면 명령 버튼을 모두 막고 이유를 보여 준다', async () => {
+    renderWithStore(<RobotModeControl />, { devices: [robotState()], me: ADMIN, connection: 'offline' });
+    expect(within(card()).getByRole('note')).toHaveTextContent('연결 끊김');
+    await userEvent.click(radio('수동'));
+    for (const b of within(card()).getAllByRole('button')) expect(b).toBeDisabled();
+  });
+
+  it('자동 · 섹터 지정: 섹터 칩(여러 개)과 적용 하나. 빈 선택은 막고, 확인 후에만 서버 순서로 보낸다', async () => {
+    const { store } = renderWithStore(<RobotModeControl />, { devices: [robotState()], me: ADMIN });
+    await userEvent.click(radio('자동 · 섹터 지정'));
+    expect(within(card()).getByRole('button', { name: '적용' })).toBeDisabled();
+    expect(within(card()).getByText('섹터를 1개 이상 고르세요')).toBeInTheDocument();
+    await userEvent.click(within(card()).getByRole('button', { name: '섹터 B1' }));
+    await userEvent.click(within(card()).getByRole('button', { name: '섹터 A1' }));
+    expect(within(card()).getByRole('button', { name: '섹터 A1' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(within(card()).getByRole('button', { name: '적용' }));
+    const dialog = screen.getByRole('dialog', { name: '모드 전환' });
+    expect(within(dialog).getByText(/자동 → 자동 · 섹터 지정 \(섹터 A1, 섹터 B1\)/)).toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: '자동 · 섹터 지정 적용' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: '취소' }));
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    await userEvent.click(within(card()).getByRole('button', { name: '적용' }));
     await userEvent.click(screen.getByRole('button', { name: '실행' }));
     expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['tank-a1', 'tank-b1'], confirm: true });
-    await screen.findByRole('button', { name: '자동 · 섹터 지정 적용 처리 중' });
+    await within(card()).findByRole('button', { name: '적용 처리 중' });
     finish(store, 'cmd-1');
   });
 
-  it('지정 상태를 표시하고 일반 자동 복귀는 지정 없는 명령으로 확인한다', async () => {
-    const { store } = renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['tank-b2'] })], me: ADMIN });
-    expect(screen.getByRole('status')).toHaveTextContent('지정된 섹터: 섹터 B2');
-    expect(screen.getByRole('button', { name: '섹터 지정 집기' })).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: '자동 모드로 전환' }));
+  it('지정 모드에서는 적용된 섹터를 칩에 표시하고, 같은 섹터면 적용할 것이 없다', async () => {
+    renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['tank-b2'] })], me: ADMIN });
+    expect(radio('자동 · 섹터 지정')).toHaveAttribute('aria-checked', 'true');
+    expect(within(card()).getByRole('button', { name: '섹터 B2 (적용됨)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(card()).getByRole('button', { name: '적용' })).toBeDisabled();
+    await userEvent.click(within(card()).getByRole('button', { name: '섹터 A2' }));
+    expect(within(card()).getByRole('button', { name: '적용' })).toBeEnabled();
+  });
+
+  it('지정 모드에서 자동으로 돌아가는 것은 지정 없는 명령이다', async () => {
+    const { store } = renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['tank-b2'] })], me: ADMIN });
+    await userEvent.click(radio('자동'));
+    await userEvent.click(within(card()).getByRole('button', { name: '적용' }));
+    expect(within(screen.getByRole('dialog')).getByText(/자동 · 섹터 지정 → 자동/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '실행' }));
     expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'set_mode', mode: 'auto', confirm: true });
-    await screen.findByRole('button', { name: '자동 모드로 전환 처리 중' });
     finish(store, 'cmd-1');
   });
 
-  it('모드 전환: 확인하기 전에는 보내지 않고, 취소하면 보내지 않는다', async () => {
-    renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()], me: ADMIN });
-
-    await userEvent.click(screen.getByRole('button', { name: '수동 모드로 전환' }));
-    const dialog = screen.getByRole('dialog', { name: '모드 전환' });
-    expect(within(dialog).getByText(/자동 → 수동/)).toBeInTheDocument();
-    expect(api.sendCommand).not.toHaveBeenCalled();
-    expect(within(dialog).getByRole('button', { name: '취소' })).toHaveFocus();
-
-    await userEvent.click(within(dialog).getByRole('button', { name: '취소' }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(api.sendCommand).not.toHaveBeenCalled();
-  });
-
-  it('모드 전환: 확인하면 confirm: true로 보낸다', async () => {
-    const { store } = renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()], me: ADMIN });
-    await userEvent.click(screen.getByRole('button', { name: '수동 모드로 전환' }));
+  it('수동: 지금 수동이 아니면 적용으로 바꾸고, 집기는 수동이 적용된 뒤에만 누를 수 있다', async () => {
+    const { store } = renderWithStore(<RobotModeControl />, { devices: [robotState()], me: ADMIN });
+    await userEvent.click(radio('수동'));
+    expect(within(card()).getByRole('button', { name: '집기' })).toBeDisabled();
+    expect(within(card()).getByText('수동 모드가 적용된 뒤 집을 수 있습니다')).toBeInTheDocument();
+    await userEvent.click(within(card()).getByRole('button', { name: '적용' }));
     await userEvent.click(screen.getByRole('button', { name: '실행' }));
-
-    expect(api.sendCommand).toHaveBeenCalledTimes(1);
     expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'set_mode', mode: 'manual', confirm: true });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    await screen.findByRole('button', { name: '수동 모드로 전환 처리 중' });
     finish(store, 'cmd-1');
   });
 
-  it('수동 모드이면 "자동 모드로 전환"이 보이고 자동으로 보낸다', async () => {
-    const { store } = renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, {
-      devices: [robotState({ mode: 'manual' })],
-      me: ADMIN,
-    });
-    await userEvent.click(screen.getByRole('button', { name: '자동 모드로 전환' }));
-    await userEvent.click(screen.getByRole('button', { name: '실행' }));
-    expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'set_mode', mode: 'auto', confirm: true });
-    await screen.findByRole('button', { name: '자동 모드로 전환 처리 중' });
-    finish(store, 'cmd-1');
-  });
-
-  it('섹터 지정 집기는 자동 모드에서는 비활성화되고 이유를 보여 준다', () => {
-    renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()], me: ADMIN });
-    expect(screen.getByRole('button', { name: '섹터 지정 집기' })).toBeDisabled();
-    expect(screen.getByText('수동 모드에서만 사용할 수 있습니다')).toBeInTheDocument();
-  });
-
-  it('수동 모드에서 탱크를 골라 확인하면 그 탱크로 confirm: true를 보낸다', async () => {
-    const { store } = renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, {
-      devices: [robotState({ mode: 'manual' })],
-      me: ADMIN,
-    });
-    await userEvent.selectOptions(screen.getByLabelText('집을 섹터'), 'tank-b1');
-    await userEvent.click(screen.getByRole('button', { name: '섹터 지정 집기' }));
-    const dialog = screen.getByRole('dialog', { name: '섹터 지정 집기' });
+  it('수동 모드에서는 "집을 섹터"와 "집기"가 한 줄이고, 확인하면 그 섹터로 confirm: true를 보낸다', async () => {
+    const { store } = renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'manual' })], me: ADMIN });
+    // 지금 모드가 수동이면 적용 버튼 없이 집기만
+    expect(within(card()).queryByRole('button', { name: '적용' })).not.toBeInTheDocument();
+    const select = within(card()).getByLabelText('집을 섹터');
+    expect(select.closest('label')!.parentElement).toContainElement(within(card()).getByRole('button', { name: '집기' }));
+    await userEvent.selectOptions(select, 'tank-b1');
+    await userEvent.click(within(card()).getByRole('button', { name: '집기' }));
+    const dialog = screen.getByRole('dialog', { name: '수동 집기' });
     expect(within(dialog).getByText(/섹터 B1/)).toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
-
     await userEvent.click(within(dialog).getByRole('button', { name: '실행' }));
     expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'pick_from', tankId: 'tank-b1', confirm: true });
-    await screen.findByRole('button', { name: '섹터 지정 집기 처리 중' });
+    await within(card()).findByRole('button', { name: '집기 처리 중' });
     finish(store, 'cmd-1');
   });
 
+  it('모드 전환 결과를 보여 준다: 적용 대기 → 적용됨, 거부되면 거부됨', async () => {
+    const { store } = renderWithStore(<RobotModeControl />, { devices: [robotState()], me: ADMIN });
+    expect(within(card()).queryByRole('status', { name: '모드 전환 결과' })).not.toBeInTheDocument();
+    await userEvent.click(radio('수동'));
+    await userEvent.click(within(card()).getByRole('button', { name: '적용' }));
+    await userEvent.click(screen.getByRole('button', { name: '실행' }));
+    expect(await within(card()).findByRole('status', { name: '모드 전환 결과' })).toHaveTextContent('적용 대기');
+    finish(store, 'cmd-1');
+    expect(within(card()).getByRole('status', { name: '모드 전환 결과' })).toHaveTextContent('적용됨');
+
+    await userEvent.click(within(card()).getByRole('button', { name: '적용' }));
+    await userEvent.click(screen.getByRole('button', { name: '실행' }));
+    await within(card()).findByText('적용 대기');
+    finish(store, 'cmd-2', 'rejected', '진행 중인 사이클이 있습니다');
+    expect(within(card()).getByRole('status', { name: '모드 전환 결과' })).toHaveTextContent('거부됨');
+  });
+
+  it('서버 모드가 바뀌면 초안을 서버 값으로 되돌린다', async () => {
+    const { store } = renderWithStore(<RobotModeControl />, { devices: [robotState()], me: ADMIN });
+    await userEvent.click(radio('자동 · 섹터 지정'));
+    await userEvent.click(within(card()).getByRole('button', { name: '섹터 A2' }));
+    act(() => {
+      store.dispatch(devicesReceived([robotState({ mode: 'manual', updatedAt: '2026-10-13T05:00:05.000Z' })]));
+    });
+    expect(radio('수동')).toHaveAttribute('aria-checked', 'true');
+    expect(radio('수동')).toHaveTextContent('지금');
+  });
+});
+
+describe('DeviceControls: 홈', () => {
   it('홈에는 위험 조작 버튼 자체가 없다', () => {
     renderWithStore(<DeviceControls deviceId="robot-1" context="home" />, { devices: [robotState()], me: ADMIN });
-    expect(screen.queryByText(/모드로 전환/)).not.toBeInTheDocument();
-    expect(screen.queryByText('섹터 지정 집기')).not.toBeInTheDocument();
+    expect(screen.queryByText(/적용|집기|모드/)).not.toBeInTheDocument();
   });
 });
 

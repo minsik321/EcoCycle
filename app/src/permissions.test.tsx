@@ -50,7 +50,7 @@ const user = (role: Role): Me => ({ id: role, name: `${role}-user`, role, permis
 
 /** 한 장짜리 기준표: 역할별로 화면에서 할 수 있는 것 */
 const MATRIX: Record<Role, { quick: boolean; ack: boolean; danger: boolean; settings: boolean; batch: boolean }> = {
-  //            시작·일시정지·재개·정지   알람 확인   수동 모드·섹터 지정 집기   설정값 변경
+  //            시작·일시정지·재개·정지   알람 확인   모드 전환·수동 집기   설정값 변경
   admin: { quick: true, ack: true, danger: true, settings: true, batch: true },
   operator: { quick: true, ack: true, danger: false, settings: false, batch: false },
   viewer: { quick: false, ack: false, danger: false, settings: false, batch: false },
@@ -147,8 +147,8 @@ describe.each(ROLES)('역할 %s', (role) => {
       else expect(button).not.toBeInTheDocument(); // 보낼 수 있는 조작이 하나도 없으면 아예 보이지 않는다
     }
     // 위험 조작은 홈에 없다 (어떤 역할이든)
-    expect(screen.queryByRole('button', { name: /모드로 전환/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '섹터 지정 집기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /적용|집기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '집기' })).not.toBeInTheDocument();
   });
 
   it('홈: 알람 확인 버튼', () => {
@@ -173,31 +173,39 @@ describe.each(ROLES)('역할 %s', (role) => {
     expect(screen.getByLabelText('열린 알람')).toHaveTextContent('섹터 A1');
   });
 
-  it('로봇팔 페이지: 낮은 위험 조작, 위험 조작, 설정', async () => {
+  it('로봇팔 페이지: 조작 줄(낮은 위험), 운전 모드(위험 조작), 진단, 설정', async () => {
     renderWithStore(<RobotPage />, { me, devices: [robotState({ mode: 'manual' })] });
-    const controls = screen.getByLabelText('조작');
-    const quick = within(controls).queryByRole('button', { name: '일시정지' });
-    const mode = within(controls).queryByRole('button', { name: '자동 모드로 전환' });
-    const pick = within(controls).queryByRole('button', { name: '섹터 지정 집기' });
-    const pinned = within(controls).queryByRole('button', { name: '자동 · 섹터 지정 적용' });
+    const bar = screen.queryByRole('region', { name: '조작' });
+    const modeCard = screen.queryByRole('region', { name: '운전 모드' });
 
     if (!m.quick) {
-      // 열람자: 조작 영역에 버튼이 하나도 없다
-      expect(within(controls).queryAllByRole('button')).toHaveLength(0);
-      expect(pinned).not.toBeInTheDocument();
+      // 열람자: 조작 줄도 운전 모드도 없다 (모드는 주요 수치에서 본다)
+      expect(bar).not.toBeInTheDocument();
+      expect(modeCard).not.toBeInTheDocument();
     } else {
-      expect(quick).toBeEnabled();
-      if (m.danger) {
-        expect(mode).toBeEnabled();
-        expect(pick).toBeEnabled();
-      } else {
-        // 작업자: 보이지만 비활성이고 이유가 있다
-        expect(mode).toBeDisabled();
+      expect(within(bar!).getByRole('button', { name: '일시정지' })).toBeEnabled();
+      // 위험 조작은 조작 줄에 두지 않는다
+      expect(within(bar!).queryByRole('button', { name: '집기' })).not.toBeInTheDocument();
+      // 지금 모드(수동) 칸: 집을 섹터 + 집기
+      const pick = within(modeCard!).getByRole('button', { name: '집기' });
+      if (m.danger) expect(pick).toBeEnabled();
+      else {
         expect(pick).toBeDisabled();
-        expect(pinned).toBeDisabled();
-        expect(within(controls).getAllByText('권한이 없습니다').length).toBeGreaterThanOrEqual(2);
+        expect(within(modeCard!).getByText('권한이 없습니다')).toBeInTheDocument();
+      }
+      // 자동 칸을 고르면 "적용"
+      act(() => within(modeCard!).getByRole('radio', { name: '자동' }).click());
+      const apply = within(modeCard!).getByRole('button', { name: '적용' });
+      if (m.danger) expect(apply).toBeEnabled();
+      else {
+        // 작업자: 보이지만 비활성이고 이유가 있다
+        expect(apply).toBeDisabled();
+        expect(within(modeCard!).getByText('권한이 없습니다')).toBeInTheDocument();
       }
     }
+    // 진단(관절 각도 표)과 설정은 "자세히" 안. 진단은 관리자에게만 보인다
+    act(() => screen.getByRole('button', { name: '자세히' }).click());
+    expect(!!screen.queryByLabelText('관절 값')).toBe(m.danger);
     const speed = screen.getByLabelText('동작 속도');
     if (m.settings) expect(speed).toBeEnabled();
     else {
@@ -225,19 +233,18 @@ describe.each(ROLES)('역할 %s', (role) => {
     renderWithStore(element, {
       me,
       route: kind === '탱크' ? '/tanks/tank-a1' : '/',
-      devices: [tankState(), conveyorState(), { id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 28, temperatureC: 40, updatedAt: NOW }],
+      devices: [tankState(), conveyorState(), { id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 28, temperatureC: 40, cycleStage: 'pressing', updatedAt: NOW }],
     });
-    // 섹터 페이지는 설정이 "자세히" 안에 있다 (기기 페이지 틀)
-    if (kind === '탱크') act(() => screen.getByRole('button', { name: '자세히' }).click());
+    // 설정은 "자세히" 안에 있다 (기기 페이지 틀)
+    act(() => screen.getByRole('button', { name: '자세히' }).click());
     const input = screen.getByLabelText(label);
     if (m.settings) expect(input).toBeEnabled();
     else expect(input).toBeDisabled();
 
     if (hasControls) {
-      const controls = screen.getByLabelText('조작');
-      const stop = within(controls).queryByRole('button', { name: '정지' });
-      if (m.quick) expect(stop).toBeEnabled();
-      else expect(stop).not.toBeInTheDocument();
+      const bar = screen.queryByRole('region', { name: '조작' });
+      if (m.quick) expect(within(bar!).getByRole('button', { name: '정지' })).toBeEnabled();
+      else expect(bar).not.toBeInTheDocument();
     }
     await screen.findByLabelText(/알람 이력/);
   });
@@ -266,7 +273,12 @@ describe.each(ROLES)('역할 %s', (role) => {
 
   it('조작 가능 여부는 어느 역할이든 연결이 끊기면 모두 막힌다', async () => {
     renderWithStore(<RobotPage />, { me, connection: 'offline', devices: [robotState({ mode: 'manual' })] });
-    for (const button of within(screen.getByLabelText('조작')).queryAllByRole('button')) expect(button).toBeDisabled();
+    // 명령을 보내는 버튼은 모두 막힌다 (모드 칸 고르기는 초안이라 명령이 아니다: role="radio")
+    for (const name of ['조작', '운전 모드']) {
+      const region = screen.queryByRole('region', { name });
+      for (const button of region ? within(region).queryAllByRole('button') : []) expect(button).toBeDisabled();
+    }
+    act(() => screen.getByRole('button', { name: '자세히' }).click());
     expect(screen.getByLabelText('동작 속도')).toBeDisabled();
     await screen.findByLabelText('오류 로그 (최근 7일)');
   });

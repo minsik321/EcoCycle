@@ -53,8 +53,14 @@ export interface ConveyorState {
   running: boolean;
   /** 적재 정도 % (0~100) */
   loadPercent: number;
+  /** 벨트에 놓였지만 아직 압축기에 닿지 않은 집기 덩어리 수 (개). ⚠ 제안안 (`docs/questions.md` B32) */
+  itemsToBaler: number;
   updatedAt: IsoTimestamp;
 }
+
+/** 압축 사이클 단계: 대기 → 투입(배합 중인 배치를 받는 중) → 압축 → 결속·배출. ⚠ 제안안 (`docs/questions.md` B32) */
+export const COMPRESSOR_CYCLE_STAGES = ['idle', 'filling', 'pressing', 'ejecting'] as const;
+export type CompressorCycleStage = (typeof COMPRESSOR_CYCLE_STAGES)[number];
 
 /** GET /devices/compressor-1/state */
 export interface CompressorState {
@@ -64,6 +70,7 @@ export interface CompressorState {
   running: boolean;
   pressureMpa: number;
   temperatureC: number;
+  cycleStage: CompressorCycleStage;
   updatedAt: IsoTimestamp;
 }
 

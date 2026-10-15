@@ -26,6 +26,7 @@ const device: DeviceState = {
   status: 'normal',
   running: true,
   loadPercent: 40,
+  itemsToBaler: 2,
   updatedAt: '2026-10-13T05:00:00.000Z',
 };
 const alarm = (id: string, state: Alarm['state']): Alarm => ({

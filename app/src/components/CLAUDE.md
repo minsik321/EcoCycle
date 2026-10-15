@@ -9,7 +9,7 @@ components/
 ├── common/        Button(48px, 처리 중 비활성), Card, Dialog(초점 가두기·Esc·초점 복귀), GlassPanel(유리 패널: main/minor),
 │                  KpiCard + Sparkline(지표 카드와 작은 추이선), Tabs, DataTable, ToastCard(알림 카드 한 장)
 ├── status/        StatusBadge(색+기호+글자), OfflineNotice, Timestamp, useDisplayStatus(끊기면 모든 상태를 "연결 끊김"으로), tone(색 클래스)
-├── controls/      DeviceControls, CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
+├── controls/      DeviceControls, RobotModeControl(로봇 운전 모드 세 칸 + 섹터 칩·집기), CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
 ├── layout/        Sidebar(앱의 유일한 주 메뉴: 폰 아래 탭 바 + "더 보기", md 이상 왼쪽 사이드바·접힘, 강조 `NAV_ACTIVE`), TopBar(로고·시계·알람 수·연결 상태·화질·사용자),
 │                  AppShell(슬롯: headerCenter·headerExtra·overlays), TopCards,
 │                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 상단 바·끊김 안내를 숨기고 headerExtra를 넘기며 주 메뉴를 접는다. 3D 홈만 쓴다)
@@ -41,7 +41,8 @@ components/
 - 모든 기기 페이지는 `DevicePage`에 다섯 조각(hero, tiles, now, actions, details)을 끼워 만든다. 지난 기록이 있으면 여섯째 `records`(맨 아래 폭 전체, 폰에서는 조작 줄 앞). 폰은 한 줄(조작 줄은 주 메뉴 바로 위에 붙음), `md` 이상은 두 줄.
 - 연결 끊김 처리는 조각들이 `useDeviceLive()`로 직접 한다: 값·하는 일·지금/다음은 "–", 상태 칩은 "연결 끊김", 마지막 수신 시각 표시, 그림 영역은 `data-frozen="true"`(CSS 움직임 정지, `styles/index.css`). 캔버스 그림은 `useDeviceLive().disconnected`를 보고 스스로 멈춘다.
 - `DeviceLiveOverride`는 서버 없이 보는 미리 보기(`/design/device`)에서만 쓴다.
-- 조작 줄에는 위험도 낮은 조작만 둔다. 위험 조작(모드 전환·탱크 지정 집기·설정 변경)은 "자세히" 안에서 확인 단계를 거친다.
+- 조작 줄에는 위험도 낮은 조작만 둔다. 설정 변경은 "자세히" 안에서 확인 단계를 거친다. 로봇 운전 모드(모드 전환·수동 집기)는 로봇팔 페이지의 핵심 조작이라 "자세히" 밖, 지금/다음 아래의 카드(`RobotModeControl`)에 두고 같은 확인 단계를 거친다.
+- `KeyTile`의 `kind: 'text'`는 글로 된 값(모드·현재 작업·단계)을 숫자보다 작게 적고 넘치면 말줄임한다. `sub`(예: "/ 28.5")는 폰에서는 값 옆, 태블릿의 좁은 반 칸에서는 값 아래 줄.
 - "자세히"의 내용은 열 때 처음 그린다(열기 전에는 이력 요청이 나가지 않는다).
 
 ## 디자인 시스템
@@ -57,9 +58,10 @@ components/
 
 명세: "같은 조작 컴포넌트를 홈과 기기 페이지 두 곳에서 재사용".
 
-- `DeviceControls`는 `deviceId`와 `context: 'home' | 'page'`를 받는다.
+- `DeviceControls`는 `deviceId`와 `context: 'home' | 'page'`를 받는다. 버튼 하나로 보내는 명령만 그린다.
   - `home`: 위험도 낮음 명령만(`start`, `pause`, `resume`, `stop`, `ack_alarm`).
-  - `page`: 전체 명령. 위험도 높음 명령은 반드시 `ConfirmDialog`를 거쳐 `confirm: true`로 보낸다.
+  - `page`: 기기 페이지에 둘 수 있는 명령 중 값을 고를 필요가 없는 것. 값을 고르는 위험 조작은 각자 컴포넌트가 맡는다: `update_setting`은 `SettingForm`, `set_mode`·`pick_from`은 `RobotModeControl`. 위험도 높음 명령은 반드시 `ConfirmDialog`를 거쳐 `confirm: true`로 보낸다.
+- `RobotModeControl`: 세 칸(`role="radiogroup"`, 좌우 화살표)을 고르는 것은 초안이고 서버 모드에는 "지금"이 붙는다. 자동 · 섹터 지정은 섹터 칩(여러 개, 적용된 칩 표시)과 "적용" 하나, 수동은 "집을 섹터" 선택과 "집기"가 한 줄(지금 수동이 아니면 먼저 "적용"). 머리에 마지막 모드 전환 결과(적용 대기 → 적용됨·거부됨, 시각). 서버 모드·지정 섹터가 바뀌면 초안을 서버 값으로 되돌린다. 로봇 조작 권한이 하나도 없으면 그리지 않는다.
 - 명령별 위험도와 필요 권한은 `@ecocycle/shared`의 표에서 읽는다. 컴포넌트 안에 목록을 다시 쓰지 않는다.
 - 권한이 없으면 숨기거나 비활성화(`selectCan`). 이는 표시일 뿐이고 차단은 서버가 한다.
 - 연결 끊김 또는 기기 `offline`이면 조작 버튼을 비활성화하고 이유를 보여 준다.

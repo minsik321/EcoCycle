@@ -147,7 +147,7 @@ export function demoData(startMs: number, tSec: number): StudioData {
     'tank-b1': tank('tank-b1', 'B1', 40, 61),
     'tank-b2': tank('tank-b2', 'B2', 66, 43),
     'robot-1': { id: 'robot-1', type: 'robot', status: 'running', mode: 'auto', pinnedSectors: [], pickRecordsRevision: 0, phase: pose.phase, targetTankId: pose.targetTankId, gripper: pose.gripper, updatedAt: iso(now) },
-    'conveyor-z': { id: 'conveyor-z', type: 'conveyor', status: 'normal', running: true, loadPercent: 50, updatedAt: iso(now) },
+    'conveyor-z': { id: 'conveyor-z', type: 'conveyor', status: 'normal', running: true, loadPercent: 50, itemsToBaler: 2, updatedAt: iso(now) },
     'compressor-1': {
       id: 'compressor-1',
       type: 'compressor',
@@ -155,6 +155,7 @@ export function demoData(startMs: number, tSec: number): StudioData {
       running: true,
       pressureMpa: pressing ? round1(pressing.targetPressureMpa * (1 - Math.exp(-pressAge / 2.2))) : 0.4,
       temperatureC: round1(41.5 + Math.sin(tSec / 20) * 1.2),
+      cycleStage: pressing ? 'pressing' : 'idle',
       updatedAt: iso(now),
     },
   };

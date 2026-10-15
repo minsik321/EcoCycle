@@ -73,7 +73,14 @@ try {
       await page.getByRole('button', { name: '로그인', exact: true }).click();
       await page.waitForURL(u => u.pathname === '/');
       await page.evaluate(() => { history.pushState({}, '', '/robot'); dispatchEvent(new PopStateEvent('popstate')); });
-      await page.getByRole('button', { name: '수동 모드로 전환', exact: true }).waitFor();
+      const mode = page.getByRole('region', { name: '운전 모드', exact: true });
+      const radio = (re) => mode.getByRole('radio').filter({ hasText: re });
+      const current = (re) => mode.locator('[role="radio"]').filter({ hasText: re }).filter({ hasText: '지금' });
+      const apply = async () => {
+        await mode.getByRole('button', { name: '적용', exact: true }).click();
+        await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
+      };
+      await current(/^자동(?! ·)/).waitFor();
       await page.getByRole('region', { name: '집기 기록', exact: true }).getByText('불러오는 중…', { exact: true }).waitFor({ state: 'hidden' });
       if (zoom !== 1) await page.evaluate(zoomText, zoom);
       const shot = async (name, target) => {
@@ -88,31 +95,32 @@ try {
         if (zoom === 1 && name !== '3-confirm') await page.screenshot({ path: path.join(out, `${width}x${height}-${name}-full.png`), fullPage: true });
         assert.deepEqual({ wrapped, overflow }, { wrapped: [], overflow: false }, name);
       };
-      const controls = page.getByLabel('조작', { exact: true });
-      await shot('1-auto', controls);
-      await page.getByRole('button', { name: '수동 모드로 전환', exact: true }).click();
-      await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
-      await page.getByText('현재 모드:', { exact: false }).filter({ hasText: '수동' }).waitFor();
-      await shot('2-manual', controls);
-      await shot('2-manual-alignment', page.getByLabel('집을 섹터'));
-      await page.getByRole('checkbox', { name: '섹터 A1', exact: true }).check();
-      await page.getByRole('checkbox', { name: '섹터 B1', exact: true }).check();
-      await page.getByRole('button', { name: '자동 · 섹터 지정 적용', exact: true }).click();
+      // 운전 모드 세 칸 (자동 | 자동 · 섹터 지정 | 수동): 칸 고르기는 초안, 적용·집기는 확인 단계를 거친다
+      await shot('1-auto', mode);
+      await radio(/^수동/).click();
+      await apply();
+      await current(/^수동/).waitFor();
+      await shot('2-manual', mode);
+      await shot('2-manual-alignment', mode.getByLabel('집을 섹터'));
+      await radio(/^자동 · 섹터 지정/).click();
+      await mode.getByRole('button', { name: '섹터 A1', exact: true }).click();
+      await mode.getByRole('button', { name: '섹터 B1', exact: true }).click();
+      await mode.getByRole('button', { name: '적용', exact: true }).click();
       await shot('3-confirm');
       await page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
       assert.equal((await get('/devices/robot-1/state')).mode, 'manual');
-      await page.getByRole('button', { name: '자동 · 섹터 지정 적용', exact: true }).click();
-      await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
-      await page.getByText('지정된 섹터:', { exact: false }).waitFor();
-      await shot('4-pinned', controls);
+      await apply();
+      await current(/^자동 · 섹터 지정/).waitFor();
+      assert.deepEqual((await get('/devices/robot-1/state')).pinnedSectors, ['tank-a1', 'tank-b1']);
+      await shot('4-pinned', mode);
       await shot('5-records', page.getByRole('region', { name: '집기 기록', exact: true }));
-      await page.getByRole('button', { name: '자동 모드로 전환', exact: true }).click();
-      await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
-      await page.getByText('지정된 섹터:', { exact: false }).waitFor({ state: 'hidden' });
+      await radio(/^자동(?! ·)/).click();
+      await apply();
+      await current(/^자동(?! ·)/).waitFor();
       assert.deepEqual((await get('/devices/robot-1/state')).pinnedSectors, []);
       await context.close();
     }
   }
-  fs.writeFileSync(path.join(out, 'validation.txt'), 'PASS: 390×844, 820×1180; 100%/130%; 3 modes, pins, confirmation/cancel, reset, records; actual pinned/manual cycles, validation 422, permissions 403, idempotency.\n');
+  fs.writeFileSync(path.join(out, 'validation.txt'), 'PASS: 390×844, 820×1180; 100%/130%; segmented 3 modes (auto | auto · sector pinned | manual), pins, confirmation/cancel, reset, records; actual pinned/manual cycles, validation 422, permissions 403, idempotency.\n');
   console.log('PASS: robot modes, actual cycles, records, permissions; 2 sizes × 2 text scales.');
 } finally { await browser?.close(); app.stop(); mock.stop(); }

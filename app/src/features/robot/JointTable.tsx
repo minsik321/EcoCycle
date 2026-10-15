@@ -11,14 +11,14 @@ const SLOW_MS = 3_000;
  * 로봇 관절 각도(도) 표. 관절 순서·이름·각도 범위는 로봇 모델을 따르고, 값은 받은 그대로 보여 준다(변환하지 않는다).
  * 연결이 끊기면 마지막 값을 흐리게 두고 "마지막 값"이라고 알린다.
  */
-export function JointTable() {
+export function JointTable({ title = '관절 값 (도)' }: { title?: string }) {
   const model = useRobotModel();
   const { sample, ageMs } = useJointReading();
   const disconnected = useAppSelector(selectIsDisconnected);
   const slow = !disconnected && ageMs !== null && ageMs > SLOW_MS;
 
   return (
-    <Card title="관절 값 (도)" aria-label="관절 값">
+    <Card title={title} aria-label="관절 값">
       {sample === null ? (
         <p role="status" className="text-slate-500">
           {disconnected ? '연결이 끊겨 관절 값을 받을 수 없습니다.' : '관절 값을 기다리는 중…'}
@@ -36,8 +36,8 @@ export function JointTable() {
                 <th scope="col" className="py-1 font-medium">관절</th>
                 <th scope="col" className="py-1 font-medium">각도</th>
                 <th scope="col" className="py-1 font-medium">범위</th>
-                {/* 폰에서는 칸이 모자라 막대(각도·범위 숫자를 그림으로 보인 것)를 뺀다 */}
-                <th scope="col" className="hidden w-1/3 py-1 font-medium sm:table-cell">
+                {/* 칸이 좁으면(폰, 태블릿의 두 칸 배치) 막대(각도·범위 숫자를 그림으로 보인 것)를 뺀다 */}
+                <th scope="col" className="hidden w-1/3 py-1 font-medium sm:table-cell md:hidden xl:table-cell">
                   <span className="sr-only">범위 안 위치</span>
                 </th>
               </tr>
@@ -56,7 +56,7 @@ export function JointTable() {
                     <td className="py-2 pr-3 text-sm whitespace-nowrap text-slate-500 tabular-nums">
                       {joint.minDeg}° ~ {joint.maxDeg}°
                     </td>
-                    <td className="hidden py-2 sm:table-cell">
+                    <td className="hidden py-2 sm:table-cell md:hidden xl:table-cell">
                       <div
                         role="meter"
                         aria-label={`${joint.name} 범위 안 위치`}

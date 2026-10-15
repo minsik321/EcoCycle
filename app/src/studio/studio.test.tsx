@@ -64,7 +64,7 @@ const vehicle = (id: string, stageName: Vehicle['stage'], sectorId: Vehicle['sec
 
 const bale = (id: string, stageName: Bale['stage'], createdMs = T0): Bale => ({ id, batchId: 'batch-1', stage: stageName, stageTimes: { created: iso(createdMs) }, updatedAt: iso(createdMs) });
 
-const compressorState = (): DeviceState => ({ id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 27.9, temperatureC: 41.2, updatedAt: NOW });
+const compressorState = (): DeviceState => ({ id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 27.9, temperatureC: 41.2, cycleStage: 'pressing', updatedAt: NOW });
 
 const input = (over: Partial<StudioData> = {}): StudioData => ({ ...EMPTY_DATA, ...over });
 
@@ -358,8 +358,8 @@ describe('LiveStudio: 기존 store·조작 컴포넌트에 연결한다', () => 
     const panel = screen.getByRole('complementary', { name: '로봇팔 상세' });
     expect(within(panel).getByRole('button', { name: '일시정지' })).toBeInTheDocument();
     expect(within(panel).getByRole('link', { name: '상세 보기' })).toHaveAttribute('href', '/robot');
-    // 수동 모드 전환·섹터 지정 집기·설정 변경은 기기 페이지에만 있다
-    expect(within(panel).queryByRole('button', { name: /모드로 전환/ })).not.toBeInTheDocument();
+    // 모드 전환·수동 집기·설정 변경은 기기 페이지에만 있다
+    expect(within(panel).queryByRole('button', { name: /적용|집기/ })).not.toBeInTheDocument();
     expect(within(panel).queryByRole('button', { name: /집기/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/비상/)).not.toBeInTheDocument();
   });

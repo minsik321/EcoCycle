@@ -3,7 +3,7 @@ import { publish } from './bus';
 import { addToConveyor, excludedTanks, removeFromTank } from './plant';
 import { mixingBatchId, nextPickSector, notePlaced } from './process';
 import { publishDevice } from './publish';
-import { recordPick } from './picks';
+import { pickVolumeM3, recordPick } from './picks';
 import { devices, getSetting } from './state';
 
 // 집기 → 이동 → 놓기 사이클을 흉내 낸다. 관절 값은 15Hz로 보낸다.
@@ -125,14 +125,18 @@ function advance(dtSec: number): void {
   if (phase === 'pick' && progress >= 0.9 && !picked) {
     picked = true;
     r.gripper = { closed: true, holding: true };
-    pickedVolume = removeFromTank(tankId, 1.2);
+    // 집히는 부피는 더미 높이·등급에 따라 매번 다르다. 섹터에 남은 양보다 많이 집을 수는 없다
+    const sector = devices[tankId] as TankState;
+    const wanted = pickVolumeM3(sector.fillPercent, sector.grade);
+    pickedVolume = removeFromTank(tankId, (wanted / sector.capacityM3) * 100);
   }
   if (phase === 'place' && progress >= 0.5 && !placed) {
     placed = true;
     r.gripper = { closed: false, holding: false };
-    addToConveyor(6);
     const batchId = pickedVolume > 0 ? notePlaced(tankId, cycleBatchId) : null;
+    // 빈 섹터라 아무것도 못 집었으면 벨트에 올라가는 덩어리도 없다
     if (pickedVolume > 0) {
+      addToConveyor(6);
       recordPick({ mode: cycleMode, sectorId: tankId, volumeM3: pickedVolume, conveyorId: 'conveyor-z', batchId });
       r.pickRecordsRevision += 1;
     }

@@ -17,7 +17,8 @@ mock-server/
     ├── stream.ts         WebSocket: 티켓 검증, 구독 관리, heartbeat 5초, 시나리오 침묵·지연 반영
     ├── routes/           devices(요약·기기·이력·섹터 하역 기록), process(공정 흐름 상태·요약 이력·차량·배치 기록과 한 건 조회), robots(모델), alarms, cameras, commands(202·멱등성·403/409/422),
     │                     records(모든 `.../records`가 쓰는 페이지 나누기 `sendRecordPage`: 쿼리 검사 422, 구간 거르기, 최신 먼저, { items, total, page, pageSize })
-    ├── sim/              state(현재 값), plant(탱크·컨베이어·압축기·알람), robot(사이클·관절 15Hz), commands(접수→결과),
+    ├── sim/              state(현재 값), plant(탱크·컨베이어(벨트 위 덩어리 `itemsToBaler`)·압축기(사이클 단계 `cycleStage`)·알람), robot(사이클·관절 15Hz), commands(접수→결과),
+    │                     picks(집기 기록, 한 번에 집는 부피 `pickVolumeM3`: 0.06~0.14 m³, 적재율·등급·잡음),
     │                     process(차량·배치·베일: 회사·배정 섹터·배합비·목표 압력을 예시로 정함, 로봇이 집을 섹터도 여기서),
     │                     unloads(섹터 하역 기록: 출차 때 한 줄, 시작할 때 지난 30일치, 계중대 무게 weighTruck),
     │                     records(공정 기록: 끝난 차량·배치 보관, 시작할 때 지난 30일치 배치에 건너뜀 약 7%·일시정지됨 약 5%를 섞음. 진행 중인 것은 process가 `live...Records()`로 내줌),

@@ -85,7 +85,7 @@ describe('조작 줄', () => {
     expect(within(bar).getByRole('button', { name: '정지' })).toBeEnabled();
     expect(within(bar).queryByRole('button', { name: /비상/ })).not.toBeInTheDocument();
     // 위험 조작은 조작 줄에 두지 않는다
-    expect(within(bar).queryByRole('button', { name: /모드로 전환/ })).not.toBeInTheDocument();
+    expect(within(bar).queryByRole('button', { name: /적용|집기/ })).not.toBeInTheDocument();
   });
 
   it('열람자에게는 조작 줄이 없다', () => {

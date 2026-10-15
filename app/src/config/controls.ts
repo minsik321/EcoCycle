@@ -24,7 +24,7 @@ export const CONTROL_TEXT: Record<CommandType, ControlText> = {
   resume: { label: '재개' },
   stop: { label: '정지' },
   set_mode: { label: '모드 전환', confirmMessage: '운전 모드를 바꿉니다. 계속할까요?' },
-  pick_from: { label: '섹터 지정 집기', confirmMessage: '선택한 섹터에서 파지를 집어 옮깁니다. 계속할까요?' },
+  pick_from: { label: '수동 집기', confirmMessage: '선택한 섹터에서 파지를 집어 옮깁니다. 계속할까요?' },
   update_setting: { label: '설정 변경', confirmMessage: '설정값을 바꿉니다. 계속할까요?' },
   ack_alarm: { label: '알람 확인' },
 };
@@ -66,6 +66,12 @@ export function controlsFor(place: ControlPlace, target: DeviceType | 'alarm'): 
 export function canUse(permissions: readonly Permission[], type: CommandType): boolean {
   return permissions.includes(COMMAND_RULES[type].permission);
 }
+
+/**
+ * 로봇팔 페이지 "자세히 › 진단"(관절 각도 표)을 보여 줄 권한. 관리자만 가진 권한(`robot.manual`)을 빌려 쓰는 가정이다(`docs/questions.md` A4).
+ * 읽기 전용 정보라 막는 용도가 아니라 화면을 덜 복잡하게 하려는 표시 구분이다.
+ */
+export const ROBOT_DIAGNOSTICS_PERMISSION: Permission = 'robot.manual';
 
 /** 명령 처리 결과 표시 문구 (홈에서도 조작 결과를 바로 보여 준다) */
 export const COMMAND_STATUS_TEXT: Record<CommandStatus, string> = {

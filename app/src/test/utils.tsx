@@ -36,6 +36,7 @@ export const conveyorState = (): DeviceState => ({
   status: 'normal',
   running: true,
   loadPercent: 40,
+  itemsToBaler: 2,
   updatedAt: NOW,
 });
 

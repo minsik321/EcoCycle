@@ -335,6 +335,22 @@ export function notePlaced(sectorId: TankId, batchId: string | null): string | n
   return batch.id;
 }
 
+/** 압축 시간 중 앞부분은 누르기, 나머지는 결속·배출로 친다 (예시 비율) */
+const PRESSING_SHARE = 0.7;
+
+/** 압축기 사이클 단계: 압축 중인 배치가 있으면 누르기 → 결속·배출, 아니면 배합 중인 배치를 받는 중(투입), 둘 다 없으면 대기 */
+function syncPressStage(): void {
+  const compressing = batchIn('compressing');
+  const mixing = batchIn('mixing');
+  if (compressing && !pausedBatches.has(compressing.id)) {
+    press.stage = compressSec < BATCH_TIMING_SEC.compress * PRESSING_SHARE ? 'pressing' : 'ejecting';
+  } else if (mixing && !pausedBatches.has(mixing.id)) {
+    press.stage = 'filling';
+  } else {
+    press.stage = 'idle';
+  }
+}
+
 function tickBatches(now: number): void {
   const mixing = batchIn('mixing');
   const compressing = batchIn('compressing');
@@ -403,6 +419,7 @@ export function tickProcess(): void {
   const now = Date.now();
   tickVehicles(now);
   tickBatches(now);
+  syncPressStage();
 }
 
 export function processState(): ProcessState {
