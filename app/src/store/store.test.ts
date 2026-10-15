@@ -11,6 +11,8 @@ import {
   loginUser,
   logoutUser,
   plantReceived,
+  restoreSkipped,
+  restoreUserSession,
   sessionLost,
 } from './index';
 import {
@@ -117,6 +119,45 @@ describe('auth', () => {
     const store = await loggedInStore();
     await store.dispatch(logoutUser());
     expect(store.getState().auth.status).toBe('loggedOut');
+  });
+
+  describe('앱 시작 때 세션 되살리기', () => {
+    it('되살아나면 로그인 화면 없이 loggedIn, 권한은 방금 받은 /me 기준이다 (그새 바뀌었어도)', async () => {
+      // 지난번에는 작업자 권한이었는데 그사이 열람자로 바뀌었다
+      vi.mocked(api.restoreSession).mockResolvedValue({ kind: 'restored', me: { ...operator, permissions: [] } });
+      const store = createAppStore();
+      await store.dispatch(restoreUserSession());
+      expect(store.getState().auth).toMatchObject({ status: 'loggedIn', sessionExpired: false, restoreUnavailable: false });
+      expect(store.getState().auth.me?.permissions).toEqual([]);
+    });
+
+    it('되살릴 세션이 없거나 거부되면 loggedOut이고 "세션 만료" 안내는 띄우지 않는다', async () => {
+      vi.mocked(api.restoreSession).mockResolvedValue({ kind: 'none' });
+      const store = createAppStore();
+      await store.dispatch(restoreUserSession());
+      expect(store.getState().auth).toMatchObject({ status: 'loggedOut', sessionExpired: false });
+    });
+
+    it('서버에 닿지 못하면 unknown 그대로 두고 다시 시도하게 한다 (로그아웃하지 않는다)', async () => {
+      vi.mocked(api.restoreSession).mockResolvedValue({ kind: 'unavailable' });
+      const store = createAppStore();
+      await store.dispatch(restoreUserSession());
+      expect(store.getState().auth).toMatchObject({ status: 'unknown', restoreUnavailable: true });
+      store.dispatch(restoreSkipped());
+      expect(store.getState().auth).toMatchObject({ status: 'loggedOut', restoreUnavailable: false });
+    });
+
+    it('확인하는 사이에 직접 로그인했으면 늦게 온 결과로 덮어쓰지 않는다', async () => {
+      let finish!: (value: api.RestoreResult) => void;
+      vi.mocked(api.restoreSession).mockImplementation(() => new Promise((resolve) => (finish = resolve)));
+      vi.mocked(api.login).mockResolvedValue({ accessToken: 'a', expiresIn: 900, user: operator });
+      const store = createAppStore();
+      const restoring = store.dispatch(restoreUserSession());
+      await store.dispatch(loginUser({ id: 'operator', password: 'x' }));
+      finish({ kind: 'none' });
+      await restoring;
+      expect(store.getState().auth.status).toBe('loggedIn');
+    });
   });
 
   it('토큰 갱신이 거부되어 세션을 잃으면 초기화되고 loggedOut이 된다', async () => {

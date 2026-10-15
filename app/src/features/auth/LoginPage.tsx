@@ -30,6 +30,8 @@ export function LoginPage() {
 
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
+  // 자동 로그인: 기본은 끔. 켜면 새로고침·앱을 다시 켜도 비밀번호를 묻지 않는다(웹 14일 쿠키, 안드로이드 보안 저장소)
+  const [remember, setRemember] = useState(false);
   const [emptyError, setEmptyError] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
 
@@ -58,7 +60,7 @@ export function LoginPage() {
       return;
     }
     setEmptyError(false);
-    void dispatch(loginUser({ id: id.trim(), password }));
+    void dispatch(loginUser({ id: id.trim(), password, remember }));
   };
 
   const message = emptyError
@@ -110,6 +112,16 @@ export function LoginPage() {
               autoComplete="current-password"
               className="min-h-12 rounded-lg border border-slate-400 px-3 text-base text-slate-900"
             />
+          </label>
+
+          <label className="flex min-h-12 cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="size-5 shrink-0 accent-slate-900"
+            />
+            자동 로그인
           </label>
 
           {message && (

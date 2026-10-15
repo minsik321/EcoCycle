@@ -90,7 +90,7 @@ npm run dev                 # mock-server + app 동시 실행
 npm run dev:app             # app만 (VITE_API_BASE로 실서버 지정)
 npm run mock -- --scenario=disconnect   # 시나리오 지정해 모의 서버 실행
 npm run typecheck && npm run test       # 타입 검사 + 단위·화면 테스트 (서버 불필요, 약 1분)
-npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403 점검 (약 1분, 서버를 스스로 띄움)
+npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403·자동 로그인(쿠키·교체·재사용 감지) 점검 + 실제 Chromium으로 새로고침 뒤 로그인 유지 (약 2분, 서버·앱을 스스로 띄움, 로컬 Chromium 필요, 없으면 INTEGRATION_SKIP_BROWSER=1)
 npm run test:text           # 실제 브라우저로 폰·태블릿 화면의 글 줄바꿈·가로 넘침 점검 (글자 100%·130%, 약 15~25분, 서버를 스스로 띄움, 로컬 Chromium 필요)
 npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```
@@ -112,7 +112,8 @@ npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 # Vercel: 프로젝트 루트 폴더 app, 빌드 npm run build, 출력 dist
 #   환경 변수: VITE_USE_MOCK=true(값이 모의 서버에서 오는 동안 "예시 데이터" 표시, 실서버로 바꾸면 false), VITE_API_BASE=https://<render주소>/api/v1, VITE_WS_BASE=wss://<render주소>/ws/v1/stream
 # Render: 루트에서 npm install 후 mock-server 빌드·실행 (shared 함께 설치)
-#   환경 변수: CORS_ORIGINS=https://<vercel주소>
+#   환경 변수: CORS_ORIGINS=https://<vercel주소> (쿠키 때문에 정확한 출처만, * 불가),
+#             REFRESH_COOKIE_SAMESITE=none (Vercel과 Render는 다른 사이트라 자동 로그인 쿠키에 SameSite=None 필요)
 # APK 단계(예정): build:android → app 빌드 → cap sync android → Android Studio/Gradle로 APK
 ```
 

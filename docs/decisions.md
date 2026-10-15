@@ -86,7 +86,7 @@
 ## 2026-10-13 리프레시 토큰은 웹에서 메모리에만 둔다 (프로토타입)
 - 결정: 리프레시 토큰의 기본 저장소는 메모리다. 웹 프로토타입에서는 새로고침하면 다시 로그인해야 한다. 안드로이드 앱에서는 Capacitor 보안 저장소 구현을 `setRefreshTokenStore`로 끼운다.
 - 이유: "토큰을 URL·localStorage에 두지 않는다" 규칙. 웹에서 로그인을 유지하려면 `sessionStorage` 등 브라우저 저장소가 필요한데 규칙과 충돌한다.
-- 상태: 가정(확인 필요: 서버 담당과 토큰 보관 방식, 사용자에게 웹 프로토타입의 새로고침 재로그인 허용 여부)
+- 상태: **대체됨** (2026-10-15 "자동 로그인" — 웹은 HttpOnly 쿠키, 안드로이드는 보안 저장소)
 
 ## 2026-10-13 CCTV 재생: hls.js를 필요할 때만 불러온다
 - 결정: `<video>`가 HLS를 직접 재생하는 기기(안드로이드, 사파리)는 주소를 그대로 쓰고, 못 하는 기기(데스크톱 Chrome 등)에서만 `hls.js`를 동적 import로 불러온다. WebRTC 주소는 아직 지원하지 않고 안내만 한다.
@@ -318,3 +318,21 @@
 - 묶음 크기(이 정리 전체 끝): 처음 내려받는 스크립트 736.18KB(압축 225.87KB) → 730.20KB(압축 222.12KB), 3D 묶음 1,448.92KB(압축 469.73KB, 3D를 고를 때만).
 - 스크린샷: `docs/screenshots/home-cleanup/3-text/`(전·후 비교 `compare-*.png`, 글자 130% 폰 시트 전·후), `final/`.
 - 상태: 가정(확인 필요: 사용자 — 실제 폰에서 보고된 화면이 고쳐졌는지. 재현은 글자 확대로 흉내 냈다)
+
+## 2026-10-15 자동 로그인: 웹은 HttpOnly 쿠키, 안드로이드는 보안 저장소 (localStorage 아님)
+- 결정: 로그인 화면에 "자동 로그인" 확인란(기본 끔)을 둔다. 리프레시 토큰은 웹에서는 서버가 심는 쿠키(`ecocycle_rt`: HttpOnly, Secure, `Path=/api/v1/auth`, 같은 사이트 `SameSite=Lax`, 다른 사이트 `None` + `Partitioned`)로, 안드로이드에서는 본문으로 주고받아 Android Keystore 기반 보안 저장소에 둔다. 켜면 웹 14일 지속 쿠키·앱 보안 저장소, 끄면 웹 세션 쿠키(브라우저를 닫을 때까지)·앱 메모리. 액세스 토큰은 계속 메모리에만 둔다. 앱 시작 때 리프레시 → `GET /me`로 세션을 되살리고 그동안 "로그인 확인 중…"을 보인다. 리프레시할 때마다 토큰을 교체하고 이미 쓴 토큰이 오면 그 세션 전체를 폐기한다. 명세 6절 "토큰 보관과 자동 로그인"에 반영했다.
+- 이유:
+  - localStorage·sessionStorage는 같은 페이지의 어떤 스크립트든 읽을 수 있어 XSS 한 번이면 리프레시 토큰(장기 자격)이 통째로 빠져나간다. HttpOnly 쿠키는 스크립트가 읽을 수 없고, `Path`를 인증 경로로 묶어 다른 API 요청에는 실리지도 않는다. 기존 규칙("토큰을 URL·localStorage에 두지 않는다")을 지키면서 새로고침을 견디는 방법은 이것뿐이다.
+  - 쿠키는 CSRF를 부르므로 `SameSite`, CORS의 명시한 출처 목록(`credentials: true`에서는 `*` 불가), 쿠키 요청의 `Origin` 확인, JSON 본문(사전 요청 유발)으로 막는다. 쿠키로 얻는 것은 액세스 토큰뿐이고 그 응답은 허용한 출처만 읽을 수 있다.
+  - 안드로이드 WebView(Capacitor)는 API와 출처가 달라 쿠키가 불안정하고, 기기에 Keystore라는 더 나은 보관소가 있다. 그래서 같은 API에 `refreshTokenDelivery: "body"`로 주고받는다. 앱 코드는 `api/tokens.ts`의 `RefreshTokenStore` 하나에 웹(`createCookieTokenStore`, 기본)·네이티브(`createNativeTokenStore`) 구현을 둔다.
+  - 교체 + 재사용 감지: 토큰이 새어도 정상 사용자와 훔친 사람 중 늦게 쓴 쪽에서 재사용이 드러나 세션이 끊긴다. 계정이 역할별로 공유되므로(admin·operator·viewer) 계정 전체가 아니라 그 로그인 세션만 폐기한다.
+  - 여러 탭이 같은 쿠키로 동시에 리프레시하면 재사용으로 오인되므로 웹은 Web Locks로 탭 사이 리프레시를 한 번에 하나만 보낸다.
+- 주의:
+  - Vercel + Render처럼 앱과 API가 다른 사이트면 `SameSite=None`(모의 서버는 `REFRESH_COOKIE_SAMESITE=none`)이 필요하고, Safari처럼 제3자 쿠키를 막는 브라우저에서는 웹 자동 로그인이 동작하지 않을 수 있다(로그인 화면으로 돌아갈 뿐 안전에는 문제없음). 실서버는 앱과 같은 사이트(예: `app.`·`api.` 하위 도메인)에 두기를 권한다.
+  - `Secure` 쿠키라 `http://localhost`는 되지만 태블릿에서 `http://192.168.x.x`처럼 HTTP LAN 주소로 열면 쿠키가 저장되지 않는다(자동 로그인만 안 되고 로그인은 된다).
+  - 모의 서버는 `CORS_ORIGINS`가 비어 있으면 `http://localhost:5173`, `http://127.0.0.1:5173`만 허용한다(전에는 모든 출처). 다른 주소로 열면 `CORS_ORIGINS`에 넣는다. 안드로이드 앱 단계에서는 WebView 출처도 넣는다.
+  - 보안 저장소 플러그인은 아직 고르지 않았다(Capacitor 미설치). 안드로이드 빌드 단계에서 Android Keystore로 암호화하는 플러그인을 골라 `SecureStorage`(get·set·remove) 모양으로 감싸 `setRefreshTokenStore(createNativeTokenStore(...))`로 끼운다.
+  - 앱 시작 때 서버에 닿지 못하면 토큰을 지우지 않고 "다시 시도 / 로그인 화면으로"를 보인다(네트워크·5xx로는 로그아웃하지 않는다는 기존 규칙). 거부(4xx)면 안내 없이 로그인 화면, 사용 중 거부면 기존처럼 "로그인 시간이 지나 다시 로그인해야 합니다" 안내.
+- 시나리오: `refresh-expiry`(리프레시 토큰 30초), `refresh-reuse`(교체 5초 뒤 이전 토큰 재사용 → 세션 폐기), `server-restart`(45초 뒤·2분마다 모든 세션 삭제와 WebSocket 닫기).
+- 테스트: `api/session.test.ts`(웹·안드로이드 흐름, 저장소·주소에 토큰 없음), `store/store.test.ts`·`features/auth/auth.test.tsx`(되살리기, 확인란), `integration/auth.integration.test.ts`(실제 모의 서버: 쿠키 속성, 지속/세션 쿠키, 교체, 재사용 → 세션 폐기, 로그아웃, CORS), `scripts/authReload.mjs`(실제 Chromium: 자동 로그인 → 새로고침·브라우저 다시 열기 → 유지, 로그아웃 → 새로고침 → 로그인 화면).
+- 상태: 가정(확인 필요: 서버 담당 — `docs/questions.md` B28, 배포 주소를 같은 사이트로 둘 수 있는지)

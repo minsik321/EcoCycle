@@ -20,7 +20,7 @@ store/
 
 | 슬라이스 | 내용 |
 | --- | --- |
-| `auth` | 로그인 여부, `me`(id, name, role, permissions) |
+| `auth` | 로그인 여부, `me`(id, name, role, permissions), 앱 시작 때 세션 확인(`restoreUserSession`: 되살아나면 새 /me, 서버에 닿지 못하면 `restoreUnavailable`로 다시 시도·`restoreSkipped`) |
 | `plant` | 요약(평균 수분, 전체 적재율, 오늘 처리량, 압축기 가동률, 시스템 상태) |
 | `process` | 공정 흐름: 차량·배치·베일의 최신 상태(종류별 최근 20건, 오래된 것부터). 단계·배정·배합·압력은 서버 값 그대로 |
 | `devices` | 기기 ID별 최신 상태(`DeviceState`), `updatedAt` |

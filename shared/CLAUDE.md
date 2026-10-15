@@ -13,7 +13,8 @@ shared/
     ├── ids.ts          기기 ID 7개(상수 배열)와 DeviceId·TankId 등, deviceTypeOf
     ├── common.ts       IsoTimestamp, DeviceStatus, 단위 규칙(주석)
     ├── robot.ts        Phase, RobotStatus, RobotMode, RobotModel(제안안)
-    ├── auth.ts         Role, Permission, Me, 로그인·리프레시·로그아웃·ws-ticket 요청/응답, PushRegisterRequest
+    ├── auth.ts         Role, Permission, Me, 로그인(remember·refreshTokenDelivery)·리프레시·로그아웃·ws-ticket 요청/응답,
+    │                   리프레시 쿠키 이름·경로, 리프레시 거부 code(⚠ B28), PushRegisterRequest
     ├── devices.ts      TankState(등급 grade 포함)·RobotState·ConveyorState·CompressorState, DeviceState(type으로 구분), PlantSummary·HistoryResponse·PlantHistoryResponse(제안안)
     ├── process.ts      공정 흐름: Vehicle·Batch·Bale(stage와 stageTimes), ProcessState, PLANT_METRICS (제안안, 서버 합의 전)
     ├── alarms.ts       Alarm, AlarmLevel, AlarmState

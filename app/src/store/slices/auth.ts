@@ -22,9 +22,18 @@ export interface AuthState {
   loginError: LoginError | null;
   /** 토큰 갱신이 거부되어 로그인이 풀렸다 (로그인 화면에서 이유를 알려 준다) */
   sessionExpired: boolean;
+  /** 앱 시작 때 세션을 확인하려 했지만 서버에 닿지 못했다 (status는 unknown 그대로, 다시 시도하게 한다) */
+  restoreUnavailable: boolean;
 }
 
-const initialState: AuthState = { status: 'unknown', me: null, loginPending: false, loginError: null, sessionExpired: false };
+const initialState: AuthState = {
+  status: 'unknown',
+  me: null,
+  loginPending: false,
+  loginError: null,
+  sessionExpired: false,
+  restoreUnavailable: false,
+};
 
 function toLoginError(error: unknown): LoginError {
   if (error instanceof api.ApiError) {
@@ -35,11 +44,12 @@ function toLoginError(error: unknown): LoginError {
   return { code: 'UNKNOWN', message: '로그인에 실패했습니다.', status: 0 };
 }
 
-export const loginUser = createAsyncThunk<Me, { id: string; password: string }, { rejectValue: LoginError }>(
+/** remember: 자동 로그인 (새로고침·앱을 다시 켜도 비밀번호를 묻지 않는다) */
+export const loginUser = createAsyncThunk<Me, { id: string; password: string; remember?: boolean }, { rejectValue: LoginError }>(
   'auth/login',
-  async ({ id, password }, { rejectWithValue }) => {
+  async ({ id, password, remember = false }, { rejectWithValue }) => {
     try {
-      const res = await api.login(id, password);
+      const res = await api.login(id, password, remember);
       return res.user;
     } catch (error) {
       return rejectWithValue(toLoginError(error));
@@ -56,8 +66,8 @@ export const logoutUser = createAsyncThunk<void, void>('auth/logout', async () =
   }
 });
 
-/** 앱을 켤 때 저장된 리프레시 토큰으로 세션을 되살린다 (보안 저장소를 쓰는 안드로이드에서 의미가 있다) */
-export const restoreUserSession = createAsyncThunk<Me | null, void>('auth/restore', async () => api.restoreSession());
+/** 앱을 켤 때 리프레시 토큰(웹 쿠키·안드로이드 보안 저장소)으로 세션을 되살린다. 권한은 그때 받은 /me를 쓴다 */
+export const restoreUserSession = createAsyncThunk<api.RestoreResult, void>('auth/restore', async () => api.restoreSession());
 
 const slice = createSlice({
   name: 'auth',
@@ -71,6 +81,11 @@ const slice = createSlice({
     },
     clearLoginError(state) {
       state.loginError = null;
+    },
+    /** 세션 확인이 서버에 닿지 못했을 때 기다리지 않고 로그인 화면으로 간다 */
+    restoreSkipped(state) {
+      state.status = 'loggedOut';
+      state.restoreUnavailable = false;
     },
   },
   extraReducers: (builder) => {
@@ -93,15 +108,27 @@ const slice = createSlice({
         state.status = 'loggedOut';
         state.me = null;
       })
+      .addCase(restoreUserSession.pending, (state) => {
+        state.restoreUnavailable = false;
+      })
       .addCase(restoreUserSession.fulfilled, (state, action) => {
-        state.status = action.payload ? 'loggedIn' : 'loggedOut';
-        state.me = action.payload;
+        // 확인하는 사이에 이미 로그인했거나 로그인이 풀렸으면 그대로 둔다
+        if (state.status !== 'unknown') return;
+        const result = action.payload;
+        if (result.kind === 'restored') {
+          state.status = 'loggedIn';
+          state.me = result.me;
+        } else if (result.kind === 'none') {
+          state.status = 'loggedOut';
+        } else {
+          state.restoreUnavailable = true;
+        }
       })
       .addCase(restoreUserSession.rejected, (state) => {
-        state.status = 'loggedOut';
+        if (state.status === 'unknown') state.status = 'loggedOut';
       });
   },
 });
 
-export const { sessionLost, clearLoginError } = slice.actions;
+export const { sessionLost, clearLoginError, restoreSkipped } = slice.actions;
 export default slice.reducer;

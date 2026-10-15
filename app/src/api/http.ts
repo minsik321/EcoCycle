@@ -1,6 +1,6 @@
 import type { ApiErrorBody, RefreshRequest, RefreshResponse } from '@ecocycle/shared';
 import { API_BASE } from '../config/env';
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from './tokens';
+import { clearTokens, getAccessToken, getRefreshToken, refreshTokenDelivery, setTokens } from './tokens';
 
 /** 서버 오류를 { code, message, status }로 통일한다. status 0은 네트워크 오류(서버에 닿지 못함). */
 export class ApiError extends Error {
@@ -31,6 +31,8 @@ export interface RequestOptions {
   auth?: boolean;
   responseType?: 'json' | 'blob';
   signal?: AbortSignal;
+  /** true면 쿠키를 함께 보내고 받는다(credentials: 'include'). 웹의 인증 요청에만 쓴다 */
+  withCredentials?: boolean;
 }
 
 // 리프레시까지 실패해 로그인이 필요해졌을 때 부르는 곳(store가 등록한다). api는 store를 import하지 않는다.
@@ -82,6 +84,8 @@ async function rawRequest<T>(path: string, options: RequestOptions, token: strin
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : null,
       signal: options.signal ?? null,
+      // 웹 리프레시 토큰 쿠키는 인증 경로(로그인·리프레시·로그아웃)에서만 함께 보낸다
+      ...(options.withCredentials ? { credentials: 'include' as const } : {}),
     });
   } catch (error) {
     if (options.signal?.aborted) throw error;
@@ -94,38 +98,70 @@ async function rawRequest<T>(path: string, options: RequestOptions, token: strin
 
 // --- 리프레시: 여러 요청이 동시에 401을 받아도 리프레시는 한 번만 실행하고 나머지는 기다린다 ---
 
-let refreshing: Promise<boolean> | null = null;
+/** ok: 새 토큰을 받음, rejected: 서버가 거부(4xx, 다시 로그인해야 함), unavailable: 서버에 닿지 못함·서버 오류(토큰은 그대로) */
+export type RefreshOutcome = 'ok' | 'rejected' | 'unavailable';
 
-async function loseSession(): Promise<void> {
-  await clearTokens();
-  authLostHandler?.();
+let refreshing: Promise<RefreshOutcome> | null = null;
+
+/** 서버가 토큰을 거부한 경우만 다시 로그인해야 한다. 네트워크 문제·5xx·429는 아니다. */
+const isRejection = (error: unknown) =>
+  error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429;
+
+const REFRESH_LOCK = 'ecocycle-auth-refresh';
+
+/**
+ * 웹은 여러 탭이 같은 쿠키를 쓴다. 두 탭이 같은 리프레시 토큰을 동시에 보내면 서버가 재사용으로 보고 세션을 폐기하므로
+ * 탭 사이에서 리프레시를 한 번에 하나만 보낸다(Web Locks). 앞 탭이 바꾼 쿠키를 다음 탭이 이어서 쓴다.
+ */
+async function withRefreshLock<T>(run: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  if (refreshTokenDelivery() !== 'cookie' || !locks) return run();
+  let result!: T;
+  await locks.request(REFRESH_LOCK, async () => {
+    result = await run();
+  });
+  return result;
 }
 
-async function doRefresh(): Promise<boolean> {
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) {
-    await loseSession();
-    return false;
+async function doRefresh(): Promise<RefreshOutcome> {
+  const cookie = refreshTokenDelivery() === 'cookie';
+  let body: RefreshRequest = {};
+  if (!cookie) {
+    const refreshToken = await getRefreshToken();
+    if (!refreshToken) {
+      await clearTokens();
+      return 'rejected';
+    }
+    body = { refreshToken };
   }
   try {
-    const body: RefreshRequest = { refreshToken };
-    const res = await rawRequest<RefreshResponse>('/auth/refresh', { method: 'POST', body }, null);
+    const res = await withRefreshLock(() =>
+      rawRequest<RefreshResponse>('/auth/refresh', { method: 'POST', body, withCredentials: cookie }, null),
+    );
     await setTokens(res.accessToken, res.refreshToken);
-    return true;
+    return 'ok';
   } catch (error) {
-    // 서버가 토큰을 거부했을 때만 로그아웃한다. 네트워크 문제나 서버 오류로는 로그아웃하지 않는다.
-    if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429) {
-      await loseSession();
+    if (isRejection(error)) {
+      await clearTokens();
+      return 'rejected';
     }
-    return false;
+    return 'unavailable';
   }
 }
 
-function refreshOnce(): Promise<boolean> {
+/** 리프레시를 한 번만 실행한다 (동시에 부르면 같은 결과를 기다린다). 실패해도 화면에 알리지 않는다. */
+export function refreshSession(): Promise<RefreshOutcome> {
   refreshing ??= doRefresh().finally(() => {
     refreshing = null;
   });
   return refreshing;
+}
+
+/** 요청 중 401 때의 리프레시: 서버가 거부하면 로그인이 풀린 것을 store에 알린다 */
+async function refreshOnce(): Promise<boolean> {
+  const outcome = await refreshSession();
+  if (outcome === 'rejected') authLostHandler?.();
+  return outcome === 'ok';
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));

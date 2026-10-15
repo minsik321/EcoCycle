@@ -63,7 +63,7 @@ export interface StoreOptions {
 /** 로그인·연결·기기 상태가 정해진 store를 만든다 (서버 호출 없이 액션으로 바로 채운다) */
 export function makeStore({ me = OPERATOR, connection = 'online', lastReceivedAt = NOW, devices = [] }: StoreOptions = {}) {
   const store = createAppStore();
-  if (me === null) store.dispatch(restoreUserSession.fulfilled(null, 'test'));
+  if (me === null) store.dispatch(restoreUserSession.fulfilled({ kind: 'none' }, 'test'));
   else if (me !== 'unknown') store.dispatch(loginUser.fulfilled(me, 'test', { id: me.id, password: '' }));
   store.dispatch(connectionChanged({ status: connection, lastReceivedAt }));
   if (devices.length > 0) store.dispatch(devicesReceived(devices));

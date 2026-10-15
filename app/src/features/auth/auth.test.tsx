@@ -4,7 +4,7 @@ import { Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../api';
 import { AppShell } from '../../components/layout/AppShell';
-import { sessionLost } from '../../store';
+import { restoreUserSession, sessionLost } from '../../store';
 import { ADMIN, renderWithStore } from '../../test/utils';
 import { LoginPage } from './LoginPage';
 import { RequireAuth } from './RequireAuth';
@@ -14,6 +14,7 @@ vi.mock('../../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api')>()),
   login: vi.fn(),
   logout: vi.fn(async () => undefined),
+  restoreSession: vi.fn(),
 }));
 
 function Where() {
@@ -42,6 +43,7 @@ const where = () => screen.getByTestId('where').textContent;
 
 beforeEach(() => {
   vi.mocked(api.login).mockReset();
+  vi.mocked(api.restoreSession).mockReset();
 });
 
 afterEach(() => {
@@ -78,9 +80,36 @@ describe('RequireAuth', () => {
   it('세션을 확인하는 동안에는 로그인 화면으로 보내지도 내용을 보여 주지도 않는다', () => {
     renderWithStore(app(), { me: 'unknown', route: '/alarms' });
     expect(where()).toBe('/alarms');
-    expect(screen.getByRole('status')).toHaveTextContent('세션을 확인하는 중');
+    expect(screen.getByRole('status')).toHaveTextContent('로그인 확인 중…');
     expect(screen.queryByText('알람 내용')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('아이디')).not.toBeInTheDocument();
+  });
+
+  it('세션 확인이 서버에 닿지 못하면 다시 시도하거나 로그인 화면으로 갈 수 있다', async () => {
+    vi.mocked(api.restoreSession).mockResolvedValue({ kind: 'unavailable' });
+    const { store } = renderWithStore(app(), { me: 'unknown', route: '/alarms' });
+    await act(async () => {
+      await store.dispatch(restoreUserSession());
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('서버에 연결할 수 없어');
+    expect(where()).toBe('/alarms');
+
+    // 다시 시도: 이번에는 되살아난다
+    vi.mocked(api.restoreSession).mockResolvedValue({ kind: 'restored', me: ADMIN });
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await vi.waitFor(() => expect(screen.getByRole('main')).toHaveTextContent('알람 내용'));
+    expect(api.restoreSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('세션 확인 실패 화면에서 로그인 화면으로 갈 수 있다', async () => {
+    vi.mocked(api.restoreSession).mockResolvedValue({ kind: 'unavailable' });
+    const { store } = renderWithStore(app(), { me: 'unknown', route: '/alarms' });
+    await act(async () => {
+      await store.dispatch(restoreUserSession());
+    });
+    await userEvent.click(screen.getByRole('button', { name: '로그인 화면으로' }));
+    expect(where()).toBe('/login');
+    expect(store.getState().auth.sessionExpired).toBe(false);
   });
 
   it('로그인되어 있으면 화면을 보여 준다', () => {
@@ -129,9 +158,24 @@ describe('LoginPage', () => {
     await userEvent.click(screen.getByRole('button', { name: '로그인' }));
 
     await vi.waitFor(() => expect(where()).toBe('/'));
-    expect(api.login).toHaveBeenCalledWith('admin', 'mock-admin');
+    expect(api.login).toHaveBeenCalledWith('admin', 'mock-admin', false);
     expect(store.getState().auth.status).toBe('loggedIn');
     expect(screen.getByRole('main')).toHaveTextContent('홈 내용');
+  });
+
+  it('자동 로그인은 기본으로 꺼져 있다', () => {
+    renderWithStore(app(), { me: null, route: '/login' });
+    expect(screen.getByRole('checkbox', { name: '자동 로그인' })).not.toBeChecked();
+  });
+
+  it('자동 로그인을 켜고 로그인하면 remember: true로 보낸다', async () => {
+    vi.mocked(api.login).mockResolvedValue({ accessToken: 'a', expiresIn: 900, user: ADMIN });
+    renderWithStore(app(), { me: null, route: '/login' });
+    await type('admin', 'mock-admin');
+    await userEvent.click(screen.getByRole('checkbox', { name: '자동 로그인' }));
+    await userEvent.click(screen.getByRole('button', { name: '로그인' }));
+    await vi.waitFor(() => expect(where()).toBe('/'));
+    expect(api.login).toHaveBeenCalledWith('admin', 'mock-admin', true);
   });
 
   it('보호된 화면에서 튕겨 왔다면 로그인 후 그 화면으로 돌아간다', async () => {

@@ -1,7 +1,7 @@
 import type { Server } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { ClientMessage, ServerMessage, Topic } from '@ecocycle/shared';
-import { consumeWsTicket } from './auth';
+import { consumeWsTicket, onSessionRevoked } from './auth';
 import type { Account } from './fixtures/accounts';
 import { streamGate } from './scenarios/gate';
 import { onMessage } from './sim/bus';
@@ -15,6 +15,8 @@ const TOPICS: readonly string[] = ['plant', 'devices', 'alarms', 'process', 'rob
 interface Client {
   ws: WebSocket;
   account: Account;
+  /** 로그인 세션. 세션이 폐기(로그아웃·재사용 감지·서버 재시작)되면 연결을 닫는다 */
+  sessionId: string;
   topics: Set<Topic>;
   /** 지연 시나리오에서 순서를 지키기 위한 마지막 전달 예정 시각 */
   lastDeliverAt: number;
@@ -99,14 +101,14 @@ export function attachStream(server: Server): void {
   // 연결 전에 티켓을 확인한다. 1회용이라 쓰고 나면 다시 못 쓴다.
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url ?? '', 'http://localhost');
-    const account = url.pathname === STREAM_PATH ? consumeWsTicket(url.searchParams.get('ticket') ?? '') : undefined;
-    if (!account) {
+    const granted = url.pathname === STREAM_PATH ? consumeWsTicket(url.searchParams.get('ticket') ?? '') : undefined;
+    if (!granted) {
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
-      const client: Client = { ws, account, topics: new Set(), lastDeliverAt: 0 };
+      const client: Client = { ...granted, ws, topics: new Set(), lastDeliverAt: 0 };
       clients.add(client);
 
       ws.on('message', (data) => {
@@ -129,6 +131,13 @@ export function attachStream(server: Server): void {
   });
 
   onMessage(broadcast);
+
+  // 세션이 폐기되면 그 세션의 연결을 닫는다 (null이면 모두: 서버 재시작 흉내). 앱은 다시 연결하려다 로그인이 풀린 것을 알게 된다.
+  onSessionRevoked((sessionId) => {
+    for (const client of clients) {
+      if (sessionId === null || client.sessionId === sessionId) client.ws.close(4401, 'session revoked');
+    }
+  });
 
   // 연결 상태 확인용: 5초마다 서버 시각
   setInterval(() => broadcast({ type: 'heartbeat', ts: new Date().toISOString() }), HEARTBEAT_MS);

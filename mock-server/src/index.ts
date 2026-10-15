@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { authRouter } from './auth';
 import { config } from './config';
 import { sendError } from './errors';
@@ -11,7 +12,9 @@ import { attachStream } from './stream';
 
 const app = express();
 
-app.use(cors({ origin: config.corsOrigins.length > 0 ? config.corsOrigins : true }));
+// 웹은 리프레시 토큰을 쿠키로 주고받으므로 credentials를 허용한다. 그래서 출처는 반드시 명시한 목록만 쓴다(* 불가).
+app.use(cors({ origin: config.corsOrigins, credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
 
 // slow-network 시나리오에서만 응답이 늦어진다
@@ -35,4 +38,5 @@ startScenario();
 
 server.listen(config.port, () => {
   console.log(`[mock-server] http://localhost:${config.port}/api/v1  시나리오: ${config.scenario}`);
+  console.log(`  허용 출처: ${config.corsOrigins.join(', ')}  리프레시 쿠키 SameSite=${config.refreshCookieSameSite}`);
 });

@@ -146,13 +146,35 @@ Oct 13, 2026 · @민식
 
 | 메서드와 경로 | 설명 | 요청 | 응답 |
 | --- | --- | --- | --- |
-| POST `/auth/login` | 로그인 | `{"id","password"}` | `{"accessToken","refreshToken","expiresIn","user"}` |
-| POST `/auth/refresh` | 토큰 재발급 (리프레시 토큰은 사용할 때마다 교체) | `{"refreshToken"}` | 새 `accessToken`, 새 `refreshToken` |
-| POST `/auth/logout` | 로그아웃, 서버에서 토큰 폐기 | `{"refreshToken"}` | 204 |
+| POST `/auth/login` | 로그인 | `{"id","password","remember","refreshTokenDelivery"}` | `{"accessToken","refreshToken"(body 방식만),"expiresIn","user"}` |
+| POST `/auth/refresh` | 토큰 재발급 (리프레시 토큰은 사용할 때마다 교체) | 웹: 본문 `{}` + 쿠키, 앱: `{"refreshToken"}` | 새 `accessToken`, 새 리프레시 토큰(쿠키 또는 본문) |
+| POST `/auth/logout` | 로그아웃, 서버에서 세션(리프레시 토큰 묶음) 폐기, 쿠키 삭제 | 웹: 본문 `{}` + 쿠키, 앱: `{"refreshToken"}` | 204 |
 | POST `/auth/ws-ticket` | WebSocket 연결용 1회용 티켓 (30초 유효) | 없음 | `{"ticket","expiresIn"}` |
 | GET `/me` | 내 정보와 권한 | 없음 | `{"id","name","role","permissions"}` |
 
 `role`은 `admin`, `operator`, `viewer` 중 하나이고 실제 권한 종류는 대표님과 정한다. `permissions`는 `robot.control`, `robot.manual`, `settings.write`, `alarm.ack` 같은 문자열 목록이고 프론트는 이 목록으로 버튼 표시만 정한다. 브라우저 WebSocket은 헤더를 보낼 수 없어 토큰을 주소에 넣지 않고 티켓을 쓴다.
+
+#### 토큰 보관과 자동 로그인
+
+액세스 토큰은 앱 메모리에만 둔다. 어떤 토큰도 localStorage·sessionStorage·주소(URL)에 두지 않는다. 리프레시 토큰은 앱이 어디서 도는지에 따라 두 방식 중 하나로 주고받는다.
+
+| 항목 | 웹 (`refreshTokenDelivery: "cookie"`) | 안드로이드 앱 (`"body"`) |
+| --- | --- | --- |
+| 보관 | 서버가 쿠키로 심는다. 스크립트는 읽을 수 없다 | Android Keystore 기반 보안 저장소(Capacitor 플러그인) |
+| 응답 | 본문에 `refreshToken`을 넣지 않고 `Set-Cookie`만 보낸다 | 본문에 `refreshToken`을 넣고 쿠키는 쓰지 않는다 |
+| 리프레시·로그아웃 요청 | 본문 `{}`, `credentials: "include"`로 쿠키가 따라간다 | 본문 `{"refreshToken"}` |
+| `remember: true` (자동 로그인) | 지속 쿠키 `Max-Age` 14일 | 보안 저장소에 저장, 앱을 다시 켜도 유지 |
+| `remember: false` | 세션 쿠키(`Max-Age` 없음), 브라우저를 닫으면 사라진다 | 메모리에만, 앱을 닫으면 사라진다 |
+
+- 쿠키 속성: 이름 `ecocycle_rt`, `HttpOnly`, `Secure`, `Path=/api/v1/auth`(인증 경로에만 전송). `SameSite`는 앱과 API가 같은 사이트면 `Lax`, 다른 사이트(예: Vercel + Render)면 `None`(+`Secure`, `Partitioned`).
+- 쿠키를 쓰는 요청은 CORS가 `Access-Control-Allow-Credentials: true`와 **명시한 출처 목록**으로만 허용해야 한다(`*` 불가). 서버는 쿠키로 온 리프레시·로그아웃 요청의 `Origin`도 같은 목록으로 확인한다.
+- `remember`를 빼면 `false`, `refreshTokenDelivery`를 빼면 `"body"`로 본다.
+- 리프레시 토큰 유효 시간: 자동 로그인 14일, 아니면 12시간. 리프레시할 때마다 새 토큰이 같은 시간으로 다시 시작한다(사용 중에는 풀리지 않는다).
+- **교체와 재사용 감지:** 리프레시할 때마다 새 리프레시 토큰을 주고 이전 토큰은 사용 완료로 표시한다. 이미 쓴 토큰이 다시 오면 탈취로 보고 그 토큰이 속한 세션(로그인 한 번에서 이어진 토큰 묶음)의 모든 리프레시·액세스 토큰과 WebSocket 연결을 폐기하고 401을 준다.
+- 리프레시 거부 코드(401): `REFRESH_TOKEN_MISSING`(토큰 없음), `REFRESH_TOKEN_EXPIRED`(만료), `REFRESH_TOKEN_REUSED`(재사용 감지, 세션 폐기), `UNAUTHORIZED`(모르는 토큰, 서버 재시작 등). 거부할 때 웹 쿠키도 지운다.
+- 앱 시작: 웹은 항상, 앱은 보안 저장소에 토큰이 있으면 `POST /auth/refresh`를 부른다. 성공하면 액세스 토큰을 메모리에 두고 `GET /me`로 최신 권한을 받아 로그인 화면 없이 들어간다(그동안 "로그인 확인 중…"). 거부되면 로그인 화면, 서버에 닿지 못하면 다시 시도할 수 있게 안내하고 토큰은 지우지 않는다.
+- 로그아웃: 서버가 세션을 폐기하고 쿠키를 지운다. 앱은 보안 저장소와 메모리의 토큰을 지운다. 서버 요청이 실패해도 기기의 토큰은 지운다.
+- 여러 탭이 같은 쿠키로 동시에 리프레시하면 재사용으로 오인되므로 웹은 탭 사이에서 리프레시를 한 번에 하나만 보낸다(Web Locks).
 
 현장 밖에서도 접속하고 로그인으로 보호하므로 서버에 두 가지를 권장한다. 로그인 시도 횟수를 제한하고(초과 시 429) 접속·조작 기록을 남긴다. 위험도가 높은 명령(수동 모드 전환, 설정 변경 등)은 비밀번호나 PIN을 다시 입력하게 하며, 재인증 방식은 서버 담당과 정한다.
 
@@ -398,6 +420,7 @@ Oct 13, 2026 · @민식
 **서버 담당자에게**
 
 - [ ] 로그인, 토큰 발급, 요청마다 권한 검증이 가능한지 (안 되면 얇은 게이트웨이를 누가 만드는지)
+- [ ] 자동 로그인: 리프레시 토큰 쿠키(HttpOnly·Secure·SameSite·Path), 앱용 본문 전달, 교체·재사용 감지, 로그아웃 폐기를 6절 "토큰 보관과 자동 로그인"대로 구현할 수 있는지
 - [ ] 현장 밖 접속을 받는 서버의 보안 설정: HTTPS, 로그인 시도 횟수 제한, 접속·조작 기록, 필요하면 VPN 병행
 - [ ] 수동 조작을 받으면 서버가 자동 운전을 어떻게 멈추고 넘겨주는지, 현장 안전 장치와 어떻게 연동되는지
 - [ ] 관절 각도와 그리퍼 값을 초당 10\~20회로 제공할 수 있는지 (안 되면 진행률 방식)
@@ -422,6 +445,7 @@ Oct 13, 2026 · @민식
 | 장면 구성 | 게이트·계중대, 섹터(탱크) 4개, 로봇팔 1개, 긴 컨베이어 1개(Section Z), 압축기 1개, 출하장 | 3D 장면 배치 |
 | 태블릿 | 기종 제한 없음, 화질 3단계를 자동 선택하고 가장 낮은 단계가 저사양 안전판 | 단계별 연출 수준 |
 | 접속 | 현장 밖 포함, 로그인으로 보호 | 서버 보안 설정, VPN 병행 여부 |
+| 자동 로그인 | 웹은 HttpOnly 쿠키, 안드로이드는 보안 저장소에 리프레시 토큰을 두고 앱 시작 때 리프레시로 세션을 되살린다. 자동 로그인 14일, 아니면 브라우저·앱을 닫을 때까지 | `shared/auth.ts`, `app/src/api/tokens.ts`, 모의 서버 `auth.ts` |
 | 카메라 | 카메라 1대 이상, HLS 우선 | 영상 방식 |
 | 알림 | 앱이 켜져 있으면 WebSocket, 닫혀 있으면 FCM | 서버가 FCM을 못 보내면 앱이 켜져 있을 때만 알림 |
 | 수납 섹터 | 섹터는 A1, A2, B1, B2 네 개이고 기존 탱크 4개와 같은 대상(기기 ID 그대로) | 기기 ID 목록, 장면 배치 |
