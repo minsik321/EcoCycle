@@ -7,6 +7,8 @@ import { supportsWebGL, useDocumentVisible } from './sceneSupport';
 //  - 실제 태블릿에서 프레임(초당 그리는 횟수)을 재는 데 쓴다. 2단계 완료 기준: 초당 30프레임 안정, 30분 이상 끊김·발열 없음.
 
 const DemoStudio = lazy(() => import('../../studio').then((m) => ({ default: m.DemoStudio })));
+// 포스터 찍기(?poster=1): 빈 장면만, 패널·글자 없이 (scripts/poster.mjs)
+const PosterStudio = lazy(() => import('../../studio').then((m) => ({ default: m.PosterStudio })));
 
 interface Measure {
   fps: number;
@@ -61,6 +63,16 @@ export function SceneDemoPage() {
         <p role="alert" className="rounded-card border border-status-alarm bg-surface p-4 text-status-alarm">
           이 기기에서는 3D 장면을 표시할 수 없습니다. 홈은 대시보드로 보입니다.
         </p>
+      </main>
+    );
+  }
+
+  if (new URLSearchParams(window.location.search).get('poster') === '1') {
+    return (
+      <main className="h-full bg-paper">
+        <Suspense fallback={null}>
+          <PosterStudio onFailed={() => setFailed(true)} />
+        </Suspense>
       </main>
     );
   }

@@ -1,8 +1,9 @@
 import ReactThreeTestRenderer from '@react-three/test-renderer';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Group, Object3D } from 'three';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useEffect } from 'react';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Bale, Batch, DeviceId, DeviceState, Vehicle } from '@ecocycle/shared';
 import { chainSpecFor } from './robot/chain';
 import { fixedSource } from './robot/jointSource';
@@ -11,7 +12,7 @@ import { cctvToggled, connectionChanged, devicesReceived, vehicleReceived } from
 import { NOW, conveyorState, renderWithStore, robotState, tankState } from '../test/utils';
 import { LiveStudio } from './LiveStudio';
 import type { StageProps } from './Stage';
-import { StudioView } from './StudioView';
+import { SCENE_START, StudioView } from './StudioView';
 import { Robot } from './actors/Robot';
 import { demoData } from './demo/demoData';
 import { Detail, PhoneSheet, TrackerBar } from './overlay/Panels';
@@ -35,6 +36,9 @@ const stage = vi.hoisted(() => ({ last: null as StageProps | null }));
 vi.mock('./Stage', () => ({
   Stage: (props: StageProps) => {
     stage.last = props;
+    // 실제 무대처럼 첫 장을 그렸다고 알린다 (준비 화면을 걷고 핀을 놓는다)
+    const { onReady } = props;
+    useEffect(() => onReady?.(), [onReady]);
     return <div data-testid="stage" />;
   },
 }));
@@ -71,6 +75,15 @@ function run(director: Director, seconds: number, each?: () => void): void {
     each?.();
   }
 }
+
+// 3D 장면(StudioScene)은 lazy 조각이다. 한 번 받아 두면 이후 화면은 기다리지 않고 바로 무대를 그린다
+beforeAll(async () => {
+  // 여기서는 무대에 넘기는 값을 본다: 첫 값을 기다리지 않고 바로 올린다 (기다리는 동작은 loading.test.tsx)
+  SCENE_START.waitMs = 0;
+  render(<StudioView data={EMPTY_DATA} jointSource={fixedSource()} tier="low" disconnected={false} lastReceivedAt={null} paused={false} example={false} onFailed={() => {}} />);
+  await screen.findByTestId('stage');
+  cleanup();
+});
 
 beforeEach(() => {
   stage.last = null;

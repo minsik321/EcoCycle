@@ -1978,7 +1978,8 @@ button.st-now:hover {
   z-index: 5;
   background: #eceff3;
   display: flex;
-  align-items: flex-end;
+  /* 가운데: 폰에서는 아래 시트(z 25)가, 넓은 화면에서는 아래 패널이 바닥 쪽을 덮는다 */
+  align-items: center;
   justify-content: center;
   pointer-events: none;
 }
@@ -1992,15 +1993,49 @@ button.st-now:hover {
   object-fit: cover;
 }
 
+/* 옅은 성에 막: 포스터가 "아직 실제 장면이 아님"을 알 수 있게 살짝 흐리고 밝힌다 (위의 패널은 그대로 또렷하다) */
+.st-poster-frost {
+  position: absolute;
+  inset: 0;
+  background: rgb(246 248 251 / 0.42);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
 .st-poster-note {
   position: relative;
-  margin-bottom: 18%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 14px;
   border-radius: 999px;
   background: rgb(255 255 255 / 0.92);
   color: var(--st-soft);
   font-size: 12px;
+  white-space: nowrap;
   box-shadow: 0 6px 18px -10px rgb(30 50 100 / 0.35);
+}
+
+.st-spinner {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid rgb(37 99 235 / 0.2);
+  border-top-color: var(--st-blue);
+  animation: st-spin 0.9s linear infinite;
+}
+
+@keyframes st-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-spinner {
+    animation-duration: 2.4s;
+  }
 }
 
 .st-demo-tier {

@@ -17,8 +17,9 @@ import {
 } from '../../config/display';
 import type { PinElements } from '../three/Fx';
 import type { StudioData } from '../types';
-import { SECTOR_LABEL, VIEWS } from '../world/layout';
-import type { ViewPreset } from '../world/layout';
+import { SECTOR_LABEL } from '../../config/processDisplay';
+import { VIEWS } from '../world/views';
+import type { ViewPreset } from '../world/views';
 import { Icon } from './icons';
 import type { IconName } from './icons';
 import { BALE_STAGE_TEXT, BATCH_STAGE_TEXT, VEHICLE_STAGE_TEXT, cycleSteps, deviceLine, mixText, shortId } from './text';

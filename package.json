@@ -19,7 +19,9 @@
     "test": "npm run test --workspaces --if-present",
     "test:integration": "npm run test:integration -w @ecocycle/app",
     "test:text": "npm run test:text -w @ecocycle/app",
-    "build": "npm run build -w @ecocycle/app"
+    "build": "npm run build -w @ecocycle/app",
+    "measure:load": "npm run measure:load -w @ecocycle/app",
+    "poster": "npm run poster -w @ecocycle/app"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",

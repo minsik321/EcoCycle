@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { QUALITY_TIERS, tierFromProbe } from '../config/quality';
 import type { QualityTier } from '../config/quality';
-import { demoSource } from './robot/jointSource';
+import { demoSource, fixedSource } from './robot/jointSource';
 import { measureFps } from '../store/qualityProbe';
 import { StudioView } from './StudioView';
 import { useDemoData } from './demo/demoData';
 import { TIER_LABEL } from './quality';
+import { EMPTY_DATA } from './types';
 import { studioStats } from './three/stats';
 import { useStudioTier } from './useStudioTier';
 
@@ -90,4 +91,13 @@ export function DemoStudio({ tabs, disconnected, paused, onFailed }: { tabs?: Re
       onFailed={onFailed}
     />
   );
+}
+
+/**
+ * 포스터 찍기(/scene-demo?poster=1, scripts/poster.mjs): 빈 장면만 그린다. 3D 장면이 준비되기 전에 덮는 그림이므로
+ * 실시간 값이 될 수 있는 것은 하나도 넣지 않는다: 데이터는 비어 있고(차량·번호판·회사·배치·베일·적재 없음), 로봇은 기본 자세, 패널·핀·글자 없음.
+ */
+export function PosterStudio({ onFailed }: { onFailed: () => void }) {
+  const jointSource = useMemo(() => fixedSource(), []);
+  return <StudioView data={EMPTY_DATA} jointSource={jointSource} tier={tierFromUrl() ?? 'high'} disconnected={false} lastReceivedAt={null} paused={false} example={false} onFailed={onFailed} poster />;
 }

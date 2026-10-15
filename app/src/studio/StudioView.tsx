@@ -1,19 +1,28 @@
-import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, RobotModel, SectorGrade, TankId } from '@ecocycle/shared';
-import { chainSpecFor } from './robot/chain';
 import type { JointSource } from './robot/jointSource';
 import type { QualityTier } from '../config/quality';
-import { Stage } from './Stage';
 import { Detail, DisconnectBanner, Kpis, MapTools, PhoneSheet, Pins, Tables, TopBar, Tracker } from './overlay/Panels';
-import { Director } from './sim/director';
+import { POSTER, prefetchStudio } from './preload';
 import type { PinElements } from './three/Fx';
 import type { RigApi } from './three/Rig';
 import type { StudioData } from './types';
-import { DEFAULT_VIEW } from './world/layout';
-import type { ViewPreset } from './world/layout';
+import { DEFAULT_VIEW } from './world/views';
+import type { ViewPreset } from './world/views';
 import './studio.css';
+
+// 이 파일과 패널(overlay/)은 three를 import하지 않는다(타입만 예외). 3D 장면(three.js·무대·연출 감독)은 StudioScene 조각으로 따로 받는다:
+// 패널은 store 값으로 바로 그려지고, 그 아래에서 포스터와 "준비하는 중" 화면이 3D 첫 장까지 자리를 지킨다.
+const StudioScene = lazy(() => import('./StudioScene'));
+
+/**
+ * 3D 장면을 언제 올리는가: 첫 값(요약)이 패널에 그려져 화면에 나간 다음. 장면을 만드는 일은 느린 폰에서 메인 스레드를 수 초 잡아서,
+ * 먼저 올리면 지표가 그만큼 늦게 뜬다(측정: 미리 받아 둔 경우 지표 2.2초 → 3.5초 이상). 값이 waitMs 안에 오지 않으면 그냥 올린다.
+ * 그동안 3D 파일은 계속 받는다(modulepreload로 받기만 하고 실행하지 않는다). 0이면 바로 올린다(테스트).
+ */
+export const SCENE_START = { waitMs: 2500 };
 
 /** 3D를 그리다 오류가 나면 화면 전체가 죽지 않게 받아서 알린다 (홈이 대시보드로 돌아간다) */
 class StageBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
@@ -54,6 +63,8 @@ export interface StudioViewProps {
   /** 기기 상세 패널에 넣을 조작 영역. 기존 조작 컴포넌트를 그대로 끼운다 */
   deviceActions?: (id: DeviceId) => ReactNode;
   onFailed: () => void;
+  /** 포스터 찍기(/scene-demo?poster=1): 3D 장면만 그리고 패널·핀·준비 화면은 그리지 않는다. 첫 장을 그리면 data-poster-ready */
+  poster?: boolean;
 }
 
 type Layout = 'wide' | 'narrow' | 'phone';
@@ -89,8 +100,7 @@ function useLayout(ref: RefObject<HTMLElement | null>): Layout {
  * 스튜디오 화면: 가득 찬 3D 무대와 그 위의 유리 패널. 데이터는 모두 props로 받는다
  * (store 연결은 LiveStudio, 서버 없는 시연은 DemoStudio).
  */
-export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, disconnected, lastReceivedAt, paused, example, switcher, tabs, account, deviceActions, onFailed }: StudioViewProps) {
-  const director = useMemo(() => new Director(), []);
+export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, disconnected, lastReceivedAt, paused, example, switcher, tabs, account, deviceActions, onFailed, poster = false }: StudioViewProps) {
   const [selection, setSelection] = useState<string | null>(null);
   const [view, setView] = useState(DEFAULT_VIEW.key);
   const root = useRef<HTMLElement>(null);
@@ -98,21 +108,18 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
   const pins = useRef<PinElements>({});
   const routeKeys = useRef<string[]>([]);
   const rig = useRef<RigApi | null>(null);
-  const robotSpec = useMemo(() => chainSpecFor(robotModel), [robotModel]);
-  // 셰이더를 미리 컴파일하는 동안 포스터를 보여 준다 (단계가 바뀌면 무대를 새로 만들므로 다시 덮는다)
-  const [ready, setReady] = useState(false);
-  useEffect(() => setReady(false), [tier]);
+  // 3D 조각을 받고 셰이더를 미리 컴파일하는 동안 포스터를 보여 준다.
+  // 어느 단계의 무대가 첫 장을 그렸는가. 단계가 바뀌면 무대를 새로 만들므로 그 단계가 첫 장을 그릴 때까지 다시 덮는다
+  const [readyTier, setReadyTier] = useState<QualityTier | null>(null);
+  const ready = readyTier === tier;
+  const tierNow = useRef(tier);
+  tierNow.current = tier;
   const firstFrame = useRef(onFirstFrame);
   firstFrame.current = onFirstFrame;
   const onReady = useCallback(() => {
-    setReady(true);
+    setReadyTier(tierNow.current);
     firstFrame.current?.(performance.now());
   }, []);
-
-  // 서버 값이 바뀌면 연출 감독에게 알린다. 끊긴 동안에는 알리지 않는다 (받지 못한 값을 추측해 움직이지 않는다)
-  useEffect(() => {
-    if (!disconnected) director.sync(data, Date.now());
-  }, [director, data, disconnected]);
 
   // 경로 점선과 목적지 핀은 고른 차량(또는 지게차)에만 그린다 (참고 화면 10)
   routeKeys.current = selection && (selection.startsWith('veh:') || selection === 'forklift') ? [selection] : [];
@@ -129,6 +136,27 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
     });
     return out;
   }, [gradeKey]);
+
+  // 패널이 떴다: 3D 파일을 받기 시작한다 (받기만 하고 실행하지 않는다. 로그인 화면에서 이미 받았으면 아무것도 하지 않는다)
+  useEffect(() => {
+    if (!poster) prefetchStudio(document, { force: true });
+  }, [poster]);
+
+  const hasValues = data.summary !== null || disconnected;
+  const [sceneOn, setSceneOn] = useState(() => poster || SCENE_START.waitMs === 0);
+  useEffect(() => {
+    if (sceneOn) return;
+    let raf = 0;
+    let timer = 0;
+    const start = () => setSceneOn(true);
+    // 값이 왔으면 그 화면이 그려진 뒤(다음 그리기 → 그 뒤의 작업)에 올린다
+    if (hasValues) raf = requestAnimationFrame(() => (timer = window.setTimeout(start, 0)));
+    else timer = window.setTimeout(start, SCENE_START.waitMs);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [sceneOn, hasValues]);
 
   const select = useCallback((key: string | null) => setSelection(key), []);
   const goView = useCallback((preset: ViewPreset) => {
@@ -158,14 +186,14 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
   const phone = layout === 'phone';
   const common = { data, disconnected, selection, onSelect: select };
 
-  return (
-    <section ref={root} className={`st-root st-layout-${layout}`} aria-label="스튜디오 3D 장면" data-tier={tier} data-frozen={disconnected || undefined} data-paused={paused || undefined}>
-      <div className="st-canvas">
-        <StageBoundary onError={onFailed}>
-          <Stage
-            director={director}
+  const scene = (
+    <StageBoundary onError={onFailed}>
+      <Suspense fallback={null}>
+        {sceneOn && (
+          <StudioScene
+            data={data}
+            robotModel={robotModel}
             jointSource={jointSource}
-            robotSpec={robotSpec}
             tier={tier}
             onReady={onReady}
             frozen={disconnected}
@@ -179,18 +207,25 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
             balerStatus={compressor?.type === 'compressor' ? compressor.status : 'offline'}
             grades={grades}
           />
-        </StageBoundary>
-      </div>
-      {!ready && (
-        <div className="st-poster" role="status" aria-label="3D 장면을 준비하는 중">
-          <picture>
-            <source media="(orientation: portrait)" srcSet="/studio/poster-tall.jpg" />
-            <img src="/studio/poster-wide.jpg" alt="" />
-          </picture>
-          <span className="st-poster-note">3D 장면을 준비하는 중…</span>
-        </div>
-      )}
-      <Pins {...common} pins={pins} />
+        )}
+      </Suspense>
+    </StageBoundary>
+  );
+
+  if (poster) {
+    return (
+      <section ref={root} className={`st-root st-layout-${layout}`} aria-hidden="true" data-tier={tier} data-poster-ready={ready || undefined}>
+        <div className="st-canvas">{scene}</div>
+      </section>
+    );
+  }
+
+  return (
+    <section ref={root} className={`st-root st-layout-${layout}`} aria-label="스튜디오 3D 장면" data-tier={tier} data-frozen={disconnected || undefined} data-paused={paused || undefined}>
+      <div className="st-canvas">{scene}</div>
+      {!ready && <SceneLoading />}
+      {/* 핀은 3D 장면이 자리를 계산해 준다: 첫 장 전에는 놓을 곳이 없다 */}
+      {ready && <Pins {...common} pins={pins} />}
       <TopBar data={data} switcher={switcher} tabs={tabs} account={account} disconnected={disconnected} lastReceivedAt={lastReceivedAt} example={example} view={view} onView={goView} onSelect={select} compact={phone} />
       {disconnected && <DisconnectBanner lastReceivedAt={lastReceivedAt} />}
       <Kpis data={data} disconnected={disconnected} />
@@ -206,5 +241,25 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
       )}
       {jointSource.kind === 'demo' && <p className="st-demo-note">로봇팔은 시연 동작입니다 (실제 로봇 값이 아닙니다)</p>}
     </section>
+  );
+}
+
+/**
+ * 3D 장면이 준비될 때까지: 빈 장면 포스터 + 옅은 성에 막 + 작은 돌림표 + 문구. 패널 아래(z 5)에 깔리고 누르기를 막지 않는다.
+ * 포스터에는 빈 장면만 있다(번호판·회사·숫자 같은 실시간 값 없음, scripts/poster.mjs).
+ */
+export function SceneLoading() {
+  return (
+    <div className="st-poster" role="status" aria-label="3D 장면을 준비하는 중">
+      <picture>
+        <source media={POSTER.portraitQuery} srcSet={POSTER.tall} />
+        <img src={POSTER.wide} alt="" />
+      </picture>
+      <span className="st-poster-frost" />
+      <span className="st-poster-note">
+        <span className="st-spinner" aria-hidden="true" />
+        3D 장면을 준비하는 중…
+      </span>
+    </div>
   );
 }

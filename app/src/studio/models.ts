@@ -3,6 +3,11 @@ import type { BufferGeometry, Mesh, MeshStandardMaterial, Texture } from 'three'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MAT } from './three/kit';
+import { MODELS, MODEL_BASE } from './modelList';
+import type { ModelEntry, ModelKey } from './modelList';
+
+export { MODELS } from './modelList';
+export type { ModelEntry, ModelKey } from './modelList';
 
 // 스튜디오가 쓰는 모델 파일(glTF/GLB) 목록과 불러오기.
 //  - 파일은 app/public/models 아래에 둔다. Meshopt 압축은 늘 읽는다(디코더가 작아 스튜디오 묶음에 들어 있다).
@@ -13,46 +18,6 @@ import { MAT } from './three/kit';
 // 지금 쓰는 팩은 Kenney "Car Kit" 하나뿐이고(CC0), 주차된 승용차에만 쓴다.
 // 트럭(적재함이 들림)·지게차(포크가 오르내림)·작업자(팔다리가 움직임)·나무·소품은 코드로 만든 모형이다:
 // CC0 팩 하나로 이 전부를 갖추면서 움직이는 마디까지 나뉜 것을 찾지 못했다 (studio/CLAUDE.md "모델").
-
-export interface ModelEntry {
-  /** app/public/models 아래 경로 */
-  file: string;
-  /** 장면 크기에 맞추는 배율 */
-  scale: number;
-  /** 장면 방향(+X가 앞)에 맞추는 회전 (라디안, XYZ) */
-  rotation: readonly [number, number, number];
-  /** 원점을 옮길 양 (배율·회전 뒤, 장면 단위). 바닥 중심이 원점이 되게 한다 */
-  pivot: readonly [number, number, number];
-  licence: string;
-  source: string;
-  triangles: number;
-  /** 원본 대비 바꾼 것 */
-  note: string;
-  /** Draco로 압축된 파일이면 true (불러올 때 Draco 디코더를 따로 내려받는다) */
-  draco?: boolean;
-}
-
-const KENNEY = {
-  licence: 'CC0 1.0 (Kenney, www.kenney.nl)',
-  source: 'https://kenney.nl/assets/car-kit',
-  note: 'Car Kit 3.1의 GLB를 gltf-transform meshopt로 압축(텍스처 포함). 색은 불러올 때 스튜디오 색으로 바꾼다.',
-  scale: 0.54,
-  rotation: [0, Math.PI / 2, 0],
-  pivot: [0, 0, 0],
-} as const;
-
-export const MODELS = {
-  'car-sedan': { ...KENNEY, file: 'kenney-car-kit/sedan.glb', triangles: 2032 },
-  'car-suv': { ...KENNEY, file: 'kenney-car-kit/suv.glb', triangles: 2474 },
-  'car-hatchback': { ...KENNEY, file: 'kenney-car-kit/hatchback-sports.glb', triangles: 2088 },
-  'car-van': { ...KENNEY, file: 'kenney-car-kit/van.glb', triangles: 2082 },
-  'car-suv-luxury': { ...KENNEY, file: 'kenney-car-kit/suv-luxury.glb', triangles: 2086 },
-  'car-sedan-sports': { ...KENNEY, file: 'kenney-car-kit/sedan-sports.glb', triangles: 2088 },
-} as const satisfies Record<string, ModelEntry>;
-
-export type ModelKey = keyof typeof MODELS;
-
-const MODEL_BASE = '/models/';
 
 let loader: GLTFLoader | null = null;
 let dracoReady: Promise<void> | null = null;

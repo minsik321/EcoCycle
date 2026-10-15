@@ -21,8 +21,10 @@ glTF 모델, 새 색·재질·배치·핀·패널. 기존 재질·팔레트·배
 ## 고정 규칙 (이 탭에 남아 있는 규칙은 이것뿐이다)
 
 1. **3D 없는 홈을 깨지 않고, 메인 묶음을 키우지 않는다.** 3D 코드는 `app/src/studio/`에만 두고, 3D를 고를 때만 lazy로 불러온다. 3D 없는 홈 화면은 three.js를 내려받지 않아야 한다.
-   - `features/home`이 정적으로 import해도 되는 것은 three를 import하지 않는 `three/stats.ts`(측정 화면)뿐이다. 나머지는 `lazy(() => import('../../studio'))`만 쓴다. 스타일도 `studio.css`(스튜디오 묶음과 함께 내려받음)에만 둔다.
-   - 고친 뒤 `npm run build`로 처음 내려받는 묶음(index와 그것이 정적으로 import하는 조각의 합)을 확인한다.
+   - `features/home`(과 앱 틀)이 정적으로 import해도 되는 것은 three를 import하지 않는 `three/stats.ts`(측정 화면)와 `preload.ts`(미리 받기·포스터 주소)뿐이다. 나머지는 `lazy(() => import('../../studio'))`만 쓴다. 스타일도 `studio.css`(패널 조각과 함께 내려받음)에만 둔다.
+   - **조각은 둘이다:** 패널 조각(`index.ts` → LiveStudio·StudioView·overlay, three 없음, 약 16KB gzip)과 3D 조각(`StudioScene.tsx` → Stage·Director·three, 약 450KB gzip).
+     패널은 store 값으로 바로 그려지고, 3D 장면은 첫 값이 그려진 뒤에 올린다(`SCENE_START`). 패널 쪽 파일은 three를 정적으로 import하지 않는다(`import type`만): 카메라 지역은 `world/views.ts`, 모델 목록은 `modelList.ts`.
+   - 고친 뒤 `npm run build`로 처음 내려받는 묶음(index와 그것이 정적으로 import하는 조각의 합)과 패널 조각에 three가 없는지 확인한다(`loading.test.tsx`가 import 그래프를 본다).
 2. **데이터는 기존 store·실시간 계층에서만 온다**(`/scene-demo`에서는 `demo/demoData.ts`의 예시 원본). 프론트에 업무 로직을 두지 않는다:
    번호판 → 회사 → 섹터 배정, 등급, 수분, 배합비, 압력은 서버 값이다. 서버가 아직 주지 않는 숫자가 필요하면 **명세와 모의 서버에 먼저 추가**하거나, 화면에 **"예시 데이터"라고 분명히 표시**한다.
 3. **연결 끊김:** 연결이 끊기면 **모든 움직임을 멈추고** "연결 끊김"과 마지막 수신 시각을 보여 준다. 추측을 실제처럼 움직이지 않는다.
@@ -32,7 +34,7 @@ glTF 모델, 새 색·재질·배치·핀·패널. 기존 재질·팔레트·배
    배치는 390×844(폰)에서 먼저 성립해야 하고 820×1180(태블릿)·데스크톱으로 넓힌다. 기본 단계는 폰 `low`, 태블릿 `standard`, 데스크톱 `high`이고
    접속 때 프레임 측정으로 한 단계까지 조정한다. `low`는 끊김 없이 도는 것이 유일한 기준이다. 단계별 내용은 아래 "성능" 절.
 
-이 여섯 가지는 `studio.test.tsx`와 `features/home/switch.test.tsx`가 점검한다. 규칙을 건드리는 변경을 하면 그 테스트부터 본다.
+이 여섯 가지는 `studio.test.tsx`, `loading.test.tsx`(조각 나누기·첫 화면·미리 받기·포스터), `features/home/switch.test.tsx`가 점검한다. 규칙을 건드리는 변경을 하면 그 테스트부터 본다.
 
 ## 미술 방향
 
@@ -63,23 +65,27 @@ glTF 모델, 새 색·재질·배치·핀·패널. 기존 재질·팔레트·배
 
 ```
 studio/
-├── index.ts            입구. LiveStudio(홈)와 DemoStudio(/scene-demo)만 내보낸다
+├── index.ts            입구(패널 조각). LiveStudio(홈), DemoStudio·PosterStudio(/scene-demo)만 내보낸다. three 없음
 ├── LiveStudio.tsx      store·실시간 계층 → StudioView. 기존 조작 컴포넌트와 "상세 보기" 링크를 상세 패널에 끼운다. 앱 틀을 넘겨받는다
-├── DemoStudio.tsx      예시 원본 → StudioView (조작 없음, "예시 데이터" 표시)
-├── StudioView.tsx      화면 전체: 3D 무대 + 유리 패널. 데이터는 모두 props (StudioData)
+├── DemoStudio.tsx      예시 원본 → StudioView (조작 없음, "예시 데이터" 표시). PosterStudio: 포스터 찍기용 빈 장면(?poster=1)
+├── StudioView.tsx      화면 전체: 유리 패널 + 준비 화면(포스터) + 3D 조각(lazy). three 없음. 데이터는 모두 props (StudioData)
+├── StudioScene.tsx     3D 조각의 입구: Director(연출 감독)를 만들어 서버 값을 넘기고 Stage를 그린다. three는 여기서부터
+├── preload.ts          3D 파일 미리 받기(정적 파일만: 빌드가 적은 조각 목록, 모델, 포스터)와 포스터 주소. 메인 묶음에 들어간다
 ├── Stage.tsx           Canvas, 조명·그림자·환경광, 후처리. frozen이면 색을 빼고, paused면 그리기를 멈춘다
 ├── types.ts            StudioData (서버 값 묶음)
 ├── quality.ts          화질 단계별 그리기(STUDIO_PROFILES), 기기 종류(폰·태블릿·데스크톱), 단계 고르기(studioTier)
 ├── useStudioTier.ts    기기 종류·측정값·직접 고른 값 → 지금 단계 (화면 크기가 바뀌면 다시)
 ├── theme.ts            색 (구역 밝기 단계, 등급 색, 회사 띠 색, 승용차 색)
-├── models.ts           모델 파일 목록(파일·배율·회전·원점·라이선스·출처·삼각형 수)과 불러오기(draco·meshopt), 색 맞추기
+├── modelList.ts        모델 파일 목록(파일·배율·회전·원점·라이선스·출처·삼각형 수). three 없음 (미리 받기도 읽는다)
+├── models.ts           모델 불러오기(draco·meshopt), 색 맞추기
 ├── studio.css          이 탭 전용 스타일 (st- 접두사). 앱의 Tailwind·토큰을 쓰지 않는다
 ├── sim/
 │   ├── director.ts     "연출 감독": 서버 단계 → 트럭·지게차·베일·작업자의 움직임. three 미사용, 테스트 가능. motionKey()로 "움직였나"를 알려 준다
 │   ├── pace.ts         박자: 단계의 프레임 상한마다 시계를 돌리고(끊기면 안 돌림) 그릴지 정한다. three 미사용, 테스트 가능
 │   └── paths.ts        둥글린 경로와 거리 → 위치·방향
 ├── world/
-│   ├── layout.ts       월드 배치·경로·핀 자리·카메라 지역 (섹터 집는 각도·시연 주기만 config/robotCycle)
+│   ├── layout.ts       월드 배치·경로·핀 자리 (섹터 집는 각도·시연 주기만 config/robotCycle). views.ts를 다시 내보낸다
+│   ├── views.ts        카메라 지역·거리 단계 (three 없음: 패널의 지역 전환도 읽는다)
 │   ├── buildWorld.ts   고정물 조립 (본관 벽은 방향별로 따로: 카메라 쪽 벽을 숨긴다)
 │   ├── props.ts        나무·가로등·팔레트·베일·차 같은 소품 조립법
 │   ├── Dynamic.tsx     고정물 그리기, 파지 더미, 벨트·뭉치, 압축기 램·표시등, 차단기, 누르는 영역
@@ -102,7 +108,8 @@ studio/
 │   ├── icons.tsx       작은 선 아이콘
 │   └── text.ts         문구와 공정 추적 계산(서버 stage → 여섯 칸)
 ├── demo/demoData.ts    /scene-demo용 예시 원본 (전부 "예시 데이터")
-└── studio.test.tsx
+├── studio.test.tsx
+└── loading.test.tsx    조각 나누기(패널에 three 없음), 3D 전 패널·준비 화면, 장면 올리는 때, 미리 받기(정적 파일만), 포스터(빈 장면)
 ```
 
 - 홈의 전환 "3D | 대시보드"(`HomeSwitch`)와 lazy import는 `features/home`에 있다. 전환은 상단 바의 `switcher` 자리에 들어가고 폰에서도 "더 보기"에 숨기지 않는다(자리가 모자라면 지역 전환이 아이콘만 남도록 먼저 줄어든다). `tabs`는 시연 화면의 측정 버튼 같은 보조 영역이다.
@@ -121,9 +128,9 @@ studio/
 - 끊긴 동안에는 `Director.sync()`도 부르지 않는다. 복구되면 store가 REST로 다시 받은 상태가 들어와 이어진다.
 - 로봇이 집는 자리·놓는 자리는 서버 관절 값(base 각도)에서 나온다. 섹터 칸과 컨베이어는 그 자리에 맞춰 놓였다(`world/layout.ts`의 `PICK`, `PLACE`). 로봇 배율을 바꾸면 칸 배치도 함께 봐야 한다.
 
-## 모델 (`models.ts`)
+## 모델 (`modelList.ts`, `models.ts`)
 
-- 모델 파일은 `app/public/models/<팩 이름>/`에 두고 `MODELS`에 파일·배율·회전·원점·라이선스·출처·삼각형 수를 적는다. 목록에 없는 파일은 쓰지 않는다. 팩의 라이선스 파일도 같은 폴더에 둔다.
+- 모델 파일은 `app/public/models/<팩 이름>/`에 두고 `modelList.ts`의 `MODELS`에 파일·배율·회전·원점·라이선스·출처·삼각형 수를 적는다. 목록에 없는 파일은 쓰지 않는다. 팩의 라이선스 파일도 같은 폴더에 둔다.
 - **팩은 하나로 통일한다.** 지금은 Kenney "Car Kit" 3.1(CC0)이고 **주차된 승용차 6종**에만 쓴다. 불러올 때 텍스처 색을 꼭짓점 색으로 옮기고 차체 색만 스튜디오 색으로 바꿔 공용 재질을 입힌다(`repaint`).
 - 트럭·지게차·작업자·나무·소품은 코드로 만든 모형이다. 이유: 적재함·포크·팔다리가 따로 움직여야 하는데, CC0 팩 하나로 이 전부(차량·사람·승용차·나무·소품)를 갖추면서 마디가 나뉜 것을 찾지 못했다
   (Kenney Car Kit에는 덤프트럭·지게차·사람·나무가 없다). 팩을 섞으면 모양이 어긋나므로 섞지 않았다.
@@ -152,7 +159,13 @@ studio/
   아무것도 움직이지 않으면 그리지 않는다(끊긴 동안 5초에 0장, 측정). 작업자의 제자리 몸짓처럼 시계만 따르는 장식은 깨우지 않는다(다른 것이 움직일 때 함께 움직인다).
   새 움직임을 넣으면 `motionKey()`에 넣거나 깨우개를 단다. 넣지 않으면 그 움직임은 다른 것이 움직일 때만 보인다.
 - Stage는 `memo`다. 패널이 1초마다 다시 그려져도 무대를 다시 그리지 않게(r3f는 새 배열 props를 바뀐 값으로 보고 한 장을 더 그린다).
-- 시작: 셰이더를 `renderer.compileAsync`로 미리 컴파일하고 첫 장을 그릴 때까지 포스터(`app/public/studio/poster-wide.jpg`, 세로 화면은 `poster-tall.jpg`)를 덮는다. 장면이 크게 바뀌면 포스터도 다시 찍는다.
+- **시작(폰 먼저, 2026-10-15):** 목표는 로그인 뒤 1.5초 안에 지표가 보이는 것. 순서:
+  1. 로그인 화면: 홈을 3D로 기억했고 데이터 절약·2G가 아니면, 한가할 때 3D 파일을 미리 받는다(`features/home/useStudioPrefetch` → `preload.ts`). JS 조각은 `modulepreload`(받고 읽기만, 실행 안 함. 받는 중에 로그인해도 `import()`가 이어 쓴다), CSS·모델·포스터는 `prefetch`. **정적 파일만** 받고 API·WebSocket은 부르지 않는다. 조각 이름은 빌드가 `index.html`의 `<meta name="ecocycle-studio-files">`에 적는다(`vite.config.ts`의 `studioFilesMeta`, 개발 서버에는 없음).
+  2. 로그인 뒤 홈: 패널 조각(작음)만 받아 패널을 store 값으로 바로 그린다. 그 아래에 준비 화면(빈 장면 포스터 + 옅은 성에 막 + 돌림표 + "3D 장면을 준비하는 중…", z 5, 누르기를 막지 않음). 핀은 첫 장 뒤에 놓는다. 패널이 뜨면 3D 파일 받기를 시작한다(이미 받았으면 그대로).
+  3. 첫 값(요약)이 그려진 다음 3D 장면을 올린다(`SCENE_START.waitMs`: 값이 오지 않으면 2.5초 뒤 그냥 올림, 끊긴 채 열면 바로). 장면 만들기가 느린 폰의 메인 스레드를 수 초 잡기 때문이다.
+  4. 셰이더를 `renderer.compileAsync`로 미리 컴파일하고 첫 장을 그리면 준비 화면을 걷는다.
+- 포스터(`app/public/studio/poster-wide.jpg`, 세로 화면은 `poster-tall.jpg`)는 로그인 전에 받는 공개 파일이다: **빈 장면만**(데이터 없음, 로봇 기본 자세, 번호판·회사 이름·숫자·패널·핀 없음). `npm run poster`(`scripts/poster.mjs`, `/scene-demo?poster=1`)로 찍고, 화면에 글자가 있으면 멈춘다. 장면이 크게 바뀌면 다시 찍는다.
+- 첫 화면 시간 측정: `npm run measure:load`(`scripts/loadtime.mjs`): 프로덕션 빌드를 배포처럼(gzip, 다시 확인 캐시) 내주고 390×844 폰, 4G(4Mbps·150ms), CPU 4배 느림으로 로그인 → 지표 숫자, 로그인 → 3D 첫 장을 잰다. 결과는 `docs/decisions.md`.
 - 측정 화면: `/scene-demo`(3D 홈만, 예시 데이터). 상단 바에 그린 장 수(지금·평균·최저), 메모리, 기기 종류·단계(측정값), 첫 화면까지 걸린 시간, 그리기 횟수·삼각형 수. 측정값과 묶음 크기는 `docs/decisions.md`.
 
 ## 글 줄바꿈

@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:integration": "node scripts/integration.mjs",
-    "test:text": "node scripts/textcheck.mjs"
+    "test:text": "node scripts/textcheck.mjs",
+    "measure:load": "node scripts/loadtime.mjs",
+    "poster": "node scripts/poster.mjs"
   },
   "dependencies": {
     "@ecocycle/shared": "*",

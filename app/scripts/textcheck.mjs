@@ -4,12 +4,11 @@
 // 브라우저: CHROMIUM_PATH, 없으면 이 컴퓨터의 Playwright 브라우저 폴더(ms-playwright/chromium-*)에서 찾는다. 내려받지 않는다.
 // 글자를 키운 폰(안드로이드 "글자 크기" 130%)도 함께 본다: 글자만 1.3배, 상자 폭은 그대로.
 // 실패하면 그 화면을 scripts/.textcheck/에 찍어 둔다.
-import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { findChromium, start } from './browserKit.mjs';
 import { findWrappedText, zoomText } from './textAudit.mjs';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -17,7 +16,6 @@ const rootDir = path.resolve(appDir, '..');
 const outDir = path.join(appDir, 'scripts', '.textcheck');
 const MOCK_PORT = process.env.TEXTCHECK_MOCK_PORT ?? '4098';
 const APP_PORT = process.env.TEXTCHECK_APP_PORT ?? '5198';
-const isWindows = process.platform === 'win32';
 
 const SIZES = [
   [360, 780],
@@ -25,55 +23,6 @@ const SIZES = [
   [820, 1180],
 ];
 const ZOOMS = [1, 1.3];
-
-function findChromium() {
-  if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
-  const roots = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
-    path.join(os.homedir(), 'AppData/Local/ms-playwright'),
-    path.join(os.homedir(), '.cache/ms-playwright'),
-    path.join(os.homedir(), 'Library/Caches/ms-playwright'),
-  ].filter(Boolean);
-  for (const root of roots) {
-    if (!fs.existsSync(root)) continue;
-    for (const dir of fs.readdirSync(root).filter((d) => /^chromium-\d+$/.test(d)).sort().reverse()) {
-      for (const exe of ['chrome-win64/chrome.exe', 'chrome-win/chrome.exe', 'chrome-linux/chrome', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium']) {
-        const full = path.join(root, dir, exe);
-        if (fs.existsSync(full)) return full;
-      }
-    }
-    if (fs.existsSync(path.join(root, 'chromium'))) return path.join(root, 'chromium');
-  }
-  return null;
-}
-
-function start(name, args, cwd, env, readyText) {
-  const child = spawn('npm', args, { cwd, shell: true, detached: !isWindows, env: { ...process.env, ...env } });
-  const ready = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${name}가 40초 안에 시작되지 않았습니다.`)), 40_000);
-    const onData = (chunk) => {
-      if (String(chunk).replace(/\x1b\[[0-9;]*m/g, '').includes(readyText)) {
-        clearTimeout(timer);
-        resolve(undefined);
-      }
-    };
-    child.stdout.on('data', onData);
-    child.stderr.on('data', onData);
-    child.on('exit', (code) => reject(new Error(`${name}가 먼저 끝났습니다 (코드 ${code}).`)));
-  });
-  const stop = () => {
-    if (!child.pid) return;
-    if (isWindows) spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-    else {
-      try {
-        process.kill(-child.pid);
-      } catch {
-        // 이미 끝났다
-      }
-    }
-  };
-  return { ready, stop };
-}
 
 const failures = [];
 let checked = 0;
