@@ -94,7 +94,7 @@ async function run(browser) {
           await check(page, `시트 ${tab}`, zoom);
         }
         for (const [pin, name] of [
-          ['탱크 A1', '섹터 상세'],
+          ['섹터 A1', '섹터 상세'],
           ['로봇팔', '로봇팔 상세'],
           ['압축기', '압축기 상세'],
           ['컨베이어', '컨베이어 상세'],
@@ -132,7 +132,7 @@ async function run(browser) {
         await check(page, '3D 홈 상세', zoom);
       }
       for (const [route, name] of [
-        ['/tanks/tank-a1', '탱크 페이지'],
+        ['/tanks/tank-a1', '섹터 페이지'],
         ['/robot', '로봇팔 페이지'],
         ['/compressor', '압축기 페이지'],
         ['/design/records', '기록 목록'],

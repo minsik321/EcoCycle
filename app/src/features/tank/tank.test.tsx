@@ -63,12 +63,12 @@ describe('TankListPage', () => {
     pages('/tanks');
     const links = screen.getAllByRole('link');
     expect(links).toHaveLength(4);
-    expect(links[3]).toHaveTextContent('탱크 B2');
+    expect(links[3]).toHaveTextContent('섹터 B2');
     expect(links[3]).toHaveTextContent('주의');
     expect(links[3]).toHaveTextContent('82.0%');
 
-    await userEvent.click(screen.getByRole('link', { name: /탱크 A2/ }));
-    expect(await screen.findByRole('heading', { name: '탱크 A2' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: /섹터 A2/ }));
+    expect(await screen.findByRole('heading', { name: '섹터 A2' })).toBeInTheDocument();
   });
 
   it('연결이 끊기면 상태가 연결 끊김으로 바뀐다', () => {
@@ -142,11 +142,11 @@ describe('TankPage', () => {
       </Routes>,
       { route: '/tanks/tank-a1' },
     );
-    expect(screen.getByText('탱크 상태를 불러오는 중…')).toBeInTheDocument();
+    expect(screen.getByText('섹터 상태를 불러오는 중…')).toBeInTheDocument();
     await screen.findByRole('img');
 
     pages('/tanks/tank-zz');
-    expect(screen.getByRole('heading', { name: '탱크를 찾을 수 없습니다' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '탱크 목록으로' })).toHaveAttribute('href', '/tanks');
+    expect(screen.getByRole('heading', { name: '섹터를 찾을 수 없습니다' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '섹터 목록으로' })).toHaveAttribute('href', '/tanks');
   });
 });

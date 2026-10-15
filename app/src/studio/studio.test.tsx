@@ -295,7 +295,7 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
     expect(within(alert).getByText(/모든 움직임을 멈췄습니다/)).toBeInTheDocument();
     expect(alert.querySelector('time')).toHaveAttribute('datetime', NOW);
     expect(screen.getByLabelText('압축기 연결 끊김')).toBeInTheDocument();
-    expect(screen.getByLabelText('탱크 A1 연결 끊김')).toBeInTheDocument();
+    expect(screen.getByLabelText('섹터 A1 연결 끊김')).toBeInTheDocument();
     expect(screen.getByText('시스템 연결 끊김')).toBeInTheDocument();
     expect(screen.getAllByText('마지막 값')).toHaveLength(3);
     // 공정 추적도 진행 중인 것처럼 보이지 않는다
@@ -354,7 +354,7 @@ describe('LiveStudio: 기존 store·조작 컴포넌트에 연결한다', () => 
     const panel = screen.getByRole('complementary', { name: '로봇팔 상세' });
     expect(within(panel).getByRole('button', { name: '일시정지' })).toBeInTheDocument();
     expect(within(panel).getByRole('link', { name: '상세 보기' })).toHaveAttribute('href', '/robot');
-    // 수동 모드 전환·탱크 지정 집기·설정 변경은 기기 페이지에만 있다
+    // 수동 모드 전환·섹터 지정 집기·설정 변경은 기기 페이지에만 있다
     expect(within(panel).queryByRole('button', { name: /모드로 전환/ })).not.toBeInTheDocument();
     expect(within(panel).queryByRole('button', { name: /집기/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/비상/)).not.toBeInTheDocument();

@@ -52,7 +52,7 @@ export function RobotPage() {
         <section aria-label="현재 상태" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Fact label="모드" value={ROBOT_MODE_TEXT[r.mode]} dim={disconnected} />
           <Fact label="동작 단계" value={PHASE_STEPS.find((s) => s.phase === r.phase)?.label ?? '대기'} dim={disconnected} />
-          <Fact label="작업 중 탱크" value={r.targetTankId ? DEVICE_NAMES[r.targetTankId] : '없음'} dim={disconnected} />
+          <Fact label="작업 중 섹터" value={r.targetTankId ? DEVICE_NAMES[r.targetTankId] : '없음'} dim={disconnected} />
         </section>
       )}
 

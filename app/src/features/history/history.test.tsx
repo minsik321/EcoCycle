@@ -193,7 +193,7 @@ describe('HistoryPanel: 불러오는 중, 실패, 빈 구간', () => {
   it('그래프에는 접근성용 요약(최소·최대·마지막 값)이 붙는다', async () => {
     panel(makeFetcher([10, 20, 30]));
     const label = (await screen.findByRole('img')).getAttribute('aria-label')!;
-    expect(label).toContain('탱크 A1 적재율');
+    expect(label).toContain('섹터 A1 적재율');
     expect(label).toContain('최소 10%');
     expect(label).toContain('최대 30%');
     expect(label).toContain('마지막 30%');

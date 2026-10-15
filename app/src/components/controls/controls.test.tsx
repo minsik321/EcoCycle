@@ -62,7 +62,7 @@ describe('DeviceControls: 표시', () => {
   it('기기 페이지에는 위험 조작이 더해지고, 권한이 없는 것은 비활성화하고 이유를 보여 준다 (작업자)', () => {
     renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()] });
     expect(screen.getByRole('button', { name: '수동 모드로 전환' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '탱크 지정 집기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '섹터 지정 집기' })).toBeDisabled();
     expect(screen.getAllByText('권한이 없습니다').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole('button', { name: '정지' })).toBeEnabled();
   });
@@ -163,9 +163,9 @@ describe('DeviceControls: 위험 조작은 확인 단계를 거친다', () => {
     finish(store, 'cmd-1');
   });
 
-  it('탱크 지정 집기는 자동 모드에서는 비활성화되고 이유를 보여 준다', () => {
+  it('섹터 지정 집기는 자동 모드에서는 비활성화되고 이유를 보여 준다', () => {
     renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()], me: ADMIN });
-    expect(screen.getByRole('button', { name: '탱크 지정 집기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '섹터 지정 집기' })).toBeDisabled();
     expect(screen.getByText('수동 모드에서만 사용할 수 있습니다')).toBeInTheDocument();
   });
 
@@ -174,22 +174,22 @@ describe('DeviceControls: 위험 조작은 확인 단계를 거친다', () => {
       devices: [robotState({ mode: 'manual' })],
       me: ADMIN,
     });
-    await userEvent.selectOptions(screen.getByLabelText('집을 탱크'), 'tank-b1');
-    await userEvent.click(screen.getByRole('button', { name: '탱크 지정 집기' }));
-    const dialog = screen.getByRole('dialog', { name: '탱크 지정 집기' });
-    expect(within(dialog).getByText(/탱크 B1/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('집을 섹터'), 'tank-b1');
+    await userEvent.click(screen.getByRole('button', { name: '섹터 지정 집기' }));
+    const dialog = screen.getByRole('dialog', { name: '섹터 지정 집기' });
+    expect(within(dialog).getByText(/섹터 B1/)).toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
 
     await userEvent.click(within(dialog).getByRole('button', { name: '실행' }));
     expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'pick_from', tankId: 'tank-b1', confirm: true });
-    await screen.findByRole('button', { name: '탱크 지정 집기 처리 중' });
+    await screen.findByRole('button', { name: '섹터 지정 집기 처리 중' });
     finish(store, 'cmd-1');
   });
 
   it('홈에는 위험 조작 버튼 자체가 없다', () => {
     renderWithStore(<DeviceControls deviceId="robot-1" context="home" />, { devices: [robotState()], me: ADMIN });
     expect(screen.queryByText(/모드로 전환/)).not.toBeInTheDocument();
-    expect(screen.queryByText('탱크 지정 집기')).not.toBeInTheDocument();
+    expect(screen.queryByText('섹터 지정 집기')).not.toBeInTheDocument();
   });
 });
 

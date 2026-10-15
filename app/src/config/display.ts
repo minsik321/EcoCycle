@@ -49,10 +49,10 @@ export const ROLE_TEXT: Record<Role, string> = {
 };
 
 export const DEVICE_NAMES: Record<DeviceId, string> = {
-  'tank-a1': '탱크 A1',
-  'tank-a2': '탱크 A2',
-  'tank-b1': '탱크 B1',
-  'tank-b2': '탱크 B2',
+  'tank-a1': '섹터 A1',
+  'tank-a2': '섹터 A2',
+  'tank-b1': '섹터 B1',
+  'tank-b2': '섹터 B2',
   'robot-1': '로봇팔',
   'conveyor-z': '컨베이어 Section Z',
   'compressor-1': '압축기',
@@ -163,7 +163,7 @@ export const HISTORY_EMPTY_TEXT = '이 구간에는 기록된 값이 없습니�
 /** 권한을 사용자가 읽을 수 있는 말로. 권한 종류는 대표님과 확정 전이다 (docs/questions.md A4). */
 export const PERMISSION_TEXT: Record<Permission, string> = {
   'robot.control': '시작·일시정지·재개·정지',
-  'robot.manual': '수동 모드, 탱크 지정 집기',
+  'robot.manual': '수동 모드, 섹터 지정 집기',
   'settings.write': '설정값 변경',
   'alarm.ack': '알람 확인 처리',
 };

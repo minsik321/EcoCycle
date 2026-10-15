@@ -23,7 +23,7 @@ export const DEVICE_SETTINGS: Record<DeviceType, readonly SettingField[]> = {
       min: 1,
       max: 94,
       step: 1,
-      help: '탱크 적재율이 이 값 이상이면 서버가 "주의"로 판정합니다.',
+      help: '섹터 적재율이 이 값 이상이면 서버가 "주의"로 판정합니다.',
     },
   ],
   robot: [{ key: 'speedPercent', label: '동작 속도', unit: '%', min: 10, max: 100, step: 5, help: '로봇팔 동작 속도입니다. 100%가 기본입니다.' }],

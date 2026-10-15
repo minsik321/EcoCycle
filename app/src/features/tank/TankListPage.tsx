@@ -17,7 +17,7 @@ export function TankListPage() {
       <h1 className="text-xl font-bold">섹터</h1>
       {tanks.length === 0 ? (
         <p role="status" className="text-slate-500">
-          탱크 상태를 불러오는 중…
+          섹터 상태를 불러오는 중…
         </p>
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">

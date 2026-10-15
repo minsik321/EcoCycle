@@ -33,9 +33,9 @@ export function TankPage() {
   if (!isTankId(id)) {
     return (
       <div>
-        <h1 className="text-xl font-bold">탱크를 찾을 수 없습니다</h1>
+        <h1 className="text-xl font-bold">섹터를 찾을 수 없습니다</h1>
         <Link to="/tanks" className="mt-3 inline-flex min-h-12 items-center underline">
-          탱크 목록으로
+          섹터 목록으로
         </Link>
       </div>
     );
@@ -54,7 +54,7 @@ function TankDetail({ id }: { id: TankId }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <Link to="/tanks" className="inline-flex min-h-12 items-center text-sm font-medium text-slate-700 underline">
-          ◀ 탱크 목록
+          ◀ 섹터 목록
         </Link>
         <h1 className="text-xl font-bold">{DEVICE_NAMES[id]}</h1>
         {t && <StatusBadge status={status} />}
@@ -67,7 +67,7 @@ function TankDetail({ id }: { id: TankId }) {
 
       {!t ? (
         <p role="status" className="text-slate-500">
-          탱크 상태를 불러오는 중…
+          섹터 상태를 불러오는 중…
         </p>
       ) : (
         <section aria-label="현재 상태" className="grid grid-cols-1 gap-3 sm:grid-cols-3">

@@ -59,7 +59,7 @@ describe('AlarmsPage: 열린 알람', () => {
     });
     const items = within(screen.getByLabelText('열린 알람')).getAllByRole('listitem');
     expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent('탱크 B2 · a2 메시지');
+    expect(items[0]).toHaveTextContent('섹터 B2 · a2 메시지');
     expect(items[0]).toHaveTextContent('확인함');
     expect(items[1]).toHaveTextContent('발생 중');
     expect(screen.getByRole('button', { name: '열린 알람 2건' })).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe('AlarmsPage: 열린 알람', () => {
     act(() => {
       store.dispatch(alarmReceived(alarm('a1', 'active', '2026-10-13T04:00:00.000Z', 'tank-a2')));
     });
-    await userEvent.click(screen.getByRole('link', { name: /탱크 A2/ }));
+    await userEvent.click(screen.getByRole('link', { name: /섹터 A2/ }));
     expect(screen.getByText('탱크 페이지')).toBeInTheDocument();
   });
 
@@ -113,7 +113,7 @@ describe('AlarmsPage: 최근 7일 이력', () => {
     await userEvent.click(screen.getByRole('button', { name: '최근 7일 이력' }));
     const items = await within(screen.getByLabelText('알람 이력')).findAllByRole('listitem');
     expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent('탱크 A1 · al-2 메시지');
+    expect(items[0]).toHaveTextContent('섹터 A1 · al-2 메시지');
     expect(items[0]).toHaveTextContent('발생 중');
     expect(items[1]).toHaveTextContent('압축기 · al-1 메시지');
     expect(items[1]).toHaveTextContent('해제됨');

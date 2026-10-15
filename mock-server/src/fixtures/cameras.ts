@@ -1,7 +1,7 @@
 import type { Camera } from '@ecocycle/shared';
 
 export const CAMERAS: Camera[] = [
-  { id: 'cam-1', name: '탱크 구역', location: 'A·B 탱크 전경' },
+  { id: 'cam-1', name: '섹터 구역', location: 'A·B 섹터 전경' },
   { id: 'cam-2', name: '컨베이어·압축기', location: 'Section Z' },
 ];
 

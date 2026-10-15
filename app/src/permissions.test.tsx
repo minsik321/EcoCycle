@@ -49,7 +49,7 @@ const user = (role: Role): Me => ({ id: role, name: `${role}-user`, role, permis
 
 /** 한 장짜리 기준표: 역할별로 화면에서 할 수 있는 것 */
 const MATRIX: Record<Role, { quick: boolean; ack: boolean; danger: boolean; settings: boolean }> = {
-  //            시작·일시정지·재개·정지   알람 확인   수동 모드·탱크 지정 집기   설정값 변경
+  //            시작·일시정지·재개·정지   알람 확인   수동 모드·섹터 지정 집기   설정값 변경
   admin: { quick: true, ack: true, danger: true, settings: true },
   operator: { quick: true, ack: true, danger: false, settings: false },
   viewer: { quick: false, ack: false, danger: false, settings: false },
@@ -145,7 +145,7 @@ describe.each(ROLES)('역할 %s', (role) => {
     }
     // 위험 조작은 홈에 없다 (어떤 역할이든)
     expect(screen.queryByRole('button', { name: /모드로 전환/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '탱크 지정 집기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '섹터 지정 집기' })).not.toBeInTheDocument();
   });
 
   it('홈: 알람 확인 버튼', () => {
@@ -156,7 +156,7 @@ describe.each(ROLES)('역할 %s', (role) => {
     const button = screen.queryByRole('button', { name: '알람 확인' });
     if (m.ack) expect(button).toBeEnabled();
     else expect(button).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /탱크 A1 · 적재율 80% 초과/ })).toBeInTheDocument(); // 알람 조회는 모두 가능
+    expect(screen.getByRole('link', { name: /섹터 A1 · 적재율 80% 초과/ })).toBeInTheDocument(); // 알람 조회는 모두 가능
   });
 
   it('알람 화면: 알람 확인 버튼', () => {
@@ -167,7 +167,7 @@ describe.each(ROLES)('역할 %s', (role) => {
     const button = screen.queryByRole('button', { name: '알람 확인' });
     if (m.ack) expect(button).toBeEnabled();
     else expect(button).not.toBeInTheDocument();
-    expect(screen.getByLabelText('열린 알람')).toHaveTextContent('탱크 A1');
+    expect(screen.getByLabelText('열린 알람')).toHaveTextContent('섹터 A1');
   });
 
   it('로봇팔 페이지: 낮은 위험 조작, 위험 조작, 설정', async () => {
@@ -175,7 +175,7 @@ describe.each(ROLES)('역할 %s', (role) => {
     const controls = screen.getByLabelText('조작');
     const quick = within(controls).queryByRole('button', { name: '일시정지' });
     const mode = within(controls).queryByRole('button', { name: '자동 모드로 전환' });
-    const pick = within(controls).queryByRole('button', { name: '탱크 지정 집기' });
+    const pick = within(controls).queryByRole('button', { name: '섹터 지정 집기' });
 
     if (!m.quick) {
       // 열람자: 조작 영역에 버튼이 하나도 없다

@@ -173,7 +173,7 @@ function PickFromControl({
   return (
     <div className="flex flex-wrap items-start gap-2">
       <label className="flex flex-col gap-1 text-xs text-slate-600">
-        집을 탱크
+        집을 섹터
         <select
           value={tankId}
           onChange={(e) => setTankId(e.target.value as TankId)}

@@ -133,7 +133,7 @@ describe('연결 끊김 통합 점검 (disconnect 시나리오)', () => {
     expect(within(alert3d!).getByText('연결 끊김')).toBeInTheDocument();
     expect(alert3d!.querySelector('time')).toHaveAttribute('datetime', lastReceivedAt!);
     expect(screen.getByLabelText('압축기 연결 끊김')).toBeInTheDocument();
-    expect(screen.getByLabelText('탱크 A1 연결 끊김')).toBeInTheDocument();
+    expect(screen.getByLabelText('섹터 A1 연결 끊김')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: '공정 추적' })).queryByText('진행 중')).not.toBeInTheDocument();
     // 로봇팔을 골라도 시작·일시정지 같은 조작은 누를 수 없다
     await userEvent.click(screen.getByLabelText('로봇팔 연결 끊김'));

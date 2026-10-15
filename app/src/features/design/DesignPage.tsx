@@ -121,7 +121,7 @@ export function DesignPage() {
             </GlassPanel>
           </div>
           <div className="mt-3 flex max-w-md flex-col gap-2">
-            <ToastCard tone="alarm" role="status" title="탱크 A1" onDismiss={() => {}}>
+            <ToastCard tone="alarm" role="status" title="섹터 A1" onDismiss={() => {}}>
               적재율 95% 초과
             </ToastCard>
             <ToastCard tone="normal" title="압축기 · 시작">

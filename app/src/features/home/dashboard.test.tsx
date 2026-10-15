@@ -180,7 +180,7 @@ describe('대시보드 홈', () => {
       store.dispatch(alarmReceived({ id: 'al-1', level: 'alarm', deviceId: 'tank-b2', message: '적재율 80% 초과', state: 'active', ts: NOW }));
     });
     const alarms = screen.getByRole('region', { name: '알람' });
-    expect(within(alarms).getByText(/탱크 B2 · 적재율 80% 초과/)).toBeInTheDocument();
+    expect(within(alarms).getByText(/섹터 B2 · 적재율 80% 초과/)).toBeInTheDocument();
     // 알람은 상태 요약보다 앞에 있다
     expect(alarms.compareDocumentPosition(screen.getByRole('region', { name: '상태 요약' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole('button', { name: '알람 확인' })).toBeEnabled();

@@ -71,7 +71,7 @@ describe('SettingForm', () => {
     await userEvent.click(screen.getByRole('button', { name: '설정 변경' }));
 
     const dialog = screen.getByRole('dialog', { name: '주의 기준 적재율 변경' });
-    expect(dialog).toHaveTextContent('탱크 A1');
+    expect(dialog).toHaveTextContent('섹터 A1');
     expect(dialog).toHaveTextContent('70%');
     expect(api.sendCommand).not.toHaveBeenCalled();
 

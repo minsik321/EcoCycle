@@ -123,7 +123,7 @@ describe('ToastCard', () => {
   it('닫기를 주면 닫기 버튼이 생기고, 알람은 alert로 알린다', async () => {
     const onDismiss = vi.fn();
     render(
-      <ToastCard tone="alarm" role="alert" title="탱크 A1" onDismiss={onDismiss}>
+      <ToastCard tone="alarm" role="alert" title="섹터 A1" onDismiss={onDismiss}>
         적재율 95% 초과
       </ToastCard>,
     );

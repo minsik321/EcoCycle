@@ -81,7 +81,7 @@ describe('RobotPage', () => {
     const status = screen.getByRole('region', { name: '현재 상태' });
     expect(within(status).getByText('자동')).toBeInTheDocument();
     expect(within(status).getByText('이동')).toBeInTheDocument();
-    expect(within(status).getByText('탱크 A2')).toBeInTheDocument();
+    expect(within(status).getByText('섹터 A2')).toBeInTheDocument();
 
     const controls = screen.getByLabelText('조작');
     expect(within(controls).getByRole('button', { name: '수동 모드로 전환' })).toBeEnabled(); // 위험 조작은 기기 페이지에서만

@@ -19,7 +19,7 @@ export const CONTROL_TEXT: Record<CommandType, ControlText> = {
   resume: { label: '재개' },
   stop: { label: '정지' },
   set_mode: { label: '모드 전환', confirmMessage: '운전 모드를 바꿉니다. 계속할까요?' },
-  pick_from: { label: '탱크 지정 집기', confirmMessage: '선택한 탱크에서 파지를 집어 옮깁니다. 계속할까요?' },
+  pick_from: { label: '섹터 지정 집기', confirmMessage: '선택한 섹터에서 파지를 집어 옮깁니다. 계속할까요?' },
   update_setting: { label: '설정 변경', confirmMessage: '설정값을 바꿉니다. 계속할까요?' },
   ack_alarm: { label: '알람 확인' },
 };
