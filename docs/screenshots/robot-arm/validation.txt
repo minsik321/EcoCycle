@@ -1,0 +1,1 @@
+PASS: 390×844, 820×1180; 100%/130%; 3 modes, pins, confirmation/cancel, reset, records; actual pinned/manual cycles, validation 422, permissions 403, idempotency.

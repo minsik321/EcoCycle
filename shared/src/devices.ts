@@ -36,6 +36,8 @@ export interface RobotState {
   type: 'robot';
   status: RobotStatus;
   mode: RobotMode;
+  pinnedSectors: TankId[];
+  pickRecordsRevision: number;
   phase: Phase;
   /** 작업 중인 탱크. 작업 중이 아니면 null */
   targetTankId: TankId | null;

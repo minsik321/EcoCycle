@@ -1,8 +1,9 @@
-import type { Phase, RobotState, TankId } from '@ecocycle/shared';
+import type { Phase, RobotMode, RobotState, TankId, TankState } from '@ecocycle/shared';
 import { publish } from './bus';
 import { addToConveyor, excludedTanks, removeFromTank } from './plant';
-import { nextPickSector, notePlaced } from './process';
+import { mixingBatchId, nextPickSector, notePlaced } from './process';
 import { publishDevice } from './publish';
+import { recordPick } from './picks';
 import { devices, getSetting } from './state';
 
 // 집기 → 이동 → 놓기 사이클을 흉내 낸다. 관절 값은 15Hz로 보낸다.
@@ -40,6 +41,10 @@ let lastTickAt = Date.now();
 let picked = false;
 let placed = false;
 let pendingTank: TankId | null = null;
+let cycleMode: RobotMode = 'auto';
+let cycleBatchId: string | null = null;
+let pickedVolume = 0;
+let pinCursor = 0;
 
 /** 시나리오용: 자동 사이클이 이 탱크를 건너뛰게 한다 */
 export function excludeFromRotation(id: TankId): void {
@@ -49,8 +54,21 @@ export function excludeFromRotation(id: TankId): void {
 function startCycle(tankId?: TankId): void {
   const r = robot();
   // 자동 모드에서는 배합 중인 배치의 배합비를 따라 집을 섹터가 정해진다. 배합할 배치가 없으면 기다린다.
-  const target = tankId ?? nextPickSector();
+  let target = tankId ?? nextPickSector();
+  if (!tankId && r.mode === 'auto_pinned') {
+    target = null;
+    if (mixingBatchId()) {
+      for (let i = 0; i < r.pinnedSectors.length; i++) {
+        const id = r.pinnedSectors[pinCursor++ % r.pinnedSectors.length]!;
+        const sector = devices[id] as TankState;
+        if (!excludedTanks.has(id) && sector.status !== 'offline' && sector.volumeM3 > 0) { target = id; break; }
+      }
+    }
+  }
   if (!target) return;
+  cycleMode = r.mode;
+  cycleBatchId = mixingBatchId();
+  pickedVolume = 0;
   r.targetTankId = target;
   r.phase = 'pick';
   elapsedSec = 0;
@@ -85,7 +103,7 @@ function advance(dtSec: number): void {
   if (r.status !== 'running') return;
 
   if (r.phase === 'idle') {
-    if (r.mode === 'auto') {
+    if (r.mode !== 'manual') {
       idleSec += dtSec;
       if (idleSec >= IDLE_GAP_SEC) startCycle();
     } else if (pendingTank) {
@@ -107,13 +125,17 @@ function advance(dtSec: number): void {
   if (phase === 'pick' && progress >= 0.9 && !picked) {
     picked = true;
     r.gripper = { closed: true, holding: true };
-    removeFromTank(tankId, 1.2);
+    pickedVolume = removeFromTank(tankId, 1.2);
   }
   if (phase === 'place' && progress >= 0.5 && !placed) {
     placed = true;
     r.gripper = { closed: false, holding: false };
     addToConveyor(6);
-    notePlaced(tankId);
+    const batchId = pickedVolume > 0 ? notePlaced(tankId, cycleBatchId) : null;
+    if (pickedVolume > 0) {
+      recordPick({ mode: cycleMode, sectorId: tankId, volumeM3: pickedVolume, conveyorId: 'conveyor-z', batchId });
+      r.pickRecordsRevision += 1;
+    }
   }
 
   if (progress >= 1) {

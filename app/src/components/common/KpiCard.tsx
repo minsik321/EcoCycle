@@ -14,12 +14,14 @@ export interface KpiCardProps {
   /** 유리 패널로 띄울지(3D 화면 위), 일반 카드로 둘지 */
   glass?: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
 /** 지표 카드: 이름, 큰 숫자, 작은 추이선. 값은 서버가 준 것을 표시만 한다. */
-export function KpiCard({ label, value, unit, trend, note, glass = true, className = '' }: KpiCardProps) {
+export function KpiCard({ label, value, unit, trend, note, glass = true, className = '', onClick }: KpiCardProps) {
   const body = (
     <>
+      {onClick && <button type="button" aria-label={`${label} 상세 보기`} onClick={onClick} className="absolute inset-0 z-10 min-h-12 rounded-card focus-visible:outline-2 focus-visible:outline-accent" />}
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink-soft">{label}</p>
         <p className="mt-0.5 text-3xl leading-tight font-bold text-ink">
@@ -31,7 +33,7 @@ export function KpiCard({ label, value, unit, trend, note, glass = true, classNa
       {trend && <Sparkline values={trend} className="shrink-0 self-end" />}
     </>
   );
-  const layout = `flex items-start justify-between gap-3 p-4 ${className}`;
+  const layout = `relative flex items-start justify-between gap-3 p-4 ${className}`;
   return glass ? (
     <GlassPanel as="section" aria-label={label} className={layout}>
       {body}

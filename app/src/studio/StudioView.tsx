@@ -1,4 +1,5 @@
-import { Component, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, Suspense, lazy, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { KpiDetailOpenContext } from '../components/charts/KpiDetailContext';
 import type { ReactNode, RefObject } from 'react';
 import { TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, RobotModel, SectorGrade, TankId } from '@ecocycle/shared';
@@ -103,6 +104,7 @@ function useLayout(ref: RefObject<HTMLElement | null>): Layout {
  * (store 연결은 LiveStudio, 서버 없는 시연은 DemoStudio).
  */
 export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, disconnected, lastReceivedAt, paused, example, switcher, tabs, account, deviceActions, recordLink, onFailed, poster = false }: StudioViewProps) {
+  const kpiOpen = useContext(KpiDetailOpenContext);
   const [selection, setSelection] = useState<string | null>(null);
   const [view, setView] = useState(DEFAULT_VIEW.key);
   const root = useRef<HTMLElement>(null);
@@ -199,7 +201,7 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
             tier={tier}
             onReady={onReady}
             frozen={disconnected}
-            paused={paused}
+            paused={paused || kpiOpen}
             selection={selection}
             onSelect={select}
             pins={pins}

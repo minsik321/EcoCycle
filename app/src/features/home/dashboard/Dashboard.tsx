@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
+import { KpiDetailContext } from '../../../components/charts/KpiDetailContext';
 import { Link } from 'react-router-dom';
 import { TANK_IDS } from '@ecocycle/shared';
 import type { CompressorState, TankId, TankState } from '@ecocycle/shared';
@@ -88,6 +89,7 @@ function StatusSummary() {
 }
 
 function Kpis() {
+  const openKpi = useContext(KpiDetailContext);
   const summary = useAppSelector(selectPlantSummary);
   const disconnected = useAppSelector(selectIsDisconnected);
   const { lastReceivedAt } = useAppSelector(selectConnection);
@@ -96,9 +98,9 @@ function Kpis() {
   const note = disconnected ? `연결 끊김 · 마지막 수신 ${formatLocalClock(lastReceivedAt)}` : '최근 24시간';
   return (
     <>
-      <KpiCard glass={false} label="오늘 생산 베일" value={live ? integer.format(live.balesToday) : null} unit="개" trend={live ? trends.balesToday : undefined} note={note} />
-      <KpiCard glass={false} label="평균 수분" value={live ? oneDecimal.format(live.averageMoisturePercent) : null} unit="%" trend={live ? trends.averageMoisturePercent : undefined} note={note} />
-      <KpiCard glass={false} label="압축기 가동률" value={live ? oneDecimal.format(live.compressorUptimePercent) : null} unit="%" trend={live ? trends.compressorUptimePercent : undefined} note={note} />
+      <KpiCard onClick={() => openKpi('balesToday')} glass={false} label="오늘 생산 베일" value={live ? integer.format(live.balesToday) : null} unit="개" trend={live ? trends.balesToday : undefined} note={note} />
+      <KpiCard onClick={() => openKpi('averageMoisturePercent')} glass={false} label="평균 수분" value={live ? oneDecimal.format(live.averageMoisturePercent) : null} unit="%" trend={live ? trends.averageMoisturePercent : undefined} note={note} />
+      <KpiCard onClick={() => openKpi('compressorUptimePercent')} glass={false} label="압축기 가동률" value={live ? oneDecimal.format(live.compressorUptimePercent) : null} unit="%" trend={live ? trends.compressorUptimePercent : undefined} note={note} />
     </>
   );
 }

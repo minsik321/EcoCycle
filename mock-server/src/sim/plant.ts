@@ -18,8 +18,11 @@ const moistureRaw = new Map<TankId, number>(TANK_IDS.map((id) => [id, tank(id).m
 let loadRaw = conveyor().loadPercent;
 
 /** 탱크에서 파지를 집어 갔을 때 (로봇 시뮬레이터가 호출) */
-export function removeFromTank(id: TankId, percent: number): void {
-  fillRaw.set(id, clamp((fillRaw.get(id) ?? 0) - percent, 0, 100));
+export function removeFromTank(id: TankId, percent: number): number {
+  const before = fillRaw.get(id) ?? 0;
+  const removed = Math.min(before, percent);
+  fillRaw.set(id, before - removed);
+  return Math.round(removed * tank(id).capacityM3 / 100 * 1000) / 1000;
 }
 
 /** 차량이 섹터에 파지를 내렸을 때 (공정 흐름 시뮬레이터가 호출) */

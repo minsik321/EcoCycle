@@ -321,11 +321,18 @@ export function nextPickSector(): TankId | null {
   return best;
 }
 
-/** 로봇이 컨베이어에 한 번 올렸을 때 (로봇 시뮬레이터가 호출) */
-export function notePlaced(sectorId: TankId): void {
+/** 새 사이클에 투입 가능한 배치. 진행 중 사이클은 이 ID를 기억한다. */
+export function mixingBatchId(): string | null {
   const batch = batchIn('mixing');
-  if (!batch || pausedBatches.has(batch.id)) return;
+  return batch && !pausedBatches.has(batch.id) ? batch.id : null;
+}
+
+/** 진행 중 집기가 끝나면 원래 배치에만 반영한다. 일시정지 중에도 이미 집은 양은 보존한다. */
+export function notePlaced(sectorId: TankId, batchId: string | null): string | null {
+  const batch = batches.find(b => b.id === batchId && b.stage === 'mixing');
+  if (!batch) return null;
   countFor(batch).set(sectorId, (countFor(batch).get(sectorId) ?? 0) + 1);
+  return batch.id;
 }
 
 function tickBatches(now: number): void {

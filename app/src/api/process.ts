@@ -1,5 +1,8 @@
-import type { PlantHistoryResponse, PlantMetric, ProcessState } from '@ecocycle/shared';
+import type { KpiHistoryResponse, KpiRange, PlantHistoryResponse, PlantMetric, ProcessState } from '@ecocycle/shared';
 import { request } from './http';
+
+export const getKpiHistory = (metric: PlantMetric, range: KpiRange, signal?: AbortSignal) =>
+  request<KpiHistoryResponse>('/plant/kpi-history', { query: { metric, range, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }, signal });
 
 /** 공정 흐름 현재 상태와 최근 목록 (연결·재연결 뒤 한 번 받아 맞춘다) */
 export const getProcessState = (): Promise<ProcessState> => request<ProcessState>('/process/state');

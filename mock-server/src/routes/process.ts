@@ -7,6 +7,7 @@ import { batchControlState, batchEvents, baleDetail, liveBatchRecords, liveVehic
 import { finishedBatchRecords, finishedVehicleRecords } from '../sim/records';
 import { summarize } from '../sim/state';
 import { sendRecordPage } from './records';
+import { buildKpiHistory } from '../sim/kpi';
 
 export const processRouter = Router();
 
@@ -54,6 +55,16 @@ processRouter.get('/batches/:id', (req, res) => {
 
 const isPlantMetric =(value: unknown): value is PlantMetric =>
   typeof value === 'string' && (PLANT_METRICS as readonly string[]).includes(value);
+
+processRouter.get('/plant/kpi-history', (req, res) => {
+  const { metric, range, timeZone = 'Asia/Seoul' } = req.query;
+  if (!isPlantMetric(metric) || (range !== 'today' && range !== '7d' && range !== '30d') || typeof timeZone !== 'string') {
+    return sendError(res, 422, 'VALIDATION_FAILED', 'metric, range, timeZone을 확인하세요.');
+  }
+  try { new Intl.DateTimeFormat('ko-KR', { timeZone }); }
+  catch { return sendError(res, 422, 'VALIDATION_FAILED', '올바른 IANA timeZone이 필요합니다.'); }
+  res.json(buildKpiHistory(metric, range, timeZone, summarize()));
+});
 
 // GET /plant/history?metric=balesToday&from=...&to=...&interval=10m
 processRouter.get('/plant/history', (req, res) => {

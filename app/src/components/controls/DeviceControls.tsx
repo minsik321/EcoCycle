@@ -3,6 +3,7 @@ import { deviceTypeOf } from '@ecocycle/shared';
 import type { Command, CommandType, DeviceId, TankId } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
 import { CONTROL_TEXT, canUse, controlsFor } from '../../config/controls';
+import { RobotModeControl } from './RobotModeControl';
 import { DEVICE_NAMES, ROBOT_MODE_TEXT } from '../../config/display';
 import { useAppSelector } from '../../store/hooks';
 import { selectConnection, selectDevice, selectIsCommandPending, selectPermissions } from '../../store/selectors';
@@ -66,23 +67,8 @@ export function DeviceControls({ deviceId, context, className = '' }: DeviceCont
 
           if (type === 'set_mode') {
             if (!robot) return null;
-            const next = robot.mode === 'auto' ? 'manual' : 'auto';
-            return (
-              <ControlButton
-                key={type}
-                deviceId={deviceId}
-                type={type}
-                label={`${ROBOT_MODE_TEXT[next]} 모드로 전환`}
-                {...base}
-                onClick={() =>
-                  setConfirming({
-                    command: { type: 'set_mode', mode: next, confirm: true },
-                    type,
-                    detail: `${ROBOT_MODE_TEXT[robot.mode]} → ${ROBOT_MODE_TEXT[next]}`,
-                  })
-                }
-              />
-            );
+            return <RobotModeControl key={type} robot={robot} {...base}
+              onMode={(command) => setConfirming({ command, type, detail: `${ROBOT_MODE_TEXT[robot.mode]} → ${ROBOT_MODE_TEXT[command.mode]}${command.mode === 'auto_pinned' ? ` (${command.pinnedSectors.map(id => DEVICE_NAMES[id]).join(', ')})` : ''} · 다음 사이클부터 적용` })} />;
           }
 
           if (type === 'pick_from') {
@@ -171,14 +157,14 @@ function PickFromControl({
   const reason = !allowed ? '권한이 없습니다' : !manualMode ? '수동 모드에서만 사용할 수 있습니다' : null;
   const disabled = !allowed || disabledByGroup || !manualMode;
   return (
-    <div className="flex flex-wrap items-start gap-2">
-      <label className="flex flex-col gap-1 text-xs text-slate-600">
+    <div className="flex w-full flex-wrap items-start gap-2">
+      <label className="flex flex-wrap items-baseline gap-2 text-sm text-ink-soft">
         집을 섹터
         <select
           value={tankId}
           onChange={(e) => setTankId(e.target.value as TankId)}
           disabled={disabled || pending}
-          className="min-h-12 rounded-lg border border-slate-400 bg-white px-3 text-base text-slate-900 disabled:text-slate-400"
+          className="min-h-12 rounded-control border border-line bg-surface px-3 text-base text-ink disabled:text-ink-faint"
         >
           {TANK_IDS.map((id) => (
             <option key={id} value={id}>
@@ -187,7 +173,7 @@ function PickFromControl({
           ))}
         </select>
       </label>
-      <div className="self-end">
+      <div className="self-start">
         <CommandButton
           label={CONTROL_TEXT.pick_from.label}
           onClick={() => onPick(tankId)}

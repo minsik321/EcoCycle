@@ -35,6 +35,7 @@
 - `records/`(4단위): `RecordsPage`(탭은 주소의 `?tab=vehicles|batches`라 홈의 링크가 탭을 골라 열고 뒤로 가기에도 유지), `VehicleRecords`(입차·출차 시각, 번호판, 회사, 섹터, 총중량·공차·순중량 t, 상태 인식·하역·출차, `GET /vehicles/records`), `BatchRecords`(시작·종료, 배합 섹터 %, 평균 수분, 목표→실제 압력, 결과 완료·건너뜀·일시정지됨·진행 중, 만든 베일, `GET /batches/records`), 줄을 누르면 상세(`VehicleDetailPage` = `GET /vehicles/{id}`, `BatchDetailPage` = `GET /batches/{id}`, 둘 다 `useRecord`·`RecordDetail` 틀). 주소 만들기는 `config/navigation.ts`(`recordsPath`, `vehicleRecordPath`, `batchRecordPath`). 폰은 "더 보기" 안의 메뉴. 홈에서 오는 링크: 대시보드 "전체 보기"(지금 배치 카드 → 배치 탭, 최근 차량·베일 카드 → 차량 탭), 3D 홈 "기록 보기"·"이 차량 기록"·"이 배치 상세"(`studio`의 `RecordLink`, 링크 그리기는 `LiveStudio`가 넘긴다).
 추가된 폴더: `history/`(이력 그래프 패널·구간 훅·알람 이력 훅, 탱크·컨베이어·압축기 페이지가 공유), `devices/`(컨베이어·압축기 공통 페이지 틀).
 서버가 제공하지 않아 안내 문구만 둔 항목: 로봇팔 사이클 통계, 압축기 점검 이력, 설정의 현재값 (`docs/questions.md` B18, B21, B22).
+- `robot/`(6단위): 자동·수동·자동 섹터 지정(`auto_pinned`), 지정 목록은 서버 상태와 초안을 구분. `set_mode`의 기존 권한·확인 흐름을 확장한다. 사이클 통계 아래 `PickRecords` = 별도 `RecordList`(`GET /robots/robot-1/picks/records`, 시각·모드·섹터·부피 m³·컨베이어 → 배치). `pickRecordsRevision` 변경 시 같은 기간·쪽을 갱신한다. 재현은 `node app/scripts/robotArm.mjs`, 결과는 `docs/screenshots/robot-arm`.
 
 ## 정보 배치 기준 (명세 3절)
 
@@ -118,3 +119,9 @@
 - `batch.control` 권한은 관리자만 주는 가정. 명령은 기존 `useDeviceCommand`·`ConfirmDialog`·`CommandResultToast` 사용. 상태/범위/승인은 서버가 결정한다.
 - 사건 줄을 누르면 변경 전후·수행자·시각·사유 전체를 대화상자로 보여 준다. `eventsRevision` 변경 시 같은 기간·쪽을 새로 조회한다.
 - 재현: `node app/scripts/batchBale.mjs` (실제 목업 명령 검증, 두 크기·글자 100/130%, `docs/screenshots/batch-bale`). 전체 글 검사에도 새 화면을 포함한다.
+
+## 7단위 KPI 상세
+- 두 홈의 세 KPI는 `HomePage`가 제공하는 `KpiDetailContext`로 같은 `KpiDetail`을 연다. studio는 features를 import하지 않는다. 폰은 하단 시트, 640px 이상은 대화상자. 열린 동안 뒤의 3D 그리기는 멈춘다.
+- `GET /plant/kpi-history`: 현지 자정 기준 오늘·7일·30일, 구간 생산량·수분 목표 범위·가동/정지 분·통계는 모두 서버 값. 기존 추이선 API는 그대로 둔다.
+- 요청 취소로 기간 전환의 응답 역전을 방지한다. 끊기면 현재값은 “–”, 받은 이력과 마지막 갱신은 유지, 재연결 시 다시 조회한다.
+- 재현: `node app/scripts/kpiDetails.mjs`. 360/390/820px·글자 100/130%, 두 홈, 세 기간, 오류 재시도·초점 복귀·끊김 및 API 검증. 스크린샷은 `docs/screenshots/kpi-detail`. 전체 글 검사에도 포함한다.

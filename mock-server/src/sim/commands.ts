@@ -68,7 +68,7 @@ export function conflictReason(deviceId: DeviceId, command: Command): string | u
       case 'stop':
         return r.status === 'stopped' ? '이미 정지 상태입니다.' : undefined;
       case 'set_mode':
-        return r.mode === command.mode ? '이미 해당 모드입니다.' : undefined;
+        return r.mode === command.mode && (command.mode !== 'auto_pinned' || (r.pinnedSectors.length === command.pinnedSectors.length && r.pinnedSectors.every(id => command.pinnedSectors.includes(id)))) ? '이미 해당 모드와 지정 섹터입니다.' : undefined;
       case 'pick_from':
         if (r.mode !== 'manual') return '수동 모드에서만 사용할 수 있습니다.';
         if (r.status !== 'running') return '로봇이 작동 중일 때만 사용할 수 있습니다.';
@@ -158,7 +158,10 @@ async function execute({ deviceId, command, userId }: CommandRecord): Promise<Ou
     }
 
     case 'set_mode': {
+      const reason = conflictReason(deviceId, command);
+      if (reason) return { status: 'rejected', reason };
       robot().mode = command.mode;
+      robot().pinnedSectors = command.mode === 'auto_pinned' ? [...command.pinnedSectors] : [];
       publishDevice(robot(), true);
       return { status: 'completed', reason: null };
     }

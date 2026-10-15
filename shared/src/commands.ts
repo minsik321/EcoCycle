@@ -1,6 +1,5 @@
 import type { DeviceType, TankId } from './ids';
 import type { Permission } from './auth';
-import type { RobotMode } from './robot';
 
 /** 명령 처리 상태. `rejected`와 `failed`에는 reason이 따른다. */
 export const COMMAND_STATUSES = ['accepted', 'rejected', 'completed', 'failed'] as const;
@@ -19,7 +18,7 @@ export type BatchCommand =
 export type Command =
   | BatchCommand
   | { type: 'start' | 'pause' | 'resume' | 'stop' }
-  | { type: 'set_mode'; mode: RobotMode; confirm: true }
+  | { type: 'set_mode'; confirm: true } & ({ mode: 'auto' | 'manual'; pinnedSectors?: never } | { mode: 'auto_pinned'; pinnedSectors: TankId[] })
   | { type: 'pick_from'; tankId: TankId; confirm: true }
   | { type: 'update_setting'; key: string; value: string | number | boolean; confirm: true }
   | { type: 'ack_alarm'; alarmId: string };

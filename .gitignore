@@ -19,3 +19,6 @@ Thumbs.db
 # 글 줄바꿈 점검(npm run test:text)이 실패한 화면
 app/scripts/.textcheck/
 app/scripts/.loadtime/
+
+# 로컬 개발 서버 로그
+dev-server.*.log

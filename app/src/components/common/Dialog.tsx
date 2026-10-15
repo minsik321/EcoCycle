@@ -13,7 +13,7 @@ export interface DialogProps {
   /** 하단 버튼 영역 */
   actions?: ReactNode;
   /** md: 확인 대화상자 크기, xl: 영상처럼 넓은 내용 */
-  size?: 'md' | 'xl';
+  size?: 'md' | 'xl' | 'sheet';
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -61,7 +61,7 @@ export function Dialog({ open, title, onClose, dismissible = true, children, act
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+      className={`fixed inset-0 z-50 flex justify-center bg-ink/40 ${size === 'sheet' ? 'items-end sm:items-center sm:p-6' : 'items-center p-4'}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && dismissible) onClose();
       }}
@@ -73,7 +73,7 @@ export function Dialog({ open, title, onClose, dismissible = true, children, act
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className={`w-full ${size === 'xl' ? 'max-w-4xl' : 'max-w-md'} rounded-panel bg-surface p-6 shadow-soft-3 outline-none`}
+        className={`w-full ${size === 'sheet' ? 'max-w-2xl max-h-[90dvh] overflow-y-auto rounded-t-panel p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-panel sm:p-6' : `${size === 'xl' ? 'max-w-4xl' : 'max-w-md'} rounded-panel p-6`} bg-surface shadow-soft-3 outline-none`}
       >
         <h2 id={titleId} className="mb-2 text-lg font-bold text-ink">
           {title}

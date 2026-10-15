@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { KpiDetailContext } from '../../components/charts/KpiDetailContext';
 import type { MutableRefObject, ReactNode } from 'react';
 import { DEVICE_IDS, TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, DeviceState, DeviceStatus, PlantMetric, Vehicle } from '@ecocycle/shared';
@@ -407,22 +408,24 @@ const KPIS: Array<{ metric: PlantMetric; label: string; unit: string; digits: nu
 ];
 
 export function Kpis({ data, disconnected }: Pick<PanelCommon, 'data' | 'disconnected'>) {
+  const openKpi = useContext(KpiDetailContext);
   return (
     <div className="st-kpis">
       {KPIS.map(({ metric, label, unit, digits, icon }) => {
         const value = data.summary?.[metric];
         return (
-          <section key={metric} className={`st-glass st-kpi${disconnected ? ' st-stale' : ''}`} aria-label={label}>
+          <section key={metric} style={{ position: 'relative' }} className={`st-glass st-kpi${disconnected ? ' st-stale' : ''}`} aria-label={label}>
+            <button type="button" aria-label={`${label} 상세 보기`} onClick={() => openKpi(metric)} style={{ position: 'absolute', inset: 0, zIndex: 1, minHeight: 48, borderRadius: 'inherit' }} />
             <span className="st-kpi-icon">
               <Icon name={icon} size={17} />
             </span>
             <div className="st-kpi-body">
               <p className="st-kpi-label">{label}</p>
               <p className="st-kpi-value">
-                {value === undefined ? '–' : value.toFixed(digits)}
+                {disconnected || value === undefined ? '–' : value.toFixed(digits)}
                 <span>{unit}</span>
               </p>
-              <p className="st-kpi-note">{disconnected ? '마지막 값' : '최근 24시간'}</p>
+              <p className="st-kpi-note">{disconnected ? '연결 끊김' : '최근 24시간'}</p>
             </div>
             <Spark values={data.trends[metric]} />
           </section>

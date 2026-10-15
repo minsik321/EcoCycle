@@ -1,4 +1,5 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { RecordPage, RecordQuery } from '@ecocycle/shared';
@@ -80,6 +81,29 @@ describe('기록 기간 계산', () => {
 });
 
 describe('RecordList', () => {
+  it('새 기록 알림은 현재 쪽을 유지하고 조회 끝을 현재까지 넓힌다', async () => {
+    const load = fakeLoad(rows(23));
+    let clock = NOW;
+    function UpdatingRecords() {
+      const [revision, setRevision] = useState(0);
+      return <>
+        <button onClick={() => setRevision(n => n + 1)}>새 기록 수신</button>
+        <RecordList<Row> label="집기 기록" load={load} rowKey={r => r.id} time={r => r.ts}
+          title={r => r.plate} detail={r => r.note} columns={[]} compactTime
+          now={() => clock} refreshToken={String(revision)} />
+      </>;
+    }
+    renderWithStore(<UpdatingRecords />);
+    const pager = await screen.findByRole('navigation', { name: '쪽 이동' });
+    expect(within(screen.getByRole('table')).getAllByRole('row')[1]).toHaveTextContent('14:30');
+    expect(within(screen.getByRole('table')).getAllByRole('row')[1]).not.toHaveTextContent('10. 15.');
+    await userEvent.click(within(pager).getByRole('button', { name: '2쪽' }));
+    await waitFor(() => expect(lastQuery(load).page).toBe(2));
+    clock = new Date(NOW.getTime() + 60_000);
+    await userEvent.click(screen.getByRole('button', { name: '새 기록 수신' }));
+    await waitFor(() => expect(lastQuery(load)).toMatchObject({ page: 2, to: clock.toISOString(), from: new Date(2026, 9, 15).toISOString() }));
+  });
+
   it('처음에는 오늘의 첫 쪽을 10줄로 요청하고 UTC ISO 시각을 보낸다', async () => {
     const load = fakeLoad(rows(23));
     list(load);

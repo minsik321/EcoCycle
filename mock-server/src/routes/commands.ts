@@ -57,7 +57,15 @@ function parseCommand(type: CommandType, body: Record<string, unknown>, deviceId
       if (typeof mode !== 'string' || !(ROBOT_MODES as readonly string[]).includes(mode)) {
         return { error: `mode는 ${ROBOT_MODES.join(' 또는 ')}여야 합니다.` };
       }
-      return { command: { type, mode: mode as (typeof ROBOT_MODES)[number], confirm: true } };
+      if (mode === 'auto_pinned') {
+        const pins = body.pinnedSectors;
+        if (!Array.isArray(pins) || !pins.length || pins.length > TANK_IDS.length || new Set(pins).size !== pins.length || !pins.every(id => TANK_IDS.includes(id))) {
+          return { error: '지정 섹터는 중복 없는 유효 섹터 1~4개여야 합니다.' };
+        }
+        return { command: { type, mode, pinnedSectors: pins, confirm: true } };
+      }
+      if (body.pinnedSectors !== undefined) return { error: '섹터 지정 자동에서만 pinnedSectors를 보냅니다.' };
+      return { command: { type, mode: mode as 'auto' | 'manual', confirm: true } };
     }
     case 'pick_from': {
       const tankId = body.tankId;

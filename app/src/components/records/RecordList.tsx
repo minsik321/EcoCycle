@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { RECORD_PAGE_SIZE, recordPageCount } from '@ecocycle/shared';
 import type { IsoTimestamp, RecordPage, RecordQuery } from '@ecocycle/shared';
-import { RECORD_LIST, RECORD_RANGES, formatLocalTime } from '../../config/display';
+import { RECORD_LIST, RECORD_RANGES, formatLocalClock, formatLocalTime } from '../../config/display';
 import type { RecordRangeKey } from '../../config/display';
 import { useAppSelector } from '../../store/hooks';
 import { selectConnection, selectIsDisconnected } from '../../store/selectors';
@@ -33,6 +33,8 @@ export interface RecordListProps<T> {
   columns: readonly Column<T>[];
   /** 맨 앞 시각 칸의 머리글 (기본 "시각", 예: "입차") */
   timeHeader?: string;
+  /** 짧은 기록의 시각은 오늘이면 시:분만 표시한다. */
+  compactTime?: boolean;
   /** 표의 칸 여백을 줄인다 (칸이 많은 목록) */
   dense?: boolean;
   /** 줄을 누르면 부른다 (상세 화면으로 가기). 주면 폰 줄과 표 줄이 모두 눌린다 */
@@ -53,7 +55,7 @@ type LoadState<T> = { status: 'loading'; data: RecordPage<T> | null } | { status
  * 쪽은 서버가 나눈다(`GET .../records?from&to&page&pageSize`, shared/records.ts). 시각은 UTC로 보내고 현지 시각으로 적는다.
  * 지난 기록이라 연결이 끊겨도 받은 줄은 그대로 두고 끊김과 마지막 수신 시각을 알리며, 다시 연결되면 같은 쪽을 새로 받는다.
  */
-export function RecordList<T>({ label, load, rowKey, time, title, detail, extra, columns, timeHeader = '시각', dense = false, onOpen, initialRange = RECORD_LIST.defaultRange, now = () => new Date(), className = '', refreshToken = '' }: RecordListProps<T>) {
+export function RecordList<T>({ label, load, rowKey, time, title, detail, extra, columns, timeHeader = '시각', compactTime = false, dense = false, onOpen, initialRange = RECORD_LIST.defaultRange, now = () => new Date(), className = '', refreshToken = '' }: RecordListProps<T>) {
   const nowRef = useRef(now);
   nowRef.current = now;
   const loadRef = useRef(load);
@@ -96,7 +98,16 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, extra,
       },
     );
     return () => controller.abort();
-  }, [range, page, attempt, refreshToken]);
+  }, [range, page, attempt]);
+
+  // 새 사건은 현재 쪽을 유지하되 "오늘/최근 7일"의 끝을 지금까지 넓혀 받는다.
+  const lastRefreshToken = useRef(refreshToken);
+  useEffect(() => {
+    if (lastRefreshToken.current === refreshToken) return;
+    lastRefreshToken.current = refreshToken;
+    if (rangeKey !== 'custom') setRange(presetRange(rangeKey, nowRef.current()));
+    else setAttempt(n => n + 1);
+  }, [refreshToken, rangeKey]);
 
   // 다시 연결되면 같은 쪽을 새로 받는다 (정해 둔 기간은 지금 시각으로 다시 계산)
   const wasDisconnected = useRef(disconnected);
@@ -131,7 +142,8 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, extra,
   const data = state.data;
   const pages = data ? recordPageCount(data.total, data.pageSize) : 0;
   const busy = state.status === 'loading';
-  const tableColumns: Column<T>[] = [{ key: '__time', header: timeHeader, cell: (item) => <time dateTime={time(item)} className="tabular-nums">{formatLocalTime(time(item), false)}</time> }, ...columns];
+  const timeText = (item: T) => compactTime ? formatLocalClock(time(item), false, nowRef.current()) : formatLocalTime(time(item), false);
+  const tableColumns: Column<T>[] = [{ key: '__time', header: timeHeader, cell: (item) => <time dateTime={time(item)} className="tabular-nums">{timeText(item)}</time> }, ...columns];
 
   return (
     <section aria-label={label} aria-busy={busy || undefined} className={`flex flex-col gap-3 ${className}`}>
@@ -178,7 +190,7 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, extra,
                   <div className="flex items-baseline gap-2">
                     <span className="min-w-0 flex-1 truncate font-semibold text-ink">{title(item)}</span>
                     <time dateTime={time(item)} className="shrink-0 text-xs whitespace-nowrap text-ink-faint tabular-nums">
-                      {formatLocalTime(time(item), false)}
+                      {timeText(item)}
                     </time>
                   </div>
                   <p className="truncate text-sm text-ink-soft">{detail(item)}</p>

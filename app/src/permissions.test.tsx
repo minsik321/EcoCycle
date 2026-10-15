@@ -179,10 +179,12 @@ describe.each(ROLES)('역할 %s', (role) => {
     const quick = within(controls).queryByRole('button', { name: '일시정지' });
     const mode = within(controls).queryByRole('button', { name: '자동 모드로 전환' });
     const pick = within(controls).queryByRole('button', { name: '섹터 지정 집기' });
+    const pinned = within(controls).queryByRole('button', { name: '자동 · 섹터 지정 적용' });
 
     if (!m.quick) {
       // 열람자: 조작 영역에 버튼이 하나도 없다
       expect(within(controls).queryAllByRole('button')).toHaveLength(0);
+      expect(pinned).not.toBeInTheDocument();
     } else {
       expect(quick).toBeEnabled();
       if (m.danger) {
@@ -192,6 +194,7 @@ describe.each(ROLES)('역할 %s', (role) => {
         // 작업자: 보이지만 비활성이고 이유가 있다
         expect(mode).toBeDisabled();
         expect(pick).toBeDisabled();
+        expect(pinned).toBeDisabled();
         expect(within(controls).getAllByText('권한이 없습니다').length).toBeGreaterThanOrEqual(2);
       }
     }

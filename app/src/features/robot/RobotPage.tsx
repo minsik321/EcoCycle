@@ -10,12 +10,13 @@ import { useAppSelector } from '../../store/hooks';
 import { selectDevice } from '../../store/selectors';
 import { useRobotJointsSubscription } from '../../store/useRealtime';
 import { DeviceAlarmHistory } from '../history/DeviceAlarmHistory';
+import { PickRecords } from './PickRecords';
 import { JointTable } from './JointTable';
 
-function Fact({ label, value, dim }: { label: string; value: string; dim: boolean }) {
+function Fact({ label, value, dim, className }: { label: string; value: string; dim: boolean; className?: string }) {
   return (
-    <Card title={label}>
-      <p className={`text-xl font-bold ${dim ? 'text-slate-400' : 'text-slate-900'}`}>{value}</p>
+    <Card title={label} className={className}>
+      <p className={`text-xl font-bold ${dim ? 'text-ink-faint' : 'text-ink'}`}>{value}</p>
     </Card>
   );
 }
@@ -38,27 +39,27 @@ export function RobotPage() {
         <h1 className="text-xl font-bold">{DEVICE_NAMES['robot-1']}</h1>
         {r && <StatusBadge status={tone} label={disconnected ? undefined : ROBOT_STATUS_TEXT[r.status]} />}
         {r && (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-ink-faint">
             {disconnected ? '마지막으로 받은 값 · ' : ''}마지막 갱신 <Timestamp iso={r.updatedAt} />
           </span>
         )}
       </div>
 
       {!r ? (
-        <p role="status" className="text-slate-500">
+        <p role="status" className="text-ink-faint">
           로봇 상태를 불러오는 중…
         </p>
       ) : (
-        <section aria-label="현재 상태" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Fact label="모드" value={ROBOT_MODE_TEXT[r.mode]} dim={disconnected} />
-          <Fact label="동작 단계" value={PHASE_STEPS.find((s) => s.phase === r.phase)?.label ?? '대기'} dim={disconnected} />
-          <Fact label="작업 중 섹터" value={r.targetTankId ? DEVICE_NAMES[r.targetTankId] : '없음'} dim={disconnected} />
+        <section aria-label="현재 상태" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Fact label="모드" value={disconnected ? '–' : ROBOT_MODE_TEXT[r.mode]} dim={disconnected} className="sm:col-span-2" />
+          <Fact label="동작 단계" value={disconnected ? '–' : PHASE_STEPS.find((s) => s.phase === r.phase)?.label ?? '대기'} dim={disconnected} />
+          <Fact label="작업 중 섹터" value={disconnected ? '–' : r.targetTankId ? DEVICE_NAMES[r.targetTankId] : '없음'} dim={disconnected} />
         </section>
       )}
 
       <Card title="조작" aria-label="조작">
         <DeviceControls deviceId="robot-1" context="page" />
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-ink-faint">
           정지는 일반 정지이며 안전 장치가 아닙니다. 비상정지는 현장의 물리 버튼과 안전 장치가 맡습니다.
         </p>
       </Card>
@@ -78,6 +79,7 @@ export function RobotPage() {
           사이클 횟수와 평균 시간은 서버가 값을 제공해야 표시할 수 있습니다. 현재 API 명세에는 이 값이 없어 서버 담당과 확인 중입니다.
         </p>
       </Card>
+      <PickRecords revision={r?.pickRecordsRevision ?? 0} />
     </div>
   );
 }

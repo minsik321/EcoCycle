@@ -142,6 +142,25 @@ async function run(browser) {
         await go(route);
         await page.waitForTimeout(1200);
         await check(page, name, zoom);
+        if (route === '/robot') {
+          await page.getByRole('button', { name: '수동 모드로 전환', exact: true }).click();
+          await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
+          await page.getByText('현재 모드:', { exact: false }).filter({ hasText: '수동' }).waitFor();
+          await page.getByLabel('집을 섹터').scrollIntoViewIfNeeded();
+          await check(page, '로봇 수동 집기 정렬', zoom);
+          await page.getByRole('checkbox', { name: '섹터 A1', exact: true }).check();
+          await page.getByRole('button', { name: '자동 · 섹터 지정 적용', exact: true }).click();
+          await check(page, '로봇 지정 자동 확인', zoom);
+          await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
+          await page.getByText('지정된 섹터:', { exact: false }).waitFor();
+          await page.getByLabel('조작', { exact: true }).scrollIntoViewIfNeeded();
+          await check(page, '로봇 지정 자동', zoom);
+          await page.getByRole('region', { name: '집기 기록', exact: true }).scrollIntoViewIfNeeded();
+          await check(page, '로봇 집기 기록', zoom);
+          await page.getByRole('button', { name: '자동 모드로 전환', exact: true }).click();
+          await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
+          await page.getByText('지정된 섹터:', { exact: false }).waitFor({ state: 'hidden' });
+        }
       }
       // 공정 기록: 차량·배치 탭과 각각의 상세 (첫 줄을 눌러 연다)
       for (const [tab, label, name] of [
@@ -187,6 +206,15 @@ async function run(browser) {
       await page.getByRole('region', { name: '상태 요약' }).waitFor();
       await page.waitForTimeout(800);
       await check(page, '대시보드', zoom);
+      for (const label of ['오늘 생산 베일', '평균 수분', '압축기 가동률']) {
+        await page.getByRole('button', { name: `${label} 상세 보기`, exact: true }).click();
+        await page.getByRole('dialog').getByText('마지막 갱신', { exact: false }).waitFor();
+        await check(page, `KPI 상세 ${label}`, zoom);
+        await page.getByRole('tab', { name: '30일', exact: true }).click();
+        await page.waitForTimeout(400);
+        await check(page, `KPI 30일 ${label}`, zoom);
+        await page.keyboard.press('Escape');
+      }
       await context.close();
     }
   }

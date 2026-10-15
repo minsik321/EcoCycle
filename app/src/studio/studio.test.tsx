@@ -297,7 +297,11 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
     expect(screen.getByLabelText('압축기 연결 끊김')).toBeInTheDocument();
     expect(screen.getByLabelText('섹터 A1 연결 끊김')).toBeInTheDocument();
     expect(screen.getByText('시스템 연결 끊김')).toBeInTheDocument();
-    expect(screen.getAllByText('마지막 값')).toHaveLength(3);
+    for (const label of ['오늘 생산 베일', '평균 수분', '압축기 가동률']) {
+      const kpi = within(screen.getByRole('region', { name: label }));
+      expect(kpi.getByText('연결 끊김')).toBeInTheDocument();
+      expect(kpi.getByText('–')).toBeInTheDocument();
+    }
     // 공정 추적도 진행 중인 것처럼 보이지 않는다
     expect(within(screen.getByRole('region', { name: '공정 추적' })).queryByText('진행 중')).not.toBeInTheDocument();
   });

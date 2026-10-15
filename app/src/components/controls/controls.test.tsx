@@ -125,6 +125,34 @@ describe('DeviceControls: 낮은 위험 조작 보내기', () => {
 });
 
 describe('DeviceControls: 위험 조작은 확인 단계를 거친다', () => {
+  it('섹터 지정 자동: 빈 선택은 차단하고 선택·확인 후에만 지정 명령을 보낸다', async () => {
+    const { store } = renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()], me: ADMIN });
+    expect(screen.getByRole('button', { name: '자동 · 섹터 지정 적용' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('checkbox', { name: '섹터 A1' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: '섹터 B1' }));
+    await userEvent.click(screen.getByRole('button', { name: '자동 · 섹터 지정 적용' }));
+    expect(within(screen.getByRole('dialog')).getByText(/섹터 A1, 섹터 B1/)).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: '자동 · 섹터 지정 적용' }));
+    await userEvent.click(screen.getByRole('button', { name: '실행' }));
+    expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['tank-a1', 'tank-b1'], confirm: true });
+    await screen.findByRole('button', { name: '자동 · 섹터 지정 적용 처리 중' });
+    finish(store, 'cmd-1');
+  });
+
+  it('지정 상태를 표시하고 일반 자동 복귀는 지정 없는 명령으로 확인한다', async () => {
+    const { store } = renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['tank-b2'] })], me: ADMIN });
+    expect(screen.getByRole('status')).toHaveTextContent('지정된 섹터: 섹터 B2');
+    expect(screen.getByRole('button', { name: '섹터 지정 집기' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: '자동 모드로 전환' }));
+    await userEvent.click(screen.getByRole('button', { name: '실행' }));
+    expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'set_mode', mode: 'auto', confirm: true });
+    await screen.findByRole('button', { name: '자동 모드로 전환 처리 중' });
+    finish(store, 'cmd-1');
+  });
+
   it('모드 전환: 확인하기 전에는 보내지 않고, 취소하면 보내지 않는다', async () => {
     renderWithStore(<DeviceControls deviceId="robot-1" context="page" />, { devices: [robotState()], me: ADMIN });
 

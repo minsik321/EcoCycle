@@ -367,7 +367,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | --- | --- | --- | --- | --- |
 | `start`, `pause`, `resume` | 로봇·컨베이어·압축기 | 낮음 (홈에서 가능) | `robot.control` | 없음 |
 | `stop` | 로봇·컨베이어·압축기 | 낮음 (홈에서 가능) | `robot.control` | 없음 |
-| `set_mode` | 로봇 | 높음 (기기 페이지에서만) | `robot.manual` | `mode`: `auto` 또는 `manual`, `confirm: true` |
+| `set_mode` | 로봇 | 높음 (기기 페이지에서만) | `robot.manual` | `mode`: `auto`, `manual`, `auto_pinned`; 지정 자동은 `pinnedSectors` 1개 이상, `confirm: true` |
 | `pick_from` | 로봇 (수동 모드에서만) | 높음 (기기 페이지에서만) | `robot.manual` | `tankId`, `confirm: true` |
 | `update_setting` | 전체 기기 | 높음 (기기 페이지에서만) | `settings.write` | `key`, `value`, `confirm: true` |
 | `ack_alarm` | 알람 | 낮음 | `alarm.ack` | `alarmId` |
@@ -419,6 +419,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | --- | --- |
 | GET `/process/state` | 공정 흐름 현재 상태: 진행 중인 차량·배치·베일과 최근 목록(표·검색용, 종류별 최근 20건 가정) |
 | GET `/plant/history?metric=...&from=...&to=...&interval=...` | 요약 값의 이력(지표 카드의 작은 추이선용). 응답은 기기 이력과 같은 `points: [{ts, value}]` |
+| GET `/plant/kpi-history?metric=...&range=today\|7d\|30d&timeZone=Asia/Seoul` | 7단위 KPI 상세(제안안): metric은 기존 세 지표. 오늘은 현지 자정부터 시간별, 7일·30일은 오늘 포함 일별. `{metric, range, from, to, interval, points:[{ts,value,runningMinutes?,stoppedMinutes?}], statistics:{current,average,min,max}, targetBand:{min,max}\|null, updatedAt}`. 생산량은 누적이 아닌 구간 생산 개수, current는 홈 현재값. 통계·목표 범위·가동/정지 분은 서버 집계. 잘못된 metric·range·IANA timeZone은 422. 인증 필요. 목업은 지난 30일을 생성하며 생산량은 야간·휴일 감소, 수분 변동, 정기 정지를 반영한다. |
 
 실시간은 구독 주제 `process`를 추가하고 메시지 세 가지를 받는다.
 
@@ -580,3 +581,12 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 시안 이미지와 실제 구현의 차이 | 이미지 생성 시안은 배치와 분위기 참고용이며 깨진 글자는 실제 구현에서 정확히 넣는다. 대표님께는 실제로 돌아가는 시안을 보여 기대를 맞춘다. |
 | 현장 밖 접속과 원격 수동 조작 | 로그인만으로 보호하면 보안 수준이 서버 설정에 달려 있다. HTTPS, 로그인 시도 제한, 접속·조작 기록, 요청마다 권한 검증, 위험 명령 재인증을 서버 담당과 합의하고 VPN 병행은 열어 둔다. 물리 비상정지와 안전 인터록은 앱·네트워크와 무관하게 동작해야 한다. |
 | 확인 전 가정으로 개발 | 프로토타입 가정 표를 시안과 함께 전달해 어긋난 부분을 일찍 찾는다. 가정에 의존하는 값(권한 종류, 기준값, 조작 목록)은 설정으로 분리해 쉽게 바꾼다. |
+
+
+### 로봇팔 6단위: 섹터 지정 자동 및 집기 기록
+- `auto`는 배치 계획을 따르고 `manual`은 `pick_from` 한 번에 한 사이클만 실행한다. `auto_pinned`(자동 · 섹터 지정)은 배합 순서 대신 지정한 섹터만 순환한다. 배합 가능한 배치가 없거나 일시정지되면 대기하며 제외·빈 섹터는 건너뛴다.
+- 예: `{ "type": "set_mode", "mode": "auto_pinned", "pinnedSectors": ["tank-a1", "tank-b1"], "confirm": true }`. 섹터는 중복 없는 유효 ID 1~4개(위반 422). 다른 모드에는 pinnedSectors를 보내지 않는다. 같은 지정 모드에서 섹터 변경 가능. `auto`·`manual` 전환은 지정을 해제한다.
+- 기존 `robot.manual` 권한·높은 위험도·기기 페이지 확인 단계를 적용한다(현재 가정: 관리자 허용, 작업자·열람자 403). 기존 202 → command.result/GET 결과 흐름과 멱등 키를 사용하며 실행 시 상태도 다시 검사한다.
+- 로봇 상태에 `pinnedSectors: TankId[]`, `pickRecordsRevision: number`를 추가한다. 지정 모드 외에는 빈 배열. 화면은 서버 확정값과 편집 초안을 구분하고 적용된 섹터·다음 사이클부터 적용·일반 자동 복귀를 안내한다. 진행 중 사이클은 시작 당시 모드·섹터로 마친다.
+- `GET /robots/robot-1/picks/records?from&to&page&pageSize` → 공통 `RecordPage<PickRecord>`. 필드: `id`, `pickedAt`(놓기 완료 UTC), `mode`(사이클 시작 당시), `sectorId`, `volumeM3`(실제 집은 부피), `conveyorId`(`conveyor-z`), `batchId`(투입 배치, 없으면 null). 성공적으로 놓은 건만 저장한다. 사이클 시작 때 배치를 기억하고 도중에 건너뛴 배치는 다른 배치로 귀속하지 않는다.
+- 페이지 맨 아래 별도 RecordList로 시각·모드·섹터·m³·컨베이어 → 배치 ID를 표시한다. 기존 사이클 통계는 그대로 유지한다. 새 기록 revision으로 같은 기간·쪽을 갱신하고 연결 끊김 시 받은 줄을 유지한다.

@@ -34,6 +34,7 @@ components/
 - 폰은 기간 버튼 2×2(글자 130%에서도 한 줄), 쪽 번호는 지금 쪽 앞뒤 3개, md 이상은 한 줄·5개.
 - 선택: `timeHeader`(시각 칸 머리글), `extra`(폰 줄의 둘째 설명 줄), `dense`(표 칸 여백을 줄여 칸이 많은 목록이 820px에 들어가게), `onOpen`(줄을 누르면 부름: 폰 줄은 버튼, 표 줄은 `DataTable.onRowClick`). 공정 기록이 쓴다.
 - 미리 보기: `/design/records`(예시 값, `?empty=1`, `?offline=1`).
+- 짧은 기록은 `compactTime`으로 오늘의 시각을 시:분만 표시한다. 로봇 집기 기록이 사용한다.
 
 ## 기기 페이지 틀 (`device/`)
 
@@ -71,3 +72,4 @@ components/
 - 터치 대상 최소 48dp, 호버 의존 금지.
 - 컴포넌트는 props와 선택자로만 데이터를 받는다. API를 직접 호출하지 않고, 명령은 `api/commands`를 쓰는 훅을 통해 보낸다.
 - 차트는 Recharts로 통일한다. `HistoryChart`는 받은 점만 그리는 표시 전용이고, 구간 이동·요청은 `features`의 `useHistoryWindow`가 맡는다(규칙은 `features/CLAUDE.md`의 이력 그래프 절). 홈 3D 장면과 같은 화면에서는 차트 애니메이션을 끈다.
+- `KpiHistoryChart`는 KPI 서버 응답의 구간별 막대·수분 선/목표 밴드·가동/정지 막대를 그리는 표시 전용이다(`/design`에서 세 종류 미리 보기). `Dialog size="sheet"`는 폰 하단 시트·큰 화면 중앙 대화상자이며, KPI 카드의 선택적 `onClick`은 접근 가능한 전체 카드 버튼을 제공한다.

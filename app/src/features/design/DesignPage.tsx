@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import type { PlantMetric } from '@ecocycle/shared';
+import { KpiHistoryChart } from '../../components/charts/KpiHistoryChart';
+import { KPI_DISPLAY } from '../../config/kpi';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { DataTable } from '../../components/common/DataTable';
@@ -73,6 +76,13 @@ export function DesignPage() {
         </Card>
 
         {/* 유리 패널은 뒤에 무언가 있어야 보인다. 장면 대신 색 띠를 깔아 화질 단계별 차이를 확인한다. */}
+        <Card>
+          <h2 className="mb-4 font-semibold">KPI 상세 차트 · 예시 데이터</h2>
+          {(Object.keys(KPI_DISPLAY) as PlantMetric[]).map(metric => <section key={metric} aria-label={KPI_DISPLAY[metric].label} className="mb-6">
+            <h3 className="mb-2 text-sm">{KPI_DISPLAY[metric].label}</h3>
+            <KpiHistoryChart history={{ metric, range: 'today', interval: '1h', from: '2026-10-15T00:00:00Z', to: '2026-10-15T05:00:00Z', updatedAt: '2026-10-15T05:00:00Z', statistics: { current: 12, average: 11, min: 10, max: 14 }, targetBand: metric === 'averageMoisturePercent' ? { min: 10, max: 14 } : null, points: [10, 12, 11, 14, 12, 13].map((value, i) => ({ ts: `2026-10-15T0${i}:00:00Z`, value: metric === 'compressorUptimePercent' ? value * 6 : value, runningMinutes: value * 3.6, stoppedMinutes: 60 - value * 3.6 })) }} />
+          </section>)}
+        </Card>
         <section
           aria-label="유리 패널"
           className="relative overflow-hidden rounded-panel p-5"

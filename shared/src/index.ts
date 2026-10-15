@@ -11,3 +11,4 @@ export * from './cameras';
 export * from './errors';
 export * from './commands';
 export * from './ws';
+export * from './kpi';

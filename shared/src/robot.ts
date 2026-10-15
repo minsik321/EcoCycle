@@ -6,7 +6,7 @@ export type Phase = (typeof PHASES)[number];
 export const ROBOT_STATUSES = ['idle', 'running', 'paused', 'stopped', 'error', 'offline'] as const;
 export type RobotStatus = (typeof ROBOT_STATUSES)[number];
 
-export const ROBOT_MODES = ['auto', 'manual'] as const;
+export const ROBOT_MODES = ['auto', 'manual', 'auto_pinned'] as const;
 export type RobotMode = (typeof ROBOT_MODES)[number];
 
 /**
@@ -29,4 +29,15 @@ export interface RobotModel {
   joints: RobotJointModel[];
   /** 링크 길이(m) */
   linkLengthsM: number[];
+}
+
+/** 컨베이어에 놓은 집기 기록. 양은 부피(m³). */
+export interface PickRecord {
+  id: string;
+  pickedAt: string;
+  mode: RobotMode;
+  sectorId: import('./ids').TankId;
+  volumeM3: number;
+  conveyorId: 'conveyor-z';
+  batchId: string | null;
 }

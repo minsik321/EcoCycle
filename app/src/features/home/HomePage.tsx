@@ -5,6 +5,9 @@ import { HomeSwitch } from './HomeSwitch';
 import { Dashboard } from './dashboard/Dashboard';
 import { POSTER, claimStudioFiles } from '../../studio/preload';
 import { supportsWebGL } from './sceneSupport';
+import type { PlantMetric } from '@ecocycle/shared';
+import { KpiDetailContext, KpiDetailOpenContext } from '../../components/charts/KpiDetailContext';
+import { KpiDetail } from './KpiDetail';
 
 // 3D 홈(studio)은 3D를 고를 때만 불러온다. 대시보드만 쓰는 기기는 three.js를 내려받지 않는다.
 // 이 조각(패널)은 작고 three가 없다. three.js와 장면은 그 안에서 한 번 더 나눠 받는다(studio/StudioScene)
@@ -16,6 +19,16 @@ const LiveStudio = lazy(() => import('../../studio').then((m) => ({ default: m.L
  * 기억한 값은 그대로 두고 대시보드로 보여 주며 짧게 알린다.
  */
 export function HomePage() {
+  const [metric, setMetric] = useState<PlantMetric | null>(null);
+  return <KpiDetailContext.Provider value={setMetric}>
+    <KpiDetailOpenContext.Provider value={metric !== null}>
+    <HomeContent />
+    {metric && <KpiDetail key={metric} metric={metric} onClose={() => setMetric(null)} />}
+    </KpiDetailOpenContext.Provider>
+  </KpiDetailContext.Provider>;
+}
+
+function HomeContent() {
   const dispatch = useAppDispatch();
   const mode = useAppSelector((state) => state.ui.homeMode);
   const [failed, setFailed] = useState(false);

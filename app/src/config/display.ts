@@ -39,6 +39,7 @@ export const ROBOT_STATUS_TONE: Record<RobotStatus, DeviceStatus> = {
 export const ROBOT_MODE_TEXT: Record<RobotMode, string> = {
   auto: '자동',
   manual: '수동',
+  auto_pinned: '자동 · 섹터 지정',
 };
 
 // 권한 종류는 대표님과 확정 전이다 (docs/questions.md A4). 표시 이름만 둔다. 화면 분기에는 쓰지 않는다.
@@ -76,6 +77,8 @@ const integer = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 });
 
 export const formatPercent = (value: number): string => `${oneDecimal.format(value)}%`;
 export const formatVolumeM3 = (value: number): string => `${oneDecimal.format(value)} m³`;
+const pickVolume = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 3 });
+export const formatPickVolumeM3 = (value: number): string => `${pickVolume.format(value)} m³`;
 export const formatPressureMpa = (value: number): string => `${oneDecimal.format(value)} MPa`;
 export const formatTemperatureC = (value: number): string => `${oneDecimal.format(value)} °C`;
 export const formatAngleDeg = (value: number): string => `${oneDecimal.format(value)}°`;
@@ -181,7 +184,7 @@ export const HISTORY_EMPTY_TEXT = '이 구간에는 기록된 값이 없습니�
 export const PERMISSION_TEXT: Record<Permission, string> = {
   'batch.control': '배치 수동 제어',
   'robot.control': '시작·일시정지·재개·정지',
-  'robot.manual': '수동 모드, 섹터 지정 집기',
+  'robot.manual': '모드 전환·자동 섹터 지정·수동 집기',
   'settings.write': '설정값 변경',
   'alarm.ack': '알람 확인 처리',
 };
