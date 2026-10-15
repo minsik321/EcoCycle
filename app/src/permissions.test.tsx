@@ -30,6 +30,7 @@ vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
   getHistory: vi.fn(),
   getAlarms: vi.fn(),
+  getRecords: vi.fn(),
   getRobotModel: vi.fn(),
   sendCommand: vi.fn(),
   logout: vi.fn(async () => undefined),
@@ -60,6 +61,7 @@ const openAlarm: Alarm = { id: 'al-1', level: 'caution', deviceId: 'tank-a1', me
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.getAlarms).mockResolvedValue([]);
+  vi.mocked(api.getRecords).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 10 });
   vi.mocked(api.getRobotModel).mockRejectedValue(new api.ApiError(503, 'X', ''));
   vi.mocked(api.getHistory).mockImplementation(async (q) => ({
     deviceId: q.deviceId,
@@ -221,6 +223,8 @@ describe.each(ROLES)('역할 %s', (role) => {
       route: kind === '탱크' ? '/tanks/tank-a1' : '/',
       devices: [tankState(), conveyorState(), { id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 28, temperatureC: 40, updatedAt: NOW }],
     });
+    // 섹터 페이지는 설정이 "자세히" 안에 있다 (기기 페이지 틀)
+    if (kind === '탱크') act(() => screen.getByRole('button', { name: '자세히' }).click());
     const input = screen.getByLabelText(label);
     if (m.settings) expect(input).toBeEnabled();
     else expect(input).toBeDisabled();

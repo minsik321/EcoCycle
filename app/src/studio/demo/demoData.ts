@@ -136,6 +136,7 @@ export function demoData(startMs: number, tSec: number): StudioData {
       volumeM3: round1(fill * 0.08),
       capacityM3: 8,
       moisturePercent: round1(11 + (id.charCodeAt(6) % 4) * 0.5),
+      cautionThresholdPercent: 80,
       updatedAt: iso(now),
     };
   };

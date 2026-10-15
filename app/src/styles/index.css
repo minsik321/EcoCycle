@@ -29,7 +29,15 @@
   /* 장면과 맞춘 보조색: 파지(크라프트), 로봇·지게차(안전 노랑) */
   --color-kraft: #c9a26b;
   --color-kraft-soft: #f3e9d8;
+  --color-kraft-deep: #a37a45;
+  --color-kraft-light: #e0c393;
   --color-safety: #f5b301;
+
+  /* 섹터 그림(features/tank/SectorBin)의 콘크리트 벽: 윗면 → 안쪽 면 → 그늘진 면 순으로 어둡다 */
+  --color-concrete-top: #efede8;
+  --color-concrete: #d8d4cb;
+  --color-concrete-shade: #bfbab0;
+  --color-concrete-edge: #9f998e;
 
   /* 상태 색: 앱 전체에서 normal / caution / alarm / offline 네 가지만 쓴다.
      뜻이 있는 색이라 강조색과 섞어 쓰지 않는다. 색만으로 구분하지 않도록 화면에서는 기호·글자를 함께 쓴다. */

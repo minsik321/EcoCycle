@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | `auth/` | `/login` | 로그인, 로그아웃, 인증 필요 라우트 보호 |
 | `home/` | `/` | 맨 위 전환 "3D | 대시보드": 3D 홈(`studio`) 또는 3D 없는 대시보드 |
-| `tank/` | `/tanks`, `/tanks/:id` | 이력 그래프, 기준값 설정, 알람 이력 |
+| `tank/` | `/tanks`, `/tanks/:id` | 섹터(표시 이름, 코드·주소는 tank): 칸 그림 목록, 상세(칸 그림·주요 수치·지금/다음·자세히·하역 기록) |
 | `robot/` | `/robot` | 관절 값, 수동 조작, 오류 로그, 사이클 통계 |
 | `conveyor/` | `/conveyor` | 속도 설정, 이력 |
 | `compressor/` | `/compressor` | 압력·온도 그래프, 설정, 점검 이력 |
@@ -30,6 +30,7 @@
 - `home/SceneDemoPage.tsx`: 서버·로그인 없이 3D 홈만 보여 주는 시연·프레임 측정 화면(`/scene-demo`). 값은 예시이고 화면에 그렇게 표시한다. 이 주소를 열 때만 불러온다(lazy).
 - 3D 홈의 모양·배치 규칙은 `app/src/studio/CLAUDE.md`. 아래 home/ 규칙은 대시보드의 규칙이다.
 - 홈 주소에 `?demo=1`을 붙이면 서버 관절 값 대신 정해진 시연 동작을 보여 준다(명세의 최후 수단, "시연 동작" 표시).
+- `tank/`: `SectorBin`(칸 그림 SVG: 크라프트 더미가 적재율만큼, 서버 주의 기준선, 값이 바뀌면 `transform` 전환), `TankListPage`(폰 2개씩), `TankPage`(`DevicePage` 틀, 맨 아래 `SectorUnloads` = `RecordList`로 `GET /devices/{id}/unloads/records`), `sectorText`(그림 설명, 지금/다음 문장). 화면 글은 "섹터", 코드·주소·ID는 tank 그대로.
 추가된 폴더: `history/`(이력 그래프 패널·구간 훅·알람 이력 훅, 탱크·컨베이어·압축기 페이지가 공유), `devices/`(컨베이어·압축기 공통 페이지 틀).
 서버가 제공하지 않아 안내 문구만 둔 항목: 로봇팔 사이클 통계, 압축기 점검 이력, 설정의 현재값 (`docs/questions.md` B18, B21, B22).
 

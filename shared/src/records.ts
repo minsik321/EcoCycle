@@ -1,4 +1,5 @@
 import type { IsoTimestamp } from './common';
+import type { TankId } from './ids';
 
 /*
  * 기록 목록 (명세 6절 "기록 목록(페이지 나누기)").
@@ -38,4 +39,30 @@ export interface RecordPage<T> {
 /** 전체 쪽 수 (기록이 없으면 0) */
 export function recordPageCount(total: number, pageSize: number): number {
   return pageSize > 0 ? Math.ceil(total / pageSize) : 0;
+}
+
+/**
+ * 섹터 하역 기록 한 줄 — GET /devices/{tankId}/unloads/records (명세 6절 "기록 목록").
+ * 차량이 섹터에 하역하고 출차 계량을 마치면 한 줄이 생긴다. 기록 시각은 `unloadedAt`.
+ * 무게는 계중대 값(t)이고 세 값을 모두 둔다(명세 6절 "공통 규칙"의 양의 기준). 순중량은 서버가 계산한다.
+ * ⚠ 프론트 제안 형식이다 (`docs/questions.md` B30).
+ */
+export interface UnloadRecord {
+  id: string;
+  vehicleId: string;
+  sectorId: TankId;
+  plate: string;
+  companyName: string;
+  /** 하역 완료 시각 */
+  unloadedAt: IsoTimestamp;
+  /** 입차 총중량 t */
+  grossT: number;
+  /** 출차 공차 t */
+  tareT: number;
+  /** 순중량 t (grossT − tareT) */
+  netT: number;
+  /** 하역 직전 섹터 적재율 % */
+  fillBeforePercent: number;
+  /** 하역 직후 섹터 적재율 % */
+  fillAfterPercent: number;
 }

@@ -70,7 +70,7 @@ export const PHASE_STEPS: ReadonlyArray<{ key: string; label: string; phase: Pha
   { key: 'compress', label: '압축', phase: null },
 ];
 
-// 값 표시 형식: 단위는 %, m³, MPa, °C, 도. 무게는 쓰지 않는다.
+// 값 표시 형식: 단위는 %, m³, MPa, °C, 도. 무게(t)는 차량·하역 기록에만 쓴다 (명세 6절 "공통 규칙").
 const oneDecimal = new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const integer = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 });
 
@@ -80,6 +80,23 @@ export const formatPressureMpa = (value: number): string => `${oneDecimal.format
 export const formatTemperatureC = (value: number): string => `${oneDecimal.format(value)} °C`;
 export const formatAngleDeg = (value: number): string => `${oneDecimal.format(value)}°`;
 export const formatLoadPercent = (value: number): string => `${integer.format(value)}%`;
+const twoDecimals = new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** 계중대 무게 (차량·하역 기록에만). 계중대 눈금이 10 kg라 소수 둘째 자리까지 */
+export const formatWeightT = (value: number): string => `${twoDecimals.format(value)} t`;
+
+/**
+ * 하역 전후 적재율: "42% → 55%"와 "+13%p". 서버가 준 두 값을 정수로 적고 그 차이를 붙일 뿐이다.
+ * 차이는 반올림한 두 값의 차라서 화면에 적힌 숫자와 맞는다.
+ */
+export function formatFillChange(beforePercent: number, afterPercent: number): { range: string; delta: string } {
+  const before = Math.round(beforePercent);
+  const after = Math.round(afterPercent);
+  const diff = after - before;
+  return { range: `${before}% → ${after}%`, delta: `${diff > 0 ? '+' : diff < 0 ? '−' : '±'}${Math.abs(diff)}%p` };
+}
+
+/** 섹터 등급 표시 (등급 종류는 가정, docs/questions.md A8) */
+export const formatGrade = (grade: string): string => `${grade}등급`;
 
 /** ISO 8601 UTC 문자열을 현지 시각으로 (표시할 때만 변환한다). 잘못된 값이면 "-" */
 export function formatLocalTime(iso: string | null | undefined, withSeconds = true): string {

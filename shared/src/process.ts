@@ -6,7 +6,7 @@ import type { TankId } from './ids';
  * 번호판 → 회사 → 배정 섹터, 배합비, 목표 압력은 모두 서버가 정한다. 화면은 표시하고 움직임으로 옮기기만 한다.
  * 사건만 흘리지 않고 대상(차량·배치·베일)의 전체 상태를 `stage`와 함께 보낸다 (`device.state`와 같은 방식).
  * ⚠ 프론트 제안 형식이며 서버 담당과 합의 전이다 (`docs/questions.md` B23~B27).
- * 무게 필드는 없다.
+ * 실시간 메시지에는 무게 필드가 없다. 계중대 무게는 하역 기록(`UnloadRecord`, records.ts)으로 따로 받는다.
  */
 
 /** arrived(계중대 도착) → identified(번호판 인식) → unloading(하역 중) → unloaded(하역 완료) → departed(출차) */

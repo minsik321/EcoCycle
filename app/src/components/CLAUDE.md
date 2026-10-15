@@ -36,7 +36,7 @@ components/
 
 ## 기기 페이지 틀 (`device/`)
 
-- 모든 기기 페이지는 `DevicePage`에 다섯 조각(hero, tiles, now, actions, details)을 끼워 만든다. 폰은 한 줄(조작 줄은 주 메뉴 바로 위에 붙음), `md` 이상은 두 줄.
+- 모든 기기 페이지는 `DevicePage`에 다섯 조각(hero, tiles, now, actions, details)을 끼워 만든다. 지난 기록이 있으면 여섯째 `records`(맨 아래 폭 전체, 폰에서는 조작 줄 앞). 폰은 한 줄(조작 줄은 주 메뉴 바로 위에 붙음), `md` 이상은 두 줄.
 - 연결 끊김 처리는 조각들이 `useDeviceLive()`로 직접 한다: 값·하는 일·지금/다음은 "–", 상태 칩은 "연결 끊김", 마지막 수신 시각 표시, 그림 영역은 `data-frozen="true"`(CSS 움직임 정지, `styles/index.css`). 캔버스 그림은 `useDeviceLive().disconnected`를 보고 스스로 멈춘다.
 - `DeviceLiveOverride`는 서버 없이 보는 미리 보기(`/design/device`)에서만 쓴다.
 - 조작 줄에는 위험도 낮은 조작만 둔다. 위험 조작(모드 전환·탱크 지정 집기·설정 변경)은 "자세히" 안에서 확인 단계를 거친다.

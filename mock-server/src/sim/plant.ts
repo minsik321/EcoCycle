@@ -75,6 +75,7 @@ export function tickPlant(): void {
     t.volumeM3 = round1((t.capacityM3 * fill) / 100);
     t.moisturePercent = round1(moisture);
     const cautionThreshold = getSetting(id, 'cautionThresholdPercent');
+    t.cautionThresholdPercent = cautionThreshold;
     const status: DeviceStatus = judgeTankStatus(t.fillPercent, cautionThreshold);
     t.status = status;
     syncTankAlarm(t, cautionThreshold);

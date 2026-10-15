@@ -14,6 +14,7 @@ const tank = (fill: number, id: TankState['id'] = 'tank-a1'): TankState => ({
   volumeM3: 1,
   capacityM3: 8,
   moisturePercent: 10,
+  cautionThresholdPercent: 80,
   updatedAt: '2026-10-13T05:00:00.000Z',
 });
 

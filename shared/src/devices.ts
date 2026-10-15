@@ -20,6 +20,8 @@ export interface TankState {
   capacityM3: number;
   /** 수분 % (0~100) */
   moisturePercent: number;
+  /** 지금 적용 중인 주의 기준 적재율 % (설정 `cautionThresholdPercent`의 현재값). 서버는 이 값으로 status를 판정하고 화면은 주의선으로 그리기만 한다 */
+  cautionThresholdPercent: number;
   updatedAt: IsoTimestamp;
 }
 

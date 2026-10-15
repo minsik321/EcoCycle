@@ -132,6 +132,7 @@ async function run(browser) {
         await check(page, '3D 홈 상세', zoom);
       }
       for (const [route, name] of [
+        ['/tanks', '섹터 목록'],
         ['/tanks/tank-a1', '섹터 페이지'],
         ['/robot', '로봇팔 페이지'],
         ['/compressor', '압축기 페이지'],

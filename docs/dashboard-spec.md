@@ -197,6 +197,7 @@ Oct 13, 2026 · @민식
 | GET `/devices` | 기기 목록과 현재 상태 |
 | GET `/devices/{id}/state` | 기기 하나의 최신 상태 |
 | GET `/devices/{id}/history?metric=level&from=...&to=...&interval=1m` | 이력 시계열 (그래프용) |
+| GET `/devices/{id}/unloads/records?from=...&to=...&page=1&pageSize=10` | 섹터(탱크) 하나의 하역 기록 (섹터 기기 ID만, 아래 "기록 목록" 모양) |
 | GET `/robots/{id}/model` | 로봇 모델 정보: 축 수, 관절 순서, 링크 길이, 각도 범위, 영점 (기종이 정해지면 이 값으로 화면을 맞춘다) |
 | GET `/alarms?state=active` | 알람 목록 |
 | GET `/cameras` | 카메라 목록 |
@@ -223,14 +224,30 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 - 전체 쪽 수보다 큰 `page`는 오류가 아니라 빈 `items`를 돌려준다. 빠진 쿼리, `from >= to`, 범위 밖 `page`·`pageSize`는 422.
 - 각 기록의 시각 필드는 ISO 8601 UTC 문자열이다.
 
+섹터 하역 기록(`GET /devices/{id}/unloads/records`)의 한 줄은 다음과 같다. 차량이 그 섹터에 하역하고 출차 계량(공차)을 마치면 한 줄이 생기고, 기록 시각은 하역 완료 시각(`unloadedAt`)이다.
+
+```json
+{
+  "id": "unl-20261015-034", "vehicleId": "veh-20261015-034", "sectorId": "tank-a1",
+  "plate": "12가 3456", "companyName": "한빛자원",
+  "unloadedAt": "2026-10-15T04:12:40.000Z",
+  "grossT": 18.42, "tareT": 9.86, "netT": 8.56,
+  "fillBeforePercent": 42.0, "fillAfterPercent": 55.1
+}
+```
+
+- 무게는 계중대 값(t): 입차 총중량 `grossT`, 출차 공차 `tareT`, 순중량 `netT = grossT − tareT`(서버가 계산해 저장).
+- `fillBeforePercent`·`fillAfterPercent`는 하역 직전·직후의 섹터 적재율 %. 화면은 두 값과 차이(%p)를 적기만 한다.
+
 기기별 상태 형식은 다음과 같으며 `status`가 `normal`, `caution`, `alarm`, `offline` 중 무엇인지는 서버가 기준값으로 정해서 보낸다.
 
 ```json
 // 탱크: GET /devices/tank-a1/state
 {
-  "id": "tank-a1", "type": "tank", "section": "A1",
+  "id": "tank-a1", "type": "tank", "section": "A1", "grade": "A",
   "status": "normal",
   "fillPercent": 72.4, "volumeM3": 5.8, "capacityM3": 8.0,
+  "cautionThresholdPercent": 80,
   "moisturePercent": 11.8,
   "updatedAt": "2026-10-13T05:23:11.250Z"
 }
@@ -250,6 +267,8 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 // 압축기: GET /devices/compressor-1/state
 { "id": "compressor-1", "type": "compressor", "status": "normal", "running": true, "pressureMpa": 28.7, "temperatureC": 42.3, "updatedAt": "..." }
 ```
+
+섹터의 `cautionThresholdPercent`는 지금 적용 중인 주의 기준 적재율(설정 `cautionThresholdPercent`의 현재값)이다. 서버는 이 값으로 `status`를 판정하고, 화면은 섹터 그림에 주의선으로 그리기만 한다. `update_setting`으로 바뀌면 다음 상태에 새 값이 실린다.
 
 `phase`는 `idle`, `pick`, `move`, `place` 중 하나로 하단 단계 바에 쓰이고, `robot.status`는 `idle`, `running`, `paused`, `stopped`, `error`, `offline` 중 하나다. 기기 상태에는 무게를 쓰지 않고 부피와 용량을 쓴다.
 
@@ -485,6 +504,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 섹터 등급 | 등급은 A와 C 두 가지, 섹터마다 서버가 등급과 수분을 알려 준다 | `shared/`의 등급 타입, 표시 문구 |
 | 계중대와 무게 | 차량·하역 기록에만 계중대 순중량(t, 총중량 − 공차, 세 값 모두 저장)을 쓴다. 섹터는 적재율·부피, 로봇 집기는 부피 또는 횟수. 실시간 장면의 계중대는 진행 표시만 한다 | 기록 형식(`shared/`), 기록 화면의 표시 단위, `app/src/config/display.ts` |
 | 기록 목록 | 모든 기록 목록은 `from`·`to`·`page`·`pageSize` 쿼리와 `{ items, total, page, pageSize }` 응답, 한 쪽 10줄 | `shared/records.ts`, 모의 서버 `routes/records.ts`, `components/records` |
+| 섹터 하역 기록 | `GET /devices/{id}/unloads/records`, 줄마다 번호판·회사·총중량·공차·순중량(t)·하역 전후 적재율. 섹터 상태에 지금의 주의 기준 `cautionThresholdPercent` | `shared/records.ts`·`devices.ts`, 모의 서버 `sim/unloads.ts`, `features/tank` |
 | 차량·회사·섹터 배정 | 번호판 → 회사 → 배정 섹터는 서버가 정해 보낸다. 모의 서버는 가상의 회사(한빛자원, 동해페이퍼, 새솔리싸이클)와 가상의 번호판을 쓴다 | 모의 서버 예시 데이터 |
 | 배합과 압력 | 배치별 배합비·평균 수분·목표 압력은 서버가 정해 보낸다 | 모의 서버 예시 데이터 |
 | 공정 흐름 형식 | 6절 "공정 흐름"의 `process.*` 메시지와 `GET /process/state` | API 경로와 값 형식 |

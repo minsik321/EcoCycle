@@ -1,6 +1,6 @@
 import type { Bale, Batch, CompressorState, MixPart, ProcessState, TankId, TankState, Vehicle } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
-import type { CompanyFixture } from '../fixtures/process';
+import type { CompanyFixture, TruckFixture } from '../fixtures/process';
 import {
   BATCH_TIMING_SEC,
   COMPANIES,
@@ -8,12 +8,12 @@ import {
   PICKS_PER_BATCH,
   RECENT_LIMIT,
   TARGET_PRESSURE_MPA,
-  UNLOAD_FILL_PERCENT,
   VEHICLE_TIMING_SEC,
 } from '../fixtures/process';
 import { publish } from './bus';
 import { addToTank, excludedTanks } from './plant';
 import { devices, press, production } from './state';
+import { addUnloadRecord, fillGainPercent, weighTruck } from './unloads';
 
 // 공정 흐름 시뮬레이터: 차량(입고·인식·하역·출차), 배치(계획·배합·압축), 베일(배출·출하).
 // 실서버에서는 서버가 정하는 값(회사·배정 섹터·배합비·목표 압력)을 fixtures의 예시로 흉내 낸다.
@@ -35,7 +35,12 @@ const compressor = () => devices['compressor-1'] as CompressorState;
 interface VehicleRun {
   vehicle: Vehicle;
   company: CompanyFixture;
-  plate: string;
+  truck: TruckFixture;
+  /** 계중대 무게 (입차 때 총중량, 출차 때 공차를 잰 것으로 친다) */
+  weight: { grossT: number; tareT: number; netT: number };
+  /** 하역 직전·직후 섹터 적재율 % */
+  fillBefore: number | null;
+  fillAfter: number | null;
   /** 지금 단계에 들어선 시각(ms) */
   stageAt: number;
 }
@@ -85,10 +90,14 @@ function setVehicleStage(run: VehicleRun, stage: Vehicle['stage'], now: number):
   v.updatedAt = iso(now);
   run.stageAt = now;
   if (stage === 'identified') {
-    v.plate = run.plate;
+    v.plate = run.truck.plate;
     v.companyName = run.company.name;
     v.sectorId = run.company.sectorId;
   }
+  if (stage === 'unloading') run.fillBefore = tank(run.company.sectorId).fillPercent;
+  if (stage === 'unloaded') run.fillAfter = tank(run.company.sectorId).fillPercent;
+  // 출차 계량(공차)까지 마치면 하역 기록 한 줄이 생긴다
+  if (stage === 'departed') recordUnload(run);
   sendVehicle(v);
 }
 
@@ -103,6 +112,7 @@ function spawnVehicle(now: number): void {
   const lowest = Math.min(...candidates.map((c) => tank(c.sectorId).fillPercent));
   const company = pick(candidates.filter((c) => tank(c.sectorId).fillPercent === lowest));
 
+  const truck = pick(company.trucks);
   vehicleSeq += 1;
   lastSpawnAt = now;
   const run: VehicleRun = {
@@ -116,7 +126,10 @@ function spawnVehicle(now: number): void {
       updatedAt: iso(now),
     },
     company,
-    plate: pick(company.plates),
+    truck,
+    weight: weighTruck(truck),
+    fillBefore: null,
+    fillAfter: null,
     stageAt: now,
   };
   activeRuns.push(run);
@@ -135,7 +148,7 @@ function tickVehicles(now: number): void {
         break;
       case 'unloading':
         // 쏟는 동안 섹터 더미가 조금씩 자란다
-        addToTank(run.company.sectorId, UNLOAD_FILL_PERCENT / VEHICLE_TIMING_SEC.unload);
+        addToTank(run.company.sectorId, fillGainPercent(run.weight.netT) / VEHICLE_TIMING_SEC.unload);
         if (waitedSec >= VEHICLE_TIMING_SEC.unload) setVehicleStage(run, 'unloaded', now);
         break;
       case 'unloaded':
@@ -147,6 +160,21 @@ function tickVehicles(now: number): void {
   }
   activeRuns = activeRuns.filter((r) => r.vehicle.stage !== 'departed');
   spawnVehicle(now);
+}
+
+function recordUnload(run: VehicleRun): void {
+  const v = run.vehicle;
+  addUnloadRecord({
+    id: v.id.replace(/^veh-/, 'unl-'),
+    vehicleId: v.id,
+    sectorId: run.company.sectorId,
+    plate: run.truck.plate,
+    companyName: run.company.name,
+    unloadedAt: v.stageTimes.unloaded ?? v.updatedAt,
+    ...run.weight,
+    fillBeforePercent: run.fillBefore ?? tank(run.company.sectorId).fillPercent,
+    fillAfterPercent: run.fillAfter ?? tank(run.company.sectorId).fillPercent,
+  });
 }
 
 // ── 배치·베일 ─────────────────────────────────────────────────────────
@@ -281,10 +309,25 @@ function seedRecent(): void {
   for (let i = 4; i >= 1; i -= 1) {
     const at = now - i * 9 * 60_000;
     const company = COMPANIES[(i * 2) % COMPANIES.length] as CompanyFixture;
+    const truck = company.trucks[0] as TruckFixture;
+    const vehicleId = `veh-${siteDate(at)}-${pad(vehicleSeq - i + 1, 3)}`;
+    const weight = weighTruck(truck);
+    const fillAfter = tank(company.sectorId).fillPercent;
+    addUnloadRecord({
+      id: vehicleId.replace(/^veh-/, 'unl-'),
+      vehicleId,
+      sectorId: company.sectorId,
+      plate: truck.plate,
+      companyName: company.name,
+      unloadedAt: iso(at + 31_000),
+      ...weight,
+      fillBeforePercent: round1(Math.max(0, fillAfter - fillGainPercent(weight.netT))),
+      fillAfterPercent: fillAfter,
+    });
     vehicles.push({
-      id: `veh-${siteDate(at)}-${pad(vehicleSeq - i + 1, 3)}`,
+      id: vehicleId,
       stage: 'departed',
-      plate: company.plates[0] ?? null,
+      plate: truck.plate,
       companyName: company.name,
       sectorId: company.sectorId,
       stageTimes: {

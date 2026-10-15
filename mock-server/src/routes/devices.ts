@@ -1,8 +1,11 @@
 import { Router } from 'express';
-import type { DeviceListResponse, HistoryResponse } from '@ecocycle/shared';
+import type { DeviceListResponse, HistoryResponse, TankId } from '@ecocycle/shared';
+import { TANK_IDS } from '@ecocycle/shared';
 import { sendError } from '../errors';
 import { buildHistory, MAX_HISTORY_POINTS, parseInterval, supportedMetrics } from '../sim/history';
 import { devices, isDeviceId, listDevices, summarize } from '../sim/state';
+import { unloadRecords } from '../sim/unloads';
+import { sendRecordPage } from './records';
 
 export const devicesRouter = Router();
 
@@ -58,4 +61,13 @@ devicesRouter.get('/devices/:id/history', (req, res) => {
     points,
   };
   res.json(body);
+});
+
+const isTankId = (value: string): value is TankId => (TANK_IDS as readonly string[]).includes(value);
+
+// GET /devices/{id}/unloads/records?from=...&to=...&page=1&pageSize=10 — 섹터(탱크) 하나의 하역 기록
+devicesRouter.get('/devices/:id/unloads/records', (req, res) => {
+  const id = req.params.id;
+  if (!isTankId(id)) return sendError(res, 422, 'VALIDATION_FAILED', `하역 기록은 섹터(탱크) 기기에만 있습니다: ${id}`);
+  sendRecordPage(req, res, unloadRecords(id), (r) => r.unloadedAt);
 });

@@ -57,6 +57,7 @@ function tank(
     volumeM3: Math.round(((capacityM3 * fill) / 100) * 10) / 10,
     capacityM3,
     moisturePercent: moisture,
+    cautionThresholdPercent: 80,
     updatedAt: nowIso(),
   };
 }

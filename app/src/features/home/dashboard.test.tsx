@@ -34,6 +34,7 @@ const tank = (id: 'tank-a1' | 'tank-a2' | 'tank-b1' | 'tank-b2', fill: number, s
   volumeM3: Math.round(fill) / 10,
   capacityM3: 8,
   moisturePercent: 11.8,
+  cautionThresholdPercent: 80,
   updatedAt: NOW,
 });
 

@@ -1,32 +1,32 @@
 import { Link, useParams } from 'react-router-dom';
 import { TANK_IDS } from '@ecocycle/shared';
-import type { TankId } from '@ecocycle/shared';
+import type { RobotState, TankId } from '@ecocycle/shared';
 import { Card } from '../../components/common/Card';
 import { SettingForm } from '../../components/controls/SettingForm';
-import { StatusBadge } from '../../components/status/StatusBadge';
-import { Timestamp } from '../../components/status/Timestamp';
-import { useDisplayStatus } from '../../components/status/useDisplayStatus';
-import { BAR_CLASS } from '../../components/status/tone';
-import { DEVICE_NAMES, HISTORY_METRICS, formatPercent, formatVolumeM3 } from '../../config/display';
+import { DeviceActionBar } from '../../components/device/ActionBar';
+import { DetailsSection } from '../../components/device/DetailsSection';
+import { DeviceHero } from '../../components/device/DeviceHero';
+import { DevicePage } from '../../components/device/DevicePage';
+import { KeyTiles } from '../../components/device/KeyTile';
+import { useDeviceLive } from '../../components/device/live';
+import { NowNext } from '../../components/device/NowNext';
+import { DEVICE_NAMES, HISTORY_METRICS } from '../../config/display';
 import { DEVICE_SETTINGS } from '../../config/settings';
 import { useAppSelector } from '../../store/hooks';
 import { selectDevice } from '../../store/selectors';
 import { DeviceAlarmHistory } from '../history/DeviceAlarmHistory';
 import { HistoryPanel } from '../history/HistoryPanel';
+import { SectorBin } from './SectorBin';
+import { binLabel, sectorActivity } from './sectorText';
+import { SectorUnloads } from './SectorUnloads';
 
 const isTankId = (value: string | undefined): value is TankId => !!value && (TANK_IDS as readonly string[]).includes(value);
 
-function Stat({ label, value, dim }: { label: string; value: string; dim: boolean }) {
-  return (
-    <Card title={label}>
-      <p className={`text-2xl font-bold ${dim ? 'text-slate-400' : 'text-slate-900'}`}>{value}</p>
-    </Card>
-  );
-}
+const oneDecimal = (n: number) => n.toFixed(1);
 
 /**
- * 탱크 기기 페이지 = "왜 그런가, 설정은, 이력은": 현재 값, 이력 그래프, 기준값 설정, 알람 이력.
- * 설정 변경은 위험도가 높아 이 페이지에서만, 확인 단계를 거쳐 보낸다.
+ * 섹터 기기 페이지 = "왜 그런가, 설정은, 이력은": 칸 그림과 주요 수치, 지금/다음, 자세히(이력 그래프·기준값 설정·알람 이력), 맨 아래 하역 기록.
+ * 설정 변경은 위험도가 높아 이 페이지의 "자세히" 안에서만, 확인 단계를 거쳐 보낸다.
  */
 export function TankPage() {
   const { id } = useParams();
@@ -40,64 +40,65 @@ export function TankPage() {
       </div>
     );
   }
-  return <TankDetail id={id} />;
+  // 다른 섹터로 옮기면 기록 목록·자세히를 처음 상태로
+  return <TankDetail key={id} id={id} />;
 }
 
 function TankDetail({ id }: { id: TankId }) {
-  const tank = useAppSelector(selectDevice(id));
-  const { disconnected, show } = useDisplayStatus();
-  const t = tank?.type === 'tank' ? tank : null;
-  const status = t ? show(t.status) : 'offline';
-  const level = t ? Math.min(100, Math.max(0, t.fillPercent)) : 0;
+  const device = useAppSelector(selectDevice(id));
+  const robotDevice = useAppSelector(selectDevice('robot-1'));
+  const { vehicles, batches } = useAppSelector((state) => state.process);
+  const { disconnected } = useDeviceLive();
+  const tank = device?.type === 'tank' ? device : null;
+  const robot = robotDevice?.type === 'robot' ? (robotDevice as RobotState) : null;
+  const name = DEVICE_NAMES[id];
+  const activity = sectorActivity(id, vehicles, batches, robot);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link to="/tanks" className="inline-flex min-h-12 items-center text-sm font-medium text-slate-700 underline">
-          ◀ 섹터 목록
-        </Link>
-        <h1 className="text-xl font-bold">{DEVICE_NAMES[id]}</h1>
-        {t && <StatusBadge status={status} />}
-        {t && (
-          <span className="text-xs text-slate-500">
-            {disconnected ? '마지막으로 받은 값 · ' : ''}마지막 갱신 <Timestamp iso={t.updatedAt} />
-          </span>
-        )}
-      </div>
-
-      {!t ? (
-        <p role="status" className="text-slate-500">
-          섹터 상태를 불러오는 중…
-        </p>
-      ) : (
-        <section aria-label="현재 상태" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Card title="적재율(수위)">
-            <p className={`text-2xl font-bold ${disconnected ? 'text-slate-400' : 'text-slate-900'}`}>{formatPercent(t.fillPercent)}</p>
-            <div
-              role="meter"
-              aria-label="수위"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(level)}
-              className="mt-2 h-3 w-full overflow-hidden rounded-full bg-slate-200"
-            >
-              <div className={`h-full ${BAR_CLASS[status]}`} style={{ width: `${level}%` }} />
+    <DevicePage
+      hero={
+        <DeviceHero
+          name={name}
+          status={tank?.status ?? null}
+          activity={tank ? (activity.now ?? '하역·집기 없이 대기 중') : null}
+          updatedAt={tank?.updatedAt ?? null}
+          back={{ to: '/tanks', label: '섹터 목록' }}
+          illustration={
+            <div className="flex h-full items-center justify-center p-2 md:p-4">
+              <SectorBin
+                fillPercent={tank?.fillPercent ?? null}
+                cautionPercent={tank?.cautionThresholdPercent ?? null}
+                label={tank ? binLabel(name, tank, disconnected) : `${name} 그림, 불러오는 중`}
+                className="h-full w-full"
+              />
             </div>
+          }
+        />
+      }
+      tiles={
+        <KeyTiles
+          tiles={[
+            { label: '적재율', value: tank ? oneDecimal(tank.fillPercent) : null, unit: '%' },
+            { label: '부피', value: tank ? oneDecimal(tank.volumeM3) : null, unit: 'm³', sub: tank ? `/ ${oneDecimal(tank.capacityM3)}` : undefined },
+            { label: '수분', value: tank ? oneDecimal(tank.moisturePercent) : null, unit: '%' },
+            { label: '등급', value: tank ? tank.grade : null, unit: '등급' },
+          ]}
+        />
+      }
+      now={<NowNext now={activity.now} next={activity.next} />}
+      actions={<DeviceActionBar deviceId={id} />}
+      details={
+        <DetailsSection>
+          <HistoryPanel deviceId={id} metrics={HISTORY_METRICS.tank} />
+          <Card title="기준값 설정" aria-label="기준값 설정" className="flex flex-col gap-4">
+            {DEVICE_SETTINGS.tank.map((field) => (
+              <SettingForm key={field.key} deviceId={id} field={field} />
+            ))}
           </Card>
-          <Stat label="부피(용량)" value={`${formatVolumeM3(t.volumeM3)} / ${formatVolumeM3(t.capacityM3)}`} dim={disconnected} />
-          <Stat label="수분" value={formatPercent(t.moisturePercent)} dim={disconnected} />
-        </section>
-      )}
-
-      <HistoryPanel deviceId={id} metrics={HISTORY_METRICS.tank} />
-
-      <Card title="기준값 설정" aria-label="기준값 설정" className="flex flex-col gap-4">
-        {DEVICE_SETTINGS.tank.map((field) => (
-          <SettingForm key={field.key} deviceId={id} field={field} />
-        ))}
-      </Card>
-
-      <DeviceAlarmHistory deviceId={id} />
-    </div>
+          <DeviceAlarmHistory deviceId={id} />
+        </DetailsSection>
+      }
+      records={<SectorUnloads id={id} />}
+    />
   );
 }

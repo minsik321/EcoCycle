@@ -57,6 +57,7 @@
 | B27 | 오늘 처리량(베일 수)과 압축기 가동률을 `plant.summary`에 넣고, 요약 값의 이력(`GET /plant/history`)을 줄 수 있나요? | 홈 지표 카드와 작은 추이선에 쓴다. 앱이 임의로 집계하지 않는다. | `balesToday`, `compressorUptimePercent` 추가, 이력은 기기 이력과 같은 형식 | `shared/devices.ts`, 홈 지표 카드 |
 | B28 | 자동 로그인을 위해 명세 6절 "토큰 보관과 자동 로그인"대로 구현해 줄 수 있나요? (1) 웹: 리프레시 토큰을 응답 본문 대신 쿠키로 — `HttpOnly`, `Secure`, `Path=/api/v1/auth`, 같은 사이트면 `SameSite=Lax`, 다른 사이트면 `SameSite=None; Secure; Partitioned`, 자동 로그인이면 `Max-Age` 14일·아니면 세션 쿠키. CORS는 `credentials: true` + 명시한 출처 목록, 쿠키 요청의 `Origin` 확인 (2) 안드로이드: 같은 토큰을 본문으로 (`refreshTokenDelivery: "body"`) (3) 리프레시할 때마다 교체, 이미 쓴 토큰이 오면 그 세션의 모든 토큰·WebSocket 폐기(재사용 감지). 단 교체 직후 30초 안에 바로 앞 토큰이 다시 오면(응답을 잃은 경우) 같은 새 토큰 쌍을 다시 준다 (4) 로그아웃 때 세션 폐기와 쿠키 삭제 (5) 거부 코드 `REFRESH_TOKEN_MISSING/EXPIRED/REUSED`, `UNAUTHORIZED`. 앱과 API를 같은 사이트(예: app.회사.kr + api.회사.kr)에 둘 수 있나요? | 토큰을 localStorage에 두지 않으면서 새로고침·앱 재시작 뒤에도 로그인을 유지하는 유일한 방법이다. 서로 다른 사이트(Vercel + Render)면 Safari 등 일부 브라우저가 제3자 쿠키를 막아 웹 자동 로그인이 안 될 수 있다. | 명세 그대로, 모의 서버가 같은 동작을 흉내 냄 | 서버 인증 구현, `shared/auth.ts`, `app/src/api/tokens.ts`·`http.ts`, 배포 주소 |
 | B29 | 기록 목록(차량·하역·로봇 집기 등)을 모두 `GET .../records?from=&to=&page=&pageSize=` → `{ items, total, page, pageSize }`로 줄 수 있나요? `page`는 1부터, `pageSize` 상한 100, `items`는 최신 먼저, `[from, to)` 구간, 쪽 수보다 큰 `page`는 빈 `items`를 기준으로 했습니다. | 기록 화면들이 같은 기간 고르기와 쪽 넘기기(10줄)를 쓴다. 쪽을 서버가 나눠야 기록이 많아도 앱이 가볍다. | 명세 6절 "기록 목록" 그대로, 모의 서버가 같은 모양으로 응답 | `shared/records.ts`, 모의 서버 `routes/records.ts`, `components/records` |
+| B30 | 섹터마다 하역 기록(`GET /devices/{id}/unloads/records`, 기록 목록 모양)을 줄 수 있나요? 줄마다 번호판, 회사, 하역 완료 시각, 계중대 총중량·공차·순중량(t), 하역 직전·직후 적재율(%)이 필요합니다. 또 섹터 상태에 지금 적용 중인 주의 기준 적재율(`cautionThresholdPercent`)을 함께 실어 줄 수 있나요? | 섹터 페이지 아래의 하역 기록과 섹터 그림의 주의선에 쓴다. 화면은 무게·적재율 변화를 계산하지 않고 표시만 한다. | 명세 6절 "기록 목록"의 섹터 하역 기록 예시 그대로, 모의 서버가 차량 흐름에서 만들어 지난 기록을 쌓아 둠 | `shared/records.ts`·`devices.ts`, `features/tank` |
 
 ## 변경 기록
 
@@ -68,3 +69,4 @@
 - 2026-10-15 서버 담당자 질문 B28 추가 (자동 로그인: 리프레시 토큰 쿠키·본문 전달, 교체·재사용 감지, 로그아웃)
 - 2026-10-15 B28에 재사용 감지의 30초 유예(응답을 잃은 리프레시) 추가
 - 2026-10-15 대표님 질문 A12(파지의 양 기준: 차량·하역 기록에만 계중대 무게), 서버 담당자 질문 B29(기록 목록 페이지 모양) 추가
+- 2026-10-15 서버 담당자 질문 B30 추가 (섹터 하역 기록, 섹터 상태의 주의 기준값)

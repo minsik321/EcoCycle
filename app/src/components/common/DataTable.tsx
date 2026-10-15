@@ -5,8 +5,8 @@ export interface Column<T> {
   header: string;
   cell: (row: T) => ReactNode;
   align?: 'left' | 'right';
-  /** 좁은 화면에서 숨길 열 */
-  hideOnNarrow?: boolean;
+  /** 좁은 화면에서 숨길 열 (true: sm 미만, 'xl': 데스크톱(xl) 미만 — 세로 태블릿에서도 숨긴다) */
+  hideOnNarrow?: boolean | 'xl';
 }
 
 export interface DataTableProps<T> {
@@ -34,7 +34,7 @@ export function DataTable<T>({
   className = '',
 }: DataTableProps<T>) {
   if (rows.length === 0) return <p className={`px-2 py-4 text-sm text-ink-faint ${className}`}>{empty}</p>;
-  const cellClass = (c: Column<T>) => `${c.align === 'right' ? 'text-right' : 'text-left'} ${c.hideOnNarrow ? 'hidden sm:table-cell' : ''}`;
+  const cellClass = (c: Column<T>) => `${c.align === 'right' ? 'text-right' : 'text-left'} ${c.hideOnNarrow === 'xl' ? 'hidden xl:table-cell' : c.hideOnNarrow ? 'hidden sm:table-cell' : ''}`;
   return (
     <div className={`overflow-auto ${className}`}>
       <table aria-label={label} className="w-full border-separate border-spacing-0 text-sm">

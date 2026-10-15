@@ -15,14 +15,15 @@ mock-server/
     │                     재사용 감지 → 세션 폐기, 단 교체 직후 30초 안의 바로 앞 토큰은 같은 새 쌍을 다시 줌: REFRESH_REUSE_GRACE_SEC), 로그아웃(세션 폐기·쿠키 삭제), ws-ticket(30초, 1회용), /me, requireAuth
     ├── errors.ts         {"error":{"code","message"}} 응답
     ├── stream.ts         WebSocket: 티켓 검증, 구독 관리, heartbeat 5초, 시나리오 침묵·지연 반영
-    ├── routes/           devices(요약·기기·이력), process(공정 흐름 상태·요약 이력), robots(모델), alarms, cameras, commands(202·멱등성·403/409/422),
+    ├── routes/           devices(요약·기기·이력·섹터 하역 기록), process(공정 흐름 상태·요약 이력), robots(모델), alarms, cameras, commands(202·멱등성·403/409/422),
     │                     records(모든 `.../records`가 쓰는 페이지 나누기 `sendRecordPage`: 쿼리 검사 422, 구간 거르기, 최신 먼저, { items, total, page, pageSize })
     ├── sim/              state(현재 값), plant(탱크·컨베이어·압축기·알람), robot(사이클·관절 15Hz), commands(접수→결과),
     │                     process(차량·배치·베일: 회사·배정 섹터·배합비·목표 압력을 예시로 정함, 로봇이 집을 섹터도 여기서),
+    │                     unloads(섹터 하역 기록: 출차 때 한 줄, 시작할 때 지난 14일치, 계중대 무게 weighTruck),
     │                     alarmOps, publish(변할 때·5초마다), history(가짜 이력), bus(sim → stream)
     ├── scenarios/        index(시나리오 9종), gate(침묵·지연 스위치)
     └── fixtures/         accounts(역할별 계정·권한 표), robotModel(범용 6축), cameras, settings(설정 키·범위),
-                      process(가상의 회사·번호판·배정 섹터, 배합비·압력 범위, 단계별 시간)
+                      process(가상의 회사·차량(번호판·등록 공차·싣는 양)·배정 섹터, 배합비·압력 범위, 단계별 시간, 하역 기록 채우기 규칙)
 ```
 
 시나리오: `normal`, `tank-alarm`, `disconnect`, `robot-error`, `token-expiry`, `slow-network`, `refresh-expiry`(리프레시 토큰 30초), `refresh-reuse`(교체 뒤 유예 30초 + 5초에 이전 토큰을 다시 써 세션 폐기), `server-restart`(45초 뒤·2분마다 모든 세션 삭제와 WebSocket 닫기) (`npm run mock -- --scenario=이름`).

@@ -47,6 +47,7 @@ export const tankState = (): DeviceState => ({
   volumeM3: 5.8,
   capacityM3: 8,
   moisturePercent: 11.8,
+  cautionThresholdPercent: 80,
   updatedAt: NOW,
 });
 
