@@ -86,18 +86,19 @@ function refreshExpiry(): void {
 }
 
 /**
- * refresh-reuse: 리프레시 토큰을 훔친 사람이 있다고 흉내 낸다. 토큰이 교체되고 5초 뒤 이전 토큰을 다시 쓴다.
+ * refresh-reuse: 리프레시 토큰을 훔친 사람이 있다고 흉내 낸다. 토큰이 교체되고 유예 시간(config.refreshReuseGraceSec, 기본 30초)이
+ * 지난 5초 뒤 이전 토큰을 다시 쓴다(유예 시간 안이면 응답을 잃은 정상 요청으로 보아 폐기하지 않으므로).
  * 서버는 재사용을 감지해 그 세션의 모든 토큰과 WebSocket을 폐기하고, 앱은 로그인 화면("세션 만료" 안내)으로 돌아가야 한다.
  */
 function refreshReuse(): void {
-  const REPLAY_MS = 5_000;
+  const REPLAY_MS = config.refreshReuseGraceSec * 1000 + 5_000;
   onRefreshRotated((oldToken) => {
     setTimeout(() => {
       const result = consumeRefreshToken(oldToken);
       log(`이전 리프레시 토큰을 다시 써 봄 → ${result.ok ? '통과(문제)' : result.code}`);
     }, REPLAY_MS);
   });
-  log(`액세스 토큰 ${config.accessTokenTtlSec}초. 리프레시(새로고침 포함) 5초 뒤 이전 토큰을 재사용해 세션이 폐기된다`);
+  log(`액세스 토큰 ${config.accessTokenTtlSec}초. 리프레시(새로고침 포함) ${REPLAY_MS / 1000}초 뒤 이전 토큰을 재사용해 세션이 폐기된다`);
 }
 
 /** server-restart: 45초 뒤, 그 뒤로 2분마다 서버가 다시 켜진 것처럼 모든 세션을 잃고 WebSocket을 닫는다 */

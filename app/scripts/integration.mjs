@@ -3,6 +3,7 @@
 //   npm run test:integration
 // 브라우저 점검은 내려받지 않는 Chromium이 필요하다(CHROMIUM_PATH 또는 Playwright 브라우저 폴더).
 // 없는 컴퓨터에서는 INTEGRATION_SKIP_BROWSER=1로 그 부분만 건너뛸 수 있다(건너뛰었다고 표시한다).
+// 브라우저 점검이 안정적인지 보려면 INTEGRATION_BROWSER_RUNS=5처럼 여러 번 잇달아 돌린다(기본 1번).
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -16,13 +17,15 @@ const APP_PORT = process.env.INTEGRATION_APP_PORT ?? '5199';
 const APP_ORIGIN = `http://localhost:${APP_PORT}`;
 const API_BASE = `http://localhost:${PORT}/api/v1`;
 const WS_BASE = `ws://localhost:${PORT}/ws/v1/stream`;
+// 리프레시 재사용 유예 시간(기본 30초)을 짧게 해 "유예 시간이 지난 재사용은 폐기"를 오래 기다리지 않고 본다
+const REFRESH_GRACE_SEC = '3';
 
 // 쿠키를 쓰는 요청은 출처를 명시해야 하므로 앱 주소를 허용 목록에 넣는다
 const server = start(
   '모의 서버',
   ['run', 'start', '-w', '@ecocycle/mock-server', '--', '--scenario=disconnect'],
   rootDir,
-  { PORT, CORS_ORIGINS: APP_ORIGIN },
+  { PORT, CORS_ORIGINS: APP_ORIGIN, REFRESH_REUSE_GRACE_SEC: REFRESH_GRACE_SEC },
   '[mock-server]',
 );
 let app = null;
@@ -49,6 +52,7 @@ try {
       VITE_API_BASE: API_BASE,
       VITE_WS_BASE: WS_BASE,
       INTEGRATION_APP_ORIGIN: APP_ORIGIN,
+      INTEGRATION_REFRESH_GRACE_SEC: REFRESH_GRACE_SEC,
     },
   });
   exitCode = result.status ?? 1;
@@ -69,9 +73,17 @@ try {
       'Local:',
     );
     await app.ready;
-    const failures = await runAuthReload({ exe, appUrl: APP_ORIGIN, apiBase: API_BASE });
-    console.log(failures.length ? `브라우저 점검 실패 ${failures.length}개` : '브라우저 점검 통과');
-    if (failures.length) exitCode = 1;
+    const runs = Math.max(1, Number(process.env.INTEGRATION_BROWSER_RUNS ?? 1) || 1);
+    let failedRuns = 0;
+    for (let run = 1; run <= runs; run += 1) {
+      if (runs > 1) console.log(`
+· 브라우저 점검 ${run}/${runs}`);
+      const failures = await runAuthReload({ exe, appUrl: APP_ORIGIN, apiBase: API_BASE });
+      console.log(failures.length ? `브라우저 점검 실패 ${failures.length}개` : '브라우저 점검 통과');
+      if (failures.length) failedRuns += 1;
+    }
+    if (runs > 1) console.log(`브라우저 점검 ${runs}번 중 ${runs - failedRuns}번 통과`);
+    if (failedRuns) exitCode = 1;
   }
 } catch (error) {
   console.error(String(error));

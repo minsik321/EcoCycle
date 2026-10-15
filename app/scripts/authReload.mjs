@@ -72,6 +72,23 @@ export async function runAuthReload({ exe, appUrl, apiBase }) {
     await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30_000 });
   }
 
+  /**
+   * 새로고침하고 앱 시작 때의 세션 되살리기(POST /auth/refresh → GET /me)가 끝날 때까지 기다린다.
+   * 끝나기 전에 다른 주소로 가면 리프레시 요청은 서버에 닿아 토큰이 교체됐는데 응답(새 쿠키)을 잃을 수 있다.
+   * 시간에 기대지 않고 리프레시 응답과 "로그인 확인 중…" 화면이 걷히는 것을 기다린다.
+   */
+  async function reloadAndSettle(page, label) {
+    const flashes = watchLoginFlash(page);
+    const refreshed = page.waitForResponse((res) => new URL(res.url()).pathname.endsWith('/auth/refresh') && res.request().method() === 'POST', {
+      timeout: 30_000,
+    });
+    await page.reload();
+    const res = await refreshed;
+    await res.finished();
+    await page.getByText('로그인 확인 중…').waitFor({ state: 'detached', timeout: 30_000 });
+    check(res.ok() && flashes.length === 0 && !new URL(page.url()).pathname.startsWith('/login'), `${label}: 세션을 되살린다 (리프레시 ${res.status()})`);
+  }
+
   async function expectSignedIn(page, label) {
     const flashes = watchLoginFlash(page);
     await page.goto(`${appUrl}/settings`);
@@ -143,7 +160,7 @@ export async function runAuthReload({ exe, appUrl, apiBase }) {
       '자동 로그인: 리프레시 쿠키가 HttpOnly·Secure·SameSite=Lax·Path=/api/v1/auth, 14일짜리 지속 쿠키다',
     );
     if (failures.length) console.log('    받은 쿠키:', JSON.stringify({ ...persistent, value: '…' }));
-    await page.reload();
+    await reloadAndSettle(page, '자동 로그인 후 새로고침');
     await expectSignedIn(page, '자동 로그인 후 새로고침');
     await expectNoLeak(page, '자동 로그인 후 새로고침');
 
@@ -166,7 +183,7 @@ export async function runAuthReload({ exe, appUrl, apiBase }) {
     await login(page, false);
     const session = await refreshCookie(context);
     check(session?.httpOnly === true && session.expires === -1, '자동 로그인 끔: 세션 쿠키(브라우저를 닫으면 사라짐)');
-    await page.reload();
+    await reloadAndSettle(page, '자동 로그인 끔, 새로고침');
     await expectSignedIn(page, '자동 로그인 끔, 새로고침');
     context = await reopenBrowser(context);
     page = await context.newPage();

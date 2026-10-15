@@ -29,8 +29,17 @@ interface Session {
 }
 const sessions = new Map<string, Session>();
 const accessTokens = new Map<string, { userId: string; sessionId: string; expiresAt: number }>();
-/** usedAt이 있으면 이미 교체된 토큰이다. 다시 오면 재사용(탈취)으로 본다. 만료되거나 세션이 폐기될 때까지 남겨 둔다. */
-const refreshTokens = new Map<string, { sessionId: string; expiresAt: number; usedAt?: number }>();
+/** 리프레시 한 번이 준 토큰 쌍. 유예 시간 안에 이전 토큰이 다시 오면 이것을 그대로 다시 준다. */
+interface IssuedPair {
+  accessToken: string;
+  refreshToken: string;
+}
+/**
+ * usedAt이 있으면 이미 교체된 토큰이다. 다시 오면 재사용(탈취)으로 본다. 단, 교체 직후 유예 시간(config.refreshReuseGraceSec) 안이고
+ * 그 교체로 준 새 토큰(rotatedTo)이 아직 쓰이지 않았으면 응답을 잃은 정상 요청으로 보고 같은 새 토큰 쌍을 다시 준다.
+ * 만료되거나 세션이 폐기될 때까지 남겨 둔다.
+ */
+const refreshTokens = new Map<string, { sessionId: string; expiresAt: number; usedAt?: number; rotatedTo?: IssuedPair }>();
 const wsTickets = new Map<string, { userId: string; sessionId: string; expiresAt: number }>();
 
 // 세션이 폐기되면 그 세션의 WebSocket을 닫는다. stream.ts가 등록한다(stream이 auth를 import하므로 반대로는 부르지 않는다).
@@ -115,8 +124,8 @@ function clearRefreshCookie(res: Response): void {
   res.clearCookie(REFRESH_COOKIE_NAME, cookieOptions());
 }
 
-/** 새 액세스·리프레시 토큰을 만들어 방식에 맞게 돌려준다 (cookie 방식이면 본문에 리프레시 토큰을 넣지 않는다) */
-function issueTokens(res: Response, sessionId: string, session: Session): RefreshResponse {
+/** 새 액세스·리프레시 토큰을 만든다 */
+function createTokens(sessionId: string, session: Session): IssuedPair {
   const accessToken = newToken('at');
   const refreshToken = newToken('rt');
   accessTokens.set(accessToken, {
@@ -125,11 +134,22 @@ function issueTokens(res: Response, sessionId: string, session: Session): Refres
     expiresAt: now() + config.accessTokenTtlSec * 1000,
   });
   refreshTokens.set(refreshToken, { sessionId, expiresAt: now() + refreshTtlSec(session) * 1000 });
+  return { accessToken, refreshToken };
+}
+
+/** 토큰 쌍을 방식에 맞게 돌려준다 (cookie 방식이면 본문에 리프레시 토큰을 넣지 않는다). expiresIn은 액세스 토큰의 남은 시간 */
+function sendTokens(res: Response, pair: IssuedPair, session: Session): RefreshResponse {
+  const access = accessTokens.get(pair.accessToken);
+  const expiresIn = access ? Math.max(1, Math.round((access.expiresAt - now()) / 1000)) : config.accessTokenTtlSec;
   if (session.delivery === 'cookie') {
-    setRefreshCookie(res, refreshToken, session);
-    return { accessToken, expiresIn: config.accessTokenTtlSec };
+    setRefreshCookie(res, pair.refreshToken, session);
+    return { accessToken: pair.accessToken, expiresIn };
   }
-  return { accessToken, refreshToken, expiresIn: config.accessTokenTtlSec };
+  return { accessToken: pair.accessToken, refreshToken: pair.refreshToken, expiresIn };
+}
+
+function issueTokens(res: Response, sessionId: string, session: Session): RefreshResponse {
+  return sendTokens(res, createTokens(sessionId, session), session);
 }
 
 /** 리프레시·로그아웃 요청의 토큰: 본문(앱)에 있으면 본문, 없으면 쿠키(웹) */
@@ -148,11 +168,28 @@ function allowedOrigin(req: Request): boolean {
 }
 
 type RefreshResult =
-  | { ok: true; sessionId: string; session: Session }
+  /** rotated: 새 토큰 쌍을 만들었다. replayed: 유예 시간 안의 이전 토큰이라 방금 만든 쌍을 그대로 다시 준다 */
+  | { ok: true; kind: 'rotated' | 'replayed'; sessionId: string; session: Session; pair: IssuedPair }
   | { ok: false; code: RefreshErrorCode; message: string };
 
 /**
+ * 유예 시간 안에 다시 온 바로 앞 토큰이면 그 교체로 준 새 쌍을 돌려준다. 새 리프레시 토큰이 이미 쓰였거나(그다음 교체가 일어남)
+ * 사라졌으면 유예하지 않는다: 그때는 응답을 잃은 경우가 아니다.
+ */
+function graceReplay(entry: { usedAt?: number; rotatedTo?: IssuedPair }): IssuedPair | null {
+  const pair = entry.rotatedTo;
+  if (entry.usedAt === undefined || !pair) return null;
+  if (now() - entry.usedAt > config.refreshReuseGraceSec * 1000) return null;
+  const next = refreshTokens.get(pair.refreshToken);
+  if (!next || next.usedAt !== undefined || next.expiresAt <= now()) return null;
+  const access = accessTokens.get(pair.accessToken);
+  if (!access || access.expiresAt <= now()) return null;
+  return pair;
+}
+
+/**
  * 리프레시 토큰 하나를 소비한다. 이미 교체된 토큰이 다시 오면 그 세션 전체를 폐기한다(재사용 감지).
+ * 단, 교체 직후 유예 시간 안에 바로 앞 토큰이 다시 오면 같은 새 토큰 쌍을 다시 준다(응답을 잃은 정상 요청).
  * refresh-reuse 시나리오도 이것으로 "훔친 토큰"을 다시 써 본다.
  */
 export function consumeRefreshToken(token: string): RefreshResult {
@@ -160,6 +197,11 @@ export function consumeRefreshToken(token: string): RefreshResult {
   const session = entry ? sessions.get(entry.sessionId) : undefined;
   if (!entry || !session) return { ok: false, code: 'UNAUTHORIZED', message: '다시 로그인해야 합니다.' };
   if (entry.usedAt !== undefined) {
+    const pair = graceReplay(entry);
+    if (pair) {
+      console.log(`[auth] 교체 ${((now() - entry.usedAt) / 1000).toFixed(1)}초 뒤 이전 리프레시 토큰이 다시 옴 → 유예 시간 안이라 같은 새 토큰을 다시 줌 (${session.userId})`);
+      return { ok: true, kind: 'replayed', sessionId: entry.sessionId, session, pair };
+    }
     revokeSession(entry.sessionId);
     console.warn(`[auth] 이미 쓴 리프레시 토큰이 다시 왔다 → 세션 폐기 (${session.userId})`);
     return { ok: false, code: 'REFRESH_TOKEN_REUSED', message: '보안을 위해 로그인이 해제되었습니다. 다시 로그인하세요.' };
@@ -169,7 +211,8 @@ export function consumeRefreshToken(token: string): RefreshResult {
     return { ok: false, code: 'REFRESH_TOKEN_EXPIRED', message: '로그인 시간이 지났습니다. 다시 로그인하세요.' };
   }
   entry.usedAt = now();
-  return { ok: true, sessionId: entry.sessionId, session };
+  entry.rotatedTo = createTokens(entry.sessionId, session);
+  return { ok: true, kind: 'rotated', sessionId: entry.sessionId, session, pair: entry.rotatedTo };
 }
 
 // 교체될 때마다 이전 토큰을 알린다 (refresh-reuse 시나리오가 이전 토큰을 기억해 두었다가 다시 쓴다)
@@ -237,6 +280,7 @@ authRouter.post('/auth/login', (req, res) => {
 });
 
 // 리프레시 토큰은 사용할 때마다 교체된다. 이미 쓴 토큰이 다시 오면 세션 전체를 폐기하고 401.
+// 단, 교체 직후 유예 시간 안에 바로 앞 토큰이 다시 오면 같은 새 토큰 쌍을 다시 준다(응답을 잃은 경우).
 authRouter.post('/auth/refresh', (req, res) => {
   const presented = presentedToken(req);
   if (!presented) return sendError(res, 401, 'REFRESH_TOKEN_MISSING', '다시 로그인해야 합니다.');
@@ -254,8 +298,8 @@ authRouter.post('/auth/refresh', (req, res) => {
   }
   // 받은 방식 그대로 돌려준다 (웹 쿠키는 쿠키로, 앱 본문은 본문으로)
   result.session.delivery = presented.delivery;
-  const body: RefreshResponse = issueTokens(res, result.sessionId, result.session);
-  for (const listener of rotateListeners) listener(presented.token);
+  const body: RefreshResponse = sendTokens(res, result.pair, result.session);
+  if (result.kind === 'rotated') for (const listener of rotateListeners) listener(presented.token);
   res.json(body);
 });
 

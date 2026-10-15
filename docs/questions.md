@@ -54,7 +54,7 @@
 | B25 | 배치별 배합비(섹터별 %), 평균 수분, 목표 압력(MPa)을 줄 수 있나요? 섹터 등급(`grade`)은 탱크 상태에 넣을 수 있나요? | 화면은 배합·압력을 계산하지 않고 표시만 한다. | `process.batch`의 `mix`, `avgMoisturePercent`, `targetPressureMpa`, 탱크 상태의 `grade` | `shared/devices.ts`, 배치 표시 |
 | B26 | 베일 ID 규칙은(예: `BL-20261013-0412`)? 베일 생성과 출하 시점을 서버가 알 수 있나요? | 베일 표와 출하 연출(지게차)의 기준이다. | ID는 서버가 부여, `stage`: created → shipped | 베일 상태 형식 |
 | B27 | 오늘 처리량(베일 수)과 압축기 가동률을 `plant.summary`에 넣고, 요약 값의 이력(`GET /plant/history`)을 줄 수 있나요? | 홈 지표 카드와 작은 추이선에 쓴다. 앱이 임의로 집계하지 않는다. | `balesToday`, `compressorUptimePercent` 추가, 이력은 기기 이력과 같은 형식 | `shared/devices.ts`, 홈 지표 카드 |
-| B28 | 자동 로그인을 위해 명세 6절 "토큰 보관과 자동 로그인"대로 구현해 줄 수 있나요? (1) 웹: 리프레시 토큰을 응답 본문 대신 쿠키로 — `HttpOnly`, `Secure`, `Path=/api/v1/auth`, 같은 사이트면 `SameSite=Lax`, 다른 사이트면 `SameSite=None; Secure; Partitioned`, 자동 로그인이면 `Max-Age` 14일·아니면 세션 쿠키. CORS는 `credentials: true` + 명시한 출처 목록, 쿠키 요청의 `Origin` 확인 (2) 안드로이드: 같은 토큰을 본문으로 (`refreshTokenDelivery: "body"`) (3) 리프레시할 때마다 교체, 이미 쓴 토큰이 오면 그 세션의 모든 토큰·WebSocket 폐기(재사용 감지) (4) 로그아웃 때 세션 폐기와 쿠키 삭제 (5) 거부 코드 `REFRESH_TOKEN_MISSING/EXPIRED/REUSED`, `UNAUTHORIZED`. 앱과 API를 같은 사이트(예: app.회사.kr + api.회사.kr)에 둘 수 있나요? | 토큰을 localStorage에 두지 않으면서 새로고침·앱 재시작 뒤에도 로그인을 유지하는 유일한 방법이다. 서로 다른 사이트(Vercel + Render)면 Safari 등 일부 브라우저가 제3자 쿠키를 막아 웹 자동 로그인이 안 될 수 있다. | 명세 그대로, 모의 서버가 같은 동작을 흉내 냄 | 서버 인증 구현, `shared/auth.ts`, `app/src/api/tokens.ts`·`http.ts`, 배포 주소 |
+| B28 | 자동 로그인을 위해 명세 6절 "토큰 보관과 자동 로그인"대로 구현해 줄 수 있나요? (1) 웹: 리프레시 토큰을 응답 본문 대신 쿠키로 — `HttpOnly`, `Secure`, `Path=/api/v1/auth`, 같은 사이트면 `SameSite=Lax`, 다른 사이트면 `SameSite=None; Secure; Partitioned`, 자동 로그인이면 `Max-Age` 14일·아니면 세션 쿠키. CORS는 `credentials: true` + 명시한 출처 목록, 쿠키 요청의 `Origin` 확인 (2) 안드로이드: 같은 토큰을 본문으로 (`refreshTokenDelivery: "body"`) (3) 리프레시할 때마다 교체, 이미 쓴 토큰이 오면 그 세션의 모든 토큰·WebSocket 폐기(재사용 감지). 단 교체 직후 30초 안에 바로 앞 토큰이 다시 오면(응답을 잃은 경우) 같은 새 토큰 쌍을 다시 준다 (4) 로그아웃 때 세션 폐기와 쿠키 삭제 (5) 거부 코드 `REFRESH_TOKEN_MISSING/EXPIRED/REUSED`, `UNAUTHORIZED`. 앱과 API를 같은 사이트(예: app.회사.kr + api.회사.kr)에 둘 수 있나요? | 토큰을 localStorage에 두지 않으면서 새로고침·앱 재시작 뒤에도 로그인을 유지하는 유일한 방법이다. 서로 다른 사이트(Vercel + Render)면 Safari 등 일부 브라우저가 제3자 쿠키를 막아 웹 자동 로그인이 안 될 수 있다. | 명세 그대로, 모의 서버가 같은 동작을 흉내 냄 | 서버 인증 구현, `shared/auth.ts`, `app/src/api/tokens.ts`·`http.ts`, 배포 주소 |
 
 ## 변경 기록
 
@@ -64,3 +64,4 @@
 - 2026-10-13 서버 담당자 질문 B21~B22 추가 (사이클 통계, 점검 이력 — 명세 화면에는 있고 API에는 없는 항목)
 - 2026-10-13 홈 3D 재설계에 따른 질문 추가: 대표님 A8~A11(섹터·등급, 계중대 무게, 배정 기준, 상단 지표), 서버 담당자 B23~B27(공정 흐름 제안안, 번호판 인식, 배합·압력, 베일, 요약 지표)
 - 2026-10-15 서버 담당자 질문 B28 추가 (자동 로그인: 리프레시 토큰 쿠키·본문 전달, 교체·재사용 감지, 로그아웃)
+- 2026-10-15 B28에 재사용 감지의 30초 유예(응답을 잃은 리프레시) 추가

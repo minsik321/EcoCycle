@@ -12,7 +12,7 @@ mock-server/
     ├── index.ts          Express + WebSocket 서버 시작, 시뮬레이터·시나리오 시작
     ├── config.ts         포트, CORS_ORIGINS(쿠키 때문에 명시한 출처만, 비면 localhost:5173), REFRESH_COOKIE_SAMESITE(lax|none), --scenario 인자, 토큰 유효 시간
     ├── auth.ts           로그인(시도 제한 429, remember·refreshTokenDelivery), 세션(로그인 한 번의 토큰 묶음), 리프레시(쿠키 또는 본문, 사용할 때마다 교체,
-    │                     재사용 감지 → 세션 폐기), 로그아웃(세션 폐기·쿠키 삭제), ws-ticket(30초, 1회용), /me, requireAuth
+    │                     재사용 감지 → 세션 폐기, 단 교체 직후 30초 안의 바로 앞 토큰은 같은 새 쌍을 다시 줌: REFRESH_REUSE_GRACE_SEC), 로그아웃(세션 폐기·쿠키 삭제), ws-ticket(30초, 1회용), /me, requireAuth
     ├── errors.ts         {"error":{"code","message"}} 응답
     ├── stream.ts         WebSocket: 티켓 검증, 구독 관리, heartbeat 5초, 시나리오 침묵·지연 반영
     ├── routes/           devices(요약·기기·이력), process(공정 흐름 상태·요약 이력), robots(모델), alarms, cameras, commands(202·멱등성·403/409/422)
@@ -24,8 +24,8 @@ mock-server/
                       process(가상의 회사·번호판·배정 섹터, 배합비·압력 범위, 단계별 시간)
 ```
 
-시나리오: `normal`, `tank-alarm`, `disconnect`, `robot-error`, `token-expiry`, `slow-network`, `refresh-expiry`(리프레시 토큰 30초), `refresh-reuse`(교체 5초 뒤 이전 토큰을 다시 써 세션 폐기), `server-restart`(45초 뒤·2분마다 모든 세션 삭제와 WebSocket 닫기) (`npm run mock -- --scenario=이름`).
-이 서버 자체의 단위 테스트는 없다. 동작은 `app`의 통합 테스트(`npm run test:integration`: 연결 끊김, 권한 403, 자동 로그인 쿠키·교체·재사용 감지·로그아웃)와 `app` 화면 테스트가 확인한다.
+시나리오: `normal`, `tank-alarm`, `disconnect`, `robot-error`, `token-expiry`, `slow-network`, `refresh-expiry`(리프레시 토큰 30초), `refresh-reuse`(교체 뒤 유예 30초 + 5초에 이전 토큰을 다시 써 세션 폐기), `server-restart`(45초 뒤·2분마다 모든 세션 삭제와 WebSocket 닫기) (`npm run mock -- --scenario=이름`).
+이 서버 자체의 단위 테스트는 없다. 동작은 `app`의 통합 테스트(`npm run test:integration`: 연결 끊김, 권한 403, 자동 로그인 쿠키·교체·재사용 감지·유예·로그아웃)와 `app` 화면 테스트가 확인한다.
 
 ## 규칙
 

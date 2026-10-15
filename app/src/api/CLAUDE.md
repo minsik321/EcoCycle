@@ -33,7 +33,7 @@ api/
   - 웹(`createCookieTokenStore`, 기본): 서버가 HttpOnly 쿠키로 보관한다. 스크립트는 토큰을 보지 않는다. 로그인·리프레시·로그아웃만 `withCredentials`(`credentials: 'include'`)로 보낸다.
   - 안드로이드(`createNativeTokenStore(secure)`): 본문으로 주고받고 자동 로그인이면 보안 저장소, 아니면 메모리. 앱 시작 때 `setRefreshTokenStore`로 끼운다.
   - 어떤 토큰도 localStorage·sessionStorage·URL에 두지 않는다(`session.test.ts`가 검사한다).
-- 자동 로그인: 앱 시작 때 `restoreSession` → `restored`(로그인 화면 없이, 권한은 새 /me) / `none`(로그인 화면, 안내 없음) / `unavailable`(토큰 유지, 다시 시도). 웹은 여러 탭이 같은 쿠키를 쓰므로 리프레시를 Web Locks로 탭 사이 한 번에 하나만 보낸다(동시에 보내면 서버가 재사용으로 보고 세션을 폐기한다).
+- 자동 로그인: 앱 시작 때 `restoreSession` → `restored`(로그인 화면 없이, 권한은 새 /me) / `none`(로그인 화면, 안내 없음) / `unavailable`(토큰 유지, 다시 시도). 웹은 여러 탭이 같은 쿠키를 쓰므로 리프레시를 Web Locks로 탭 사이 한 번에 하나만 보낸다(동시에 보내면 하나만 교체되고 나머지는 이전 토큰을 내민 것이 된다. 서버는 교체 직후 30초 유예 안이면 같은 새 토큰을 다시 주지만, 그 밖에서는 재사용으로 보고 세션을 폐기한다).
 - 명령 전송:
   - 요청마다 새 `Idempotency-Key`(UUID). 같은 버튼 재시도는 같은 키를 재사용한다.
   - 202 `accepted`는 완료가 아니다. 결과는 WebSocket `command.result`로 받고, 일정 시간 안에 못 받으면 `GET /commands/{id}`로 조회한다.

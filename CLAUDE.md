@@ -90,7 +90,7 @@ npm run dev                 # mock-server + app 동시 실행
 npm run dev:app             # app만 (VITE_API_BASE로 실서버 지정)
 npm run mock -- --scenario=disconnect   # 시나리오 지정해 모의 서버 실행
 npm run typecheck && npm run test       # 타입 검사 + 단위·화면 테스트 (서버 불필요, 약 1분)
-npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403·자동 로그인(쿠키·교체·재사용 감지) 점검 + 실제 Chromium으로 새로고침 뒤 로그인 유지 (약 2분, 서버·앱을 스스로 띄움, 로컬 Chromium 필요, 없으면 INTEGRATION_SKIP_BROWSER=1)
+npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403·자동 로그인(쿠키·교체·재사용 감지·유예) 점검 + 실제 Chromium으로 새로고침 뒤 로그인 유지 (약 2분, 서버·앱을 스스로 띄움, 로컬 Chromium 필요, 없으면 INTEGRATION_SKIP_BROWSER=1, 브라우저 점검 반복은 INTEGRATION_BROWSER_RUNS=5)
 npm run test:text           # 실제 브라우저로 폰·태블릿 화면의 글 줄바꿈·가로 넘침 점검 (글자 100%·130%, 약 15~25분, 서버를 스스로 띄움, 로컬 Chromium 필요)
 npm run measure:load        # 3D 홈 첫 화면 시간: 프로덕션 빌드, 폰 390×844 + 4G + CPU 4배 느림으로 로그인 → 지표·3D 첫 장 (약 10~20분, 로컬 Chromium 필요)
 npm run poster              # 3D 홈 준비 화면의 포스터(빈 장면)를 다시 찍는다 (약 1분, 로컬 Chromium 필요)

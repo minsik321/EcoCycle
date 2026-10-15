@@ -3,6 +3,8 @@
 //   - 웹: 쿠키 속성(HttpOnly·Secure·SameSite·Path), 자동 로그인이면 지속 쿠키(14일), 아니면 세션 쿠키, 본문에 리프레시 토큰 없음
 //   - 교체: 리프레시할 때마다 새 토큰, 이전 토큰은 다시 못 쓴다
 //   - 재사용 감지: 이미 쓴 토큰이 오면 그 세션의 모든 토큰이 폐기된다 (다른 세션은 그대로)
+//   - 유예: 교체 직후(유예 시간 안) 바로 앞 토큰이 다시 오면 응답을 잃은 정상 요청으로 보고 같은 새 토큰 쌍을 다시 준다.
+//     유예 시간이 지났거나 그 뒤 교체가 또 일어났으면 재사용으로 보고 폐기한다
 //   - 로그아웃: 세션 폐기와 쿠키 삭제
 //   - CORS: credentials 허용, 명시한 출처만
 // 브라우저에서 새로고침해도 로그인이 유지되는지는 scripts/authReload.mjs가 실제 Chromium으로 본다.
@@ -13,6 +15,11 @@ import { REFRESH_COOKIE_NAME } from '@ecocycle/shared';
 const API = (process.env.VITE_API_BASE ?? 'http://localhost:4099/api/v1').replace(/\/$/, '');
 /** 모의 서버의 CORS_ORIGINS에 들어 있는 출처 (scripts/integration.mjs가 넘긴다) */
 const ORIGIN = process.env.INTEGRATION_APP_ORIGIN ?? 'http://localhost:5173';
+/** 모의 서버의 리프레시 재사용 유예 시간 (scripts/integration.mjs가 짧게 줄여 넘긴다) */
+const GRACE_MS = Number(process.env.INTEGRATION_REFRESH_GRACE_SEC ?? 30) * 1000;
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** 유예 시간이 지나기를 기다린다 */
+const pastGrace = () => sleep(GRACE_MS + 500);
 
 interface SetCookie {
   value: string;
@@ -103,7 +110,8 @@ describe('자동 로그인: 쿠키 (웹)', () => {
     const newAccess = ((await first.json()) as { accessToken: string }).accessToken;
     const newCookie = parseSetCookie(first)!.value;
 
-    // 훔친(이미 쓴) 쿠키를 다시 보낸다
+    // 유예 시간이 지난 뒤 훔친(이미 쓴) 쿠키를 다시 보낸다
+    await pastGrace();
     const replay = await post('/auth/refresh', {}, { cookie: victim.cookie.value });
     expect(replay.status).toBe(401);
     expect(await errorCode(replay)).toBe('REFRESH_TOKEN_REUSED');
@@ -118,6 +126,64 @@ describe('자동 로그인: 쿠키 (웹)', () => {
     // 다른 로그인 세션은 영향이 없다
     expect(await meStatus(other.body.accessToken)).toBe(200);
     expect((await post('/auth/refresh', {}, { cookie: other.cookie.value })).status).toBe(200);
+  });
+
+  it('응답을 잃은 리프레시: 유예 시간 안에 이전 쿠키가 다시 오면 같은 새 토큰을 다시 주고 세션은 그대로', async () => {
+    const { cookie } = await webLogin(true);
+    // 요청은 서버에 닿아 교체되었지만 응답을 잃었다 (새로고침·이동·네트워크 끊김) → 브라우저에는 이전 쿠키가 남는다
+    const lost = await post('/auth/refresh', {}, { cookie: cookie.value });
+    expect(lost.status).toBe(200);
+    const lostAccess = ((await lost.json()) as { accessToken: string }).accessToken;
+    const lostCookie = parseSetCookie(lost)!;
+
+    const retry = await post('/auth/refresh', {}, { cookie: cookie.value });
+    expect(retry.status).toBe(200);
+    const retryBody = (await retry.json()) as { accessToken: string; refreshToken?: string; expiresIn: number };
+    expect(retryBody.accessToken).toBe(lostAccess);
+    expect(retryBody.refreshToken).toBeUndefined();
+    expect(retryBody.expiresIn).toBeGreaterThan(0);
+    const retryCookie = parseSetCookie(retry)!;
+    expect(retryCookie.value).toBe(lostCookie.value);
+    expect(retryCookie.attrs.httponly).toBe(true);
+    expect(retryCookie.attrs['max-age']).toBe(lostCookie.attrs['max-age']);
+    expect(await meStatus(retryBody.accessToken)).toBe(200);
+
+    // 세션은 살아 있고 교체가 이어진다: 다시 받은 쿠키로 리프레시하면 새 토큰
+    const next = await post('/auth/refresh', {}, { cookie: retryCookie.value });
+    expect(next.status).toBe(200);
+    const nextAccess = ((await next.json()) as { accessToken: string }).accessToken;
+    expect(parseSetCookie(next)!.value).not.toBe(retryCookie.value);
+    expect(await meStatus(nextAccess)).toBe(200);
+  });
+
+  it('유예 시간 안이어도 그 뒤 교체가 또 일어났으면(바로 앞 토큰이 아니면) 재사용으로 보고 폐기한다', async () => {
+    const { cookie } = await webLogin(true);
+    const first = await post('/auth/refresh', {}, { cookie: cookie.value });
+    const second = await post('/auth/refresh', {}, { cookie: parseSetCookie(first)!.value });
+    expect(second.status).toBe(200);
+    const secondAccess = ((await second.json()) as { accessToken: string }).accessToken;
+
+    const replay = await post('/auth/refresh', {}, { cookie: cookie.value });
+    expect(replay.status).toBe(401);
+    expect(await errorCode(replay)).toBe('REFRESH_TOKEN_REUSED');
+    expect(await meStatus(secondAccess)).toBe(401);
+  });
+
+  it('유예 시간이 지난 뒤 이전 쿠키가 오면 재사용으로 보고 세션을 폐기한다 (응답을 잃었어도)', async () => {
+    const { cookie } = await webLogin(true);
+    const lost = await post('/auth/refresh', {}, { cookie: cookie.value });
+    const lostAccess = ((await lost.json()) as { accessToken: string }).accessToken;
+    const lostCookie = parseSetCookie(lost)!.value;
+    // 유예 시간 안에는 같은 토큰을 다시 받는다
+    expect((await post('/auth/refresh', {}, { cookie: cookie.value })).status).toBe(200);
+
+    await pastGrace();
+    const late = await post('/auth/refresh', {}, { cookie: cookie.value });
+    expect(late.status).toBe(401);
+    expect(await errorCode(late)).toBe('REFRESH_TOKEN_REUSED');
+    expect(parseSetCookie(late)!.value).toBe('');
+    expect((await post('/auth/refresh', {}, { cookie: lostCookie })).status).toBe(401);
+    expect(await meStatus(lostAccess)).toBe(401);
   });
 
   it('로그아웃: 204, 쿠키를 지우고 세션의 토큰을 모두 폐기한다', async () => {
@@ -170,11 +236,23 @@ describe('자동 로그인: 본문 (안드로이드)', () => {
     const second = (await rotated.json()) as { accessToken: string; refreshToken: string };
     expect(second.refreshToken).not.toBe(first.refreshToken);
 
+    await pastGrace();
     const replay = await post('/auth/refresh', { refreshToken: first.refreshToken });
     expect(replay.status).toBe(401);
     expect(await errorCode(replay)).toBe('REFRESH_TOKEN_REUSED');
     expect((await post('/auth/refresh', { refreshToken: second.refreshToken })).status).toBe(401);
     expect(await meStatus(second.accessToken)).toBe(401);
+  });
+
+  it('본문 방식도 응답을 잃으면 유예 시간 안에는 같은 새 토큰 쌍을 다시 받는다', async () => {
+    const first = await bodyLogin();
+    const lost = (await (await post('/auth/refresh', { refreshToken: first.refreshToken })).json()) as { accessToken: string; refreshToken: string };
+    const retry = await post('/auth/refresh', { refreshToken: first.refreshToken });
+    expect(retry.status).toBe(200);
+    expect(parseSetCookie(retry)).toBeNull();
+    const again = (await retry.json()) as { accessToken: string; refreshToken: string };
+    expect(again).toMatchObject({ accessToken: lost.accessToken, refreshToken: lost.refreshToken });
+    expect((await post('/auth/refresh', { refreshToken: again.refreshToken })).status).toBe(200);
   });
 
   it('로그아웃하면 본문의 토큰이 속한 세션이 폐기된다', async () => {

@@ -30,6 +30,14 @@ function parseSameSite(value: string | undefined): 'lax' | 'none' {
   process.exit(1);
 }
 
+function parseGraceSec(value: string | undefined): number {
+  if (value === undefined || value === '') return 30;
+  const sec = Number(value);
+  if (Number.isFinite(sec) && sec >= 0) return sec;
+  console.error(`REFRESH_REUSE_GRACE_SEC는 0 이상의 초여야 합니다: ${value}`);
+  process.exit(1);
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 4000),
   /** 쉼표로 구분한 허용 출처(쿠키를 보내는 출처). 비어 있으면 로컬 Vite 개발 주소. 배포 시 Vercel 주소를 넣는다. */
@@ -50,6 +58,12 @@ export const config = {
   /** 자동 로그인을 끈 세션의 리프레시 토큰 유효 시간(초). 쿠키는 세션 쿠키(브라우저를 닫으면 사라짐) */
   sessionRefreshTokenTtlSec: 60 * 60 * 12,
   wsTicketTtlSec: 30,
+  /**
+   * 리프레시 직후 이 시간(초) 안에 바로 앞 토큰이 다시 오면 재사용으로 보지 않고 방금 준 새 토큰 쌍을 그대로 다시 준다.
+   * 요청은 서버에 닿았는데 응답을 잃은 경우(새로고침·이동·네트워크 끊김) 정상 사용자가 로그아웃되지 않게 한다.
+   * 통합 테스트는 기다리는 시간을 줄이려고 REFRESH_REUSE_GRACE_SEC로 짧게 한다.
+   */
+  refreshReuseGraceSec: parseGraceSec(process.env.REFRESH_REUSE_GRACE_SEC),
 };
 
 if (config.corsOrigins.length === 0) config.corsOrigins = DEV_ORIGINS;
