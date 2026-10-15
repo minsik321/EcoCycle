@@ -13,11 +13,12 @@
 | `conveyor/` | `/conveyor` | 속도 설정, 이력 |
 | `compressor/` | `/compressor` | 압력·온도 그래프, 설정, 점검 이력 |
 | `alarms/` | `/alarms` | 활성·이력 목록, 확인 처리, 누르면 해당 기기 페이지로 |
+| `records/` | `/records`, `/records/vehicles/:id`, `/records/batches/:id` | 공정 기록: 탭 차량·배치(`?tab=`, 둘 다 `RecordList`), 차량 상세, 배치 상세(5단위가 이어서 채움) |
 | `settings/` | `/settings` | 화질 모드(고화질/기본/저사양, 자동으로 다시 고르기), 계정, 앱 정보 |
 | `design/` | `/design` | 디자인 토큰과 공용 컴포넌트 미리 보기 (개발용, 로그인 불필요, 값은 모두 예시) |
 | `cctv/` | 오버레이 | 카메라 선택, 발급받은 주소를 `<video>`로 재생 |
 
-주 메뉴 순서: 홈, 섹터, 로봇팔, 컨베이어, 압축기, 알람, 설정. 권한 없는 메뉴는 숨기거나 비활성화.
+주 메뉴 순서: 홈, 섹터, 로봇팔, 컨베이어, 압축기, 알람, 공정 기록, 설정. 권한 없는 메뉴는 숨기거나 비활성화.
 메뉴는 앱 전체(3D 홈 포함)에 하나뿐이다(`components/layout/Sidebar`, 앱 틀 `AppShell`이 그린다): 폰은 아래 탭 바(홈·섹터·로봇팔·알람 + "더 보기"), 태블릿·데스크톱은 왼쪽 사이드바(3D 홈에서는 아이콘만, 누르면 3D 위로 펼침). 화면이 메뉴를 따로 만들지 않는다.
 
 ## 구현 상태 (1단계 완료, 2단계 3D 홈 구현)
@@ -31,6 +32,7 @@
 - 3D 홈의 모양·배치 규칙은 `app/src/studio/CLAUDE.md`. 아래 home/ 규칙은 대시보드의 규칙이다.
 - 홈 주소에 `?demo=1`을 붙이면 서버 관절 값 대신 정해진 시연 동작을 보여 준다(명세의 최후 수단, "시연 동작" 표시).
 - `tank/`: `SectorBin`(칸 그림 SVG: 크라프트 더미가 적재율만큼, 서버 주의 기준선, 값이 바뀌면 `transform` 전환), `TankListPage`(폰 2개씩), `TankPage`(`DevicePage` 틀, 맨 아래 `SectorUnloads` = `RecordList`로 `GET /devices/{id}/unloads/records`), `sectorText`(그림 설명, 지금/다음 문장). 화면 글은 "섹터", 코드·주소·ID는 tank 그대로.
+- `records/`(4단위): `RecordsPage`(탭은 주소의 `?tab=vehicles|batches`라 홈의 링크가 탭을 골라 열고 뒤로 가기에도 유지), `VehicleRecords`(입차·출차 시각, 번호판, 회사, 섹터, 총중량·공차·순중량 t, 상태 인식·하역·출차, `GET /vehicles/records`), `BatchRecords`(시작·종료, 배합 섹터 %, 평균 수분, 목표→실제 압력, 결과 완료·건너뜀·일시정지됨·진행 중, 만든 베일, `GET /batches/records`), 줄을 누르면 상세(`VehicleDetailPage` = `GET /vehicles/{id}`, `BatchDetailPage` = `GET /batches/{id}`, 둘 다 `useRecord`·`RecordDetail` 틀). 주소 만들기는 `config/navigation.ts`(`recordsPath`, `vehicleRecordPath`, `batchRecordPath`). 폰은 "더 보기" 안의 메뉴. 홈에서 오는 링크: 대시보드 "전체 보기"(지금 배치 카드 → 배치 탭, 최근 차량·베일 카드 → 차량 탭), 3D 홈 "기록 보기"·"이 차량 기록"·"이 배치 상세"(`studio`의 `RecordLink`, 링크 그리기는 `LiveStudio`가 넘긴다).
 추가된 폴더: `history/`(이력 그래프 패널·구간 훅·알람 이력 훅, 탱크·컨베이어·압축기 페이지가 공유), `devices/`(컨베이어·압축기 공통 페이지 틀).
 서버가 제공하지 않아 안내 문구만 둔 항목: 로봇팔 사이클 통계, 압축기 점검 이력, 설정의 현재값 (`docs/questions.md` B18, B21, B22).
 

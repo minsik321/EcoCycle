@@ -5,7 +5,7 @@ import type { DeviceId } from '@ecocycle/shared';
 import { DeviceControls } from '../components/controls/DeviceControls';
 import { useImmersiveShell } from '../components/layout/shellChrome';
 import { USE_MOCK } from '../config/env';
-import { devicePagePath } from '../config/navigation';
+import { batchRecordPath, devicePagePath, recordsPath, vehicleRecordPath } from '../config/navigation';
 import { useRobotModel } from '../features/robot/useRobot';
 import { demoSource, liveSource } from './robot/jointSource';
 import { useAppSelector } from '../store/hooks';
@@ -16,7 +16,17 @@ import { useRobotJointsSubscription } from '../store/useRealtime';
 import { StudioView } from './StudioView';
 import { StudioAccount } from './overlay/Account';
 import { useStudioTier } from './useStudioTier';
-import type { StudioData } from './types';
+import type { RecordLink, StudioData } from './types';
+
+/** 공정 기록 화면으로 가는 링크 (패널은 주소를 모르고, 앱의 주소 규칙은 config/navigation에 있다) */
+const recordLink: RecordLink = (target, label, className) => {
+  const to = target.kind === 'list' ? recordsPath(target.tab) : target.kind === 'vehicle' ? vehicleRecordPath(target.id) : batchRecordPath(target.id);
+  return (
+    <Link to={to} className={className}>
+      {label}
+    </Link>
+  );
+};
 
 /**
  * 3D 홈: 기존 store·실시간 계층의 값을 그대로 스튜디오 화면에 넘긴다.
@@ -71,6 +81,7 @@ export function LiveStudio({ switcher, onFailed }: { switcher?: ReactNode; onFai
       switcher={switcher}
       account={chrome ? <StudioAccount extra={chrome.extra} /> : undefined}
       onFailed={onFailed}
+      recordLink={recordLink}
       deviceActions={(id: DeviceId) => (
         <>
           <DeviceControls deviceId={id} context="home" />

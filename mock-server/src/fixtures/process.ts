@@ -74,4 +74,14 @@ export const FILL_PERCENT_PER_TON = 1.4;
 export const RECENT_LIMIT = 20;
 
 /** 하역 기록: 시작할 때 채워 둘 지난 날 수, 섹터마다 하루 하역 횟수 범위, 작업 시간(현장 시각), 기억할 날 수 */
-export const UNLOAD_HISTORY = { seedDays: 14, perSectorPerDay: [3, 7] as [number, number], workHours: [7, 18] as [number, number], keepDays: 40 };
+export const UNLOAD_HISTORY = { seedDays: 30, perSectorPerDay: [3, 7] as [number, number], workHours: [7, 18] as [number, number], keepDays: 40 };
+
+/** 배치 기록: 시작할 때 채워 둘 지난 날 수, 하루 배치 수 범위, 작업 시간(현장 시각), 건너뜀·일시정지됨 비율, 기억할 날 수 (차량 기록도 같은 기간을 기억한다) */
+export const BATCH_HISTORY = {
+  seedDays: 30,
+  perDay: [8, 13] as [number, number],
+  workHours: [7, 19] as [number, number],
+  skipChance: 0.07,
+  pauseChance: 0.05,
+  keepDays: 40,
+};

@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import type { PlantHistoryResponse, PlantMetric, ProcessState } from '@ecocycle/shared';
+import type { BatchRecord, PlantHistoryResponse, PlantMetric, ProcessState, VehicleRecord } from '@ecocycle/shared';
 import { PLANT_METRICS } from '@ecocycle/shared';
 import { sendError } from '../errors';
 import { buildPlantHistory, MAX_HISTORY_POINTS, parseInterval } from '../sim/history';
-import { processState } from '../sim/process';
+import { liveBatchRecords, liveVehicleRecords, processState } from '../sim/process';
+import { finishedBatchRecords, finishedVehicleRecords } from '../sim/records';
 import { summarize } from '../sim/state';
+import { sendRecordPage } from './records';
 
 export const processRouter = Router();
 
@@ -14,7 +16,35 @@ processRouter.get('/process/state', (_req, res) => {
   res.json(body);
 });
 
-const isPlantMetric = (value: unknown): value is PlantMetric =>
+/** 끝난 기록(sim/records)과 지금 진행 중인 것(sim/process)을 합친 공정 기록 전체 */
+const allVehicles = (): VehicleRecord[] => [...finishedVehicleRecords(), ...liveVehicleRecords()];
+const allBatches = (): BatchRecord[] => [...finishedBatchRecords(), ...liveBatchRecords()];
+
+// GET /vehicles/records?from=...&to=...&page=1&pageSize=10 — 차량 기록 (입차 시각 기준)
+processRouter.get('/vehicles/records', (req, res) => {
+  sendRecordPage(req, res, allVehicles(), (r) => r.arrivedAt);
+});
+
+// GET /vehicles/{id} — 차량 기록 한 건
+processRouter.get('/vehicles/:id', (req, res) => {
+  const record = allVehicles().find((r) => r.id === req.params.id);
+  if (!record) return sendError(res, 404, 'NOT_FOUND', `찾을 수 없는 차량: ${req.params.id}`);
+  res.json(record);
+});
+
+// GET /batches/records?from=...&to=...&page=1&pageSize=10 — 배치 기록 (시작 시각 기준)
+processRouter.get('/batches/records', (req, res) => {
+  sendRecordPage(req, res, allBatches(), (r) => r.startedAt);
+});
+
+// GET /batches/{id} — 배치 기록 한 건
+processRouter.get('/batches/:id', (req, res) => {
+  const record = allBatches().find((r) => r.id === req.params.id);
+  if (!record) return sendError(res, 404, 'NOT_FOUND', `찾을 수 없는 배치: ${req.params.id}`);
+  res.json(record);
+});
+
+const isPlantMetric =(value: unknown): value is PlantMetric =>
   typeof value === 'string' && (PLANT_METRICS as readonly string[]).includes(value);
 
 // GET /plant/history?metric=balesToday&from=...&to=...&interval=10m

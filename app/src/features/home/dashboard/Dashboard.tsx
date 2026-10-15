@@ -6,7 +6,7 @@ import { KpiCard } from '../../../components/common/KpiCard';
 import { StatusBadge } from '../../../components/status/StatusBadge';
 import { BAR_CLASS } from '../../../components/status/tone';
 import { formatLocalClock, formatPercent, formatPressureMpa } from '../../../config/display';
-import { devicePagePath } from '../../../config/navigation';
+import { devicePagePath, recordsPath } from '../../../config/navigation';
 import { BATCH_STAGE_TEXT, SECTOR_LABEL, cycleSteps, mixText } from '../../../config/processDisplay';
 import { useAppSelector } from '../../../store/hooks';
 import { selectConnection, selectDevice, selectIsDisconnected, selectPlantSummary } from '../../../store/selectors';
@@ -31,6 +31,15 @@ function Panel({ title, aside, className = '', children }: { title: string; asid
       </header>
       {children}
     </section>
+  );
+}
+
+/** 카드 제목 줄 오른쪽의 "전체 보기" 링크 (공정 기록 화면으로). 터치 대상은 48px 이상 */
+function SeeAll({ to, label }: { to: string; label: string }) {
+  return (
+    <Link to={to} aria-label={label} className="-my-2 -mr-2 inline-flex min-h-12 items-center rounded-control px-2 text-xs font-semibold whitespace-nowrap text-accent-strong active:bg-paper-deep">
+      전체 보기
+    </Link>
   );
 }
 
@@ -146,7 +155,15 @@ function BatchCard() {
   const batch = currentBatch(batches);
   const dash = (text: string) => (disconnected ? '–' : text);
   return (
-    <Panel title="지금 배치" aside={batch && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-accent-strong">{disconnected ? '연결 끊김' : BATCH_STAGE_TEXT[batch.stage]}</span>}>
+    <Panel
+      title="지금 배치"
+      aside={
+        <span className="flex shrink-0 items-center gap-2">
+          {batch && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-accent-strong">{disconnected ? '연결 끊김' : BATCH_STAGE_TEXT[batch.stage]}</span>}
+          <SeeAll to={recordsPath('batches')} label="배치 기록 전체 보기" />
+        </span>
+      }
+    >
       {batch ? (
         <>
           <p className="truncate text-base font-bold text-ink">{batch.id}</p>
@@ -219,7 +236,7 @@ function Recent() {
   const { vehicles, bales } = useAppSelector((state) => state.process);
   const rows = recentActivity(vehicles, bales, 5);
   return (
-    <Panel title="최근 차량·베일">
+    <Panel title="최근 차량·베일" aside={<SeeAll to={recordsPath('vehicles')} label="차량 기록 전체 보기" />}>
       {rows.length === 0 ? (
         <p className="text-sm text-ink-soft">아직 기록이 없습니다.</p>
       ) : (

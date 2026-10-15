@@ -11,6 +11,7 @@ import { DesignPage } from './features/design/DesignPage';
 import { DevicePreviewPage } from './features/design/DevicePreviewPage';
 import { RecordsPreviewPage } from './features/design/RecordsPreviewPage';
 import { HomePage } from './features/home/HomePage';
+import { BatchDetailPage, RecordsPage, VehicleDetailPage } from './features/records';
 import { RobotPage } from './features/robot';
 import { SettingsPage } from './features/settings';
 import { TankListPage, TankPage } from './features/tank';
@@ -19,7 +20,7 @@ import { TankListPage, TankPage } from './features/tank';
 const SceneDemoPage = lazy(() => import('./features/home/SceneDemoPage').then((m) => ({ default: m.SceneDemoPage })));
 
 // 별도 라우트를 가진 화면. 나머지는 아래 Placeholder로 이어진다.
-const IMPLEMENTED = new Set(['tanks', 'robot', 'conveyor', 'compressor', 'alarms', 'settings']);
+const IMPLEMENTED = new Set(['tanks', 'robot', 'conveyor', 'compressor', 'alarms', 'records', 'settings']);
 
 // 화면(features)을 하나씩 만들면서 아래 Placeholder를 실제 화면으로 바꾼다.
 function Placeholder({ title }: { title: string }) {
@@ -63,6 +64,9 @@ export default function AppRoutes() {
           <Route path="/tanks" element={<TankListPage />} />
           <Route path="/tanks/:id" element={<TankPage />} />
           <Route path="/alarms" element={<AlarmsPage />} />
+          <Route path="/records" element={<RecordsPage />} />
+          <Route path="/records/vehicles/:id" element={<VehicleDetailPage />} />
+          <Route path="/records/batches/:id" element={<BatchDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/robot" element={<RobotPage />} />
           <Route path="/conveyor" element={<ConveyorPage />} />

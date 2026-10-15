@@ -15,6 +15,7 @@ api/
 ├── cameras.ts      getCameras, getStreamInfo, getSnapshotBlob (이미지는 토큰을 주소에 넣을 수 없어 Blob으로 받음)
 ├── push.ts         registerPush, unregisterPush
 ├── records.ts      getRecords<T>(경로, { from, to, page, pageSize }) — 모든 기록 목록이 함께 쓴다 (응답 RecordPage<T>)
+├── processRecords.ts getVehicleRecord, getBatchRecord — 공정 기록 한 건 (404는 ApiError.status). 목록은 getRecords로
 ├── commands.ts     sendCommand(Idempotency-Key 생성), getCommand
 └── index.ts        재수출
 ```

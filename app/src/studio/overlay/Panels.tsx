@@ -16,7 +16,7 @@ import {
   formatVolumeM3,
 } from '../../config/display';
 import type { PinElements } from '../three/Fx';
-import type { StudioData } from '../types';
+import type { RecordLink, StudioData } from '../types';
 import { SECTOR_LABEL } from '../../config/processDisplay';
 import { VIEWS } from '../world/views';
 import type { ViewPreset } from '../world/views';
@@ -545,6 +545,8 @@ function DetailHead({ icon, eyebrow, title, sub, onClose, closeLabel = '상세 �
 }
 
 export interface DetailProps extends PanelCommon {
+  /** 공정 기록 화면으로 가는 링크 ("이 차량 기록", "이 배치 상세"). 없으면 링크를 그리지 않는다 */
+  recordLink?: RecordLink;
   /** 기기를 골랐을 때 넣을 조작 영역 (기존 조작 컴포넌트와 "상세 보기" 링크). 없으면 조작을 보여 주지 않는다 */
   deviceActions?: (id: DeviceId) => ReactNode;
   /** 폰의 아래 시트 안에 넣을 때: 유리 패널 틀 없이 내용만 */
@@ -553,7 +555,7 @@ export interface DetailProps extends PanelCommon {
   collapsible?: boolean;
 }
 
-export function Detail({ data, disconnected, selection, onSelect, deviceActions, bare = false, collapsible = false }: DetailProps) {
+export function Detail({ data, disconnected, selection, onSelect, deviceActions, recordLink, bare = false, collapsible = false }: DetailProps) {
   const [expanded, setExpanded] = useState(false);
   const shell = bare ? 'st-detail st-detail-bare' : 'st-glass st-detail';
   const [kind, id] = selection ? (selection.includes(':') ? [selection.slice(0, selection.indexOf(':')), selection.slice(selection.indexOf(':') + 1)] : [selection, '']) : ['', ''];
@@ -624,8 +626,9 @@ export function Detail({ data, disconnected, selection, onSelect, deviceActions,
                 ['출차', time(vehicle.stageTimes.departed)],
               ]}
             >
-              <p className="st-muted">회사·배정 섹터는 서버가 번호판으로 정한 값입니다. 계량 값(무게)은 표시하지 않습니다.</p>
+              <p className="st-muted">회사·배정 섹터는 서버가 번호판으로 정한 값입니다. 무게는 이 패널에 표시하지 않습니다.</p>
             </More>
+            {recordLink && <div className="st-actions">{recordLink({ kind: 'vehicle', id: vehicle.id }, '이 차량 기록', 'st-link')}</div>}
           </div>
         ) : (
           <p className="st-muted">이 차량의 기록이 목록에서 지나갔습니다.</p>
@@ -659,6 +662,7 @@ export function Detail({ data, disconnected, selection, onSelect, deviceActions,
                 ['출하', time(bale.stageTimes.shipped)],
               ]}
             />
+            {recordLink && <div className="st-actions">{recordLink({ kind: 'batch', id: bale.batchId }, '이 배치 상세', 'st-link')}</div>}
           </div>
         ) : (
           <p className="st-muted">이 베일의 기록이 목록에서 지나갔습니다.</p>
@@ -736,6 +740,7 @@ export function Detail({ data, disconnected, selection, onSelect, deviceActions,
           />
         </div>
       )}
+      {batch && recordLink && <div className="st-actions">{recordLink({ kind: 'batch', id: batch.id }, '이 배치 상세', 'st-link')}</div>}
     </aside>
   );
 }
@@ -933,7 +938,7 @@ function TableBody({ tab, data, disconnected, selection, onSelect }: PanelCommon
   );
 }
 
-export function Tables({ data, disconnected, selection, onSelect }: PanelCommon) {
+export function Tables({ data, disconnected, selection, onSelect, recordLink }: PanelCommon & { recordLink?: RecordLink }) {
   const [tab, setTab] = useState<TableTab>('vehicles');
   const onSite = data.vehicles.filter((v) => v.stage !== 'departed').length;
   const tabs: Array<{ key: TableTab; label: string; count: number }> = [
@@ -955,6 +960,7 @@ export function Tables({ data, disconnected, selection, onSelect }: PanelCommon)
             </button>
           ))}
         </div>
+        {recordLink && (tab === 'vehicles' || tab === 'batches') && recordLink({ kind: 'list', tab }, '기록 보기', 'st-link-mini')}
       </div>
       <div className={`st-table-scroll${disconnected ? ' st-stale' : ''}`} role="tabpanel">
         <TableBody tab={tab} data={data} disconnected={disconnected} selection={selection} onSelect={onSelect} />
@@ -998,7 +1004,7 @@ const SHEET_TABS: Array<{ key: SheetTab; label: string }> = [
  * 폰의 아래 시트: 접힌 상태(기본)에서는 짧은 공정 막대와 요약 한 줄만, 펼치면 탭(배치 · 차량 · 섹터 · 베일)과 내용.
  * 대상을 고르면 펼쳐서 그 상세를 보여 준다 (상세의 닫기 = 고르기 풀기).
  */
-export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActions }: DetailProps) {
+export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActions, recordLink }: DetailProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<SheetTab>('batches');
   useEffect(() => {
@@ -1028,7 +1034,7 @@ export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActi
         </button>
       ) : selection ? (
         <div className="st-sheet-body">
-          <Detail {...common} deviceActions={deviceActions} bare />
+          <Detail {...common} deviceActions={deviceActions} recordLink={recordLink} bare />
         </div>
       ) : (
         <>
@@ -1040,7 +1046,8 @@ export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActi
             ))}
           </div>
           <div className={`st-sheet-body st-table${disconnected ? ' st-stale' : ''}`} role="tabpanel">
-            {tab === 'batches' && <Detail {...common} selection={null} bare />}
+            {recordLink && (tab === 'vehicles' || tab === 'batches') && <div className="st-list-link">{recordLink({ kind: 'list', tab }, '기록 보기', 'st-link-mini')}</div>}
+            {tab === 'batches' && <Detail {...common} selection={null} recordLink={recordLink} bare />}
             <TableBody tab={tab} {...common} />
           </div>
         </>

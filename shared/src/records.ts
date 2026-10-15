@@ -1,6 +1,5 @@
 import type { IsoTimestamp } from './common';
 import type { TankId } from './ids';
-
 /*
  * 기록 목록 (명세 6절 "기록 목록(페이지 나누기)").
  * 차량·하역·로봇 집기 같은 지난 기록을 보여 주는 모든 `GET .../records` 엔드포인트가 같은 요청·응답 모양을 쓴다.

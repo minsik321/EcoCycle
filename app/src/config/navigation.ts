@@ -1,7 +1,7 @@
 import { deviceTypeOf } from '@ecocycle/shared';
 import type { DeviceId, Permission } from '@ecocycle/shared';
 
-// 주 메뉴. 순서는 명세 기준: 홈, 섹터, 로봇팔, 컨베이어, 압축기, 알람, 설정.
+// 주 메뉴. 순서는 명세 기준: 홈, 섹터, 로봇팔, 컨베이어, 압축기, 알람, 공정 기록, 설정.
 // `requires`가 있으면 그 권한이 없을 때 `whenDenied`에 따라 메뉴를 숨기거나(hide) 비활성화(disable)한다.
 // 가정 단계에서는 모든 메뉴가 열려 있다. 권한별로 보이는 화면은 대표님과 확정한다 (docs/questions.md A4).
 // 이것도 표시일 뿐이고, 화면 안의 조작과 데이터 접근은 서버가 막는다.
@@ -28,6 +28,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'conveyor', label: '컨베이어', path: '/conveyor' },
   { id: 'compressor', label: '압축기', path: '/compressor' },
   { id: 'alarms', label: '알람', path: '/alarms', badge: 'activeAlarms', phoneTab: true },
+  { id: 'records', label: '공정 기록', path: '/records' }, // 차량·배치 지난 기록 (폰에서는 "더 보기" 안)
   { id: 'settings', label: '설정', path: '/settings' },
 ];
 
@@ -58,6 +59,17 @@ export function devicePagePath(id: DeviceId): string {
       return '/compressor';
   }
 }
+
+/** 공정 기록 화면의 탭 (쿼리 `?tab=`) */
+export type RecordsTab = 'vehicles' | 'batches';
+export const RECORDS_TABS: readonly RecordsTab[] = ['vehicles', 'batches'];
+
+/** 공정 기록 화면 주소 (홈의 "기록 보기"·"전체 보기"가 탭을 골라 연다) */
+export const recordsPath = (tab: RecordsTab = 'vehicles'): string => `/records?tab=${tab}`;
+/** 차량 한 대의 기록 상세 */
+export const vehicleRecordPath = (id: string): string => `/records/vehicles/${encodeURIComponent(id)}`;
+/** 배치 하나의 기록 상세 (베일 상세와 함께 5단위가 채운다) */
+export const batchRecordPath = (id: string): string => `/records/batches/${encodeURIComponent(id)}`;
 
 /** 이 주소가 이 메뉴의 화면인가 (메뉴 강조용: 홈은 정확히 "/"만, 나머지는 그 아래 주소 포함) */
 export function isNavActive(item: NavItem, pathname: string): boolean {

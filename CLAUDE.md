@@ -25,7 +25,7 @@ EcoCycle/
         ├── store/         앱 상태(Redux Toolkit) — 저빈도 값만
         ├── config/        로봇 모델·장면 배치·화질 모드·환경값 (가정에 의존하는 값)
         ├── components/    공용 UI, 재사용 조작 컴포넌트
-        ├── features/      화면 단위: 로그인, 홈, 기기 페이지, 알람, 설정, CCTV
+        ├── features/      화면 단위: 로그인, 홈, 기기 페이지, 알람, 공정 기록, 설정, CCTV
         └── studio/        3D 홈 (react-three-fiber): 홈의 유일한 3D 장면 (자체 규칙, 3D를 고를 때만 불러옴)
 ```
 

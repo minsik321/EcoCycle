@@ -1,4 +1,4 @@
-import type { Bale, BaleStage, Batch, BatchStage, TankId, Vehicle, VehicleStage } from '@ecocycle/shared';
+import type { Bale, BaleStage, Batch, BatchResult, BatchStage, TankId, Vehicle, VehicleRecordStatus, VehicleStage } from '@ecocycle/shared';
 import { formatPressureMpa } from './display';
 
 // 공정 흐름(차량·배치·베일)을 화면에 적는 문구와 "공정 추적" 계산. 서버가 준 stage를 여섯 단계 칸에 옮겨 적을 뿐, 값을 만들지 않는다.
@@ -34,7 +34,26 @@ export const BALE_STAGE_TEXT: Record<BaleStage, string> = {
   shipped: '출하',
 };
 
-export const mixText = (batch: Batch): string => batch.mix.map((m) => `${SECTOR_LABEL[m.sectorId]} ${m.percent}`).join(' : ');
+export const mixText = (batch: Pick<Batch, 'mix'>): string => batch.mix.map((m) => `${SECTOR_LABEL[m.sectorId]} ${m.percent}`).join(' : ');
+
+/** 배합을 %로 분명히 적은 것 (공정 기록: "A1 40% · B2 60%") */
+export const mixPercentText = (batch: Pick<Batch, 'mix'>): string => batch.mix.map((m) => `${SECTOR_LABEL[m.sectorId]} ${m.percent}%`).join(' · ');
+
+/** 공정 기록: 차량 상태 (인식 · 하역 · 출차) */
+export const VEHICLE_RECORD_STATUS_TEXT: Record<VehicleRecordStatus, string> = {
+  identified: '인식',
+  unloading: '하역',
+  departed: '출차',
+};
+
+/** 공정 기록: 배치 결과. 진행 중이면 결과가 아직 없다(null) */
+export const BATCH_RESULT_TEXT: Record<BatchResult, string> = {
+  completed: '완료',
+  skipped: '건너뜀',
+  paused: '일시정지됨',
+};
+export const BATCH_RESULT_RUNNING_TEXT = '진행 중';
+export const batchResultText = (result: BatchResult | null): string => (result ? BATCH_RESULT_TEXT[result] : BATCH_RESULT_RUNNING_TEXT);
 
 /** 베일·배치 ID의 끝 번호만 (표에서 좁게 보여 줄 때) */
 export const shortId = (id: string): string => `#${id.split('-').pop() ?? id}`;

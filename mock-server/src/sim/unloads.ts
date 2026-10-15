@@ -1,10 +1,12 @@
-import type { TankId, UnloadRecord } from '@ecocycle/shared';
+import type { TankId, UnloadRecord, VehicleRecord } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
 import type { TruckFixture } from '../fixtures/process';
 import { COMPANIES, FILL_PERCENT_PER_TON, UNLOAD_HISTORY } from '../fixtures/process';
+import { addVehicleRecord } from './records';
 
 // 섹터 하역 기록 (GET /devices/{id}/unloads/records). 차량 흐름(sim/process)이 출차 계량을 마칠 때마다 한 줄씩 쌓고,
 // 기간 고르기·쪽 넘기기를 볼 수 있게 시작할 때 지난 며칠치를 같은 규칙으로 채워 둔다. 회사·번호판은 가상이다.
+// 같은 차량의 공정 기록(GET /vehicles/records, sim/records)도 이때 함께 채운다.
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -38,6 +40,25 @@ export function addUnloadRecord(record: UnloadRecord): void {
 }
 
 export const unloadRecords = (sectorId: TankId): UnloadRecord[] => records.filter((r) => r.sectorId === sectorId);
+
+/** 지난 하역 한 줄에 해당하는 차량 기록: 단계 시각은 sim/process의 지난 예시 차량과 같은 간격(하역 완료 기준) */
+function vehicleOf(r: UnloadRecord): VehicleRecord {
+  const at = Date.parse(r.unloadedAt);
+  const iso = (offsetSec: number) => new Date(at + offsetSec * 1000).toISOString();
+  return {
+    id: r.vehicleId,
+    status: 'departed',
+    plate: r.plate,
+    companyName: r.companyName,
+    sectorId: r.sectorId,
+    arrivedAt: iso(-31),
+    departedAt: iso(14),
+    grossT: r.grossT,
+    tareT: r.tareT,
+    netT: r.netT,
+    stageTimes: { arrived: iso(-31), identified: iso(-25), unloading: iso(-9), unloaded: iso(0), departed: iso(14) },
+  };
+}
 
 /** 지난 며칠치: 섹터마다 하루 몇 대, 작업 시간 안에 흩어서. `until` 이후는 차량 흐름이 채운다 */
 function seedHistory(until: number): void {
@@ -85,6 +106,7 @@ function seedHistory(until: number): void {
     seqByDay.set(date, seq);
     r.vehicleId = `veh-${date}-h${pad(seq, 3)}`;
     r.id = `unl-${date}-h${pad(seq, 3)}`;
+    addVehicleRecord(vehicleOf(r));
   }
   records.push(...seeded);
 }

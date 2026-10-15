@@ -17,12 +17,13 @@ shared/
     │                   리프레시 쿠키 이름·경로, 리프레시 거부 code(⚠ B28), PushRegisterRequest
     ├── devices.ts      TankState(등급 grade 포함)·RobotState·ConveyorState·CompressorState, DeviceState(type으로 구분), PlantSummary·HistoryResponse·PlantHistoryResponse(제안안)
     ├── records.ts      기록 목록 페이지 나누기: RecordQuery(from·to·page·pageSize), RecordPage<T>({ items, total, page, pageSize }), RECORD_PAGE_SIZE(10), recordPageCount (제안안)
+    ├── processRecords.ts 공정 기록: VehicleRecord(상태 identified·unloading·departed, 입·출차 시각, 총중량·공차·순중량), BatchRecord(결과 completed·skipped·paused·null=진행 중, 목표·실제 압력, 베일 ID) (제안안)
     ├── process.ts      공정 흐름: Vehicle·Batch·Bale(stage와 stageTimes), ProcessState, PLANT_METRICS (제안안, 서버 합의 전)
     ├── alarms.ts       Alarm, AlarmLevel, AlarmState
     ├── cameras.ts      Camera, StreamInfo
     ├── commands.ts     Command(type으로 구분), COMMAND_RULES(위험도·필요 권한·대상·confirm), CommandStatus, 202·조회 응답
     ├── ws.ts           Topic, ClientMessage, ServerMessage(9종, process.* 포함)
-    └── errors.ts       ApiErrorBody(code는 문자열), 클라이언트가 구분하는 상태 코드
+    └── errors.ts       ApiErrorBody(code는 문자열), 클라이언트가 구분하는 상태 코드(404 포함)
 ```
 
 명세에 JSON 예시가 없어 이름을 정한 곳은 코드 주석에 ⚠로 표시했고 서버 담당 질문(`docs/questions.md` B11~B17, 공정 흐름은 B23~B27)에 올려 두었다.

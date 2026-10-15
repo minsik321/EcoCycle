@@ -27,8 +27,16 @@ export interface RecordListProps<T> {
   title: (item: T) => ReactNode;
   /** 폰 줄의 설명 한 줄 (넘치면 말줄임) */
   detail: (item: T) => ReactNode;
+  /** 폰 줄의 둘째 설명 한 줄 (넘치면 말줄임). 표에서는 칸으로 보이는 값을 폰에서도 보여 줄 때 */
+  extra?: (item: T) => ReactNode;
   /** 태블릿·데스크톱 표의 칸 ("시각" 칸은 맨 앞에 저절로 붙는다) */
   columns: readonly Column<T>[];
+  /** 맨 앞 시각 칸의 머리글 (기본 "시각", 예: "입차") */
+  timeHeader?: string;
+  /** 표의 칸 여백을 줄인다 (칸이 많은 목록) */
+  dense?: boolean;
+  /** 줄을 누르면 부른다 (상세 화면으로 가기). 주면 폰 줄과 표 줄이 모두 눌린다 */
+  onOpen?: (item: T) => void;
   /** 처음 기간 (기본 config의 defaultRange) */
   initialRange?: RecordRangeKey;
   /** 지금 시각 (테스트용) */
@@ -43,7 +51,7 @@ type LoadState<T> = { status: 'loading'; data: RecordPage<T> | null } | { status
  * 쪽은 서버가 나눈다(`GET .../records?from&to&page&pageSize`, shared/records.ts). 시각은 UTC로 보내고 현지 시각으로 적는다.
  * 지난 기록이라 연결이 끊겨도 받은 줄은 그대로 두고 끊김과 마지막 수신 시각을 알리며, 다시 연결되면 같은 쪽을 새로 받는다.
  */
-export function RecordList<T>({ label, load, rowKey, time, title, detail, columns, initialRange = RECORD_LIST.defaultRange, now = () => new Date(), className = '' }: RecordListProps<T>) {
+export function RecordList<T>({ label, load, rowKey, time, title, detail, extra, columns, timeHeader = '시각', dense = false, onOpen, initialRange = RECORD_LIST.defaultRange, now = () => new Date(), className = '' }: RecordListProps<T>) {
   const nowRef = useRef(now);
   nowRef.current = now;
   const loadRef = useRef(load);
@@ -121,7 +129,7 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, column
   const data = state.data;
   const pages = data ? recordPageCount(data.total, data.pageSize) : 0;
   const busy = state.status === 'loading';
-  const tableColumns: Column<T>[] = [{ key: '__time', header: '시각', cell: (item) => <time dateTime={time(item)} className="tabular-nums">{formatLocalTime(time(item), false)}</time> }, ...columns];
+  const tableColumns: Column<T>[] = [{ key: '__time', header: timeHeader, cell: (item) => <time dateTime={time(item)} className="tabular-nums">{formatLocalTime(time(item), false)}</time> }, ...columns];
 
   return (
     <section aria-label={label} aria-busy={busy || undefined} className={`flex flex-col gap-3 ${className}`}>
@@ -162,20 +170,35 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, column
         <div className={busy ? 'opacity-60 transition-opacity' : undefined}>
           {/* 폰: 쌓인 줄 (제목 · 시각 / 설명 한 줄) */}
           <ul aria-label={label} className="divide-y divide-line/70 md:hidden">
-            {data.items.map((item) => (
-              <li key={rowKey(item)} className="flex min-h-14 flex-col justify-center gap-0.5 py-2">
-                <div className="flex items-baseline gap-2">
-                  <span className="min-w-0 flex-1 truncate font-semibold text-ink">{title(item)}</span>
-                  <time dateTime={time(item)} className="shrink-0 text-xs whitespace-nowrap text-ink-faint tabular-nums">
-                    {formatLocalTime(time(item), false)}
-                  </time>
-                </div>
-                <p className="truncate text-sm text-ink-soft">{detail(item)}</p>
-              </li>
-            ))}
+            {data.items.map((item) => {
+              const body = (
+                <>
+                  <div className="flex items-baseline gap-2">
+                    <span className="min-w-0 flex-1 truncate font-semibold text-ink">{title(item)}</span>
+                    <time dateTime={time(item)} className="shrink-0 text-xs whitespace-nowrap text-ink-faint tabular-nums">
+                      {formatLocalTime(time(item), false)}
+                    </time>
+                  </div>
+                  <p className="truncate text-sm text-ink-soft">{detail(item)}</p>
+                  {extra && <p className="truncate text-sm text-ink-soft">{extra(item)}</p>}
+                </>
+              );
+              const rowClass = 'flex min-h-14 flex-col justify-center gap-0.5 py-2';
+              return (
+                <li key={rowKey(item)}>
+                  {onOpen ? (
+                    <button type="button" onClick={() => onOpen(item)} className={`${rowClass} w-full min-w-0 text-left active:bg-paper-deep`}>
+                      {body}
+                    </button>
+                  ) : (
+                    <div className={rowClass}>{body}</div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
           {/* 태블릿·데스크톱: 작은 표 */}
-          <DataTable label={label} columns={tableColumns} rows={data.items} rowKey={rowKey} className="hidden md:block" />
+          <DataTable label={label} columns={tableColumns} rows={data.items} rowKey={rowKey} onRowClick={onOpen} dense={dense} className="hidden md:block" />
         </div>
       )}
 

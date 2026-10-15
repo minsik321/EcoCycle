@@ -8,7 +8,7 @@ import { Detail, DisconnectBanner, Kpis, MapTools, PhoneSheet, Pins, Tables, Top
 import { POSTER, prefetchStudio } from './preload';
 import type { PinElements } from './three/Fx';
 import type { RigApi } from './three/Rig';
-import type { StudioData } from './types';
+import type { RecordLink, StudioData } from './types';
 import { DEFAULT_VIEW } from './world/views';
 import type { ViewPreset } from './world/views';
 import './studio.css';
@@ -62,6 +62,8 @@ export interface StudioViewProps {
   account?: ReactNode;
   /** 기기 상세 패널에 넣을 조작 영역. 기존 조작 컴포넌트를 그대로 끼운다 */
   deviceActions?: (id: DeviceId) => ReactNode;
+  /** 공정 기록 화면으로 가는 링크를 그린다 ("기록 보기", "이 차량 기록", "이 배치 상세"). 없으면(시연 화면) 링크를 그리지 않는다 */
+  recordLink?: RecordLink;
   onFailed: () => void;
   /** 포스터 찍기(/scene-demo?poster=1): 3D 장면만 그리고 패널·핀·준비 화면은 그리지 않는다. 첫 장을 그리면 data-poster-ready */
   poster?: boolean;
@@ -100,7 +102,7 @@ function useLayout(ref: RefObject<HTMLElement | null>): Layout {
  * 스튜디오 화면: 가득 찬 3D 무대와 그 위의 유리 패널. 데이터는 모두 props로 받는다
  * (store 연결은 LiveStudio, 서버 없는 시연은 DemoStudio).
  */
-export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, disconnected, lastReceivedAt, paused, example, switcher, tabs, account, deviceActions, onFailed, poster = false }: StudioViewProps) {
+export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, disconnected, lastReceivedAt, paused, example, switcher, tabs, account, deviceActions, recordLink, onFailed, poster = false }: StudioViewProps) {
   const [selection, setSelection] = useState<string | null>(null);
   const [view, setView] = useState(DEFAULT_VIEW.key);
   const root = useRef<HTMLElement>(null);
@@ -231,12 +233,12 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
       <Kpis data={data} disconnected={disconnected} />
       <MapTools onZoom={zoom} onRotate={(deg) => rig.current?.rotate(deg)} onHome={() => goView(DEFAULT_VIEW)} />
       {phone ? (
-        <PhoneSheet {...common} deviceActions={deviceActions} />
+        <PhoneSheet {...common} deviceActions={deviceActions} recordLink={recordLink} />
       ) : (
         <>
-          <Detail {...common} deviceActions={deviceActions} collapsible={layout === 'narrow'} />
+          <Detail {...common} deviceActions={deviceActions} recordLink={recordLink} collapsible={layout === 'narrow'} />
           <Tracker {...common} />
-          <Tables {...common} />
+          <Tables {...common} recordLink={recordLink} />
         </>
       )}
       {jointSource.kind === 'demo' && <p className="st-demo-note">로봇팔은 시연 동작입니다 (실제 로봇 값이 아닙니다)</p>}

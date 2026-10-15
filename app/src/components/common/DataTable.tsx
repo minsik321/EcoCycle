@@ -18,6 +18,8 @@ export interface DataTableProps<T> {
   /** 줄을 누르면 부른다 (예: 그 대상으로 카메라 이동). 주면 줄이 버튼처럼 동작한다 */
   onRowClick?: (row: T) => void;
   selectedKey?: string | null;
+  /** 칸 좌우 여백을 줄인다 (칸이 많아 세로 태블릿에서 빠듯한 표) */
+  dense?: boolean;
   empty?: string;
   className?: string;
 }
@@ -30,6 +32,7 @@ export function DataTable<T>({
   rowKey,
   onRowClick,
   selectedKey,
+  dense = false,
   empty = '표시할 항목이 없습니다.',
   className = '',
 }: DataTableProps<T>) {
@@ -44,7 +47,7 @@ export function DataTable<T>({
               <th
                 key={c.key}
                 scope="col"
-                className={`sticky top-0 border-b border-line bg-surface/90 px-3 py-2 text-xs font-semibold whitespace-nowrap text-ink-faint ${cellClass(c)}`}
+                className={`sticky top-0 border-b border-line bg-surface/90 ${dense ? 'px-2' : 'px-3'} py-2 text-xs font-semibold whitespace-nowrap text-ink-faint ${cellClass(c)}`}
               >
                 {c.header}
               </th>
@@ -73,7 +76,7 @@ export function DataTable<T>({
                 className={`${onRowClick ? 'cursor-pointer active:bg-accent-soft' : ''} ${selected ? 'bg-accent-soft' : ''}`}
               >
                 {columns.map((c) => (
-                  <td key={c.key} className={`h-11 border-b border-line/70 px-3 whitespace-nowrap text-ink ${cellClass(c)}`}>
+                  <td key={c.key} className={`h-11 border-b border-line/70 ${dense ? 'px-2' : 'px-3'} whitespace-nowrap text-ink ${cellClass(c)}`}>
                     {c.cell(row)}
                   </td>
                 ))}

@@ -15,12 +15,12 @@ import type { StageProps } from './Stage';
 import { SCENE_START, StudioView } from './StudioView';
 import { Robot } from './actors/Robot';
 import { demoData } from './demo/demoData';
-import { Detail, PhoneSheet, TrackerBar } from './overlay/Panels';
+import { Detail, PhoneSheet, Tables, TrackerBar } from './overlay/Panels';
 import { cycleSteps } from './overlay/text';
 import { Director } from './sim/director';
 import { Pace } from './sim/pace';
 import { STUDIO_PROFILES, deviceClass, studioTier } from './quality';
-import type { StudioData } from './types';
+import type { RecordLink, StudioData } from './types';
 import { EMPTY_DATA } from './types';
 import { APRON, AREAS, BALE_REST, DEFAULT_VIEW, SCALE, TIER_DISTANCE, TRUCK, VIEWS, WIDE_VIEW, YARD, bayCenterZ, closeDistance, tierOf } from './world/layout';
 import { Route, Routes } from 'react-router-dom';
@@ -544,5 +544,59 @@ describe('세로 태블릿: 배치 요약 칩', () => {
   it('넓은 화면(collapsible 없음)에서는 처음부터 펼쳐 둔다', () => {
     render(<Detail data={demoData(T0, 30)} disconnected={false} selection={null} onSelect={() => {}} />);
     expect(screen.getByRole('complementary', { name: '공정 요약' })).toBeInTheDocument();
+  });
+});
+
+describe('공정 기록 링크 (앱이 주소를 그려 넘긴다)', () => {
+  // 링크 그리기는 앱(LiveStudio)의 일이라 여기서는 대상과 모양을 글로 적는 가짜를 쓴다
+  const recordLink: RecordLink = (target, label, className) => (
+    <a className={className} href={`#${target.kind}:${'tab' in target ? target.tab : target.id}`}>
+      {label}
+    </a>
+  );
+
+  it('차량 표(넓은 화면·세로 태블릿)는 머리에 "기록 보기", 배치 탭도 같고 섹터·베일 탭에는 없다', async () => {
+    const user = userEvent.setup();
+    render(<Tables data={demoData(T0, 30)} disconnected={false} selection={null} onSelect={() => {}} recordLink={recordLink} />);
+    expect(screen.getByRole('link', { name: '기록 보기' })).toHaveAttribute('href', '#list:vehicles');
+    await user.click(screen.getByRole('tab', { name: /^배치/ }));
+    expect(screen.getByRole('link', { name: '기록 보기' })).toHaveAttribute('href', '#list:batches');
+    await user.click(screen.getByRole('tab', { name: /^섹터/ }));
+    expect(screen.queryByRole('link', { name: '기록 보기' })).toBeNull();
+    await user.click(screen.getByRole('tab', { name: /^베일/ }));
+    expect(screen.queryByRole('link', { name: '기록 보기' })).toBeNull();
+  });
+
+  it('고른 차량의 상세에는 "이 차량 기록", 고른 베일의 상세와 지금 배치 요약에는 "이 배치 상세"', () => {
+    const data = demoData(T0, 30);
+    const vehicleId = data.vehicles.find((v) => v.stage !== 'departed')!.id;
+    const { rerender } = render(<Detail data={data} disconnected={false} selection={`veh:${vehicleId}`} onSelect={() => {}} recordLink={recordLink} />);
+    expect(screen.getByRole('link', { name: '이 차량 기록' })).toHaveAttribute('href', `#vehicle:${vehicleId}`);
+
+    const bale: Bale = { id: 'BL-20261013-0412', batchId: 'batch-0412', stage: 'created', stageTimes: { created: NOW }, updatedAt: NOW };
+    rerender(<Detail data={{ ...data, bales: [bale] }} disconnected={false} selection={`bale:${bale.id}`} onSelect={() => {}} recordLink={recordLink} />);
+    expect(screen.getByRole('link', { name: '이 배치 상세' })).toHaveAttribute('href', `#batch:${bale.batchId}`);
+
+    const current = data.batches.find((b) => b.stage !== 'completed')!;
+    rerender(<Detail data={data} disconnected={false} selection={null} onSelect={() => {}} recordLink={recordLink} />);
+    expect(screen.getByRole('link', { name: '이 배치 상세' })).toHaveAttribute('href', `#batch:${current.id}`);
+  });
+
+  it('폰 시트: 배치·차량 탭에 "기록 보기", 섹터 탭에는 없다. 링크를 넘기지 않으면(시연 화면) 어디에도 없다', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<PhoneSheet data={demoData(T0, 30)} disconnected={false} selection={null} onSelect={() => {}} recordLink={recordLink} />);
+    await user.click(screen.getByRole('button', { name: '공정 정보 펼치기' }));
+    await user.click(screen.getByRole('tab', { name: /^차량/ }));
+    expect(screen.getByRole('link', { name: '기록 보기' })).toHaveAttribute('href', '#list:vehicles');
+    await user.click(screen.getByRole('tab', { name: /^배치/ }));
+    expect(screen.getByRole('link', { name: '기록 보기' })).toHaveAttribute('href', '#list:batches');
+    await user.click(screen.getByRole('tab', { name: /^섹터/ }));
+    expect(screen.queryByRole('link', { name: '기록 보기' })).toBeNull();
+    unmount();
+
+    render(<PhoneSheet data={demoData(T0, 30)} disconnected={false} selection={null} onSelect={() => {}} />);
+    await user.click(screen.getByRole('button', { name: '공정 정보 펼치기' }));
+    await user.click(screen.getByRole('tab', { name: /^차량/ }));
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });

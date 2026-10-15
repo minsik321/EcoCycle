@@ -142,6 +142,21 @@ async function run(browser) {
         await page.waitForTimeout(1200);
         await check(page, name, zoom);
       }
+      // 공정 기록: 차량·배치 탭과 각각의 상세 (첫 줄을 눌러 연다)
+      for (const [tab, label, name] of [
+        ['vehicles', '차량 기록', '공정 기록 차량'],
+        ['batches', '배치 기록', '공정 기록 배치'],
+      ]) {
+        await go(`/records?tab=${tab}`);
+        await page.getByRole('region', { name: label }).waitFor({ timeout: 15_000 });
+        await page.waitForTimeout(1200);
+        await check(page, name, zoom);
+        const first = phone ? page.getByRole('list', { name: label }).getByRole('button').first() : page.getByRole('table', { name: label }).locator('tbody tr').first();
+        await first.click();
+        await page.getByText(/^(계중대 무게|만든 베일)/).first().waitFor({ timeout: 15_000 });
+        await page.waitForTimeout(800);
+        await check(page, `${name} 상세`, zoom);
+      }
       // 폰: 아래 탭 바의 "더 보기"를 펼친 모습
       if (phone) {
         await go('/robot');

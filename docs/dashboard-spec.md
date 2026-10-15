@@ -59,7 +59,7 @@ Oct 13, 2026 · @민식
 
 - 상단 지표 카드: 오늘 처리량(베일 수), 평균 함수율, 압축기 가동률. 카드마다 작은 추이선을 둔다. 시스템 상태는 상단 바에 표시하고 전체 적재율은 섹터 표에서 본다. 한 기기당 숫자는 2개 정도로 제한한다.
 - 하단 공정 추적: 입고, 차량 인식, 하역, 배합, 압축, 출하. 서버가 보낸 공정 흐름 값(6절 "공정 흐름")에 연결하고 단계별 시각을 표시하며 정지·오류·연결 끊김은 색으로 눈에 띄게 표시한다. 로봇의 동작 단계(집기, 이동, 놓기)는 로봇 상세 패널에 둔다.
-- 주 메뉴: 홈, 섹터(기존 탱크와 같은 대상), 로봇팔, 컨베이어, 압축기, 알람, 설정. 앱 어디서나(3D 홈 포함) 같은 메뉴 하나를 쓴다. 폰은 아래 탭 바(자주 쓰는 4개 + "더 보기"), 태블릿·데스크톱은 왼쪽 사이드바이고 3D 홈에서는 아이콘만 남게 접혀 있다가 누르면 펼친다. 지금 화면의 메뉴는 어디서나 같은 모양으로 강조한다. 권한이 없는 메뉴는 숨기거나 비활성화한다.
+- 주 메뉴: 홈, 섹터(기존 탱크와 같은 대상), 로봇팔, 컨베이어, 압축기, 알람, 공정 기록, 설정. 앱 어디서나(3D 홈 포함) 같은 메뉴 하나를 쓴다. 폰은 아래 탭 바(자주 쓰는 4개 + "더 보기"), 태블릿·데스크톱은 왼쪽 사이드바이고 3D 홈에서는 아이콘만 남게 접혀 있다가 누르면 펼친다. 지금 화면의 메뉴는 어디서나 같은 모양으로 강조한다. 권한이 없는 메뉴는 숨기거나 비활성화한다.
 - 핀과 기기 탭: 정해진 위치로 카메라가 이동하고 우측 상세 카드(적재율, 부피, 상태, 위치)와 상세 보기 버튼이 열린다.
 - 연결 끊김: 값이 갱신되지 않으면 마지막 값을 그대로 두지 않고 “연결 끊김”과 마지막 수신 시각을 표시하고 로봇팔은 멈춘다.
 - 알람은 단계와 상관없이 홈에서 색과 아이콘으로 눈에 띄게 하고, 누르면 해당 기기 페이지로 이동한다.
@@ -198,6 +198,10 @@ Oct 13, 2026 · @민식
 | GET `/devices/{id}/state` | 기기 하나의 최신 상태 |
 | GET `/devices/{id}/history?metric=level&from=...&to=...&interval=1m` | 이력 시계열 (그래프용) |
 | GET `/devices/{id}/unloads/records?from=...&to=...&page=1&pageSize=10` | 섹터(탱크) 하나의 하역 기록 (섹터 기기 ID만, 아래 "기록 목록" 모양) |
+| GET `/vehicles/records?from=...&to=...&page=1&pageSize=10` | 차량 기록 (입차 시각 기준, 아래 "공정 기록" 모양) |
+| GET `/vehicles/{id}` | 차량 기록 한 건 (목록 한 줄과 같은 모양). 없으면 404 |
+| GET `/batches/records?from=...&to=...&page=1&pageSize=10` | 배치 기록 (시작 시각 기준, 아래 "공정 기록" 모양) |
+| GET `/batches/{id}` | 배치 기록 한 건 (목록 한 줄과 같은 모양). 없으면 404 |
 | GET `/robots/{id}/model` | 로봇 모델 정보: 축 수, 관절 순서, 링크 길이, 각도 범위, 영점 (기종이 정해지면 이 값으로 화면을 맞춘다) |
 | GET `/alarms?state=active` | 알람 목록 |
 | GET `/cameras` | 카메라 목록 |
@@ -238,6 +242,41 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 
 - 무게는 계중대 값(t): 입차 총중량 `grossT`, 출차 공차 `tareT`, 순중량 `netT = grossT − tareT`(서버가 계산해 저장).
 - `fillBeforePercent`·`fillAfterPercent`는 하역 직전·직후의 섹터 적재율 %. 화면은 두 값과 차이(%p)를 적기만 한다.
+
+##### 공정 기록 (차량·배치)
+
+"공정 기록" 화면의 두 목록은 같은 기록 목록 모양이다. 지금 진행 중인 차량·배치도 목록에 들어 있고(`status`·`result`가 진행 상태를 알려 준다), 끝나면 같은 줄이 바뀐다. 지난 30일 안의 기록을 준다(제안).
+
+차량 기록 `GET /vehicles/records` (기록 시각은 입차 시각 `arrivedAt`):
+
+```json
+{
+  "id": "veh-20261015-034", "status": "departed",
+  "plate": "12가 3456", "companyName": "한빛자원", "sectorId": "tank-a1",
+  "arrivedAt": "2026-10-15T04:11:58.000Z", "departedAt": "2026-10-15T04:13:25.000Z",
+  "grossT": 18.42, "tareT": 9.86, "netT": 8.56,
+  "stageTimes": { "arrived": "...", "identified": "...", "unloading": "...", "unloaded": "...", "departed": "..." }
+}
+```
+
+- `status`는 서버가 정한다: `identified`(인식: 계중대 도착·번호판 인식), `unloading`(하역: 하역 중·하역 완료), `departed`(출차). 번호판·회사·배정 섹터는 인식 전에는 `null`이다.
+- `grossT`는 입차 계량이라 처음부터 있고, `tareT`·`netT`는 출차 계량 뒤에야 있다(그 전에는 `null`). `departedAt`도 출차 전에는 `null`.
+
+배치 기록 `GET /batches/records` (기록 시각은 시작 시각 `startedAt`):
+
+```json
+{
+  "id": "batch-0407", "result": "completed",
+  "startedAt": "2026-10-15T04:20:00.000Z", "endedAt": "2026-10-15T04:24:10.000Z",
+  "mix": [{ "sectorId": "tank-a1", "percent": 40 }, { "sectorId": "tank-b2", "percent": 60 }],
+  "avgMoisturePercent": 11.8, "targetPressureMpa": 28.5, "actualPressureMpa": 28.3,
+  "balesProduced": 1, "baleIds": ["BL-20261015-0407"]
+}
+```
+
+- `result`: `completed`(완료), `skipped`(건너뜀: 압축하지 않고 넘어감), `paused`(일시정지됨: 일시정지된 채 끝남), 진행 중이면 `null`.
+- `actualPressureMpa`는 압축 때 실제로 낸 압력(MPa)이고 압축하지 않았거나 아직 압축 전이면 `null`. `endedAt`은 진행 중이면 `null`. `balesProduced`는 `baleIds`의 길이다.
+- 배치·베일 상세 화면(5단위)이 쓸 `GET /batches/{id}`는 목록 한 줄과 같은 모양을 준다.
 
 기기별 상태 형식은 다음과 같으며 `status`가 `normal`, `caution`, `alarm`, `offline` 중 무엇인지는 서버가 기준값으로 정해서 보낸다.
 
@@ -505,6 +544,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 계중대와 무게 | 차량·하역 기록에만 계중대 순중량(t, 총중량 − 공차, 세 값 모두 저장)을 쓴다. 섹터는 적재율·부피, 로봇 집기는 부피 또는 횟수. 실시간 장면의 계중대는 진행 표시만 한다 | 기록 형식(`shared/`), 기록 화면의 표시 단위, `app/src/config/display.ts` |
 | 기록 목록 | 모든 기록 목록은 `from`·`to`·`page`·`pageSize` 쿼리와 `{ items, total, page, pageSize }` 응답, 한 쪽 10줄 | `shared/records.ts`, 모의 서버 `routes/records.ts`, `components/records` |
 | 섹터 하역 기록 | `GET /devices/{id}/unloads/records`, 줄마다 번호판·회사·총중량·공차·순중량(t)·하역 전후 적재율. 섹터 상태에 지금의 주의 기준 `cautionThresholdPercent` | `shared/records.ts`·`devices.ts`, 모의 서버 `sim/unloads.ts`, `features/tank` |
+| 공정 기록 | `GET /vehicles/records`·`GET /batches/records`(기록 목록 모양)와 한 건 조회 `GET /vehicles/{id}`·`GET /batches/{id}`. 차량: 입·출차 시각, 번호판, 회사, 배정 섹터, 총중량·공차·순중량, 상태(인식·하역·출차). 배치: 시작·종료, 배합, 평균 수분, 목표·실제 압력, 결과(완료·건너뜀·일시정지됨), 만든 베일. 지난 30일 | `shared/processRecords.ts`, 모의 서버 `sim/records.ts`, `features/records` |
 | 차량·회사·섹터 배정 | 번호판 → 회사 → 배정 섹터는 서버가 정해 보낸다. 모의 서버는 가상의 회사(한빛자원, 동해페이퍼, 새솔리싸이클)와 가상의 번호판을 쓴다 | 모의 서버 예시 데이터 |
 | 배합과 압력 | 배치별 배합비·평균 수분·목표 압력은 서버가 정해 보낸다 | 모의 서버 예시 데이터 |
 | 공정 흐름 형식 | 6절 "공정 흐름"의 `process.*` 메시지와 `GET /process/state` | API 경로와 값 형식 |

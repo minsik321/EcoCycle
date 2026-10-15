@@ -942,6 +942,28 @@ a.st-bell:hover {
   border-top: 1px solid var(--st-line);
 }
 
+/* 표 머리·폰 시트의 작은 "기록 보기" 링크: 탭 줄 오른쪽 끝, 한 줄 */
+.st-link-mini {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: 28px;
+  margin-left: auto;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgb(47 107 255 / 0.1);
+  color: var(--st-blue);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.st-list-link {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .st-link {
   display: flex;
   align-items: center;

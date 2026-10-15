@@ -1,4 +1,4 @@
-import type { Bale, Batch, CompressorState, MixPart, ProcessState, TankId, TankState, Vehicle } from '@ecocycle/shared';
+import type { Bale, Batch, BatchRecord, CompressorState, MixPart, ProcessState, TankId, TankState, Vehicle, VehicleRecord } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
 import type { CompanyFixture, TruckFixture } from '../fixtures/process';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../fixtures/process';
 import { publish } from './bus';
 import { addToTank, excludedTanks } from './plant';
+import { addBatchRecord, addVehicleRecord, baleIdOf, seedRecords, toVehicleRecord } from './records';
 import { devices, press, production } from './state';
 import { addUnloadRecord, fillGainPercent, weighTruck } from './unloads';
 
@@ -97,7 +98,10 @@ function setVehicleStage(run: VehicleRun, stage: Vehicle['stage'], now: number):
   if (stage === 'unloading') run.fillBefore = tank(run.company.sectorId).fillPercent;
   if (stage === 'unloaded') run.fillAfter = tank(run.company.sectorId).fillPercent;
   // 출차 계량(공차)까지 마치면 하역 기록 한 줄이 생긴다
-  if (stage === 'departed') recordUnload(run);
+  if (stage === 'departed') {
+    recordUnload(run);
+    addVehicleRecord(toVehicleRecord(v, run.weight));
+  }
   sendVehicle(v);
 }
 
@@ -255,14 +259,26 @@ function tickBatches(now: number): void {
     if (compressSec >= BATCH_TIMING_SEC.compress) {
       press.targetMpa = null;
       setBatchStage(compressing, 'completed', now);
-      const seq = compressing.id.split('-')[1] ?? '0000';
       const bale: Bale = {
-        id: `BL-${siteDate(now)}-${seq}`,
+        id: baleIdOf(compressing.id, now),
         batchId: compressing.id,
         stage: 'created',
         stageTimes: { created: iso(now) },
         updatedAt: iso(now),
       };
+      // 끝난 배치는 공정 기록에 남긴다 (실제로 낸 압력은 압축기가 지금 내는 압력)
+      addBatchRecord({
+        id: compressing.id,
+        result: 'completed',
+        startedAt: compressing.stageTimes.planned ?? compressing.updatedAt,
+        endedAt: iso(now),
+        mix: structuredClone(compressing.mix),
+        avgMoisturePercent: compressing.avgMoisturePercent,
+        targetPressureMpa: compressing.targetPressureMpa,
+        actualPressureMpa: round1(compressor().pressureMpa),
+        balesProduced: 1,
+        baleIds: [bale.id],
+      });
       production.balesToday += 1;
       sendBale(bale);
       pendingShip.push({ bale, at: now + BATCH_TIMING_SEC.ship * 1000 });
@@ -303,6 +319,26 @@ export function processState(): ProcessState {
   return structuredClone({ vehicles, batches, bales, updatedAt: iso(Date.now()) });
 }
 
+/** 지금 진행 중인 차량의 공정 기록 줄 (끝난 차량은 sim/records가 보관한다) */
+export const liveVehicleRecords = (): VehicleRecord[] => activeRuns.map((run) => toVehicleRecord(run.vehicle, run.weight));
+
+/** 지금 진행 중인 배치의 공정 기록 줄 (끝난 배치는 sim/records가 보관한다). 아직 압축하지 않아 실제 압력·베일은 없다 */
+export const liveBatchRecords = (): BatchRecord[] =>
+  batches
+    .filter((b) => b.stage !== 'completed')
+    .map((b) => ({
+      id: b.id,
+      result: null,
+      startedAt: b.stageTimes.planned ?? b.updatedAt,
+      endedAt: null,
+      mix: structuredClone(b.mix),
+      avgMoisturePercent: b.avgMoisturePercent,
+      targetPressureMpa: b.targetPressureMpa,
+      actualPressureMpa: null,
+      balesProduced: 0,
+      baleIds: [],
+    }));
+
 /** 시작할 때 표가 비어 있지 않게 지나간 예시 기록을 채워 둔다 */
 function seedRecent(): void {
   const now = Date.now();
@@ -324,7 +360,7 @@ function seedRecent(): void {
       fillBeforePercent: round1(Math.max(0, fillAfter - fillGainPercent(weight.netT))),
       fillAfterPercent: fillAfter,
     });
-    vehicles.push({
+    const vehicle: Vehicle = {
       id: vehicleId,
       stage: 'departed',
       plate: truck.plate,
@@ -338,14 +374,16 @@ function seedRecent(): void {
         departed: iso(at + 45_000),
       },
       updatedAt: iso(at + 45_000),
-    });
+    };
+    vehicles.push(vehicle);
+    addVehicleRecord(toVehicleRecord(vehicle, weight));
 
     const seq = pad(batchSeq - i, 4);
     const ratio = MIX_RATIOS[i % MIX_RATIOS.length] as [number, number];
     const first = TANK_IDS[i % 4] as TankId;
     const second = TANK_IDS[(i + 2) % 4] as TankId;
     const done = at + 4 * 60_000;
-    batches.push({
+    const batch: Batch = {
       id: `batch-${seq}`,
       stage: 'completed',
       mix: [
@@ -356,6 +394,19 @@ function seedRecent(): void {
       targetPressureMpa: round1(27.6 + i * 0.5),
       stageTimes: { planned: iso(at), mixing: iso(at + 3_000), compressing: iso(done - 8_000), completed: iso(done) },
       updatedAt: iso(done),
+    };
+    batches.push(batch);
+    addBatchRecord({
+      id: batch.id,
+      result: 'completed',
+      startedAt: iso(at),
+      endedAt: iso(done),
+      mix: structuredClone(batch.mix),
+      avgMoisturePercent: batch.avgMoisturePercent,
+      targetPressureMpa: batch.targetPressureMpa,
+      actualPressureMpa: round1(batch.targetPressureMpa - 0.2),
+      balesProduced: 1,
+      baleIds: [baleIdOf(batch.id, done)],
     });
     bales.push({
       id: `BL-${siteDate(done)}-${seq}`,
@@ -368,3 +419,5 @@ function seedRecent(): void {
 }
 
 seedRecent();
+// 그 앞의 지난 날 배치 (번호는 지난 예시 배치 바로 앞에서 거꾸로)
+seedRecords(batchSeq - 5);

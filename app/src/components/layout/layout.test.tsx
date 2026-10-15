@@ -21,7 +21,7 @@ const names = () => within(screen.getByRole('navigation', { name: '주 메뉴' }
 describe('Sidebar', () => {
   it('명세 순서대로 메뉴를 보여 주고 각각 알맞은 주소로 이어진다', () => {
     renderWithStore(<Sidebar />);
-    expect(names()).toEqual(['홈', '섹터', '로봇팔', '컨베이어', '압축기', '알람', '설정']);
+    expect(names()).toEqual(['홈', '섹터', '로봇팔', '컨베이어', '압축기', '알람', '공정 기록', '설정']);
     expect(screen.getByRole('link', { name: '로봇팔' })).toHaveAttribute('href', '/robot');
     expect(screen.getByRole('link', { name: '홈' })).toHaveAttribute('href', '/');
   });
@@ -104,7 +104,7 @@ describe('Sidebar', () => {
     expect(screen.queryByRole('group', { name: '더 보기 메뉴' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '더 보기' }));
     const group = screen.getByRole('group', { name: '더 보기 메뉴' });
-    expect(within(group).getAllByRole('link').map((a) => a.textContent)).toEqual(['컨베이어', '압축기', '설정']);
+    expect(within(group).getAllByRole('link').map((a) => a.textContent)).toEqual(['컨베이어', '압축기', '공정 기록', '설정']);
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('group', { name: '더 보기 메뉴' })).not.toBeInTheDocument();
   });

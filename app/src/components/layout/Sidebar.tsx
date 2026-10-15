@@ -32,6 +32,7 @@ const ICON_PATHS: Record<string, string> = {
   conveyor: 'M4 10h16M4 14h16M7 17a1.5 1.5 0 1 0 0 .01M12 17a1.5 1.5 0 1 0 0 .01M17 17a1.5 1.5 0 1 0 0 .01M9 6h6v4H9z',
   compressor: 'M6 4h12v4H6zM12 8v4M7 12h10v8H7zM10 16h4',
   alarms: 'M6 9a6 6 0 1 1 12 0c0 6 2.5 7 2.5 7h-17S6 15 6 9M10 20a2 2 0 0 0 4 0',
+  records: 'M7 4h8l3 3v13H7zM14 4v4h4M10 12h5M10 16h5',
   settings: 'M5 7h9M18 7h1M5 17h1M10 17h9M16 5v4M8 15v4',
   more: 'M6 12h.01M12 12h.01M18 12h.01',
   expand: 'M4 6h16M4 12h10M4 18h16M17 9l3 3-3 3',

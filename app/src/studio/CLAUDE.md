@@ -73,7 +73,7 @@ studio/
 ├── StudioScene.tsx     3D 조각의 입구: Director(연출 감독)를 만들어 서버 값을 넘기고 Stage를 그린다. three는 여기서부터
 ├── preload.ts          3D 파일 미리 받기(정적 파일만: 빌드가 적은 조각 목록, 모델, 포스터)와 포스터 주소. 메인 묶음에 들어간다
 ├── Stage.tsx           Canvas, 조명·그림자·환경광, 후처리. frozen이면 색을 빼고, paused면 그리기를 멈춘다
-├── types.ts            StudioData (서버 값 묶음)
+├── types.ts            StudioData (서버 값 묶음), RecordLink(공정 기록 화면으로 가는 링크를 앱이 그려 넘기는 함수 모양)
 ├── quality.ts          화질 단계별 그리기(STUDIO_PROFILES), 기기 종류(폰·태블릿·데스크톱), 단계 고르기(studioTier)
 ├── useStudioTier.ts    기기 종류·측정값·직접 고른 값 → 지금 단계 (화면 크기가 바뀌면 다시)
 ├── theme.ts            색 (구역 밝기 단계, 등급 색, 회사 띠 색, 승용차 색)
@@ -113,6 +113,7 @@ studio/
 └── loading.test.tsx    조각 나누기(패널에 three 없음), 3D 전 패널·준비 화면, 장면 올리는 때, 미리 받기(정적 파일만), 포스터(빈 장면)
 ```
 
+- 공정 기록 링크(2026-10-15): 차량·배치 탭의 "기록 보기"(표 머리, 폰은 시트 위쪽), 고른 차량의 "이 차량 기록", 고른 베일 상세·지금 배치 요약의 "이 배치 상세". 스튜디오는 앱의 주소를 모르므로 `StudioView`의 `recordLink` 속성으로 받는다(`LiveStudio`가 `<Link>`를 그려 넘기고 `/scene-demo`는 넘기지 않아 링크가 없다).
 - 홈의 전환 "3D | 대시보드"(`HomeSwitch`)와 lazy import는 `features/home`에 있다. 전환은 상단 바의 `switcher` 자리에 들어가고 폰에서도 "더 보기"에 숨기지 않는다(자리가 모자라면 지역 전환이 아이콘만 남도록 먼저 줄어든다). `tabs`는 시연 화면의 측정 버튼 같은 보조 영역이다.
 - 대시보드와 함께 쓰는 것: 공정 문구·6단계 계산(`config/processDisplay.ts`, `overlay/text.ts`가 다시 내보낸다), 지표 추이선(`store/usePlantTrends.ts`).
 - 앱 코드에서 가져다 쓰는 것: `config/robotModel`·`robotCycle`(로봇 기본 모델, 집는 각도·시연 주기), `config/display`(값 형식·기기 이름·상태 문구),
