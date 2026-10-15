@@ -8,7 +8,8 @@ import { bale, bush, car, cone, lamp, pallet, tree } from './props';
 
 // 스튜디오 월드의 고정물. 전부 코드로 조립하고 재질별 메시 몇 개로 합친다.
 // 본관 벽은 방향별로 따로 만들어, 카메라 쪽을 향한 벽은 숨긴다 (안이 들여다보이는 "인형의 집" 방식).
-// 모양은 참고 화면(docs/reference/)을 따른다: 흰 벽 + 지붕선·모서리·문틀의 가는 파랑 선.
+// 모양은 참고 화면(docs/reference/)을 따른다: 흰 벽 + 지붕선·모서리·문틀의 파랑 선. 색은 첫 스튜디오 시안처럼 진하게:
+// 벽 위 덮개·컨베이어 틀·압축기·문형 구조물·경비실 지붕은 채도 높은 파랑, 모터·결속 타래·유압 탱크는 노랑.
 // 구역은 밝기 단계로 나눈다: 도로(회청색, 흰 차선) < 마당 콘크리트(옅은 회색) < 건물 바닥(거의 흰색, 칠한 통로선), 가장자리의 옅은 녹지와 적당한 나무.
 
 export interface Wall {
@@ -50,7 +51,7 @@ function ground(k: Kit): void {
   const roadZ = mid(ROAD.minZ, ROAD.maxZ);
   k.box(C.asphalt, [SITE.maxX - SITE.minX + 1.6, 0.03, roadW], [mid(SITE.minX, SITE.maxX), -0.012, roadZ], { r: 0 });
   // 도로색에서 바닥색으로 옅어지는 다섯 칸
-  const fade = ['#c2c9d3', '#cbd1d9', '#d4d9e0', '#dde1e6', '#e4e7eb'];
+  const fade = ['#a7b1be', '#b4bdc8', '#c2c8d2', '#cfd4dc', '#dce0e6'];
   fade.forEach((hex, i) => {
     k.box(hex, [4.02, 0.03, roadW], [SITE.maxX + 0.8 + 2 + i * 4, -0.012 - (i + 1) * 0.002, roadZ], { r: 0 });
     k.box(hex, [4.02, 0.03, roadW], [SITE.minX - 0.8 - 2 - i * 4, -0.012 - (i + 1) * 0.002, roadZ], { r: 0 });
@@ -130,7 +131,7 @@ function inbound(k: Kit): void {
   const gx = SCALE.maxX + 0.75;
   k.box(C.wall, [0.14, 2.5, 0.14], [gx, 0, SCALE.z - 1.05], { r: 0.05 });
   k.box(C.wall, [0.14, 2.5, 0.14], [gx, 0, SCALE.z + 1.05], { r: 0.05 });
-  k.box(C.wall, [0.2, 0.2, 2.44], [gx, 2.4, SCALE.z], { r: 0.07, seg: 3 });
+  k.box(C.blue, [0.2, 0.2, 2.44], [gx, 2.4, SCALE.z], { r: 0.07, seg: 3, mat: 'gloss' });
   edgeZ(k, SCALE.z - 1.22, SCALE.z + 1.22, 2.6, gx - 0.1);
   for (const dz of [-0.5, 0.5]) {
     k.box(C.wall, [0.3, 0.16, 0.18], [gx - 0.16, 2.2, SCALE.z + dz], { r: 0.05 });
@@ -146,7 +147,7 @@ function inbound(k: Kit): void {
   k.at([GATE.houseX, 0, GATE.houseZ], 0, () => {
     k.box(C.concreteDark, [1.7, 0.08, 1.6], [0, 0, 0], { r: 0.04 });
     k.box(C.wall, [1.4, 1.5, 1.3], [0, 0.08, 0], { r: 0.12, seg: 3 });
-    k.box(C.roof, [1.7, 0.14, 1.6], [0, 1.58, 0], { r: 0.07, seg: 3 });
+    k.box(C.blue, [1.7, 0.14, 1.6], [0, 1.58, 0], { r: 0.07, seg: 3, mat: 'gloss' });
     edgeX(k, -0.85, 0.85, 1.6, -0.8);
     edgeZ(k, -0.8, 0.8, 1.6, 0.85);
     k.box(C.glass, [1.0, 0.6, 0.04], [0, 0.75, -0.655], { r: 0.02, mat: 'glass' });
@@ -206,7 +207,7 @@ function hallInterior(k: Kit): void {
   const len = CONVEYOR.startX - CONVEYOR.endX;
   const top = CONVEYOR.topY;
   for (const dz of [-1, 1]) {
-    k.box(C.wall, [len + 0.3, 0.2, 0.07], [cx, top - 0.14, CONVEYOR.z + dz * (CONVEYOR.width / 2 + 0.035)], { r: 0.03, mat: 'gloss' });
+    k.box(C.blue, [len + 0.3, 0.2, 0.07], [cx, top - 0.14, CONVEYOR.z + dz * (CONVEYOR.width / 2 + 0.035)], { r: 0.03, mat: 'gloss' });
     edgeX(k, CONVEYOR.endX - 0.15, CONVEYOR.startX + 0.15, top + 0.04, CONVEYOR.z + dz * (CONVEYOR.width / 2 + 0.05));
     for (let x = CONVEYOR.startX - 0.3; x > CONVEYOR.endX + 0.2; x -= 0.83) k.cyl(C.steelLight, 0.022, 0.24, [x, top + 0.02, CONVEYOR.z + dz * (CONVEYOR.width / 2 + 0.035)], { seg: 8, mat: 'metal' });
   }
@@ -217,7 +218,7 @@ function hallInterior(k: Kit): void {
   }
   k.cyl(C.steel, 0.1, CONVEYOR.width + 0.1, [CONVEYOR.startX + 0.05, top - 0.1, CONVEYOR.z], { axis: 'z', mat: 'metal' });
   k.cyl(C.steel, 0.1, CONVEYOR.width + 0.1, [CONVEYOR.endX - 0.05, top - 0.1, CONVEYOR.z], { axis: 'z', mat: 'metal' });
-  k.box(C.wall, [0.42, 0.34, 0.3], [CONVEYOR.endX + 0.5, top - 0.5, CONVEYOR.z + CONVEYOR.width / 2 + 0.2], { r: 0.1, mat: 'gloss', seg: 3 });
+  k.box(C.yellow, [0.42, 0.34, 0.3], [CONVEYOR.endX + 0.5, top - 0.5, CONVEYOR.z + CONVEYOR.width / 2 + 0.2], { r: 0.1, mat: 'gloss', seg: 3 });
   k.cyl(C.steel, 0.11, 0.16, [CONVEYOR.endX + 0.5, top - 0.33, CONVEYOR.z + CONVEYOR.width / 2 + 0.42], { axis: 'z', mat: 'metal' });
 
   baler(k);
@@ -261,7 +262,7 @@ function baler(k: Kit): void {
   // 흰 보강 띠 + 위 가장자리의 가는 파랑 선
   for (const dz of [0.25, 0.75]) {
     const z = minZ + (maxZ - minZ) * dz;
-    k.box(C.wallShade, [halfX * 2 + 0.1, height + 0.06, 0.12], [x, y0, z], { r: 0.05, mat: 'gloss' });
+    k.box(C.blue, [halfX * 2 + 0.1, height + 0.06, 0.12], [x, y0, z], { r: 0.05, mat: 'gloss' });
   }
   edgeZ(k, minZ, maxZ, y0 + height, x - halfX);
   edgeZ(k, minZ, maxZ, y0 + height, x + halfX);
@@ -275,21 +276,21 @@ function baler(k: Kit): void {
 
   // 유압 장치 (+Z 쪽): 흰 실린더 집, 탱크, 배관
   const hz = maxZ + 1.35;
-  k.box(C.wall, [1.3, 0.85, 1.3], [x, y0, hz], { r: 0.14, mat: 'gloss', seg: 3 });
+  k.box(C.blue, [1.3, 0.85, 1.3], [x, y0, hz], { r: 0.14, mat: 'gloss', seg: 3 });
   edgeX(k, x - 0.62, x + 0.62, y0 + 0.82, hz - 0.65);
   edgeZ(k, hz - 0.62, hz + 0.62, y0 + 0.82, x + 0.65);
   k.cyl(C.wall, 0.3, 0.9, [x - 0.2, y0 + 1.25, hz + 0.1], { axis: 'x', mat: 'gloss' });
   k.cyl(C.steelLight, 0.05, 0.5, [x + 0.42, y0 + 0.95, hz - 0.3], { mat: 'metal', seg: 10 });
   k.cyl(C.steelLight, 0.05, 0.9, [x + 0.42, y0 + 1.42, hz - 0.72], { axis: 'z', mat: 'metal', seg: 10 });
-  k.cyl(C.steelLight, 0.2, 0.75, [x, y0 + 0.5, maxZ + 0.42], { axis: 'z', mat: 'metal' });
+  k.cyl(C.yellow, 0.2, 0.75, [x, y0 + 0.5, maxZ + 0.42], { axis: 'z', mat: 'gloss' });
 
   // 결속부: 흰 문형 틀과 끈 타래
   const sz = mid(BALER.strapZ, minZ);
-  for (const dx of [-1, 1]) k.box(C.wall, [0.14, 1.45, 0.5], [x + dx * (halfX + 0.02), y0, sz], { r: 0.06, mat: 'gloss', seg: 3 });
-  k.box(C.wall, [halfX * 2 + 0.18, 0.16, 0.5], [x, y0 + 1.4, sz], { r: 0.06, mat: 'gloss', seg: 3 });
+  for (const dx of [-1, 1]) k.box(C.blue, [0.14, 1.45, 0.5], [x + dx * (halfX + 0.02), y0, sz], { r: 0.06, mat: 'gloss', seg: 3 });
+  k.box(C.blue, [halfX * 2 + 0.18, 0.16, 0.5], [x, y0 + 1.4, sz], { r: 0.06, mat: 'gloss', seg: 3 });
   edgeX(k, x - halfX - 0.09, x + halfX + 0.09, y0 + 1.56, sz - 0.25);
   for (const dx of [-0.42, 0, 0.42]) {
-    k.cyl(C.steelLight, 0.15, 0.1, [x + dx, y0 + 1.72, sz], { axis: 'x', mat: 'gloss' });
+    k.cyl(C.yellow, 0.15, 0.1, [x + dx, y0 + 1.72, sz], { axis: 'x', mat: 'gloss' });
     k.cyl(C.steel, 0.05, 0.14, [x + dx, y0 + 1.72, sz], { axis: 'x' });
   }
   k.box(C.steel, [1.5, 0.05, 0.05], [x, y0 + 1.72, sz], { r: 0.02, mat: 'metal' });
@@ -298,7 +299,7 @@ function baler(k: Kit): void {
   const z0 = BALER.strapZ + 0.1;
   const z1 = BALER.chuteEndZ;
   for (const dx of [-1, 1]) {
-    k.box(C.wall, [0.08, 0.16, z0 - z1], [x + dx * (BALE.w / 2 + 0.14), BALER.chuteY - 0.15, mid(z0, z1)], { r: 0.03, mat: 'gloss' });
+    k.box(C.blue, [0.08, 0.16, z0 - z1], [x + dx * (BALE.w / 2 + 0.14), BALER.chuteY - 0.15, mid(z0, z1)], { r: 0.03, mat: 'gloss' });
     for (let z = z0 - 0.2; z > z1; z -= 0.95) k.box(C.steelLight, [0.08, BALER.chuteY - 0.15, 0.08], [x + dx * (BALE.w / 2 + 0.14), 0, z], { r: 0.02, mat: 'metal' });
   }
   for (let z = z0 - 0.08; z > z1 + 0.05; z -= 0.2) k.cyl(C.steelLight, 0.07, BALE.w + 0.2, [x, BALER.chuteY - 0.075, z], { axis: 'x', mat: 'metal', seg: 12 });
@@ -354,7 +355,7 @@ function office(k: Kit): void {
   // 현관
   const dx = minX + 0.55 + 2 * ((w - 1.1) / 5);
   k.box(C.glass, [0.6, 0.95, 0.06], [dx, 0.08, minZ - 0.02], { r: 0.03, mat: 'glass' });
-  k.box(C.wall, [1.1, 0.08, 0.6], [dx, 1.08, minZ - 0.3], { r: 0.035 });
+  k.box(C.blue, [1.1, 0.08, 0.6], [dx, 1.08, minZ - 0.3], { r: 0.035, mat: 'gloss' });
   edgeX(k, dx - 0.55, dx + 0.55, 1.13, minZ - 0.6);
   // 옥상 실외기 (흰 상자 + 회색 팬)
   for (let i = 0; i < 3; i += 1) rooftopFan(k, minX + 1.0 + i * 1.5, height + 0.2, cz);
@@ -435,22 +436,22 @@ function utilities(k: Kit): void {
     [-5.6, -7.1, 0],
   ] as const) lamp(k, x, z, rot);
 
-  // 녹지 띠의 나무와 덤불 (숲도 맨땅도 아니게: 띠마다 몇 그루)
+  // 녹지 띠의 나무와 덤불 (숲도 맨땅도 아니게: 띠마다 몇 그루, 크기는 첫 스튜디오 시안처럼 풍성하게)
   const trees: Array<[number, number, number]> = [
-    [-11.4, 7.5, 0.8],
-    [-8.2, 7.6, 0.7],
-    [-4.6, 7.4, 0.78],
-    [-1.2, 7.6, 0.68],
-    [2.4, 7.4, 0.75],
-    [-11.5, -1.8, 0.72],
-    [-11.4, 2.6, 0.66],
-    [12.8, 6.6, 0.74],
-    [15.6, 7.2, 0.66],
-    [18.6, 6.5, 0.78],
-    [14.2, -6.1, 0.64],
-    [16.5, -6.2, 0.7],
-    [19.45, -2.5, 0.6],
-    [19.45, 2.8, 0.66],
+    [-11.4, 7.5, 1.1],
+    [-8.2, 7.6, 1],
+    [-4.6, 7.4, 1.1],
+    [-1.2, 7.6, 0.9],
+    [2.4, 7.4, 1.1],
+    [-11.5, -1.8, 1],
+    [-11.4, 2.6, 0.9],
+    [12.8, 6.6, 1],
+    [15.6, 7.2, 0.9],
+    [18.6, 6.5, 1.1],
+    [14.2, -6.1, 0.9],
+    [16.5, -6.2, 1],
+    [19.45, -2.5, 0.8],
+    [19.45, 2.8, 0.9],
   ];
   trees.forEach(([x, z, s], i) => tree(k, x, z, s, i));
   const bushes: Array<[number, number]> = [
@@ -490,7 +491,7 @@ function hallWalls(footprints: Footprint[]): Wall[] {
   north.footprints = footprints;
   north.box(C.wall, [w + wallT, wallH - 1.2, wallT], [mid(minX, maxX), 0, maxZ], { r: 0.05, seg: 3 });
   north.box(C.wall, [w + wallT, 0.38, wallT], [mid(minX, maxX), wallH - 0.36, maxZ], { r: 0.05, seg: 3 });
-  north.box(C.roof, [w + wallT + 0.04, 0.1, wallT + 0.04], [mid(minX, maxX), wallH, maxZ], { r: 0.04 });
+  north.box(C.blue, [w + wallT + 0.04, 0.1, wallT + 0.04], [mid(minX, maxX), wallH, maxZ], { r: 0.04, mat: 'gloss' });
   edgeX(north, minX - 0.12, maxX + 0.12, wallH + 0.1, maxZ - 0.12);
   north.box(C.wallShade, [w + wallT + 0.02, 0.3, wallT + 0.06], [mid(minX, maxX), 0, maxZ], { r: 0.04 });
   band(north, 'x', maxZ, minX + 0.2, maxX - 0.2);
@@ -501,7 +502,7 @@ function hallWalls(footprints: Footprint[]): Wall[] {
   west.footprints = footprints;
   west.box(C.wall, [wallT, wallH - 1.2, d + wallT], [minX, 0, 0], { r: 0.05, seg: 3 });
   west.box(C.wall, [wallT, 0.38, d + wallT], [minX, wallH - 0.36, 0], { r: 0.05, seg: 3 });
-  west.box(C.roof, [wallT + 0.04, 0.1, d + wallT + 0.04], [minX, wallH, 0], { r: 0.04 });
+  west.box(C.blue, [wallT + 0.04, 0.1, d + wallT + 0.04], [minX, wallH, 0], { r: 0.04, mat: 'gloss' });
   edgeZ(west, minZ - 0.12, maxZ + 0.12, wallH + 0.1, minX + 0.12);
   edgeY(west, minX - 0.12, maxZ + 0.12, 0, wallH + 0.1);
   west.box(C.wallShade, [wallT + 0.06, 0.3, d + wallT + 0.02], [minX, 0, 0], { r: 0.04 });
@@ -516,7 +517,7 @@ function hallWalls(footprints: Footprint[]): Wall[] {
   south.box(C.wall, [gapL - minX, wallH, wallT], [mid(minX, gapL), 0, minZ], { r: 0.05, seg: 3 });
   south.box(C.wall, [maxX - gapR, wallH, wallT], [mid(gapR, maxX), 0, minZ], { r: 0.05, seg: 3 });
   south.box(C.wall, [gapR - gapL + 0.1, wallH - 1.7, wallT], [BALER.x, 1.7, minZ], { r: 0.05 });
-  south.box(C.roof, [w + wallT + 0.04, 0.1, wallT + 0.04], [mid(minX, maxX), wallH, minZ], { r: 0.04 });
+  south.box(C.blue, [w + wallT + 0.04, 0.1, wallT + 0.04], [mid(minX, maxX), wallH, minZ], { r: 0.04, mat: 'gloss' });
   edgeX(south, minX - 0.12, maxX + 0.12, wallH + 0.1, minZ - 0.12);
   // 베일 배출구의 파랑 문틀
   edgeY(south, gapL, minZ - 0.13, 0, 1.7);
@@ -527,7 +528,7 @@ function hallWalls(footprints: Footprint[]): Wall[] {
   const east = new Kit();
   east.footprints = footprints;
   east.box(C.wall, [wallT, wallH - 2.45, d + wallT], [maxX, 2.45, 0], { r: 0.05, seg: 3 });
-  east.box(C.roof, [wallT + 0.04, 0.1, d + wallT + 0.04], [maxX, wallH, 0], { r: 0.04 });
+  east.box(C.blue, [wallT + 0.04, 0.1, d + wallT + 0.04], [maxX, wallH, 0], { r: 0.04, mat: 'gloss' });
   edgeZ(east, minZ - 0.12, maxZ + 0.12, wallH + 0.1, maxX + 0.12);
   edgeY(east, maxX + 0.12, minZ - 0.12, 0, wallH + 0.1);
   for (let i = 0; i <= 4; i += 1) east.box(C.wall, [wallT + 0.06, 2.5, 0.34], [maxX, 0, -3.4 + i * BAY.width], { r: 0.08, seg: 3 });

@@ -47,26 +47,26 @@ function stripeGroup(k: Kit, material: MeshPhysicalMaterial): Group {
   return group;
 }
 
-// 운전석·적재함은 흰색, 회사마다 색 띠 하나 (참고 화면의 흰 트럭 + 색 띠)
-const BED_PAINT = C.wall;
-const CAB_PAINT = C.wall;
+// 운전석은 안전 노랑, 적재함은 차마다 몇 가지 색 (첫 스튜디오 시안의 색). 회사 띠는 운전석 아래와 적재함 옆에 그대로 둔다
+const BED_PAINTS = [C.steelLight, C.blue, C.wall, C.blueSoft];
+const CAB_PAINT = C.yellow;
 
 export function buildTruck(variant: number): TruckModel {
   const root = new Group();
   const k = new Kit('gloss');
 
-  // 차대 (옅은 회색: 큰 어두운 면을 두지 않는다)
-  k.box(C.steel, [2.72, 0.14, 0.62], [0, 0.3, 0], { r: 0.04, mat: 'clay' });
-  k.box(C.steel, [0.2, 0.2, 1.0], [-1.0, 0.24, 0], { r: 0.05, mat: 'clay' });
+  // 차대
+  k.box(C.dark, [2.72, 0.14, 0.62], [0, 0.3, 0], { r: 0.04, mat: 'clay' });
+  k.box(C.dark, [0.2, 0.2, 1.0], [-1.0, 0.24, 0], { r: 0.05, mat: 'clay' });
   k.cyl(C.steelLight, 0.15, 0.55, [0.12, 0.33, 0.47], { axis: 'x', mat: 'metal' });
-  k.box(C.steel, [0.3, 0.22, 0.2], [0.1, 0.24, -0.47], { r: 0.05, mat: 'clay' });
+  k.box(C.dark, [0.3, 0.22, 0.2], [0.1, 0.24, -0.47], { r: 0.05, mat: 'clay' });
   // 뒷바퀴 흙받이
-  for (const dz of [-0.5, 0.5]) k.box(C.steel, [1.12, 0.06, 0.26], [-0.8, 0.56, dz], { r: 0.03, mat: 'clay' });
+  for (const dz of [-0.5, 0.5]) k.box(C.dark, [1.12, 0.06, 0.26], [-0.8, 0.56, dz], { r: 0.03, mat: 'clay' });
 
   const stripe = (MAT.gloss as MeshPhysicalMaterial).clone();
   const band = new Kit('gloss');
 
-  // 운전석 (흰색) + 아래쪽 회사 띠
+  // 운전석 (노랑) + 아래쪽 회사 띠
   k.box(CAB_PAINT, [0.92, 0.98, 1.12], [1.0, 0.38, 0], { r: 0.16, seg: 5 });
   band.box(C.white, [0.96, 0.2, 1.16], [1.0, 0.36, 0], { r: 0.08, seg: 3 });
   k.box(C.dark, [0.06, 0.4, 0.92], [1.44, 0.82, 0], { r: 0.03, mat: 'clay' });
@@ -87,7 +87,7 @@ export function buildTruck(variant: number): TruckModel {
   k.box(C.steelLight, [0.14, 0.16, 1.16], [1.44, 0.24, 0], { r: 0.05, mat: 'metal' });
   k.box(C.white, [0.02, 0.09, 0.3], [1.515, 0.29, 0], { r: 0.01, mat: 'clay' });
   // 지붕 바람막이, 배기관
-  k.box(C.steelLight, [0.5, 0.12, 0.96], [0.9, 1.34, 0], { r: 0.05, seg: 3 });
+  k.box(C.yellowDeep, [0.5, 0.12, 0.96], [0.9, 1.34, 0], { r: 0.05, seg: 3 });
   k.cyl(C.steelLight, 0.045, 0.9, [0.5, 0.62, 0.44], { mat: 'metal', seg: 10 });
   k.cyl(C.dark, 0.05, 0.08, [0.5, 1.5, 0.44], { mat: 'clay', seg: 10 });
   // 후미등, 번호판
@@ -115,7 +115,7 @@ export function buildTruck(variant: number): TruckModel {
   const pivot: [number, number, number] = [-1.42, 0.5, 0];
   const bed = new Group();
   bed.position.set(...pivot);
-  const paint = BED_PAINT;
+  const paint = BED_PAINTS[variant % BED_PAINTS.length]!;
   const b = new Kit('gloss');
   const bedBand = new Kit('gloss');
   const L = 1.9;
@@ -127,7 +127,7 @@ export function buildTruck(variant: number): TruckModel {
   }
   b.box(paint, [0.07, 0.78, 1.14], [L - 0.035, 0.06, 0], { r: 0.03 });
   b.box(C.white, [0.3, 0.06, 1.14], [L + 0.08, 0.8, 0], { r: 0.025 });
-  b.box(C.steel, [1.2, 0.1, 0.5], [L / 2, -0.08, 0], { r: 0.03, mat: 'clay' });
+  b.box(C.dark, [1.2, 0.1, 0.5], [L / 2, -0.08, 0], { r: 0.03, mat: 'clay' });
   bed.add(b.build('truck-bed'));
   bed.add(stripeGroup(bedBand, stripe));
 

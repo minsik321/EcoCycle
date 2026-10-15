@@ -27,7 +27,8 @@ import { ParkedCars } from './world/ParkedCars';
 // 화질 단계(quality.ts)마다 그리는 것이 다르다: high는 실시간 부드러운 그림자·N8AO·빛 번짐·얕은 심도,
 // standard는 반 해상도 N8AO와 2048 그림자, low는 후처리 없이 미리 구운 바닥 그림자.
 // 필요할 때만 그린다 (frameloop="demand"): Pacer가 박자마다 월드 시계를 돌리고, 무엇이 움직였을 때만 한 장 그린다.
-// 빛은 참고 화면(docs/reference/)처럼 밝고 차갑게. 노출을 너무 올리면 밝은 바닥들이 같은 흰색으로 뭉개진다.
+// 빛·후처리 값은 첫 스튜디오 시안(753041e)의 것: 따뜻한 해, 또렷하고 부드러운 그림자, 진한 주변 차폐, 채도 조금 올림.
+// 노출을 더 올리면 밝은 바닥들이 같은 흰색으로 뭉개진다 (구역 밝기 단계는 렌더 결과 픽셀로 확인한다).
 
 export interface StageProps {
   director: Director;
@@ -109,14 +110,14 @@ function WarmUp({ onReady }: { onReady?: () => void }) {
 /** 단계에 맞는 후처리 묶음. low는 쓰지 않는다 */
 function Post({ profile, frozen }: { profile: StudioProfile; frozen: boolean }) {
   const effects: ReactElement[] = [];
-  // 주변 차폐를 조금 진하게: 같은 밝기의 면들이 형태로 갈라지게
-  if (profile.ao === 'n8ao') effects.push(<N8AO key="ao" aoRadius={1.8} distanceFalloff={1.2} intensity={2.5} quality="high" color="#5a6580" />);
-  else effects.push(<N8AO key="ao" aoRadius={1.8} distanceFalloff={1.2} intensity={2.3} quality="low" halfRes color="#5a6580" />);
-  if (profile.bloom) effects.push(<Bloom key="bloom" mipmapBlur luminanceThreshold={1.1} luminanceSmoothing={0.2} intensity={0.32} radius={0.7} />);
-  if (profile.tiltShift) effects.push(<TiltShift2 key="tilt" blur={0.012} taper={0.75} />);
-  // 채도는 그대로 둔다. 회색 화면은 연결 끊김에만
-  effects.push(<HueSaturation key="hue" saturation={frozen ? -0.92 : 0} />);
-  effects.push(<BrightnessContrast key="bc" brightness={frozen ? -0.03 : 0.02} contrast={frozen ? -0.08 : 0.03} />);
+  // 주변 차폐는 첫 스튜디오 시안의 세기: 형태마다 분명하고 부드러운 그늘
+  if (profile.ao === 'n8ao') effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.6} quality="high" color="#4c566b" />);
+  else effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.5} quality="low" halfRes color="#4c566b" />);
+  if (profile.bloom) effects.push(<Bloom key="bloom" mipmapBlur luminanceThreshold={1.05} luminanceSmoothing={0.2} intensity={0.5} radius={0.7} />);
+  if (profile.tiltShift) effects.push(<TiltShift2 key="tilt" blur={0.022} taper={0.7} />);
+  // 채도를 조금 올린다 (첫 시안). 회색 화면은 연결 끊김에만
+  effects.push(<HueSaturation key="hue" saturation={frozen ? -0.92 : 0.14} />);
+  effects.push(<BrightnessContrast key="bc" brightness={frozen ? -0.03 : 0.025} contrast={frozen ? -0.08 : 0.07} />);
   effects.push(<ToneMapping key="tone" mode={ToneMappingMode.NEUTRAL} />);
   effects.push(<SMAA key="aa" />);
   return (
@@ -155,23 +156,22 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
         <color attach="background" args={[C.bg]} />
         {/* 먼 곳은 바탕색으로 옅어진다: 밝고 살짝 뿌연 공기 (부지 안의 밝기 단계는 지우지 않게 멀리서 시작) */}
         <fog attach="fog" args={[C.bg, 110, 260]} />
-        <EnvLight intensity={0.4} />
-        <hemisphereLight args={['#ffffff', '#e9edf4', baked ? 0.78 : 0.62]} />
-        {/* 해는 약하게, 그림자는 옅고 부드럽게 (진한 그림자 대신 주변 차폐로 형태를 잡는다) */}
+        <EnvLight intensity={0.36} />
+        <hemisphereLight args={['#ffffff', '#efe3d2', 0.6]} />
+        {/* 해는 첫 스튜디오 시안처럼 따뜻하고 분명하게: 부드럽지만 또렷한 그림자 + 주변 차폐로 형태를 잡는다 */}
         <directionalLight
           position={SUN}
-          color="#fffaf2"
-          intensity={1.2}
+          color="#fff0dc"
+          intensity={2.6}
           castShadow={profile.shadowMap > 0}
           shadow-mapSize={[profile.shadowMap || 512, profile.shadowMap || 512]}
           shadow-bias={-0.0003}
           shadow-normalBias={0.035}
-          shadow-radius={8}
-          shadow-intensity={0.42}
+          shadow-radius={5}
         >
           <orthographicCamera attach="shadow-camera" args={[-SHADOW, SHADOW, SHADOW, -SHADOW, 1, 140]} />
         </directionalLight>
-        <directionalLight position={[26, 18, 24]} color="#eef3ff" intensity={0.3} />
+        <directionalLight position={[26, 18, 24]} color="#dfe9ff" intensity={0.22} />
 
         <Sim />
         {!paused && <Pacer director={director} frozen={frozen} maxFps={profile.maxFps} motion={motion} />}

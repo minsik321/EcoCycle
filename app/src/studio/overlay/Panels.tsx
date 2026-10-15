@@ -1058,8 +1058,9 @@ export interface PinsProps extends PanelCommon {
 }
 
 /**
- * 지도식 핀: 평소에는 작은 물방울 핀(상태 기호 포함)만, 고른 대상에는 그 위에 작은 이름표가 뜬다 (참고 화면 05·10).
- * 연결이 끊기면 핀은 마지막 값을 감추고 "연결 끊김"으로 읽힌다.
+ * 지도식 핀: 흰 알약 칩(상태 점 또는 섹터 적재율 고리 + 이름 + 짧은 값) 아래에 대상을 가리키는 점 하나.
+ * 고른 대상은 파랑 칩으로 바뀐다. 멀리서 볼 때(부지 전체)는 섹터는 고리만, 차량·베일은 숨긴다.
+ * 연결이 끊기면 값 대신 "–"를 적고 핀 전체가 회색이 된다.
  */
 export function Pins({ data, disconnected, selection, onSelect, pins }: PinsProps) {
   const bind = (key: string) => (el: HTMLElement | null) => {
@@ -1085,15 +1086,22 @@ export function Pins({ data, disconnected, selection, onSelect, pins }: PinsProp
         const tone: DeviceStatus = disconnected || !line ? 'offline' : line.tone;
         const tank = device?.type === 'tank' ? device : null;
         const spoken = !line ? '불러오는 중' : disconnected ? STATUS_TEXT.offline : `${line.value}, ${line.statusText}`;
-        const name = tank ? `섹터 ${tank.section}` : (PIN_NAME[id] ?? DEVICE_NAMES[id]);
         return (
           <button key={key} {...pinProps(key, `${DEVICE_NAMES[id]} ${spoken}`)} className={`st-pin st-pin-${tone}${tank ? ' st-pin-sector' : ''}`}>
-            <span className="st-pin-label">
-              {name} · {!line ? '…' : disconnected ? '연결 끊김' : line.value}
-            </span>
-            <span className="st-pin-head">
-              {tank ? <b>{tank.section}</b> : <Icon name={DEVICE_ICON(id)} size={14} />}
-              {tone !== 'normal' && <i aria-hidden="true">{STATUS_SYMBOL[tone]}</i>}
+            <span className="st-pin-card">
+              {tank ? (
+                <span className="st-ring" style={{ ['--p' as string]: `${disconnected ? 0 : tank.fillPercent}` }}>
+                  <b>{tank.section}</b>
+                </span>
+              ) : (
+                <i className="st-pin-dot" aria-hidden="true">
+                  {STATUS_SYMBOL[tone]}
+                </i>
+              )}
+              <span className="st-pin-text">
+                <small>{tank ? `${tank.grade}등급` : (PIN_NAME[id] ?? DEVICE_NAMES[id])}</small>
+                <strong>{!line ? '…' : disconnected ? '–' : line.value}</strong>
+              </span>
             </span>
           </button>
         );
@@ -1104,12 +1112,15 @@ export function Pins({ data, disconnected, selection, onSelect, pins }: PinsProp
           const key = `veh:${v.id}`;
           return (
             <button key={key} {...pinProps(key, `차량 ${v.plate ?? '번호판 인식 중'} ${VEHICLE_STAGE_TEXT[v.stage]}`)} className="st-pin st-pin-vehicle">
-              <span className="st-pin-label">
-                {v.plate ?? '인식 중…'} · {v.sectorId ? `${SECTOR_LABEL[v.sectorId]} ` : ''}
-                {VEHICLE_STAGE_TEXT[v.stage]}
-              </span>
-              <span className="st-pin-head">
-                <Icon name="truck" size={13} />
+              <span className="st-pin-card">
+                <span className="st-plate">{v.plate ?? '인식 중…'}</span>
+                <span className="st-pin-text">
+                  <small>{v.companyName ?? '계중대'}</small>
+                  <strong>
+                    {v.sectorId ? `${SECTOR_LABEL[v.sectorId]} · ` : ''}
+                    {VEHICLE_STAGE_TEXT[v.stage]}
+                  </strong>
+                </span>
               </span>
             </button>
           );
@@ -1120,17 +1131,21 @@ export function Pins({ data, disconnected, selection, onSelect, pins }: PinsProp
           const key = `bale:${b.id}`;
           return (
             <button key={key} {...pinProps(key, `베일 ${b.id} ${BALE_STAGE_TEXT[b.stage]}`)} className="st-pin st-pin-bale">
-              <span className="st-pin-label">베일 {shortId(b.id)} · 적치</span>
-              <span className="st-pin-head">
-                <Icon name="bale" size={13} />
+              <span className="st-pin-card">
+                <span className="st-pin-text">
+                  <small>베일</small>
+                  <strong>{shortId(b.id)}</strong>
+                </span>
               </span>
             </button>
           );
         })}
       <button {...pinProps('forklift', '지게차')} className={`st-pin st-pin-vehicle${selection === 'forklift' ? '' : ' st-pin-quiet'}`}>
-        <span className="st-pin-label">지게차 · 베일 운반</span>
-        <span className="st-pin-head">
-          <Icon name="forklift" size={13} />
+        <span className="st-pin-card">
+          <span className="st-pin-text">
+            <small>지게차</small>
+            <strong>베일 운반</strong>
+          </span>
         </span>
       </button>
     </div>

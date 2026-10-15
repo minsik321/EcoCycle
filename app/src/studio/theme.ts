@@ -7,37 +7,37 @@ export const C = {
   bg: '#eceff3',
   floor: '#e9ecf0',
   /** 부지 판 (마당 콘크리트와 같은 층) */
-  pad: '#ced2d9',
-  padEdge: '#cfd4db',
+  pad: '#b9bec7',
+  padEdge: '#bcc1c9',
   /** 바깥 마당 콘크리트: 건물 바닥보다 분명히 어둡다 */
-  concrete: '#ced2d9',
-  concreteDark: '#c0c6ce',
+  concrete: '#b9bec7',
+  concreteDark: '#aab1bb',
   /** 도로 아스팔트: 중간 회청색 */
-  asphalt: '#b9c1cc',
-  asphaltDark: '#a9b2be',
+  asphalt: '#9aa5b4',
+  asphaltDark: '#8b97a7',
   /** 건물 안 바닥: 거의 흰색 */
   hallFloor: '#f5f6f8',
   /** 지붕·벽 위 덮개: 옅은 회색 (바닥 위에서 지붕선이 보이게) */
   roof: '#d9dee6',
   /** 가장자리 녹지 */
-  lawn: '#cfe3c8',
-  lawnEdge: '#bcd6b3',
+  lawn: '#c3e4b4',
+  lawnEdge: '#a6d297',
   line: '#ffffff',
   wall: '#fcfcfd',
   wallShade: '#f1f3f6',
   trim: '#e6e9ee',
   steel: '#bcc4cf',
   steelLight: '#d9dee5',
-  dark: '#5a6273',
-  rubber: '#3b414c',
+  dark: '#3a4250',
+  rubber: '#2a2f38',
   /** 강조 파랑 하나 */
-  blue: '#2563eb',
-  blueDeep: '#1d4fd8',
-  blueSoft: '#bfd0fa',
-  bluePale: '#e5ecfd',
+  blue: '#2f6bff',
+  blueDeep: '#1f4fd6',
+  blueSoft: '#b9cdff',
+  bluePale: '#e3ebff',
   /** 안전 노랑: 차량·로봇·안전 표시에만 */
-  yellow: '#f8c12c',
-  yellowDeep: '#e9a90c',
+  yellow: '#ffc31f',
+  yellowDeep: '#f2a900',
   /** 크라프트: 파지·베일·팔레트에만 */
   kraft: '#c99a62',
   kraftLight: '#dfbb8b',
@@ -46,13 +46,13 @@ export const C = {
   paperGrey: '#dcd7ce',
   glass: '#c4d6f2',
   /** 나무 (녹지 띠에 적당히) */
-  green: '#9fcf8f',
-  greenDeep: '#7fb873',
-  greenLight: '#b8dcaa',
+  green: '#8fd383',
+  greenDeep: '#6abd68',
+  greenLight: '#b4e3a0',
   trunk: '#c9b29a',
   skin: '#f0c4a0',
   /** 작업자 조끼도 안전 노랑 */
-  vest: '#f8c12c',
+  vest: '#ffc31f',
   vestStripe: '#ffffff',
   helmet: '#ffffff',
   trousers: '#6c7488',
@@ -64,8 +64,8 @@ export const C = {
   gradeC: '#fbebd3',
 } as const;
 
-/** 주차된 승용차: 흰색과 차분한 색 몇 가지 */
-export const CAR_PAINTS = [C.white, '#8fa3bf', '#c7b9a3', '#9fb8ae', '#d9dde3', '#b7a3b2'] as const;
+/** 주차된 승용차: 흰색·은색 사이에 산호색·청록·남색·파랑 몇 대 (첫 스튜디오 시안의 색) */
+export const CAR_PAINTS = [C.white, '#f08a7e', '#6fc7bb', '#7d8fb5', '#d9dde3', C.blue] as const;
 
 /**
  * 트럭 회사별 띠 색 (차분한 색). 회사 이름은 서버 값이고, 여기서는 이름 → 색을 고르기만 한다.

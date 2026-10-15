@@ -80,7 +80,7 @@ export function EnvLight({ intensity = 0.55 }: { intensity?: number }) {
 /** 선택한 대상 아래에서 퍼지는 고리 */
 export function SelectionRing({ director, focusKey }: { director: Director; focusKey: string | null }) {
   const rings = useRef<Array<Mesh | null>>([]);
-  const geometry = useMemo(() => new RingGeometry(0.93, 1, 72).rotateX(-Math.PI / 2), []);
+  const geometry = useMemo(() => new RingGeometry(0.86, 1, 64).rotateX(-Math.PI / 2), []);
   const materials = useMemo(() => [0, 1, 2].map(() => new MeshBasicMaterial({ color: new Color(C.blue).multiplyScalar(1.6), transparent: true, depthWrite: false, toneMapped: false, side: DoubleSide })), []);
   const anchor = useMemo(() => ({ x: 0, y: 0, z: 0 }), []);
   useEffect(
@@ -102,8 +102,8 @@ export function SelectionRing({ director, focusKey }: { director: Director; focu
       // 고리 하나는 제자리, 둘은 시간차로 퍼지며 옅어진다 (월드 시계를 쓰므로 끊기면 멈춘다)
       const u = i === 0 ? 0 : (director.t * 0.55 + (i - 1) * 0.5) % 1;
       ring.position.set(anchor.x, 0.1 + i * 0.004, anchor.z);
-      ring.scale.setScalar(base * (1 + u * 0.45));
-      materials[i]!.opacity = i === 0 ? 0.55 : (1 - u) * 0.35;
+      ring.scale.setScalar(base * (1 + u * 0.75));
+      materials[i]!.opacity = i === 0 ? 0.95 : (1 - u) * 0.6;
     });
   });
 
@@ -248,7 +248,8 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
   useFrame(() => {
     // 멀리서 볼 때는 핀을 작게 줄인다 (바닥 1m가 화면에서 몇 픽셀인지로 판단)
     const pxPerUnit = (size.height / (2 * Math.tan(((camera as PerspectiveCamera).fov * Math.PI) / 360))) / Math.max(1, camera.position.length());
-    const level = pxPerUnit < 22 ? 'far' : pxPerUnit < 60 ? 'mid' : 'near';
+    // 폰 폭에서는 섹터 핀 네 개가 붙어 겹치므로 늘 멀리 보는 모양(섹터는 적재율 고리만)
+    const level = pxPerUnit < 36 || size.width < 600 ? 'far' : pxPerUnit < 60 ? 'mid' : 'near';
     if (level !== zoom.current) {
       const first = Object.values(pins.current).find((el) => el);
       const holder = first?.parentElement;

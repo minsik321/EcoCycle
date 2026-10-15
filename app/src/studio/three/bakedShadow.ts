@@ -8,7 +8,8 @@ import type { Footprint } from './kit';
 /** 해가 있는 쪽 (Stage의 SUN과 같은 방향) */
 const SUN = { x: -22, y: 38, z: -19 };
 const PX_PER_M = 20;
-const SHADE = '38,46,68';
+/** 그림자 색: 차가운 짙은 남색 (high의 N8AO 색 #4c566b보다 조금 진하게: 후처리가 없어 겹쳐 진해지지 않는다) */
+const SHADE = '30,36,58';
 /** 바닥보다 살짝 위 (건물 바닥·섹터 칸 바닥보다 높고, 서 있는 것들의 발목보다 낮다) */
 const PLANE_Y = 0.097;
 
@@ -51,8 +52,8 @@ export function bakeGroundShadow(footprints: readonly Footprint[], bounds: Bound
     const tall = Math.min(1, (f.y1 - Math.max(0, f.y0)) / 1.5);
     // 닿는 곳의 주변 차폐: 바닥에 붙은 것만, 조금 넓혀서
     if (f.y0 < 0.4) {
-      const grow = 0.08 + 0.12 * tall;
-      ao.globalAlpha = 0.55 + 0.45 * tall;
+      const grow = 0.12 + 0.16 * tall;
+      ao.globalAlpha = 0.65 + 0.35 * tall;
       ao.fillRect(px(f.x0 - grow), pz(f.z0 - grow), (f.x1 - f.x0 + grow * 2) * PX_PER_M, (f.z1 - f.z0 + grow * 2) * PX_PER_M);
     }
     // 해 반대쪽으로 늘어진 그림자: 바닥 투영을 그림자 길이만큼 여러 번 밀어 찍는다
@@ -64,13 +65,18 @@ export function bakeGroundShadow(footprints: readonly Footprint[], bounds: Bound
       sun.fillRect(px(f.x0 + dirX * d), pz(f.z0 + dirZ * d), (f.x1 - f.x0) * PX_PER_M, (f.z1 - f.z0) * PX_PER_M);
     }
   }
-  // 합치기: 그림자는 넓고 옅게, 주변 차폐는 짧고 조금 진하게 번진다
-  ctx.filter = 'blur(7px)';
-  ctx.globalAlpha = 0.16;
-  ctx.drawImage(sunCanvas, 0, 0);
-  ctx.filter = 'blur(4px)';
-  ctx.globalAlpha = 0.3;
-  ctx.drawImage(aoCanvas, 0, 0);
+  // 합치기: high 단계의 깊이에 가깝게 (N8AO·실시간 그림자가 없으므로 여기서 진하고 부드럽게).
+  // 해 그림자는 넓게 번진 한 겹 + 가장자리를 잡는 덜 번진 한 겹, 주변 차폐는 넓게 번진 진한 한 겹 + 닿는 곳의 짧은 한 겹
+  for (const [layerCanvas, blur, alpha] of [
+    [sunCanvas, 12, 0.22],
+    [sunCanvas, 5, 0.16],
+    [aoCanvas, 9, 0.34],
+    [aoCanvas, 3, 0.22],
+  ] as const) {
+    ctx.filter = `blur(${blur}px)`;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(layerCanvas, 0, 0);
+  }
   ctx.filter = 'none';
 
   const texture = new CanvasTexture(out);
@@ -102,8 +108,9 @@ export function blobShadow(length: number, width: number): Mesh {
   if (!blob) {
     const [canvas, ctx] = layer(64, 64);
     const g = ctx.createRadialGradient(32, 32, 4, 32, 32, 32);
-    g.addColorStop(0, `rgba(${SHADE},0.42)`);
-    g.addColorStop(0.6, `rgba(${SHADE},0.2)`);
+    g.addColorStop(0, `rgba(${SHADE},0.62)`);
+    g.addColorStop(0.45, `rgba(${SHADE},0.42)`);
+    g.addColorStop(0.75, `rgba(${SHADE},0.16)`);
     g.addColorStop(1, `rgba(${SHADE},0)`);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 64, 64);
@@ -113,7 +120,7 @@ export function blobShadow(length: number, width: number): Mesh {
     blobGeometry = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   }
   const mesh = new Mesh(blobGeometry!, blob);
-  mesh.scale.set(length * 1.25, 1, width * 1.5);
+  mesh.scale.set(length * 1.35, 1, width * 1.65);
   mesh.position.y = 0.07;
   mesh.renderOrder = -1;
   mesh.name = 'blob-shadow';

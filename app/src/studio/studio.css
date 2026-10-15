@@ -1274,7 +1274,20 @@ button.st-now:hover {
   background: rgb(37 99 235 / 0.06);
 }
 
-/* ── 지도식 핀 ── */
+.st-pin .st-plate {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 6px;
+  border: 1.5px solid #1c2434;
+  background: #fff;
+  color: #1c2434;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ── 지도식 핀: 흰 칩(상태 점·적재율 고리 + 이름 + 짧은 값) + 가리키는 점 (첫 스튜디오 시안의 모양) ── */
 .st-pins {
   position: absolute;
   inset: 0;
@@ -1287,170 +1300,178 @@ button.st-now:hover {
   position: absolute;
   left: 0;
   top: 0;
-  display: flex !important;
-  flex-direction: column;
-  align-items: center;
-  padding: 0 0 2px !important;
+  display: block !important;
+  padding: 0 0 12px !important;
   pointer-events: auto;
   will-change: transform;
 }
+
+.st-pin::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2.5px solid var(--pc, var(--st-blue));
+  box-shadow: 0 2px 6px rgb(38 58 110 / 0.3);
+}
+
+.st-pin::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 2px;
+  height: 7px;
+  margin-left: -1px;
+  background: var(--pc, var(--st-blue));
+  opacity: var(--po, 0.55);
+}
+
+.st-pin-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.94);
+  box-shadow: 0 8px 20px -6px rgb(38 58 110 / 0.35);
+  transform-origin: 50% 100%;
+}
+
+.st-pin[aria-pressed='true'] .st-pin-card {
+  transform: scale(1.1);
+  background: var(--st-blue);
+  color: #fff;
+  box-shadow: 0 12px 26px -6px rgb(37 99 235 / 0.6);
+}
+
+.st-pin[aria-pressed='true'] small {
+  color: rgb(255 255 255 / 0.8);
+}
+
+.st-pin-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.12;
+}
+
+.st-pin-text small {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--st-faint);
+}
+
+.st-pin-text strong {
+  font-size: 13.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.st-pin-dot {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-style: normal;
+  font-weight: 800;
+  color: #fff;
+  background: var(--tone, var(--st-normal));
+}
+
+/* 상태 색: 점과 적재율 고리가 함께 쓴다 */
+.st-pin-caution {
+  --tone: var(--st-caution);
+}
+
+.st-pin-alarm {
+  --tone: var(--st-alarm);
+}
+
+.st-pin-offline {
+  --tone: var(--st-offline);
+}
+
+/* 섹터 핀: 적재율 고리 */
+.st-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: conic-gradient(var(--tone, var(--st-blue)) calc(var(--p) * 1%), rgb(30 45 80 / 0.12) 0);
+}
+
+.st-ring::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.st-ring b {
+  position: relative;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--st-ink);
+}
+
+.st-pin-vehicle .st-pin-card {
+  padding-left: 7px;
+}
+
+/* 가리키는 점·줄기 색: 차량은 노랑, 베일은 크라프트 */
+.st-pin-vehicle {
+  --pc: var(--st-yellow);
+  --po: 1;
+}
+
+.st-pin-bale .st-pin-card {
+  padding: 4px 11px;
+  background: rgb(250 240 224 / 0.96);
+}
+
+.st-pin-bale {
+  --pc: var(--st-kraft);
+  --po: 1;
+}
+
+.st-pins-offline .st-pin {
+  filter: grayscale(1);
+  opacity: 0.8;
+}
+
 
 .st-pin-quiet {
   display: none !important;
 }
 
-/* 물방울 모양 머리: 아래 끝이 대상을 가리킨다 */
-.st-pin-head {
-  position: relative;
-  display: grid;
-  place-items: center;
+/* 멀리서 볼 때: 섹터 핀은 고리만, 나머지는 작게 */
+.st-pins[data-zoom='far'] .st-pin-sector:not([aria-pressed='true']) .st-pin-text {
+  display: none;
+}
+
+.st-pins[data-zoom='far'] .st-pin-sector:not([aria-pressed='true']) .st-pin-card {
+  padding: 3px;
+}
+
+.st-pins[data-zoom='far'] .st-pin-sector:not([aria-pressed='true']) .st-ring {
   width: 28px;
   height: 28px;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  background: var(--st-blue);
-  color: #fff;
-  box-shadow:
-    0 6px 14px -4px rgb(30 60 140 / 0.5),
-    0 0 0 2px rgb(255 255 255 / 0.9);
-  transition: transform 0.2s;
 }
 
-.st-pin-head > b,
-.st-pin-head > .st-icon {
-  transform: rotate(45deg);
-}
-
-.st-pin-head > b {
-  font-size: 10.5px;
-  font-weight: 600;
-}
-
-.st-pin-head > i {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  display: grid;
-  place-items: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: #fff;
-  font-style: normal;
-  font-size: 9px;
-  font-weight: 700;
-  transform: rotate(45deg);
-}
-
-.st-pin-caution .st-pin-head {
-  background: var(--st-caution);
-}
-
-.st-pin-caution .st-pin-head > i {
-  color: var(--st-caution);
-}
-
-.st-pin-alarm .st-pin-head {
-  background: var(--st-alarm);
-}
-
-.st-pin-alarm .st-pin-head > i {
-  color: var(--st-alarm);
-}
-
-.st-pin-offline .st-pin-head {
-  background: var(--st-offline);
-}
-
-.st-pin-offline .st-pin-head > i {
-  color: var(--st-offline);
-}
-
-.st-pin-vehicle .st-pin-head,
-.st-pin-bale .st-pin-head {
-  width: 24px;
-  height: 24px;
-  background: #fff;
-  color: var(--st-blue);
-  box-shadow:
-    0 5px 12px -4px rgb(30 60 140 / 0.45),
-    0 0 0 1.5px var(--st-blue);
-}
-
-.st-pin-bale .st-pin-head {
-  color: #8a5a22;
-  box-shadow:
-    0 5px 12px -4px rgb(30 60 140 / 0.35),
-    0 0 0 1.5px var(--st-kraft);
-}
-
-/* 고른 대상 위의 작은 이름표 */
-.st-pin-label {
-  display: none;
-  position: relative;
-  margin-bottom: 8px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: var(--st-blue);
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  box-shadow: 0 8px 18px -6px rgb(37 99 235 / 0.6);
-}
-
-.st-pin-label::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -4px;
-  width: 8px;
-  height: 8px;
-  margin-left: -4px;
-  background: var(--st-blue);
-  transform: rotate(45deg);
-  border-radius: 1px;
-}
-
-.st-pin[aria-pressed='true'] .st-pin-label {
-  display: block;
-}
-
-.st-pin[aria-pressed='true'] .st-pin-head {
-  transform: rotate(-45deg) scale(1.12);
-}
-
-.st-pin:hover .st-pin-head {
-  transform: rotate(-45deg) scale(1.08);
-}
-
-.st-pins-offline .st-pin {
-  filter: grayscale(1);
-}
-
-.st-pins-offline .st-pin-label {
-  background: var(--st-offline);
-}
-
-.st-pins-offline .st-pin-label::after {
-  background: var(--st-offline);
-}
-
-/* 멀리서(부지 전체) 볼 때는 핀을 작게, 차량·베일 핀은 숨긴다 */
-.st-pins[data-zoom='far'] .st-pin:not([aria-pressed='true']) .st-pin-head {
-  width: 20px;
-  height: 20px;
-}
-
-.st-pins[data-zoom='far'] .st-pin:not([aria-pressed='true']) .st-pin-head > b,
-.st-pins[data-zoom='far'] .st-pin:not([aria-pressed='true']) .st-pin-head > .st-icon {
+.st-pins[data-zoom='far'] .st-pin-bale .st-pin-text small {
   display: none;
 }
 
-.st-pins[data-zoom='far'] .st-pin-vehicle:not([aria-pressed='true']),
-.st-pins[data-zoom='far'] .st-pin-bale:not([aria-pressed='true']) {
-  display: none !important;
-}
 
 .st-demo-note {
   position: absolute;
@@ -2076,7 +2097,7 @@ button.st-now:hover {
 .st-tile b,
 .st-cell-main,
 .st-cell-sub,
-.st-pin-label,
+.st-pin-text strong,
 .st-area-text b {
   min-width: 0;
   overflow: hidden;
