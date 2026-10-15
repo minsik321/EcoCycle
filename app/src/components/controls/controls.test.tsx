@@ -223,7 +223,7 @@ describe('RobotModeControl: 세 칸 하나와 확인 단계', () => {
     // 지금 모드가 수동이면 적용 버튼 없이 집기만
     expect(within(card()).queryByRole('button', { name: '적용' })).not.toBeInTheDocument();
     const select = within(card()).getByLabelText('집을 섹터');
-    expect(select.closest('label')!.parentElement).toContainElement(within(card()).getByRole('button', { name: '집기' }));
+    expect(select.parentElement).toContainElement(within(card()).getByRole('button', { name: '집기' }));
     await userEvent.selectOptions(select, 'tank-b1');
     await userEvent.click(within(card()).getByRole('button', { name: '집기' }));
     const dialog = screen.getByRole('dialog', { name: '수동 집기' });

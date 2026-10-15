@@ -56,6 +56,7 @@ function TankDetail({ id }: { id: TankId }) {
 
   return (
     <DevicePage
+      illustrated
       hero={
         <DeviceHero
           name={name}
@@ -88,14 +89,19 @@ function TankDetail({ id }: { id: TankId }) {
       now={<NowNext now={activity.now} next={activity.next} />}
       actions={<DeviceActionBar deviceId={id} />}
       details={
-        <DetailsSection>
+        <DetailsSection
+          side={
+            <>
+              <Card title="기준값 설정" aria-label="기준값 설정" className="flex flex-col gap-4">
+                {DEVICE_SETTINGS.tank.map((field) => (
+                  <SettingForm key={field.key} deviceId={id} field={field} />
+                ))}
+              </Card>
+              <DeviceAlarmHistory deviceId={id} />
+            </>
+          }
+        >
           <HistoryPanel deviceId={id} metrics={HISTORY_METRICS.tank} />
-          <Card title="기준값 설정" aria-label="기준값 설정" className="flex flex-col gap-4">
-            {DEVICE_SETTINGS.tank.map((field) => (
-              <SettingForm key={field.key} deviceId={id} field={field} />
-            ))}
-          </Card>
-          <DeviceAlarmHistory deviceId={id} />
         </DetailsSection>
       }
       records={<SectorUnloads id={id} />}

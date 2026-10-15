@@ -16,7 +16,6 @@ import { selectDevice } from '../../store/selectors';
 import { DeviceAlarmHistory } from '../history/DeviceAlarmHistory';
 import { HistoryPanel } from '../history/HistoryPanel';
 import { useDeviceTrend } from '../history/useDeviceTrend';
-import { BeltStrip } from './BeltStrip';
 
 function conveyorActivity(c: ConveyorState): string {
   if (!c.running) return '정지 상태입니다';
@@ -24,7 +23,7 @@ function conveyorActivity(c: ConveyorState): string {
 }
 
 /**
- * 컨베이어(Section Z) 기기 페이지 (DevicePage 틀): 맨 위 흐르는 벨트 그림, 주요 수치(가동·적재 정도·압축기로 가는 중),
+ * 컨베이어(Section Z) 기기 페이지 (DevicePage 틀, 그림 없음): 머리 줄, 주요 수치(가동·적재 정도·압축기로 가는 중),
  * 지금/다음(배합 중인 배치를 압축기로 이송, 다음 배치), 자세히(이력 그래프·속도 설정·알람 이력).
  * 설정 변경은 위험도가 높아 "자세히" 안에서만, 확인 단계를 거쳐 보낸다.
  */
@@ -45,11 +44,11 @@ export function ConveyorPage() {
           status={c?.status ?? null}
           activity={c ? conveyorActivity(c) : null}
           updatedAt={c?.updatedAt ?? null}
-          illustration={<BeltStrip running={!!c?.running && !disconnected} items={disconnected ? null : (c?.itemsToBaler ?? null)} />}
         />
       }
       tiles={
         <KeyTiles
+          wide
           tiles={[
             { label: '가동', value: c ? (c.running ? '가동' : '정지') : null, kind: 'text' },
             { label: '적재 정도', value: c ? formatCount(c.loadPercent) : null, unit: '%', ...(loadTrend ? { trend: loadTrend } : {}) },
@@ -65,14 +64,19 @@ export function ConveyorPage() {
       }
       actions={<DeviceActionBar deviceId="conveyor-z" />}
       details={
-        <DetailsSection>
+        <DetailsSection
+          side={
+            <>
+              <Card title="설정" aria-label="설정" className="flex flex-col gap-4">
+                {DEVICE_SETTINGS.conveyor.map((field) => (
+                  <SettingForm key={field.key} deviceId="conveyor-z" field={field} />
+                ))}
+              </Card>
+              <DeviceAlarmHistory deviceId="conveyor-z" />
+            </>
+          }
+        >
           <HistoryPanel deviceId="conveyor-z" metrics={HISTORY_METRICS.conveyor} />
-          <Card title="설정" aria-label="설정" className="flex flex-col gap-4">
-            {DEVICE_SETTINGS.conveyor.map((field) => (
-              <SettingForm key={field.key} deviceId="conveyor-z" field={field} />
-            ))}
-          </Card>
-          <DeviceAlarmHistory deviceId="conveyor-z" />
         </DetailsSection>
       }
     />

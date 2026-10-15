@@ -15,7 +15,7 @@ components/
 │                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 상단 바·끊김 안내를 숨기고 headerExtra를 넘기며 주 메뉴를 접는다. 3D 홈만 쓴다)
 ├── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
 ├── records/       RecordList(기간 고르기 → 서버에서 10줄씩 → 폰 쌓인 줄 / md 이상 표 → 쪽 넘기기), Pagination, range(기간·쪽 번호 계산)
-└── device/        기기 페이지 틀: DevicePage(배치), DeviceHero(이름·큰 상태 칩·지금 하는 일·그림), KeyTile/KeyTiles(최대 4개, 작은 추이선),
+└── device/        기기 페이지 틀: DevicePage(배치: `illustrated`면 위쪽 두 칸, 아니면 한 줄), DeviceHero(이름·큰 상태 칩·지금 하는 일·선택 그림), KeyTile/KeyTiles(최대 4개, 작은 추이선·게이지, `wide`면 폭 전체 격자),
                    NowNext(지금/다음), ActionBar·DeviceActionBar(위험도 낮은 조작 + 알람 확인), DetailsSection("자세히", 처음엔 닫힘), live(연결 상태)
 ```
 
@@ -38,7 +38,8 @@ components/
 
 ## 기기 페이지 틀 (`device/`)
 
-- 모든 기기 페이지는 `DevicePage`에 다섯 조각(hero, tiles, now, actions, details)을 끼워 만든다. 지난 기록이 있으면 여섯째 `records`(맨 아래 폭 전체, 폰에서는 조작 줄 앞). 폰은 한 줄(조작 줄은 주 메뉴 바로 위에 붙음), `md` 이상은 두 줄.
+- 모든 기기 페이지는 `DevicePage`에 다섯 조각(hero, tiles, now, actions, details)을 끼워 만든다. 지난 기록이 있으면 여섯째 `records`(폭 전체, 폰에서는 조작 줄 앞). 폰은 한 줄(조작 줄은 주 메뉴 바로 위에 붙음). `md` 이상: 그림이 있는 페이지(`illustrated`, 섹터만)는 위쪽을 두 칸(왼쪽 그림·조작, 오른쪽 수치·지금/다음)으로, 그림이 없는 페이지(로봇팔·압축기·컨베이어)는 한 줄로 머리 → 주요 수치(`KeyTiles wide`) → 지금/다음 → 조작 → 자세히 → 기록. 정보를 더하지 않는 장식 그림은 두지 않는다.
+- "자세히"(`DetailsSection`)는 어느 기기든 위쪽 영역 밖에 폭 전체로 놓이고(오른쪽 칸 안에 넣지 않는다), 열면 `md` 이상에서 왼쪽 넓은 칸(`children`: 이력 그래프·진단 표)과 오른쪽 칸(`side`: 설정·알람 이력)으로 펼친다. 한쪽만 있으면 `side`끼리 두 칸으로 나눈다.
 - 연결 끊김 처리는 조각들이 `useDeviceLive()`로 직접 한다: 값·하는 일·지금/다음은 "–", 상태 칩은 "연결 끊김", 마지막 수신 시각 표시, 그림 영역은 `data-frozen="true"`(CSS 움직임 정지, `styles/index.css`). 캔버스 그림은 `useDeviceLive().disconnected`를 보고 스스로 멈춘다.
 - `DeviceLiveOverride`는 서버 없이 보는 미리 보기(`/design/device`)에서만 쓴다.
 - 조작 줄에는 위험도 낮은 조작만 둔다. 설정 변경은 "자세히" 안에서 확인 단계를 거친다. 로봇 운전 모드(모드 전환·수동 집기)는 로봇팔 페이지의 핵심 조작이라 "자세히" 밖, 지금/다음 아래의 카드(`RobotModeControl`)에 두고 같은 확인 단계를 거친다.

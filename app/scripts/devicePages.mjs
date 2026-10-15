@@ -1,5 +1,5 @@
 // 기기 페이지 재설계(로봇팔·압축기·컨베이어) 재현과 스크린샷: node app/scripts/devicePages.mjs
-// 모의 서버와 앱을 띄워 실제 Chromium으로 390×844·820×1180에서 세 페이지(맨 위·"자세히" 열기)와 로봇 운전 모드 세 칸
+// 모의 서버와 앱을 띄워 실제 Chromium으로 390×844·820×1180·1440×900에서 네 페이지(섹터 포함, 맨 위·"자세히" 열기)와 로봇 운전 모드 세 칸
 // (자동 → 자동 · 섹터 지정 → 수동, 실제 명령·확인 단계·적용 결과)을 찍고, 글자 100%·130%에서 짧은 글 꺾임·가로 넘침이 없는지 본다.
 // 결과는 docs/screenshots/device-pages (글자 100%만 저장). 브라우저는 내려받지 않는다(CHROMIUM_PATH 또는 Playwright 브라우저 폴더).
 import fs from 'node:fs';
@@ -41,7 +41,7 @@ try {
 
   browser = await chromium.launch({ executablePath: findChromium() });
   const notes = [];
-  for (const [width, height] of [[390, 844], [820, 1180]]) {
+  for (const [width, height] of [[390, 844], [820, 1180], [1440, 900]]) {
     for (const zoom of [1, 1.3]) {
       if ((await get('/devices/robot-1/state')).mode !== 'auto') await setMode('auto');
       const context = await browser.newContext({ viewport: { width, height }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
@@ -116,15 +116,19 @@ try {
       await pick.and(page.locator(':enabled')).waitFor({ timeout: 30_000 });
       const [a, b] = [await select.boundingBox(), await pick.boundingBox()];
       assert.ok(Math.abs(a.y - b.y) < 2 && Math.abs(a.height - b.height) < 2, `집을 섹터·집기 정렬: ${JSON.stringify({ a, b })}`);
+      // 이름표도 같은 줄, 같은 가운데선
+      const text = await mode.locator('label', { hasText: '집을 섹터' }).boundingBox();
+      assert.ok(Math.abs(text.y + text.height / 2 - (a.y + a.height / 2)) < 2, `집을 섹터 이름표 정렬: ${JSON.stringify({ text, a })}`);
       await shot('robot-mode-3-manual', mode);
 
       await page.getByRole('button', { name: '자세히', exact: true }).click();
       await page.getByRole('region', { name: '관절 값' }).waitFor();
-      await shot('robot-2-details', page.getByRole('button', { name: '자세히', exact: true }));
+      await shot('robot-2-details', page.getByRole('button', { name: '자세히', exact: true }), { full: true });
       await setMode('auto');
 
-      // 압축기·컨베이어: 맨 위(전체), "자세히" 열기
+      // 섹터·압축기·컨베이어: 맨 위(전체), "자세히" 열기(전체). 열린 자세히가 폭 전체에 펼쳐지는지는 스크린샷으로 본다
       for (const [route, name] of [
+        ['/tanks/tank-a1', 'sector'],
         ['/compressor', 'compressor'],
         ['/conveyor', 'conveyor'],
       ]) {
@@ -133,7 +137,7 @@ try {
         await shot(`${name}-1-top`, null, { full: true });
         await page.getByRole('button', { name: '자세히', exact: true }).click();
         await page.getByRole('img', { name: /이력 그래프|그래프/ }).first().waitFor({ timeout: 15_000 }).catch(() => undefined);
-        await shot(`${name}-2-details`, page.getByRole('button', { name: '자세히', exact: true }));
+        await shot(`${name}-2-details`, page.getByRole('button', { name: '자세히', exact: true }), { full: true });
       }
       notes.push(`${width}×${height} 글자 ${zoom * 100}%`);
       await context.close();
@@ -142,7 +146,7 @@ try {
   fs.writeFileSync(
     path.join(out, 'validation.txt'),
     `PASS (${new Date().toISOString()}): ${notes.join(', ')}.\n` +
-      '로봇 운전 모드 자동 → 자동 · 섹터 지정(A1·B1, 확인 단계, 적용됨) → 수동(집을 섹터·집기 한 줄 정렬), 진단(관리자), 압축기·컨베이어 맨 위와 자세히.\n' +
+      '로봇 운전 모드 자동 → 자동 · 섹터 지정(A1·B1, 확인 단계, 적용됨) → 수동(이름표·선택·집기 한 줄 정렬), 진단(관리자), 섹터·압축기·컨베이어 맨 위(자세히 닫힘)와 자세히 열림 전체 화면.\n' +
       '모의 서버: 집기 부피 0.06~0.14 m³ 여러 값, 컨베이어 itemsToBaler, 압축기 cycleStage.\n',
   );
   console.log(`PASS: ${notes.join(', ')}`);

@@ -101,12 +101,14 @@ afterEach(() => {
 });
 
 describe('RobotPage', () => {
-  it('맨 위에 실시간 옆모습·상태·지금 하는 일, 주요 수치 4칸(모드·현재 작업·이번 시간 집기·그리퍼)', async () => {
+  it('그림 없이 머리 줄(이름·상태·지금 하는 일), 주요 수치 4칸(모드·현재 작업·이번 시간 집기·그리퍼)', async () => {
     renderWithStore(<RobotPage />, { me: ADMIN, devices: [robotState({ phase: 'move', targetTankId: 'tank-a2', gripper: { closed: true, holding: true } })] });
     expect(screen.getByRole('heading', { name: '로봇팔' })).toBeInTheDocument();
     expect(within(screen.getByLabelText('로봇팔 상태')).getByText('작동 중')).toBeInTheDocument();
     expect(screen.getByLabelText('지금 하는 일')).toHaveTextContent('섹터 A2 파지를 컨베이어로 옮기는 중');
-    expect(screen.getByRole('img', { name: /로봇팔 옆모습/ })).toBeInTheDocument();
+    // 정보 없는 그림은 없다: 옆모습 그림이 없고 주요 수치가 폭 전체 격자에 놓인다
+    expect(screen.queryByRole('img', { name: /옆모습/ })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('주요 수치')).toHaveClass('md:grid-cols-4');
     expect(tile('모드')).toHaveTextContent('자동');
     expect(tile('현재 작업')).toHaveTextContent('옮기는 중');
     expect(tile('그리퍼')).toHaveTextContent('잡고 있음');
@@ -198,7 +200,6 @@ describe('RobotPage', () => {
     renderWithStore(<RobotPage />, { me: ADMIN, devices: [robotState()] });
     await openDetails();
     expect(within(screen.getByLabelText('관절 값')).getByRole('status')).toHaveTextContent('관절 값을 기다리는 중');
-    expect(screen.getByRole('img', { name: '로봇팔 옆모습, 관절 값을 기다리는 중' })).toBeInTheDocument();
   });
 
   it('진단: 관절 값을 모델의 순서·이름·범위대로 보여 준다 (받은 값을 그대로)', async () => {
@@ -217,8 +218,6 @@ describe('RobotPage', () => {
     expect(rows[1]).toHaveTextContent('-45.0°');
     expect(rows[5]).toHaveTextContent('90.0°');
     expect(within(table).getByRole('meter', { name: 'shoulder 범위 안 위치' })).toHaveAttribute('aria-valuenow', '-45');
-    // 옆모습도 같은 값으로 (밑동 방향과 그리퍼)
-    expect(screen.getByRole('img', { name: /로봇팔 옆모습, 밑동 13도, 그리퍼 잡고 있음/ })).toBeInTheDocument();
   });
 
   it('진단: 서버의 로봇 모델이 있으면 그 관절 이름과 범위로 바뀐다', async () => {
@@ -242,7 +241,7 @@ describe('RobotPage', () => {
     expect(screen.queryByText('1. base')).not.toBeInTheDocument();
   });
 
-  it('연결이 끊기면 값은 "–", 상태는 연결 끊김, 옆모습은 멈추고 진단 표는 마지막 값이라고 알린다', async () => {
+  it('연결이 끊기면 값은 "–", 상태는 연결 끊김, 진단 표는 마지막 값이라고 알린다', async () => {
     const buffer = createJointBuffer({ delaySec: 0 });
     buffer.push(jointsMessage([1, 2, 3, 4, 5, 6]), Date.now());
     vi.mocked(realtimeClient.getJointBuffer).mockReturnValue(buffer);
@@ -256,24 +255,9 @@ describe('RobotPage', () => {
     expect(within(hero).getByText('연결 끊김')).toBeInTheDocument();
     expect(within(hero).getByText(/마지막 수신/)).toBeInTheDocument();
     expect(screen.getByLabelText('지금 하는 일')).toHaveTextContent('–');
-    expect(screen.getByRole('img', { name: /로봇팔 옆모습/ }).parentElement).toHaveAttribute('data-frozen', 'true');
     for (const label of ['모드', '현재 작업', '이번 시간 집기', '그리퍼']) expect(tile(label)).toHaveTextContent('–');
     expect(within(screen.getByLabelText('관절 값')).getByRole('status')).toHaveTextContent('마지막으로 받은 값입니다');
     expect(screen.getByRole('table')).toHaveClass('opacity-50');
-  });
-
-  it('끊긴 동안 옆모습은 관절 값을 더 읽지 않는다', () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const buffer = createJointBuffer({ delaySec: 0 });
-    buffer.push(jointsMessage([0, 0, 0, 0, 0, 0]), Date.now());
-    const sample = vi.spyOn(buffer, 'sample');
-    vi.mocked(realtimeClient.getJointBuffer).mockReturnValue(buffer);
-    renderWithStore(<RobotPage />, { devices: [robotState()], connection: 'offline' });
-    sample.mockClear();
-    act(() => {
-      vi.advanceTimersByTime(1_000);
-    });
-    expect(sample).not.toHaveBeenCalled();
   });
 
   it('진단: 연결은 되어 있는데 관절 값이 3초 넘게 안 오면 늦어진다고 알린다', async () => {
@@ -297,12 +281,11 @@ describe('RobotPage', () => {
 });
 
 describe('ConveyorPage', () => {
-  it('맨 위에 흐르는 벨트, 주요 수치(가동·적재 정도·압축기로 가는 중), 조작 줄', async () => {
+  it('벨트 그림 없이 주요 수치(가동·적재 정도·압축기로 가는 중), 조작 줄', async () => {
     renderWithStore(<ConveyorPage />, { me: ADMIN, devices: [conveyorState()] });
     expect(screen.getByLabelText('지금 하는 일')).toHaveTextContent('압축기로 2덩어리 이송 중');
-    expect(screen.getByRole('img', { name: /컨베이어 그림, 가동 중, 압축기로 가는 덩어리 2개/ })).toBeInTheDocument();
-    expect(screen.getAllByTestId('belt-item')).toHaveLength(2);
-    expect(screen.getAllByTestId('belt-item')[0]).toHaveClass('anim-belt-carry');
+    expect(screen.queryByRole('img', { name: /컨베이어 그림/ })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('주요 수치')).toHaveClass('md:grid-cols-3');
     expect(tile('가동')).toHaveTextContent('가동');
     expect(tile('적재 정도')).toHaveTextContent('40%');
     expect(tile('압축기로 가는 중')).toHaveTextContent('2덩어리');
@@ -311,10 +294,10 @@ describe('ConveyorPage', () => {
     await vi.waitFor(() => expect(api.getHistory).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 'conveyor-z', metric: 'load', interval: '1h' }), expect.anything()));
   });
 
-  it('멈추면 벨트와 덩어리가 움직이지 않는다', () => {
+  it('멈추면 가동은 정지, 하는 일은 정지 상태', () => {
     renderWithStore(<ConveyorPage />, { devices: [{ ...conveyorState(), running: false } as DeviceState] });
     expect(screen.getByLabelText('지금 하는 일')).toHaveTextContent('정지 상태입니다');
-    for (const item of screen.getAllByTestId('belt-item')) expect(item).not.toHaveClass('anim-belt-carry');
+    expect(tile('가동')).toHaveTextContent('정지');
   });
 
   it('지금/다음은 배합 중인 배치와 다음 배치', () => {
@@ -348,26 +331,31 @@ describe('ConveyorPage', () => {
     expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'update_setting', key: 'speedPercent', value: 80, confirm: true });
   });
 
-  it('연결이 끊기면 값은 "–", 벨트는 멈추고 덩어리를 그리지 않으며 조작을 막는다', () => {
+  it('연결이 끊기면 값은 "–"이고 조작을 막는다', () => {
     const { store } = renderWithStore(<ConveyorPage />, { me: OPERATOR, devices: [conveyorState()] });
     act(() => {
       store.dispatch(connectionChanged({ status: 'offline', lastReceivedAt: NOW }));
     });
     expect(within(screen.getByLabelText('컨베이어 Section Z 상태')).getByText('연결 끊김')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: '컨베이어 그림' }).parentElement).toHaveAttribute('data-frozen', 'true');
-    expect(screen.queryAllByTestId('belt-item')).toHaveLength(0);
+    expect(within(screen.getByLabelText('컨베이어 Section Z 상태')).getByText(/마지막 수신/)).toBeInTheDocument();
     for (const label of ['가동', '적재 정도', '압축기로 가는 중']) expect(tile(label)).toHaveTextContent('–');
     expect(within(screen.getByRole('region', { name: '조작' })).getByRole('button', { name: '정지' })).toBeDisabled();
   });
 });
 
 describe('CompressorPage', () => {
-  it('맨 위에 베일러와 원형 압력 게이지(지금 압력 vs 지금 배치의 목표)·온도', () => {
+  it('압력 칸이 지금 압력 vs 지금 배치의 목표를 작은 게이지로 보여 주고 그림은 없다', () => {
     const { store } = renderWithStore(<CompressorPage />, { me: ADMIN, devices: [compressorState()] });
     act(() => {
       store.dispatch(processStateReceived({ vehicles: [], batches: [batch('batch-0412', 'compressing', 28.5), batch('batch-0413', 'mixing', 27.8)], bales: [], updatedAt: NOW }));
     });
-    expect(screen.getByRole('img', { name: '압축기 그림, 압력 28.7 MPa, 목표 28.5 MPa, 온도 42.3 °C' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /압축기 그림/ })).not.toBeInTheDocument();
+    // 같은 숫자를 두 번 쓰지 않는다: 값은 칸에 한 번(28.7 / 28.5)이고 게이지는 막대와 목표 눈금뿐
+    expect(screen.getAllByText('28.7')).toHaveLength(1);
+    const gauge = within(tile('압력')).getByTestId('tile-gauge');
+    expect(gauge.children).toHaveLength(2);
+    expect((gauge.children[0] as HTMLElement).style.width).toBe('82%');
+    expect((gauge.children[1] as HTMLElement).style.left).toBe('81%');
     expect(screen.getByLabelText('지금 하는 일')).toHaveTextContent('배치 #0412 압축 중 · 목표 28.5 MPa');
   });
 
@@ -382,7 +370,6 @@ describe('CompressorPage', () => {
     // 오늘 베일은 공장 요약 값, 추이선은 요약 이력
     expect(tile('오늘 베일')).toHaveTextContent('–');
     await vi.waitFor(() => expect(api.getPlantHistory).toHaveBeenCalledWith(expect.objectContaining({ metric: 'balesToday' }), expect.anything()));
-    await vi.waitFor(() => expect(api.getHistory).toHaveBeenCalledWith(expect.objectContaining({ deviceId: 'compressor-1', metric: 'pressure', interval: '1h' }), expect.anything()));
   });
 
   it('지금/다음: 지금 배치와 배치·베일 화면 링크, 다음 배치', () => {
@@ -408,21 +395,18 @@ describe('CompressorPage', () => {
     expect(screen.getByLabelText('점검 이력')).toHaveTextContent('서버가 값을 제공해야');
   });
 
-  it('연결이 끊기면 게이지 숫자와 주요 수치는 "–", 그림은 멈춘다', () => {
+  it('연결이 끊기면 압력 게이지 막대와 주요 수치는 "–"', () => {
     const { store } = renderWithStore(<CompressorPage />, { devices: [compressorState()] });
     act(() => {
       store.dispatch(connectionChanged({ status: 'offline', lastReceivedAt: NOW }));
     });
-    const art = screen.getByRole('img', { name: /압축기 그림/ });
-    expect(art).toHaveAccessibleName('압축기 그림, 압력 –, 온도 –');
-    expect(art.parentElement).toHaveAttribute('data-frozen', 'true');
+    expect(within(tile('압력')).getByTestId('tile-gauge').children).toHaveLength(0);
     for (const label of ['압력', '온도', '오늘 베일', '사이클 단계']) expect(tile(label)).toHaveTextContent('–');
   });
 
-  it('멈췄으면 사이클 단계는 "정지"이고 피스톤이 움직이지 않는다', () => {
-    const { container } = renderWithStore(<CompressorPage />, { devices: [compressorState({ running: false })] });
+  it('멈췄으면 사이클 단계는 "정지"', () => {
+    renderWithStore(<CompressorPage />, { devices: [compressorState({ running: false })] });
     expect(tile('사이클 단계')).toHaveTextContent('정지');
-    expect(container.querySelector('.anim-baler-press')).toBeNull();
   });
 });
 

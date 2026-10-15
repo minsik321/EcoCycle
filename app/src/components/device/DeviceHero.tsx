@@ -13,8 +13,8 @@ export interface DeviceHeroProps {
   statusLabel?: string;
   /** "지금 하는 일" 한 줄. 서버 값으로 만든 문장만 넣는다. 모르면 null */
   activity: string | null;
-  /** 기기 그림 (SVG·CSS 또는 작은 캔버스). 끊기면 이 영역의 CSS 움직임이 멈춘다 */
-  illustration: ReactNode;
+  /** 기기 그림 (SVG·CSS 또는 작은 캔버스). 끊기면 이 영역의 CSS 움직임이 멈춘다. 정보가 없는 그림은 넣지 않는다(없으면 머리 줄만 그린다) */
+  illustration?: ReactNode;
   /** 이 기기 값의 마지막 갱신 시각 */
   updatedAt?: string | null;
   /** 목록으로 돌아가는 링크 (탱크) */
@@ -22,7 +22,7 @@ export interface DeviceHeroProps {
 }
 
 /**
- * 기기 페이지 맨 위: 이름, 큰 상태 칩, 지금 하는 일 한 줄, 기기 그림.
+ * 기기 페이지 맨 위: 이름, 큰 상태 칩, 지금 하는 일 한 줄, (있으면) 기기 그림.
  * 연결이 끊기면 상태는 "연결 끊김", 하는 일은 "–"로 바꾸고 마지막 수신 시각을 보여 주며 그림을 멈춘다.
  */
 export function DeviceHero({ name, status, statusLabel, activity, illustration, updatedAt, back }: DeviceHeroProps) {
@@ -53,12 +53,14 @@ export function DeviceHero({ name, status, statusLabel, activity, illustration, 
         {disconnected ? '–' : (activity ?? '불러오는 중…')}
       </p>
 
-      <div
-        data-frozen={disconnected ? 'true' : undefined}
-        className={`relative h-40 overflow-hidden rounded-card bg-paper md:h-72 ${disconnected ? 'opacity-60 grayscale' : ''}`}
-      >
-        {illustration}
-      </div>
+      {illustration && (
+        <div
+          data-frozen={disconnected ? 'true' : undefined}
+          className={`relative h-40 overflow-hidden rounded-card bg-paper md:h-72 ${disconnected ? 'opacity-60 grayscale' : ''}`}
+        >
+          {illustration}
+        </div>
+      )}
 
       <p className="text-xs text-ink-faint">
         {disconnected ? (

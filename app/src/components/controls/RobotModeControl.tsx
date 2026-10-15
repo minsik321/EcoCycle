@@ -223,23 +223,25 @@ function ModeEditor({ robot, blocked, canMode, canPick }: { robot: RobotState; b
 
       {draft === 'manual' && (
         <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap text-ink-soft">
+          {/* 이름표·선택·버튼을 한 줄, 같은 높이(48px)와 같은 가운데선에. 이유 글은 이 줄 밖(아래)에 둔다 */}
+          <div className="flex items-center gap-2">
+            <label htmlFor={`${groupId}-pick`} className="shrink-0 text-sm leading-none whitespace-nowrap text-ink-soft">
               집을 섹터
-              <select
-                value={pickTarget}
-                onChange={(e) => setPickTarget(e.target.value as TankId)}
-                disabled={pickDisabled || picking}
-                aria-describedby={pickReason ? pickReasonId : undefined}
-                className="min-h-12 rounded-control border border-line bg-surface px-3 text-base text-ink disabled:text-ink-faint"
-              >
-                {TANK_IDS.map((id) => (
-                  <option key={id} value={id}>
-                    {DEVICE_NAMES[id]}
-                  </option>
-                ))}
-              </select>
             </label>
+            <select
+              id={`${groupId}-pick`}
+              value={pickTarget}
+              onChange={(e) => setPickTarget(e.target.value as TankId)}
+              disabled={pickDisabled || picking}
+              aria-describedby={pickReason ? pickReasonId : undefined}
+              className="h-12 min-w-0 flex-1 rounded-control border border-line bg-surface px-3 text-base leading-none text-ink disabled:text-ink-faint"
+            >
+              {TANK_IDS.map((id) => (
+                <option key={id} value={id}>
+                  {DEVICE_NAMES[id]}
+                </option>
+              ))}
+            </select>
             <CommandButton
               label="집기"
               pending={picking}

@@ -78,6 +78,38 @@ describe('기기 페이지 틀', () => {
   });
 });
 
+describe('기기 페이지 틀 배치', () => {
+  const page = (illustrated: boolean) => (
+    <DevicePage
+      illustrated={illustrated}
+      hero={<DeviceHero name="컨베이어" status="normal" activity="이송 중" updatedAt={NOW} {...(illustrated ? { illustration: <div data-testid="art" /> } : {})} />}
+      tiles={<KeyTiles wide={!illustrated} tiles={[{ label: '가', value: '1' }, { label: '나', value: '2' }, { label: '다', value: '3' }]} />}
+      now={<NowNext now="a" />}
+      details={<DetailsSection side={<p>설정</p>}><p>그래프</p></DetailsSection>}
+    />
+  );
+
+  it('그림이 없으면 주요 수치가 폭 전체 격자이고 그림 칸이 없다', () => {
+    renderWithStore(page(false));
+    expect(screen.queryByTestId('art')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('주요 수치')).toHaveClass('md:grid-cols-3');
+  });
+
+  it('"자세히"는 어느 쪽이든 오른쪽 칸 밖에 폭 전체로 있고, 열면 왼쪽 그래프와 오른쪽 설정으로 펼친다', async () => {
+    for (const illustrated of [true, false]) {
+      const { unmount } = renderWithStore(page(illustrated));
+      const section = screen.getByRole('button', { name: '자세히' }).closest('section')!;
+      // 주요 수치·지금/다음이 있는 칸과 형제이지 그 안이 아니다
+      expect(section.parentElement).not.toContainElement(screen.getByLabelText('주요 수치'));
+      await userEvent.click(screen.getByRole('button', { name: '자세히' }));
+      const body = screen.getByText('그래프').parentElement!.parentElement!;
+      expect(body).toHaveClass('md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]');
+      expect(screen.getByText('설정')).toBeInTheDocument();
+      unmount();
+    }
+  });
+});
+
 describe('조작 줄', () => {
   it('작업자에게는 시작·일시정지·재개·정지가 보이고 비상정지처럼 보이는 버튼은 없다', () => {
     renderWithStore(<DeviceActionBar deviceId="conveyor-z" />, { me: OPERATOR, devices: [conveyorState()] });
