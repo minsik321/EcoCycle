@@ -10,12 +10,29 @@ components/
 │                  KpiCard + Sparkline(지표 카드와 작은 추이선), Tabs, DataTable, ToastCard(알림 카드 한 장)
 ├── status/        StatusBadge(색+기호+글자), OfflineNotice, Timestamp, useDisplayStatus(끊기면 모든 상태를 "연결 끊김"으로), tone(색 클래스)
 ├── controls/      DeviceControls, CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
-├── layout/        Sidebar, TopBar(로고·시계·알람 수·연결 상태·화질·사용자), AppShell(슬롯: headerCenter·headerExtra·overlays), TopCards,
-│                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 메뉴·상단 바·끊김 안내를 숨기고 headerExtra를 넘긴다. 3D 홈만 쓴다)
+├── layout/        Sidebar(앱의 유일한 주 메뉴: 폰 아래 탭 바 + "더 보기", md 이상 왼쪽 사이드바·접힘, 강조 `NAV_ACTIVE`), TopBar(로고·시계·알람 수·연결 상태·화질·사용자),
+│                  AppShell(슬롯: headerCenter·headerExtra·overlays), TopCards,
+│                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 상단 바·끊김 안내를 숨기고 headerExtra를 넘기며 주 메뉴를 접는다. 3D 홈만 쓴다)
 ├── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
+├── records/       RecordList(기간 고르기 → 서버에서 10줄씩 → 폰 쌓인 줄 / md 이상 표 → 쪽 넘기기), Pagination, range(기간·쪽 번호 계산)
 └── device/        기기 페이지 틀: DevicePage(배치), DeviceHero(이름·큰 상태 칩·지금 하는 일·그림), KeyTile/KeyTiles(최대 4개, 작은 추이선),
                    NowNext(지금/다음), ActionBar·DeviceActionBar(위험도 낮은 조작 + 알람 확인), DetailsSection("자세히", 처음엔 닫힘), live(연결 상태)
 ```
+
+## 주 메뉴 (`layout/Sidebar`)
+
+- 앱에 메뉴는 하나다. `AppShell`이 모든 로그인 화면(3D 홈 포함)에 그리고, 화면이나 스튜디오는 메뉴를 따로 만들지 않는다.
+- 같은 `<nav aria-label="주 메뉴">`가 CSS로 모양만 바꾼다: md 미만은 아래 탭 바(`phoneTab` 메뉴 + "더 보기"가 나머지를 위로 펼침), md 이상은 왼쪽 사이드바.
+- 사이드바는 접을 수 있다(아이콘만, 이름은 화면 읽기용으로 남음). 3D 홈(`useImmersiveShell`)에서는 접힌 것이 기본이고 펼치면 3D 크기를 바꾸지 않고 그 위에 뜬다(바깥을 누르거나 메뉴를 고르면 접힘). 내용 영역은 `isolate`라 3D 패널이 메뉴 위로 올라오지 않는다.
+- 지금 화면의 메뉴 강조는 `NAV_ACTIVE` 하나(펼침·접힘·탭·"더 보기" 모두). "더 보기" 안의 화면을 보고 있으면 "더 보기" 버튼이 켜진다.
+
+## 기록 목록 (`records/`)
+
+- `RecordList<T>`는 `load(query, signal)`, `rowKey`, `time`, 폰 줄의 `title`·`detail`, 표의 `columns`를 받는다("시각" 칸은 저절로 맨 앞). API는 `load`로만 부른다.
+- 기간은 현지 날짜로 고르고 `[from, to)`를 UTC ISO로 보낸다. 직접 선택은 끝날을 포함하고(다음 날 0시까지) "적용"을 눌러야 요청한다. 기간을 바꾸면 1쪽으로.
+- 처음은 "불러오는 중…", 이후는 이전 목록을 흐리게 두고 받는다. 실패하면 오류와 "다시 시도". 비면 "이 기간에 기록이 없습니다"(쪽 넘기기 없음).
+- 폰은 기간 버튼 2×2(글자 130%에서도 한 줄), 쪽 번호는 지금 쪽 앞뒤 3개, md 이상은 한 줄·5개.
+- 미리 보기: `/design/records`(예시 값, `?empty=1`, `?offline=1`).
 
 ## 기기 페이지 틀 (`device/`)
 

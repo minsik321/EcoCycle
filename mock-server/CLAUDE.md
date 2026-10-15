@@ -15,7 +15,8 @@ mock-server/
     │                     재사용 감지 → 세션 폐기, 단 교체 직후 30초 안의 바로 앞 토큰은 같은 새 쌍을 다시 줌: REFRESH_REUSE_GRACE_SEC), 로그아웃(세션 폐기·쿠키 삭제), ws-ticket(30초, 1회용), /me, requireAuth
     ├── errors.ts         {"error":{"code","message"}} 응답
     ├── stream.ts         WebSocket: 티켓 검증, 구독 관리, heartbeat 5초, 시나리오 침묵·지연 반영
-    ├── routes/           devices(요약·기기·이력), process(공정 흐름 상태·요약 이력), robots(모델), alarms, cameras, commands(202·멱등성·403/409/422)
+    ├── routes/           devices(요약·기기·이력), process(공정 흐름 상태·요약 이력), robots(모델), alarms, cameras, commands(202·멱등성·403/409/422),
+    │                     records(모든 `.../records`가 쓰는 페이지 나누기 `sendRecordPage`: 쿼리 검사 422, 구간 거르기, 최신 먼저, { items, total, page, pageSize })
     ├── sim/              state(현재 값), plant(탱크·컨베이어·압축기·알람), robot(사이클·관절 15Hz), commands(접수→결과),
     │                     process(차량·배치·베일: 회사·배정 섹터·배합비·목표 압력을 예시로 정함, 로봇이 집을 섹터도 여기서),
     │                     alarmOps, publish(변할 때·5초마다), history(가짜 이력), bus(sim → stream)
@@ -38,4 +39,5 @@ mock-server/
 - 공정 흐름은 모든 시나리오에서 함께 돈다. 탱크 적재율은 차량이 내릴 때 늘고 로봇이 집을 때 준다. 회사·번호판은 가상의 것만 쓴다.
 - 시각은 항상 UTC ISO 문자열, 단위는 명세 그대로.
 - 서버 쪽 "진짜" 기능(FCM 발송, RTSP 변환, 실제 보안)은 흉내만 낸다. CCTV는 고정 샘플 영상이나 정지 이미지로 대체한다.
+- 기록 엔드포인트(`.../records`)는 `sendRecordPage`로 응답한다. 기록은 sim이 실제처럼 쌓은 예시 값이고(가상의 회사·번호판), 앱은 "예시 데이터" 표시를 유지한다.
 - 명세에 없는 엔드포인트를 앱 편의를 위해 추가하지 않는다. 필요하면 명세 수정안부터 제안한다.

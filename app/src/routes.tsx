@@ -9,6 +9,7 @@ import { CompressorPage } from './features/compressor';
 import { ConveyorPage } from './features/conveyor';
 import { DesignPage } from './features/design/DesignPage';
 import { DevicePreviewPage } from './features/design/DevicePreviewPage';
+import { RecordsPreviewPage } from './features/design/RecordsPreviewPage';
 import { HomePage } from './features/home/HomePage';
 import { RobotPage } from './features/robot';
 import { SettingsPage } from './features/settings';
@@ -47,6 +48,8 @@ export default function AppRoutes() {
       <Route path="/design" element={<DesignPage />} />
       {/* 기기 페이지 틀 미리 보기 (개발용, 값은 모두 예시). ?offline=1이면 연결 끊김 모습 */}
       <Route path="/design/device" element={<DevicePreviewPage />} />
+      {/* 기록 목록 미리 보기 (개발용, 값은 모두 예시). ?empty=1 기록 없음, ?offline=1 연결 끊김 */}
+      <Route path="/design/records" element={<RecordsPreviewPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell headerExtra={<CctvButton />} overlays={<CctvOverlay />} />}>
           {NAV_ITEMS.filter((item) => !IMPLEMENTED.has(item.id)).map((item) => (

@@ -167,3 +167,25 @@ export const PERMISSION_TEXT: Record<Permission, string> = {
   'settings.write': '설정값 변경',
   'alarm.ack': '알람 확인 처리',
 };
+
+// --- 기록 목록 (components/records/RecordList) ---
+// 모든 기록 화면(차량·하역·로봇 집기 등)이 같은 기간 고르기와 쪽 넘기기를 쓴다. 요청·응답 모양은 shared/records.ts.
+
+export type RecordRangeKey = 'today' | 'yesterday' | 'last7d' | 'custom';
+
+export const RECORD_RANGES: ReadonlyArray<{ key: RecordRangeKey; label: string }> = [
+  { key: 'today', label: '오늘' },
+  { key: 'yesterday', label: '어제' },
+  { key: 'last7d', label: '최근 7일' },
+  { key: 'custom', label: '직접 선택' },
+];
+
+export const RECORD_LIST = {
+  /** 처음 열 때의 기간 */
+  defaultRange: 'today' as RecordRangeKey,
+  /** 직접 선택에서 한 번에 고를 수 있는 최대 일수 (서버 부담을 막는 표시용 제한, 가정) */
+  maxCustomDays: 92,
+  /** 쪽 번호를 몇 개까지 보여 주나 (폰에서는 가운데 3개만) */
+  pageWindow: 5,
+  emptyText: '이 기간에 기록이 없습니다',
+} as const;

@@ -21,8 +21,8 @@ import type { StudioData } from './types';
 /**
  * 3D 홈: 기존 store·실시간 계층의 값을 그대로 스튜디오 화면에 넘긴다.
  * 조작은 기존 조작 컴포넌트(홈용: 위험도 낮은 것만)와 기기 페이지 링크만 쓴다. 권한·차단은 그 컴포넌트와 서버가 맡는다.
- * 열려 있는 동안 앱 틀의 메뉴·상단 바를 넘겨받아(shellChrome) 상단 바 하나로 화면 전체를 쓴다.
- * 그 대신 틀이 하던 알람·CCTV·사용자·메뉴를 스튜디오 상단 바 오른쪽 끝에 둔다.
+ * 열려 있는 동안 앱 틀의 상단 바를 넘겨받아(shellChrome) 상단 바 하나로 화면을 쓴다(앱의 주 메뉴는 그대로 남아 접힌다).
+ * 그 대신 틀의 상단 바가 하던 알람·CCTV·사용자를 스튜디오 상단 바 오른쪽 끝에 둔다.
  */
 export function LiveStudio({ switcher, onFailed }: { switcher?: ReactNode; onFailed: () => void }) {
   useRobotJointsSubscription();

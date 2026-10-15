@@ -420,7 +420,7 @@ describe('참고 화면에 맞춘 화면 구성', () => {
     expect(screen.getByRole('complementary', { name: '차량 상세' })).toBeInTheDocument();
   });
 
-  it('홈에서 열면 앱의 메뉴·상단 바를 넘겨받아 상단 바 하나만 남고, 알람·사용자·로그아웃·메뉴·CCTV는 그 바에 있다', async () => {
+  it('홈에서 열면 앱의 상단 바를 넘겨받아 상단 바 하나만 남고(알람·사용자·로그아웃·CCTV는 그 바에), 화면 이동은 앱의 주 메뉴 하나로 한다', async () => {
     const user = userEvent.setup();
     renderWithStore(
       <Routes>
@@ -430,15 +430,18 @@ describe('참고 화면에 맞춘 화면 구성', () => {
       </Routes>,
       { devices: [tankState(), robotState(), conveyorState()], me: ADMIN },
     );
-    expect(screen.queryByRole('navigation', { name: '주 메뉴' })).not.toBeInTheDocument();
+    // 주 메뉴는 다른 화면과 같은 것 하나이고 아이콘만 남게 접혀 있다. 스튜디오 상단 바에는 따로 메뉴가 없다
+    const nav = screen.getByRole('navigation', { name: '주 메뉴' });
+    expect(nav).toHaveAttribute('data-collapsed', 'true');
+    expect(within(nav).getByRole('link', { name: '설정' })).toHaveAttribute('href', '/settings');
+    expect(within(nav).getByRole('link', { name: '홈' })).toHaveAttribute('aria-current', 'page');
     // 앱 상단 바(로고·로그아웃 버튼)는 없고 스튜디오 상단 바 하나뿐이다
     expect(screen.getAllByText('EcoCycle')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument();
     const bar = document.querySelector<HTMLElement>('.st-top')!;
     expect(within(bar).getByRole('link', { name: /알람 보기/ })).toHaveAttribute('href', '/alarms');
     expect(within(bar).getByRole('button', { name: 'CCTV' })).toBeInTheDocument();
-    await user.click(within(bar).getByRole('button', { name: '메뉴' }));
-    expect(within(bar).getByRole('menuitem', { name: '설정' })).toHaveAttribute('href', '/settings');
+    expect(within(bar).queryByRole('button', { name: '메뉴' })).not.toBeInTheDocument();
     await user.click(within(bar).getByRole('button', { name: new RegExp(ADMIN.name) }));
     expect(within(bar).getByRole('menuitem', { name: '로그아웃' })).toBeInTheDocument();
   });

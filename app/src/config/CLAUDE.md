@@ -13,8 +13,8 @@
 | `robotCycle.ts` | 섹터마다 로봇이 집으러 가는 base 관절 각도(`TANK_BASE_DEG`)와 시연 동작 주기(`DEMO_CYCLE`) | 실제 로봇·섹터 배치 확정 |
 | `quality.ts` | 화질 3단계(high/standard/low)의 이름·설명, 자동 선택 기준(`tierFromProbe`). 단계별로 무엇을 그리는지는 `studio/quality.ts` | 실기기 테스트 결과 |
 | `controls.ts` | 화면에 보일 조작 목록과 위치(홈/기기 페이지) — 위험도·권한 표는 `shared/commands.ts`를 참조 | 대표님 조작 목록 확정 |
-| `display.ts` | 상태 문구·기호, 표시 형식(소수점 자리, 단위 표기), 기기 표시 이름, 단계 바 구성 (색 토큰은 `styles/index.css`) | 디자인 피드백 |
-| `navigation.ts` | 사이드바 메뉴와 메뉴별 필요 권한(`requires`), 여백 없이 가득 쓰는 화면(`fullBleed`) | 대표님 권한별 화면 확정 |
+| `display.ts` | 상태 문구·기호, 표시 형식(소수점 자리, 단위 표기), 기기 표시 이름, 단계 바 구성, 기록 목록의 기간 버튼·직접 선택 최대 일수·쪽 번호 수·빈 목록 문구(`RECORD_RANGES`, `RECORD_LIST`) (색 토큰은 `styles/index.css`) | 디자인 피드백 |
+| `navigation.ts` | 주 메뉴와 메뉴별 필요 권한(`requires`), 폰 탭 바에 바로 놓을 메뉴(`phoneTab`, 나머지는 "더 보기"), 메뉴 강조 기준(`isNavActive`), 여백 없이 가득 쓰는 화면(`fullBleed`) | 대표님 권한별 화면 확정 |
 | `realtime.ts` | 끊김 감지 15초, 관절 지연 버퍼 0.15초, store 반영 묶음 주기 | 실서버 특성 |
 
 ## 규칙

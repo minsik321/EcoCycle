@@ -18,5 +18,6 @@ export type DeviceStatus = (typeof DEVICE_STATUSES)[number];
  *   압력              MPa            pressureMpa
  *   온도              °C             temperatureC
  *   각도              도(degree)     joints
- * 무게는 쓰지 않는다 (부피·용량만).
+ *   무게              t              grossT, tareT, netT — 차량·하역 기록에만 (총중량·공차·순중량)
+ * 기기 상태와 실시간 메시지에는 무게를 쓰지 않는다 (섹터는 적재율·부피, 로봇 집기는 부피 또는 횟수).
  */

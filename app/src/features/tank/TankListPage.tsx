@@ -14,7 +14,7 @@ export function TankListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-bold">탱크</h1>
+      <h1 className="text-xl font-bold">섹터</h1>
       {tanks.length === 0 ? (
         <p role="status" className="text-slate-500">
           탱크 상태를 불러오는 중…

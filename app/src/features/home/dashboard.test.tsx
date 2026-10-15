@@ -129,7 +129,7 @@ describe('대시보드 홈', () => {
     await vi.waitFor(() => expect(screen.getByRole('region', { name: '평균 수분' }).querySelector('svg path')).not.toBeNull());
   });
 
-  it('섹터 4칸: 적재율 막대, 등급, 수분, 상태. 누르면 탱크 페이지', async () => {
+  it('섹터 4칸: 적재율 막대, 등급, 수분, 상태. 누르면 섹터 페이지', async () => {
     page();
     const sectors = screen.getByRole('region', { name: '섹터' });
     expect(within(sectors).getAllByRole('link')).toHaveLength(4);

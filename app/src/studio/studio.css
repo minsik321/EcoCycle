@@ -521,8 +521,7 @@ a.st-bell:hover {
   text-align: left;
 }
 
-.st-pop-menu > *:hover,
-.st-pop-menu > a.active {
+.st-pop-menu > *:hover {
   background: rgb(37 99 235 / 0.08) !important;
   color: var(--st-blue) !important;
 }
@@ -530,12 +529,6 @@ a.st-bell:hover {
 .st-pop-menu [aria-disabled='true'] {
   color: var(--st-faint) !important;
   cursor: not-allowed;
-}
-
-.st-nav-badge {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--st-alarm);
 }
 
 /* 상단 바 안에 들어온 홈 전환(3D | 대시보드)과 시연 화면의 보조 버튼 */

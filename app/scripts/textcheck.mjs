@@ -135,10 +135,18 @@ async function run(browser) {
         ['/tanks/tank-a1', '탱크 페이지'],
         ['/robot', '로봇팔 페이지'],
         ['/compressor', '압축기 페이지'],
+        ['/design/records', '기록 목록'],
       ]) {
         await go(route);
         await page.waitForTimeout(1200);
         await check(page, name, zoom);
+      }
+      // 폰: 아래 탭 바의 "더 보기"를 펼친 모습
+      if (phone) {
+        await go('/robot');
+        await page.getByRole('navigation', { name: '주 메뉴' }).getByRole('button', { name: '더 보기' }).click();
+        await check(page, '주 메뉴 더 보기', zoom);
+        await page.keyboard.press('Escape');
       }
       // 대시보드: 3D가 다시 열리면 전환을 누르고, 3D가 실패해 이미 대시보드로 바뀌었으면 그대로 본다
       await go('/');

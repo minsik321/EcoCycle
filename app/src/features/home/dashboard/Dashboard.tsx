@@ -127,7 +127,7 @@ function SectorTile({ id }: { id: TankId }) {
 
 function Sectors() {
   return (
-    <Panel title="섹터" className="md:col-span-2" aside={<span className="text-xs whitespace-nowrap text-ink-faint">누르면 탱크 페이지</span>}>
+    <Panel title="섹터" className="md:col-span-2" aside={<span className="text-xs whitespace-nowrap text-ink-faint">누르면 섹터 페이지</span>}>
       <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
         {TANK_IDS.map((id) => (
           <SectorTile key={id} id={id} />

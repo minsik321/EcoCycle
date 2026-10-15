@@ -6,7 +6,6 @@ const PATHS = {
   chevron: 'M7 10l5 5 5-5',
   close: 'M6 6l12 12M18 6 6 18',
   bell: 'M6 9a6 6 0 1 1 12 0c0 6 2.5 7 2.5 7h-17S6 15 6 9M10 20a2 2 0 0 0 4 0',
-  menu: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
   plus: 'M12 5v14M5 12h14',
   minus: 'M5 12h14',
   rotL: 'M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5',

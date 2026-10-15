@@ -253,7 +253,7 @@ describe.each(ROLES)('역할 %s', (role) => {
       { me },
     );
     const nav = screen.getByRole('navigation', { name: '주 메뉴' });
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+$/, ''))).toEqual(['홈', '탱크', '로봇팔', '컨베이어', '압축기', '알람', '설정']);
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent?.replace(/\d+$/, ''))).toEqual(['홈', '섹터', '로봇팔', '컨베이어', '압축기', '알람', '설정']);
   });
 
   it('조작 가능 여부는 어느 역할이든 연결이 끊기면 모두 막힌다', async () => {

@@ -14,6 +14,7 @@ api/
 ├── alarms.ts       getAlarms
 ├── cameras.ts      getCameras, getStreamInfo, getSnapshotBlob (이미지는 토큰을 주소에 넣을 수 없어 Blob으로 받음)
 ├── push.ts         registerPush, unregisterPush
+├── records.ts      getRecords<T>(경로, { from, to, page, pageSize }) — 모든 기록 목록이 함께 쓴다 (응답 RecordPage<T>)
 ├── commands.ts     sendCommand(Idempotency-Key 생성), getCommand
 └── index.ts        재수출
 ```

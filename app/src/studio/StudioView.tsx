@@ -58,7 +58,7 @@ export interface StudioViewProps {
   switcher?: ReactNode;
   /** 상단 바의 보조 영역 (시연 화면의 측정 버튼 등, 폰에서는 "더 보기" 안) */
   tabs?: ReactNode;
-  /** 상단 바 오른쪽 끝: 앱 틀을 넘겨받았을 때의 알람·CCTV·사용자·메뉴 (LiveStudio가 채운다) */
+  /** 상단 바 오른쪽 끝: 앱 틀을 넘겨받았을 때의 알람·CCTV·사용자 (LiveStudio가 채운다) */
   account?: ReactNode;
   /** 기기 상세 패널에 넣을 조작 영역. 기존 조작 컴포넌트를 그대로 끼운다 */
   deviceActions?: (id: DeviceId) => ReactNode;
