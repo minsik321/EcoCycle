@@ -68,7 +68,7 @@ function Toast({ entry, onDismiss }: { entry: CommandEntry; onDismiss: () => voi
           <span>
             {DEVICE_NAMES[entry.deviceId]} · {CONTROL_TEXT[entry.type].label}
           </span>
-          <StatusBadge status={view.tone} symbol={view.symbol} label={view.text} size="sm" />
+          <StatusBadge status={view.tone} symbol={view.symbol} label={entry.type.includes('batch') && entry.status === 'accepted' ? '적용 대기' : entry.type.includes('batch') && entry.status === 'completed' ? '적용됨' : view.text} size="sm" />
         </>
       }
       {...(isPending(entry.status) ? {} : { onDismiss })}

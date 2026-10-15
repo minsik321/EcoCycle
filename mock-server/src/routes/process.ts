@@ -3,7 +3,7 @@ import type { BatchRecord, PlantHistoryResponse, PlantMetric, ProcessState, Vehi
 import { PLANT_METRICS } from '@ecocycle/shared';
 import { sendError } from '../errors';
 import { buildPlantHistory, MAX_HISTORY_POINTS, parseInterval } from '../sim/history';
-import { liveBatchRecords, liveVehicleRecords, processState } from '../sim/process';
+import { batchControlState, batchEvents, baleDetail, liveBatchRecords, liveVehicleRecords, processState } from '../sim/process';
 import { finishedBatchRecords, finishedVehicleRecords } from '../sim/records';
 import { summarize } from '../sim/state';
 import { sendRecordPage } from './records';
@@ -35,6 +35,14 @@ processRouter.get('/vehicles/:id', (req, res) => {
 // GET /batches/records?from=...&to=...&page=1&pageSize=10 — 배치 기록 (시작 시각 기준)
 processRouter.get('/batches/records', (req, res) => {
   sendRecordPage(req, res, allBatches(), (r) => r.startedAt);
+});
+
+processRouter.get('/batches/control', (_req, res) => res.json(batchControlState()));
+processRouter.get('/batches/events/records', (req, res) => sendRecordPage(req, res, batchEvents(), r => r.at));
+processRouter.get('/bales/:id', (req, res) => {
+  const bale = baleDetail(req.params.id);
+  if (!bale) return sendError(res, 404, 'NOT_FOUND', '베일을 찾을 수 없습니다.');
+  res.json(bale);
 });
 
 // GET /batches/{id} — 배치 기록 한 건

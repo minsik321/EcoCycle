@@ -10,7 +10,7 @@ export interface Account {
 
 // 권한 매트릭스는 docs/decisions.md의 가정(3단계 위계)이다. 대표님 확정 후 고친다.
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  admin: ['robot.control', 'robot.manual', 'settings.write', 'alarm.ack'],
+  admin: ['batch.control', 'robot.control', 'robot.manual', 'settings.write', 'alarm.ack'],
   operator: ['robot.control', 'alarm.ack'],
   viewer: [],
 };

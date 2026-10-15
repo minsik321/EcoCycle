@@ -110,3 +110,11 @@
 - 화면은 store 선택자와 `api` 훅으로만 데이터를 얻는다.
 - 위험 조작은 기기 페이지에서만(`components/controls`의 `context='page'`).
 - 화면을 떠날 때 그 화면이 연 구독(관절 값 등)을 해제한다.
+
+
+## 5단위 배치·베일
+- `/records/batches` (`BatchBalePage`): 현재 배치 요약, 현재/다음 선택, `BatchControls`, 사건 `RecordList`. `useBatchControl`은 서버 현재 상태를 2초마다 조회하며 명령 결과와 재연결 때 다시 받는다. 초안 입력과 서버 확정값은 분리한다.
+- `/records/bales/:id` (`BaleDetailPage`): 생산 당시 압력·수분·배합 스냅샷, 적치/출하 상태. 기존 배치 상세의 베일 ID로 연결한다.
+- `batch.control` 권한은 관리자만 주는 가정. 명령은 기존 `useDeviceCommand`·`ConfirmDialog`·`CommandResultToast` 사용. 상태/범위/승인은 서버가 결정한다.
+- 사건 줄을 누르면 변경 전후·수행자·시각·사유 전체를 대화상자로 보여 준다. `eventsRevision` 변경 시 같은 기간·쪽을 새로 조회한다.
+- 재현: `node app/scripts/batchBale.mjs` (실제 목업 명령 검증, 두 크기·글자 100/130%, `docs/screenshots/batch-bale`). 전체 글 검사에도 새 화면을 포함한다.

@@ -31,7 +31,7 @@ describe('SettingsPage: 계정', () => {
 
   it('관리자는 모든 조작이, 열람자는 조회만 가능하다고 보여 준다', () => {
     const { unmount } = renderWithStore(<SettingsPage />, { me: ADMIN });
-    expect(within(screen.getByLabelText('계정')).getAllByRole('listitem')).toHaveLength(4);
+    expect(within(screen.getByLabelText('계정')).getAllByRole('listitem')).toHaveLength(5);
     unmount();
     renderWithStore(<SettingsPage />, { me: VIEWER });
     expect(within(screen.getByLabelText('계정')).getByText('조회만 할 수 있습니다.')).toBeInTheDocument();

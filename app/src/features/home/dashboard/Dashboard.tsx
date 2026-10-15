@@ -160,7 +160,7 @@ function BatchCard() {
       aside={
         <span className="flex shrink-0 items-center gap-2">
           {batch && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-accent-strong">{disconnected ? '연결 끊김' : BATCH_STAGE_TEXT[batch.stage]}</span>}
-          <SeeAll to={recordsPath('batches')} label="배치 기록 전체 보기" />
+          <><SeeAll to="/records/batches" label="배치·베일" /><SeeAll to={recordsPath('batches')} label="배치 기록 전체 보기" /></>
         </span>
       }
     >

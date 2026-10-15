@@ -137,6 +137,7 @@ async function run(browser) {
         ['/robot', '로봇팔 페이지'],
         ['/compressor', '압축기 페이지'],
         ['/design/records', '기록 목록'],
+        ['/records/batches', '배치·베일 제어'],
       ]) {
         await go(route);
         await page.waitForTimeout(1200);
@@ -156,7 +157,22 @@ async function run(browser) {
         await page.getByText(/^(계중대 무게|만든 베일)/).first().waitFor({ timeout: 15_000 });
         await page.waitForTimeout(800);
         await check(page, `${name} 상세`, zoom);
+        if (tab === 'batches') {
+          const bale = page.locator('a[href^="/records/bales/"]').first();
+          if (await bale.count()) {
+            await bale.click();
+            await page.getByText('베일 상세', { exact: true }).waitFor();
+            await check(page, '베일 기록 상세', zoom);
+          }
+        }
       }
+      await go('/records/batches');
+      await page.getByLabel('A1 (%)', {exact:true}).waitFor();
+      await page.getByLabel('A1 (%)', {exact:true}).fill('99');
+      await check(page, '배합 검증', zoom);
+      await page.getByRole('button', {name:/^배치 (일시정지|재개)$/}).click();
+      await check(page, '배치 확인 대화상자', zoom);
+      await page.getByRole('button', {name:'취소',exact:true}).click();
       // 폰: 아래 탭 바의 "더 보기"를 펼친 모습
       if (phone) {
         await go('/robot');

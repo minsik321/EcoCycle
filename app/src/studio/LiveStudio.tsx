@@ -22,9 +22,7 @@ import type { RecordLink, StudioData } from './types';
 const recordLink: RecordLink = (target, label, className) => {
   const to = target.kind === 'list' ? recordsPath(target.tab) : target.kind === 'vehicle' ? vehicleRecordPath(target.id) : batchRecordPath(target.id);
   return (
-    <Link to={to} className={className}>
-      {label}
-    </Link>
+    <><Link to={to} className={className}>{label}</Link>{target.kind === 'batch' && <Link to="/records/batches" className={className}>배치·베일 제어 →</Link>}</>
   );
 };
 

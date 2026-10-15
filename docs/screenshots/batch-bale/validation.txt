@@ -1,0 +1,1 @@
+PASS: 390×844, 820×1180; text 100%, 130%; commands, permissions, idempotency, events.

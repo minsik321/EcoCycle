@@ -10,7 +10,7 @@ export const ADMIN: Me = {
   id: 'admin',
   name: '관리자',
   role: 'admin',
-  permissions: ['robot.control', 'robot.manual', 'settings.write', 'alarm.ack'],
+  permissions: ['batch.control', 'robot.control', 'robot.manual', 'settings.write', 'alarm.ack'],
 };
 export const VIEWER: Me = { id: 'viewer', name: '열람자', role: 'viewer', permissions: [] };
 

@@ -73,3 +73,34 @@ export interface ProcessState {
 /** `GET /plant/history`의 metric (지표 카드의 작은 추이선용) */
 export const PLANT_METRICS = ['balesToday', 'averageMoisturePercent', 'compressorUptimePercent'] as const;
 export type PlantMetric = (typeof PLANT_METRICS)[number];
+
+
+export interface ControlledBatch {
+  batch: Batch;
+  paused: boolean;
+  skipped: boolean;
+  progressPercent: number;
+  currentPressureMpa: number;
+  baleIds: string[];
+}
+export interface BatchControlState {
+  /** 사건 기록이 바뀌면 증가한다 */
+  eventsRevision: number;
+  current: ControlledBatch | null;
+  next: ControlledBatch | null;
+  pressureRange: { min: number; max: number };
+}
+export interface BaleDetail extends Bale {
+  pressureMpa: number;
+  avgMoisturePercent: number;
+  mix: MixPart[];
+}
+export interface BatchEvent {
+  id: string;
+  batchId: string;
+  at: IsoTimestamp;
+  type: 'created' | 'mix_changed' | 'pressure_changed' | 'paused' | 'resumed' | 'skipped' | 'bale_produced';
+  actor: string;
+  detail: string;
+  baleId?: string;
+}

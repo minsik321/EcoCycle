@@ -7,6 +7,7 @@ import type {
   RobotState,
 } from '@ecocycle/shared';
 import { publish } from './bus';
+import { applyBatchCommand } from './process';
 import { publishDevice, publishSummary } from './publish';
 import { requestManualPick, resetRobotCycle } from './robot';
 import { alarms, devices, setSetting } from './state';
@@ -126,7 +127,11 @@ async function finish(record: CommandRecord): Promise<void> {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-async function execute({ deviceId, command }: CommandRecord): Promise<Outcome> {
+async function execute({ deviceId, command, userId }: CommandRecord): Promise<Outcome> {
+  if ('batchId' in command) {
+    const reason = applyBatchCommand(command, userId);
+    return { status: reason ? 'rejected' : 'completed', reason: reason ?? null };
+  }
   const device = devices[deviceId];
 
   switch (command.type) {

@@ -14,6 +14,11 @@ export interface ControlText {
 }
 
 export const CONTROL_TEXT: Record<CommandType, ControlText> = {
+  set_batch_mix: { label: '배합 변경', confirmMessage: '선택한 배치를 변경합니다. 계속할까요?' },
+  set_batch_pressure: { label: '압력 변경', confirmMessage: '선택한 배치를 변경합니다. 계속할까요?' },
+  pause_batch: { label: '배치 일시정지', confirmMessage: '선택한 배치를 변경합니다. 계속할까요?' },
+  resume_batch: { label: '배치 재개', confirmMessage: '선택한 배치를 변경합니다. 계속할까요?' },
+  skip_batch: { label: '배치 건너뛰기', confirmMessage: '선택한 배치를 변경합니다. 계속할까요?' },
   start: { label: '시작' },
   pause: { label: '일시정지' },
   resume: { label: '재개' },
@@ -26,6 +31,12 @@ export const CONTROL_TEXT: Record<CommandType, ControlText> = {
 
 /** 버튼이 놓이는 순서 */
 export const CONTROL_ORDER: readonly CommandType[] = [
+  'set_batch_mix',
+  'set_batch_pressure',
+  'pause_batch',
+  'resume_batch',
+  'skip_batch',
+
   'start',
   'pause',
   'resume',
@@ -44,7 +55,7 @@ export function controlPlaces(type: CommandType): readonly ControlPlace[] {
 /** 이 위치의 이 대상에 놓을 조작 목록. 알람에 거는 조작은 대상으로 'alarm'을 넘긴다. */
 export function controlsFor(place: ControlPlace, target: DeviceType | 'alarm'): CommandType[] {
   return CONTROL_ORDER.filter(
-    (type) => COMMAND_RULES[type].targets.includes(target) && controlPlaces(type).includes(place),
+    (type) => !type.includes('batch') && COMMAND_RULES[type].targets.includes(target) && controlPlaces(type).includes(place),
   );
 }
 

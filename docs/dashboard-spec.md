@@ -26,6 +26,10 @@ Oct 13, 2026 · @민식
 
 홈 화면은 시각 품질도 목표로 삼되, 가장 낮은 화질 단계는 실제 저사양 태블릿에서 끊김 없이 도는 것만을 기준으로 하고 상위 단계의 연출이 이 기준을 깨면 안 된다.
 
+### 용어집
+
+**배치(batch)**는 섹터 배합·평균 수분·목표 압력을 정해 압축기에 공급하는 한 번의 혼합 작업이다. **베일(bale)**은 압축·결속하여 배출한 블록 하나다. 목업은 배치당 베일 하나를 만들지만 `baleIds[]`와 `Bale.batchId`로 1→N을 허용한다.
+
 ## 범위와 역할 분담
 
 프론트 담당은 화면, 앱 빌드, 모의 서버까지이며, 로봇·센서 서버와 로그인·권한·알림·영상 변환은 서버 쪽 담당이 필요하다. 담당이 정해지지 않은 항목은 7절의 확인 상태와 가정으로 관리한다.
@@ -491,6 +495,16 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 - 하단 공정 추적(입고 → 차량 인식 → 하역 → 배합 → 압축 → 출하)의 시각은 `stageTimes`를 표시만 한다. 차량·배치·베일을 하나의 사이클로 묶는 값은 서버에 없으므로 "출차하지 않은 가장 최근 차량, 진행 중인 배치, 가장 최근 베일"을 나란히 보여 준다.
 - 값이 모의 서버나 로컬 시연 소스에서 오면 화면에 "예시 데이터" 표시를 띄운다.
 
+### 5단위 배치·베일 계약 (2026-10-15, 현장 확인 전 가정)
+
+`/records/batches`: 현재·다음 배치 선택, 수동 제어, 사건 RecordList. `/records/batches/{id}`: 과거 상세. `/records/bales/{id}`: 베일 상세.
+- GET `/batches/control`: `{current,next,pressureRange,eventsRevision}`. 각 대상은 `{batch,paused,skipped,progressPercent,currentPressureMpa,baleIds}`. 진행률·압력·현재/다음 선정은 서버가 결정한다. 화면은 2초마다 조회하며 재연결 때 재조회한다.
+- GET `/batches/events/records`: 공통 기간·페이지 계약의 `BatchEvent` 목록. created, mix_changed, pressure_changed, paused, resumed, skipped, bale_produced. 시각·배치 ID·행위자·변경 전후/사유/베일 ID를 저장한다.
+- GET `/bales/{id}`: 베일 ID, 배치 ID, 생성·출하 시각, 상태, 실제 압력, 평균 수분, 배합 스냅샷.
+- POST `/devices/compressor-1/commands`: `set_batch_mix {batchId,mix}`, `set_batch_pressure {batchId,targetPressureMpa}`, `pause_batch {batchId}`, `resume_batch {batchId}`, `skip_batch {batchId,reason}`. 모두 `confirm:true`, Idempotency-Key, `batch.control` 권한 필수. admin만 권한 부여하는 가정.
+- 202는 적용 대기. command.result completed는 적용됨, rejected는 거부됨. WS 누락 시 기존 GET 명령 조회 사용. 서버 확정 전 표시값을 바꾸지 않는다.
+- 구조 오류·확인 누락 422, 권한 없음 403. 실행 시 배치 종료/단계 변경·배합 합계 오류·압력 범위 위반·이미 정지/재개 상태는 command.result rejected. 배합은 투입 전, 압력은 압축 전만 변경 가능. 압축 중 건너뛰기 거부. 사유는 공백 제외 1~120자. 압력 허용 범위는 서버 fixtures에서 제공한다.
+
 ## 확인 상태와 프로토타입 가정
 
 대표님과 현장 책임자와 대화하기 전까지는 아래 가정으로 프로토타입을 만들고, 답을 받는 대로 고친다. 확인된 항목은 체크했고, 가장 먼저 필요한 것은 서버 담당과 API 명세 합의다.
@@ -542,6 +556,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 수납 섹터 | 섹터는 A1, A2, B1, B2 네 개이고 기존 탱크 4개와 같은 대상(기기 ID 그대로) | 기기 ID 목록, 장면 배치 |
 | 섹터 등급 | 등급은 A와 C 두 가지, 섹터마다 서버가 등급과 수분을 알려 준다 | `shared/`의 등급 타입, 표시 문구 |
 | 계중대와 무게 | 차량·하역 기록에만 계중대 순중량(t, 총중량 − 공차, 세 값 모두 저장)을 쓴다. 섹터는 적재율·부피, 로봇 집기는 부피 또는 횟수. 실시간 장면의 계중대는 진행 표시만 한다 | 기록 형식(`shared/`), 기록 화면의 표시 단위, `app/src/config/display.ts` |
+| 배치·베일 제어 | 배치당 베일 1개 목업, 모델 1→N. `batch.control`은 관리자만. 투입 전 배합·압축 전 압력 변경, 압축 중 건너뛰기 거부 | `shared/commands.ts`, `mock-server/src/fixtures/accounts.ts`, `mock-server/src/sim/process.ts` |
 | 기록 목록 | 모든 기록 목록은 `from`·`to`·`page`·`pageSize` 쿼리와 `{ items, total, page, pageSize }` 응답, 한 쪽 10줄 | `shared/records.ts`, 모의 서버 `routes/records.ts`, `components/records` |
 | 섹터 하역 기록 | `GET /devices/{id}/unloads/records`, 줄마다 번호판·회사·총중량·공차·순중량(t)·하역 전후 적재율. 섹터 상태에 지금의 주의 기준 `cautionThresholdPercent` | `shared/records.ts`·`devices.ts`, 모의 서버 `sim/unloads.ts`, `features/tank` |
 | 공정 기록 | `GET /vehicles/records`·`GET /batches/records`(기록 목록 모양)와 한 건 조회 `GET /vehicles/{id}`·`GET /batches/{id}`. 차량: 입·출차 시각, 번호판, 회사, 배정 섹터, 총중량·공차·순중량, 상태(인식·하역·출차). 배치: 시작·종료, 배합, 평균 수분, 목표·실제 압력, 결과(완료·건너뜀·일시정지됨), 만든 베일. 지난 30일 | `shared/processRecords.ts`, 모의 서버 `sim/records.ts`, `features/records` |

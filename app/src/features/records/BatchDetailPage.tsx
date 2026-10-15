@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 import type { BatchRecord } from '@ecocycle/shared';
 import { getBatchRecord } from '../../api';
@@ -13,6 +14,7 @@ const stamp = (iso: string | null) => (iso ? <time dateTime={iso}>{formatLocalTi
 function Body({ record }: { record: BatchRecord }) {
   return (
     <>
+      <Link to="/records/batches" className="inline-flex min-h-12 items-center text-accent-strong font-semibold">배치·베일 · 현재 배치 제어 →</Link>
       <Card aria-label="배치" title="배치" aside={<BatchResultPill result={record.result} />}>
         <p className="truncate text-lg font-bold text-ink">{record.id}</p>
         <dl className="mt-1">
@@ -31,7 +33,7 @@ function Body({ record }: { record: BatchRecord }) {
           <ul>
             {record.baleIds.map((baleId) => (
               <li key={baleId} className="border-b border-line py-2 text-sm font-semibold text-ink tabular-nums last:border-b-0">
-                {baleId}
+                <Link className="inline-flex min-h-12 items-center text-accent-strong" to={`/records/bales/${encodeURIComponent(baleId)}`}>{baleId}</Link>
               </li>
             ))}
           </ul>
@@ -43,7 +45,7 @@ function Body({ record }: { record: BatchRecord }) {
 
 /**
  * 배치 기록 상세 (`/records/batches/:id`). 홈의 "이 배치 상세"와 배치 목록 줄이 여는 자리.
- * 지금은 서버가 준 한 건의 값만 적는다. 배치·베일 상세의 나머지는 5단위가 이어서 채운다.
+ * 과거 배치 스냅샷과 생산 베일 상세, 현재 배치 제어로 연결한다.
  */
 export function BatchDetailPage() {
   const { id = '' } = useParams();

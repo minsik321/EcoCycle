@@ -10,7 +10,14 @@ export type CommandStatus = (typeof COMMAND_STATUSES)[number];
 export const IDEMPOTENCY_KEY_HEADER = 'Idempotency-Key';
 
 /** 명령 본문. 이름이 아니라 정해진 종류(`type`)로 보낸다. */
+export type BatchCommand =
+  | { type: 'set_batch_mix'; batchId: string; mix: import('./process').MixPart[]; confirm: true }
+  | { type: 'set_batch_pressure'; batchId: string; targetPressureMpa: number; confirm: true }
+  | { type: 'pause_batch' | 'resume_batch'; batchId: string; confirm: true }
+  | { type: 'skip_batch'; batchId: string; reason: string; confirm: true };
+
 export type Command =
+  | BatchCommand
   | { type: 'start' | 'pause' | 'resume' | 'stop' }
   | { type: 'set_mode'; mode: RobotMode; confirm: true }
   | { type: 'pick_from'; tankId: TankId; confirm: true }
@@ -43,6 +50,12 @@ export interface CommandRule {
 const MACHINES = ['robot', 'conveyor', 'compressor'] as const;
 
 export const COMMAND_RULES: Record<CommandType, CommandRule> = {
+  set_batch_mix: { risk: 'high', permission: 'batch.control', targets: ['compressor'], requiresConfirm: true },
+  set_batch_pressure: { risk: 'high', permission: 'batch.control', targets: ['compressor'], requiresConfirm: true },
+  pause_batch: { risk: 'high', permission: 'batch.control', targets: ['compressor'], requiresConfirm: true },
+  resume_batch: { risk: 'high', permission: 'batch.control', targets: ['compressor'], requiresConfirm: true },
+  skip_batch: { risk: 'high', permission: 'batch.control', targets: ['compressor'], requiresConfirm: true },
+
   start: { risk: 'low', permission: 'robot.control', targets: MACHINES, requiresConfirm: false },
   pause: { risk: 'low', permission: 'robot.control', targets: MACHINES, requiresConfirm: false },
   resume: { risk: 'low', permission: 'robot.control', targets: MACHINES, requiresConfirm: false },

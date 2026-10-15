@@ -42,6 +42,8 @@ export interface RecordListProps<T> {
   /** 지금 시각 (테스트용) */
   now?: () => Date;
   className?: string;
+  /** 사건 발생 뒤 같은 기간·쪽을 다시 조회한다 */
+  refreshToken?: string;
 }
 
 type LoadState<T> = { status: 'loading'; data: RecordPage<T> | null } | { status: 'ok'; data: RecordPage<T> } | { status: 'error'; data: RecordPage<T> | null };
@@ -51,7 +53,7 @@ type LoadState<T> = { status: 'loading'; data: RecordPage<T> | null } | { status
  * 쪽은 서버가 나눈다(`GET .../records?from&to&page&pageSize`, shared/records.ts). 시각은 UTC로 보내고 현지 시각으로 적는다.
  * 지난 기록이라 연결이 끊겨도 받은 줄은 그대로 두고 끊김과 마지막 수신 시각을 알리며, 다시 연결되면 같은 쪽을 새로 받는다.
  */
-export function RecordList<T>({ label, load, rowKey, time, title, detail, extra, columns, timeHeader = '시각', dense = false, onOpen, initialRange = RECORD_LIST.defaultRange, now = () => new Date(), className = '' }: RecordListProps<T>) {
+export function RecordList<T>({ label, load, rowKey, time, title, detail, extra, columns, timeHeader = '시각', dense = false, onOpen, initialRange = RECORD_LIST.defaultRange, now = () => new Date(), className = '', refreshToken = '' }: RecordListProps<T>) {
   const nowRef = useRef(now);
   nowRef.current = now;
   const loadRef = useRef(load);
@@ -94,7 +96,7 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, extra,
       },
     );
     return () => controller.abort();
-  }, [range, page, attempt]);
+  }, [range, page, attempt, refreshToken]);
 
   // 다시 연결되면 같은 쪽을 새로 받는다 (정해 둔 기간은 지금 시각으로 다시 계산)
   const wasDisconnected = useRef(disconnected);

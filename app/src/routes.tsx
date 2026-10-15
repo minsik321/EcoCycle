@@ -1,3 +1,5 @@
+import { BatchBalePage } from './features/records/BatchBalePage';
+import { BaleDetailPage } from './features/records/BaleDetailPage';
 import { Suspense, lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
@@ -64,6 +66,8 @@ export default function AppRoutes() {
           <Route path="/tanks" element={<TankListPage />} />
           <Route path="/tanks/:id" element={<TankPage />} />
           <Route path="/alarms" element={<AlarmsPage />} />
+          <Route path="/records/batches" element={<BatchBalePage />} />
+          <Route path="/records/bales/:id" element={<BaleDetailPage />} />
           <Route path="/records" element={<RecordsPage />} />
           <Route path="/records/vehicles/:id" element={<VehicleDetailPage />} />
           <Route path="/records/batches/:id" element={<BatchDetailPage />} />

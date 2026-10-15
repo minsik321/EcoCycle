@@ -2,7 +2,7 @@ export const ROLES = ['admin', 'operator', 'viewer'] as const;
 /** 실제 권한 종류는 대표님과 확정한다 (docs/questions.md A4). */
 export type Role = (typeof ROLES)[number];
 
-export const PERMISSIONS = ['robot.control', 'robot.manual', 'settings.write', 'alarm.ack'] as const;
+export const PERMISSIONS = ['batch.control', 'robot.control', 'robot.manual', 'settings.write', 'alarm.ack'] as const;
 /** 프론트는 이 목록으로 버튼 표시·비활성만 정한다. 차단은 서버가 한다. */
 export type Permission = (typeof PERMISSIONS)[number];
 

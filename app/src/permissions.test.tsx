@@ -1,5 +1,5 @@
 // 권한별 화면 분기 점검 (G-32).
-// 권한 표는 모의 서버의 가정(docs/decisions.md: admin 4개 전부, operator 2개, viewer 없음)을 기준으로 한다.
+// 권한 표는 모의 서버의 가정(docs/decisions.md: admin 5개 전부, operator 2개, viewer 없음)을 기준으로 한다.
 // 이 파일이 "누가 어느 화면에서 무엇을 보고 누를 수 있는가"의 한 장짜리 기준표다. 권한 종류가 확정되어 바뀌면 이 표부터 고친다.
 // 화면의 표시·비활성은 편의일 뿐이고 실제 차단은 서버가 한다.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -49,11 +49,11 @@ const ROLE_BRANCH = /\brole\s*(===|!==|==|!=)|\.role\s*\?\s*[.[]?\s*(===|!==)|\?
 const user = (role: Role): Me => ({ id: role, name: `${role}-user`, role, permissions: [...ROLE_PERMISSIONS[role]] });
 
 /** 한 장짜리 기준표: 역할별로 화면에서 할 수 있는 것 */
-const MATRIX: Record<Role, { quick: boolean; ack: boolean; danger: boolean; settings: boolean }> = {
+const MATRIX: Record<Role, { quick: boolean; ack: boolean; danger: boolean; settings: boolean; batch: boolean }> = {
   //            시작·일시정지·재개·정지   알람 확인   수동 모드·섹터 지정 집기   설정값 변경
-  admin: { quick: true, ack: true, danger: true, settings: true },
-  operator: { quick: true, ack: true, danger: false, settings: false },
-  viewer: { quick: false, ack: false, danger: false, settings: false },
+  admin: { quick: true, ack: true, danger: true, settings: true, batch: true },
+  operator: { quick: true, ack: true, danger: false, settings: false, batch: false },
+  viewer: { quick: false, ack: false, danger: false, settings: false, batch: false },
 };
 
 const openAlarm: Alarm = { id: 'al-1', level: 'caution', deviceId: 'tank-a1', message: '적재율 80% 초과', state: 'active', ts: NOW };
@@ -88,6 +88,7 @@ describe('권한 기준표', () => {
       expect(canUse(p, 'ack_alarm')).toBe(MATRIX[role].ack);
       expect(canUse(p, 'set_mode') && canUse(p, 'pick_from')).toBe(MATRIX[role].danger);
       expect(canUse(p, 'update_setting')).toBe(MATRIX[role].settings);
+      expect(canUse(p, 'set_batch_mix') && canUse(p, 'skip_batch')).toBe(MATRIX[role].batch);
     }
   });
 

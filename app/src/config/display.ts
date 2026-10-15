@@ -179,6 +179,7 @@ export const HISTORY_EMPTY_TEXT = '이 구간에는 기록된 값이 없습니�
 
 /** 권한을 사용자가 읽을 수 있는 말로. 권한 종류는 대표님과 확정 전이다 (docs/questions.md A4). */
 export const PERMISSION_TEXT: Record<Permission, string> = {
+  'batch.control': '배치 수동 제어',
   'robot.control': '시작·일시정지·재개·정지',
   'robot.manual': '수동 모드, 섹터 지정 집기',
   'settings.write': '설정값 변경',

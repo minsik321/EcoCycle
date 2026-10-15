@@ -42,6 +42,12 @@ async function send(token: string, deviceId: string, body: object): Promise<numb
  * 서버는 종류·대상 → 권한 → 값 검증 → 현재 상태 순으로 판단한다.
  */
 const PROBES: Record<CommandType, { device: string; body: object }> = {
+  set_batch_mix: { device: 'compressor-1', body: { type: 'set_batch_mix' } },
+  set_batch_pressure: { device: 'compressor-1', body: { type: 'set_batch_pressure' } },
+  pause_batch: { device: 'compressor-1', body: { type: 'pause_batch' } },
+  resume_batch: { device: 'compressor-1', body: { type: 'resume_batch' } },
+  skip_batch: { device: 'compressor-1', body: { type: 'skip_batch' } },
+
   start: { device: 'conveyor-z', body: { type: 'start' } }, // 이미 가동 중이라 409
   resume: { device: 'conveyor-z', body: { type: 'resume' } }, // 이미 가동 중이라 409
   pause: { device: 'conveyor-z', body: { type: 'pause' } }, // 아래에서 따로 다룬다 (실제로 실행된다)

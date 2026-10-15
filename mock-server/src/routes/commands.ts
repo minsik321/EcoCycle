@@ -26,6 +26,27 @@ function parseCommand(type: CommandType, body: Record<string, unknown>, deviceId
     return { error: '이 명령은 confirm: true가 필요합니다.' };
   }
   switch (type) {
+    case 'set_batch_mix':
+    case 'set_batch_pressure':
+    case 'pause_batch':
+    case 'resume_batch':
+    case 'skip_batch': {
+      if (typeof body.batchId !== 'string' || !body.batchId) return { error: '배치 ID가 필요합니다.' };
+      const base = { batchId: body.batchId, confirm: true as const };
+      if (type === 'set_batch_mix') {
+        if (!Array.isArray(body.mix) || !body.mix.every(m => m && TANK_IDS.includes(m.sectorId) && typeof m.percent === 'number' && Number.isFinite(m.percent))) return { error: '섹터와 숫자 배합비가 필요합니다.' };
+        return { command: { ...base, type, mix: body.mix } };
+      }
+      if (type === 'set_batch_pressure') {
+        if (typeof body.targetPressureMpa !== 'number' || !Number.isFinite(body.targetPressureMpa)) return { error: '압력 숫자가 필요합니다.' };
+        return { command: { ...base, type, targetPressureMpa: body.targetPressureMpa } };
+      }
+      if (type === 'skip_batch') {
+        if (typeof body.reason !== 'string' || !body.reason.trim() || body.reason.trim().length > 120) return { error: '사유는 1~120자입니다.' };
+        return { command: { ...base, type, reason: body.reason.trim() } };
+      }
+      return { command: { ...base, type } };
+    }
     case 'start':
     case 'pause':
     case 'resume':
