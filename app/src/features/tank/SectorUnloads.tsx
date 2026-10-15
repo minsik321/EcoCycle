@@ -16,8 +16,17 @@ function FillChange({ record }: { record: UnloadRecord }) {
 const num = (text: string) => <span className="tabular-nums">{text}</span>;
 
 const COLUMNS: readonly Column<UnloadRecord>[] = [
-  { key: 'plate', header: '번호판', cell: (r) => <span className="font-semibold">{r.plate}</span> },
-  { key: 'company', header: '회사', cell: (r) => r.companyName },
+  // 번호판 아래에 회사: 세로 태블릿에서 적재율 변화 칸까지 옆으로 넘치지 않게 한 칸에 두 줄로
+  {
+    key: 'vehicle',
+    header: '차량',
+    cell: (r) => (
+      <span className="flex flex-col py-1 leading-tight">
+        <span className="font-semibold">{r.plate}</span>
+        <span className="text-xs text-ink-soft">{r.companyName}</span>
+      </span>
+    ),
+  },
   { key: 'net', header: '순중량', align: 'right', cell: (r) => <span className="font-semibold tabular-nums">{formatWeightT(r.netT)}</span> },
   { key: 'gross', header: '총중량', align: 'right', hideOnNarrow: 'xl', cell: (r) => num(formatWeightT(r.grossT)) },
   { key: 'tare', header: '공차', align: 'right', hideOnNarrow: 'xl', cell: (r) => num(formatWeightT(r.tareT)) },

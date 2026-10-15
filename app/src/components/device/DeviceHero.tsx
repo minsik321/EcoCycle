@@ -41,18 +41,17 @@ export function DeviceHero({ name, status, statusLabel, activity, illustration, 
             </svg>
           </Link>
         )}
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl leading-tight font-bold text-ink">{name}</h1>
-          <p aria-label="지금 하는 일" className="mt-0.5 text-base text-ink-soft">
-            {disconnected ? '–' : (activity ?? '불러오는 중…')}
-          </p>
-        </div>
+        <h1 className="min-w-0 flex-1 self-center text-xl leading-tight font-bold text-ink">{name}</h1>
         {disconnected ? (
           <StatusBadge status="offline" size="lg" />
         ) : (
           status && <StatusBadge status={status} label={statusLabel} size="lg" />
         )}
       </div>
+      {/* 하는 일은 상태 칩 옆이 아니라 폭 전체로: 좁은 칸에서 짧은 문장이 두 줄로 꺾이지 않게 */}
+      <p aria-label="지금 하는 일" className="-mt-2 text-base text-ink-soft">
+        {disconnected ? '–' : (activity ?? '불러오는 중…')}
+      </p>
 
       <div
         data-frozen={disconnected ? 'true' : undefined}
