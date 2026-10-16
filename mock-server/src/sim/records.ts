@@ -108,6 +108,8 @@ function makeHistoricBatch(id: string, startMs: number): BatchRecord {
     startedAt: iso(startMs),
     endedAt: iso(endMs),
     mix,
+    actualMix: null,
+    pinChanges: [],
     avgMoisturePercent,
     targetPressureMpa,
     actualPressureMpa: result === 'completed' ? round1(targetPressureMpa + rnd(-0.5, 0.3)) : result === 'paused' ? round1(targetPressureMpa * rnd(0.4, 0.85)) : null,

@@ -9,7 +9,7 @@ import { StatusBadge } from '../../../components/status/StatusBadge';
 import { BAR_CLASS } from '../../../components/status/tone';
 import { formatLocalClock, formatPercent, formatPressureMpa } from '../../../config/display';
 import { devicePagePath, recordsPath } from '../../../config/navigation';
-import { BATCH_STAGE_TEXT, SECTOR_LABEL, cycleSteps, mixText } from '../../../config/processDisplay';
+import { BATCH_STAGE_TEXT, SECTOR_LABEL, actualMixText, cycleSteps, mixText, sectorsText } from '../../../config/processDisplay';
 import { useAppSelector } from '../../../store/hooks';
 import { selectConnection, selectDevice, selectIsDisconnected, selectPlantSummary } from '../../../store/selectors';
 import { usePlantTrends } from '../../../store/usePlantTrends';
@@ -179,7 +179,9 @@ function BatchCard() {
             ))}
           </div>
           <dl className="mt-2">
-            <Row label="배합" value={mixText(batch)} />
+            <Row label={batch.actualMix === null ? '배합' : '계획 배합'} value={mixText(batch)} />
+            {batch.actualMix !== null && <Row label="실제 배합" value={dash(actualMixText(batch) ?? '–')} />}
+            {batch.pinning && <Row label="섹터 지정 중" value={sectorsText(batch.pinning.sectors)} />}
             <Row label="평균 수분" value={dash(formatPercent(batch.avgMoisturePercent))} />
             <Row label="목표 압력" value={dash(formatPressureMpa(batch.targetPressureMpa))} />
             <Row label="현재 압력" value={compressor && !disconnected ? formatPressureMpa(compressor.pressureMpa) : '–'} />

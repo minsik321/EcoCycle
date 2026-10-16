@@ -28,6 +28,8 @@ mock-server/
                       process(가상의 회사·차량(번호판·등록 공차·싣는 양)·배정 섹터, 배합비·압력 범위, 단계별 시간, 하역 기록 채우기 규칙)
 ```
 
+로봇팔 7단위(명세 6절): 수동은 `pick_from`(집어 들고 멈춤) → `place_on_conveyor` 두 명령이고 순서가 틀리면 409(`sim/commands.ts`의 `conflictReason`, 실행 때 다시 검사). 섹터 지정 중인 배치는 `sim/process.ts`가 놓은 부피로 실제 배합·평균 수분·목표 압력을 다시 계산하고(`setRobotPin`·`notePlaced`) 지정 사건을 남긴다.
+
 시나리오: `normal`, `tank-alarm`, `disconnect`, `robot-error`, `token-expiry`, `slow-network`, `refresh-expiry`(리프레시 토큰 30초), `refresh-reuse`(교체 뒤 유예 30초 + 5초에 이전 토큰을 다시 써 세션 폐기), `server-restart`(45초 뒤·2분마다 모든 세션 삭제와 WebSocket 닫기) (`npm run mock -- --scenario=이름`).
 이 서버 자체의 단위 테스트는 없다. 동작은 `app`의 통합 테스트(`npm run test:integration`: 연결 끊김, 권한 403, 자동 로그인 쿠키·교체·재사용 감지·유예·로그아웃)와 `app` 화면 테스트가 확인한다.
 

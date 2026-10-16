@@ -22,6 +22,8 @@ export interface DevicePageProps {
 // 바깥 여백(p-4)만큼 넓혀 가장자리까지 닿게 한다
 /** Tailwind xl과 같은 PC 기준. 섹터는 이 폭 이상에서 "자세히"를 그림 오른쪽에 늘 펼쳐 둔다(접을 수 없음) */
 export const WIDE_QUERY = '(min-width: 80rem)';
+/** 태블릿 이상(Tailwind md, 768px) */
+export const TABLET_QUERY = '(min-width: 48rem)';
 
 // 좌우 여백은 앱 틀의 SHELL_GAP_X(px-2 sm:px-2.5), 아래 여백은 pb-4만큼 되돌린다
 const PHONE_STICKY = 'sticky -bottom-4 z-10 -mx-2 mt-auto -mb-4 sm:-mx-2.5 md:static md:m-0';

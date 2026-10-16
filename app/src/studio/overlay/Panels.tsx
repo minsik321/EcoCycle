@@ -18,7 +18,7 @@ import {
 } from '../../config/display';
 import type { PinElements } from '../three/Fx';
 import type { RecordLink, RecordOpen, RecordTarget, RecordsListTab, StudioData } from '../types';
-import { SECTOR_LABEL } from '../../config/processDisplay';
+import { SECTOR_LABEL, actualMixText, sectorsText } from '../../config/processDisplay';
 import { VIEWS } from '../world/views';
 import type { ViewPreset } from '../world/views';
 import { Icon } from './icons';
@@ -302,9 +302,10 @@ function deviceRows(device: DeviceState, data: StudioData): { rows: Row[]; more:
     case 'robot':
       return {
         rows: [
-          ['모드', ROBOT_MODE_TEXT[device.mode]],
+          ['모드', device.mode === 'auto_pinned' ? `${ROBOT_MODE_TEXT[device.mode]} (${sectorsText(device.pinnedSectors)})` : ROBOT_MODE_TEXT[device.mode]],
           ['동작 단계', PHASE_STEPS.find((s) => s.phase === device.phase)?.label ?? '대기'],
           ['작업 중 섹터', device.targetTankId ? SECTOR_LABEL[device.targetTankId] : '없음'],
+          ...(device.heldSectorId ? ([['들고 있음', `${SECTOR_LABEL[device.heldSectorId]}에서 집음${device.phase === 'idle' ? ' · 놓기 대기' : ''}`]] as Row[]) : []),
         ],
         more: [['그리퍼', device.gripper.holding ? '파지를 잡고 있음' : device.gripper.closed ? '닫힘' : '열림']],
       };
@@ -546,6 +547,8 @@ export function Detail({ data, disconnected, selection, onSelect, deviceActions,
         <div className={stale.trim() || undefined}>
           <Rows
             rows={[
+              ...(batch.actualMix !== null ? ([['실제 배합', actualMixText(batch) ?? '–']] as Row[]) : []),
+              ...(batch.pinning ? ([['섹터 지정 중', sectorsText(batch.pinning.sectors)]] as Row[]) : []),
               ['목표 압력', formatPressureMpa(batch.targetPressureMpa)],
               ['현재 압력', pressure],
               ['평균 수분', formatPercent(batch.avgMoisturePercent)],

@@ -16,6 +16,7 @@ export function robotTaskShort(robot: RobotState): string {
     case 'place':
       return '놓는 중';
     case 'idle':
+      if (robot.heldSectorId) return `${SECTOR_LABEL[robot.heldSectorId]} 놓기 대기`;
       return robot.mode === 'manual' ? '명령 대기' : '대기';
   }
 }
@@ -32,6 +33,7 @@ export function robotActivity(robot: RobotState): string {
     case 'place':
       return '컨베이어에 파지를 놓는 중';
     case 'idle':
+      if (robot.heldSectorId) return `${DEVICE_NAMES[robot.heldSectorId]}에서 집음 · 컨베이어에 놓기를 기다리는 중`;
       return robot.mode === 'manual' ? '수동 모드 · 집기 명령을 기다리는 중' : '다음 집기를 기다리는 중';
   }
 }
@@ -52,11 +54,13 @@ export function robotNowNext(robot: RobotState, batches: readonly Batch[]): Robo
   const working = robot.status === 'running' && robot.phase !== 'idle' && robot.targetTankId;
   const now = working
     ? `${DEVICE_NAMES[robot.targetTankId!]} → 컨베이어${mixing ? ` · 배치 ${shortId(mixing.id)}` : ''}`
-    : null;
+    : robot.heldSectorId
+      ? `${DEVICE_NAMES[robot.heldSectorId]} 파지를 들고 있음`
+      : null;
 
   if (robot.status !== 'running') return { now, next: null };
   let next: string | null = null;
-  if (robot.mode === 'manual') next = '집기 명령을 기다립니다';
+  if (robot.mode === 'manual') next = robot.heldSectorId ? '컨베이어에 놓기를 기다립니다' : '집기 명령을 기다립니다';
   else if (robot.mode === 'auto_pinned' && robot.pinnedSectors.length > 0)
     next = `지정 섹터 ${robot.pinnedSectors.map((id) => SECTOR_LABEL[id]).join('·')} 차례로`;
   else if (mixing) next = `배치 ${shortId(mixing.id)} 배합대로 (${mixPercentText(mixing)})`;

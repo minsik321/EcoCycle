@@ -34,6 +34,7 @@ describe('controls', () => {
       'stop',
       'set_mode',
       'pick_from',
+      'place_on_conveyor',
       'update_setting',
     ]);
   });

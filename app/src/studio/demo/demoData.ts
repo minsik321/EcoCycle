@@ -101,6 +101,9 @@ export function demoData(startMs: number, tSec: number): StudioData {
         { sectorId: mix[0], percent: mix[1] },
         { sectorId: mix[2], percent: mix[3] },
       ],
+      actualMix: null,
+      pinning: null,
+      pinChanges: [],
       avgMoisturePercent: round1(10.6 + (((n % 5) + 5) % 5) * 0.4),
       targetPressureMpa: round1(27.4 + (((n % 4) + 4) % 4) * 0.7),
       stageTimes,
@@ -146,7 +149,7 @@ export function demoData(startMs: number, tSec: number): StudioData {
     'tank-a2': tank('tank-a2', 'A2', 48, 53),
     'tank-b1': tank('tank-b1', 'B1', 40, 61),
     'tank-b2': tank('tank-b2', 'B2', 66, 43),
-    'robot-1': { id: 'robot-1', type: 'robot', status: 'running', mode: 'auto', pinnedSectors: [], pickRecordsRevision: 0, phase: pose.phase, targetTankId: pose.targetTankId, gripper: pose.gripper, updatedAt: iso(now) },
+    'robot-1': { id: 'robot-1', type: 'robot', status: 'running', mode: 'auto', pinnedSectors: [], pickRecordsRevision: 0, phase: pose.phase, targetTankId: pose.targetTankId, heldSectorId: pose.gripper.holding ? pose.targetTankId : null, gripper: pose.gripper, updatedAt: iso(now) },
     'conveyor-z': { id: 'conveyor-z', type: 'conveyor', status: 'normal', running: true, loadPercent: 50, itemsToBaler: 2, updatedAt: iso(now) },
     'compressor-1': {
       id: 'compressor-1',

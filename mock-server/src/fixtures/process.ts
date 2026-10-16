@@ -43,6 +43,12 @@ export const MIX_RATIOS: [number, number][] = [
 /** 목표 압력 예시 범위 (MPa) */
 export const TARGET_PRESSURE_MPA = { min: 27.0, max: 30.0 };
 
+/**
+ * 실제 배합의 평균 수분이 계획보다 1%p 높을 때 목표 압력을 몇 MPa 올리나 (예시 규칙, 범위 안으로 자른다).
+ * 젖은 파지는 덜 눌리므로 조금 더 누른다고 가정했다. 실제 규칙은 서버 담당이 정한다 (docs/decisions.md 2026-10-16 "섹터 지정의 실제 배합").
+ */
+export const PRESSURE_PER_MOISTURE_MPA = 0.6;
+
 /** 단계별 머무는 시간(초). 화면 연출이 따라올 수 있을 만큼 여유를 둔다 */
 export const VEHICLE_TIMING_SEC = {
   /** 계중대 도착 → 번호판 인식 */

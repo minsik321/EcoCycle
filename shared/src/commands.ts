@@ -20,6 +20,7 @@ export type Command =
   | { type: 'start' | 'pause' | 'resume' | 'stop' }
   | { type: 'set_mode'; confirm: true } & ({ mode: 'auto' | 'manual'; pinnedSectors?: never } | { mode: 'auto_pinned'; pinnedSectors: TankId[] })
   | { type: 'pick_from'; tankId: TankId; confirm: true }
+  | { type: 'place_on_conveyor'; confirm: true }
   | { type: 'update_setting'; key: string; value: string | number | boolean; confirm: true }
   | { type: 'ack_alarm'; alarmId: string };
 
@@ -60,8 +61,10 @@ export const COMMAND_RULES: Record<CommandType, CommandRule> = {
   resume: { risk: 'low', permission: 'robot.control', targets: MACHINES, requiresConfirm: false },
   stop: { risk: 'low', permission: 'robot.control', targets: MACHINES, requiresConfirm: false },
   set_mode: { risk: 'high', permission: 'robot.manual', targets: ['robot'], requiresConfirm: true },
-  // 수동 모드에서만 실행된다 (아니면 서버가 409)
+  // 수동 모드에서만 실행된다 (아니면 서버가 409). 집어 들기까지만, 놓기는 place_on_conveyor (명세 6절 "로봇팔 7단위")
   pick_from: { risk: 'high', permission: 'robot.manual', targets: ['robot'], requiresConfirm: true },
+  // 수동 모드에서 집어 든 파지가 있을 때만 (아니면 409)
+  place_on_conveyor: { risk: 'high', permission: 'robot.manual', targets: ['robot'], requiresConfirm: true },
   update_setting: {
     risk: 'high',
     permission: 'settings.write',

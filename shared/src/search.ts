@@ -45,4 +45,7 @@ export const BATCH_EVENT_TYPE_TEXT: Record<BatchEvent['type'], string> = {
   resumed: '재개',
   skipped: '건너뜀',
   bale_produced: '베일 생산',
+  pin_started: '섹터 지정',
+  pin_changed: '섹터 지정 변경',
+  pin_ended: '섹터 지정 해제',
 };

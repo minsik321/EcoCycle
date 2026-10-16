@@ -400,8 +400,9 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | --- | --- | --- | --- | --- |
 | `start`, `pause`, `resume` | 로봇·컨베이어·압축기 | 낮음 (홈에서 가능) | `robot.control` | 없음 |
 | `stop` | 로봇·컨베이어·압축기 | 낮음 (홈에서 가능) | `robot.control` | 없음 |
-| `set_mode` | 로봇 | 높음 (기기 페이지에서만) | `robot.manual` | `mode`: `auto`, `manual`, `auto_pinned`; 지정 자동은 `pinnedSectors` 1개 이상, `confirm: true` |
-| `pick_from` | 로봇 (수동 모드에서만) | 높음 (기기 페이지에서만) | `robot.manual` | `tankId`, `confirm: true` |
+| `set_mode` | 로봇 | 높음 (기기 페이지·3D 홈 로봇 패널) | `robot.manual` | `mode`: `auto`, `manual`, `auto_pinned`; 지정 자동은 `pinnedSectors` 1개 이상, `confirm: true` |
+| `pick_from` | 로봇 (수동 모드에서만) | 높음 (기기 페이지·3D 홈 로봇 패널) | `robot.manual` | `tankId`, `confirm: true`. 집어 들기까지만 한다(아래 "로봇팔 7단위") |
+| `place_on_conveyor` | 로봇 (수동 모드에서만) | 높음 (기기 페이지·3D 홈 로봇 패널) | `robot.manual` | `confirm: true`. 집어 든 파지를 컨베이어에 놓는다 |
 | `update_setting` | 전체 기기 | 높음 (기기 페이지에서만) | `settings.write` | `key`, `value`, `confirm: true` |
 | `ack_alarm` | 알람 | 낮음 | `alarm.ack` | `alarmId` |
 
@@ -579,7 +580,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 서버 | 이 문서의 API 명세를 따르는 서버가 있다. 없으면 모의 서버로 동작 | API 경로와 값 형식 |
 | 로봇 기종 | 범용 6축 로봇팔, 링크 길이와 축은 설정값 | 설정값 교체, 구조가 크게 다르면 로봇 모델 재작성 |
 | 권한 | `admin`, `operator`, `viewer` 세 종류 | 권한 이름과 화면 분기 |
-| 수동 조작 | 시작, 일시정지, 재개, 정지, 수동 모드 전환, 탱크 지정 집기, 설정 변경 | 명령 목록과 위험도 분류 |
+| 수동 조작 | 시작, 일시정지, 재개, 정지, 수동 모드 전환(자동 · 섹터 지정 포함), 수동 집기·컨베이어에 놓기(두 단계), 설정 변경 | 명령 목록과 위험도 분류 |
 | 이상 기준 | 적재율 80% 이상이 주의, 서버가 `status`로 판정해 전달 | 기준값은 서버 설정이고 화면은 `status`만 표시 |
 | 장면 구성 | 게이트·계중대, 섹터(탱크) 4개, 로봇팔 1개, 긴 컨베이어 1개(Section Z), 압축기 1개, 출하장 | 3D 장면 배치 |
 | 태블릿 | 기종 제한 없음, 화질 3단계를 자동 선택하고 가장 낮은 단계가 저사양 안전판 | 단계별 연출 수준 |
@@ -623,3 +624,21 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 - 로봇 상태에 `pinnedSectors: TankId[]`, `pickRecordsRevision: number`를 추가한다. 지정 모드 외에는 빈 배열. 화면은 서버 확정값과 편집 초안을 구분하고 적용된 섹터·다음 사이클부터 적용·일반 자동 복귀를 안내한다. 진행 중 사이클은 시작 당시 모드·섹터로 마친다.
 - `GET /robots/robot-1/picks/records?from&to&page&pageSize` → 공통 `RecordPage<PickRecord>`. 필드: `id`, `pickedAt`(놓기 완료 UTC), `mode`(사이클 시작 당시), `sectorId`, `volumeM3`(실제 집은 부피), `conveyorId`(`conveyor-z`), `batchId`(투입 배치, 없으면 null). 성공적으로 놓은 건만 저장한다. 사이클 시작 때 배치를 기억하고 도중에 건너뛴 배치는 다른 배치로 귀속하지 않는다.
 - 페이지 맨 아래 별도 RecordList로 시각·모드·섹터·m³·컨베이어 → 배치 ID를 표시한다. 기존 사이클 통계는 그대로 유지한다. 새 기록 revision으로 같은 기간·쪽을 갱신하고 연결 끊김 시 받은 줄을 유지한다.
+
+### 로봇팔 7단위: 섹터 지정의 실제 배합, 수동 집기·놓기 두 단계 (2026-10-16, 현장 확인 전 가정)
+- **실제 배합.** `auto_pinned`로 집는 동안 배치는 계획 배합과 다르게 채워진다. 서버는 배합 중인 배치(`stage: mixing`)에 지정을 걸고, 그 배치에 실제로 놓은 부피(m³)로 실제 배합을 계산해 보낸다. 배치(`Batch`, `process.batch`, `GET /batches/control`의 `batch`)와 배치 기록(`BatchRecord`)에 필드를 더한다.
+  - `actualMix: MixPart[] | null`: 지정이 한 번이라도 걸린 배치에서 지금까지 놓은 부피 비율(%, 합 100, 아직 놓은 것이 없으면 빈 배열). 지정이 걸린 적 없는 배치는 `null`(계획대로).
+  - `pinning: { sectors, since, actor } | null`: 지금 그 배치에 걸린 지정. 배합이 끝나면(`compressing`) `null`.
+  - `pinChanges: { at, actor, sectors }[]`: 지정 시작·변경·해제 기록(해제는 `sectors: []`).
+  - 지정 중에 새 배치가 배합을 시작하면 같은 지정이 그 배치에도 걸린다. 지정이 끝나면 남은 집기(배치당 집기 횟수 − 이미 놓은 횟수)는 계획 배합비를 따른다. 지정 중에 놓은 몫을 메우려고 계획을 바꾸지 않는다.
+  - `avgMoisturePercent`와 `targetPressureMpa`는 실제 배합으로 **서버가** 다시 계산한다(화면은 계산하지 않는다). 사람이 `set_batch_pressure`로 정한 목표 압력은 다시 계산하지 않는다(`docs/decisions.md` 2026-10-16 "섹터 지정의 실제 배합").
+  - 배치·베일 사건(`BatchEvent.type`)에 `pin_started`(섹터 지정), `pin_changed`(섹터 지정 변경), `pin_ended`(섹터 지정 해제)를 더한다. `actor`는 지정한 사람, `detail`은 섹터 목록이다. 베일 상세의 배합 스냅샷은 실제 배합이 있으면 실제 배합이다.
+- **수동 집기·놓기 두 단계.** `manual`에서 한 사이클을 사람이 두 번 나눠 조작한다.
+  - `pick_from {tankId, confirm:true}`: 섹터에서 집어 들고 그 위에서 멈춘다. 완료(`command.result completed`)는 집어 든 때. 빈 섹터라 못 집으면 `failed`.
+  - `place_on_conveyor {confirm:true}`: 집어 든 파지를 컨베이어로 옮겨 놓는다. 완료는 놓은 때이고 그때 집기 기록이 한 줄 생긴다.
+  - 로봇 상태에 `heldSectorId: TankId | null`(집어 든 파지의 섹터, 들고 있지 않으면 `null`)을 더한다. 수동 모드에서 `phase: idle`이고 `heldSectorId`가 있으면 "놓기 대기"다.
+  - 순서는 서버가 지킨다(409): 들고 있는데 `pick_from`, 들고 있지 않은데 `place_on_conveyor`, 작업 중(`phase ≠ idle`), 수동 모드가 아님, 작동 중이 아님. 수동 모드에서 들고 있는 동안 `set_mode`도 409("먼저 컨베이어에 놓으세요"). 실행 때 다시 검사해 어긋나면 `rejected`.
+  - 정지(`stop`)는 들고 있는 것을 놓지 않는다(그리퍼는 닫힌 채). 자동 모드에서 들고 있으면 다음 사이클은 먼저 놓기부터 한다.
+  - 집기 기록(`PickRecord`)에 `grabbedAt`(집은 시각), `grabbedBy`·`placedBy`(수동 조작한 사람, 자동은 `null`)를 더한다. `pickedAt`은 그대로 놓기 완료 시각이다.
+- **3D 홈 로봇 패널.** 3D 홈에서 로봇을 고르면 상세 패널에 기기 페이지와 같은 운전 모드 조작(모드 전환, 섹터 지정, 수동 집기·놓기)이 들어간다. 같은 컴포넌트, 같은 권한·확인 단계(`confirm: true`)·`command.result` 처리를 쓰고, 권한이 없으면 상태만 보인다. 그 밖의 위험 조작(설정 변경, 배치 제어)은 여전히 기기 페이지에서만이다.
+

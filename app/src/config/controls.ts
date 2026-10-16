@@ -24,7 +24,8 @@ export const CONTROL_TEXT: Record<CommandType, ControlText> = {
   resume: { label: '재개' },
   stop: { label: '정지' },
   set_mode: { label: '모드 전환', confirmMessage: '운전 모드를 바꿉니다. 계속할까요?' },
-  pick_from: { label: '수동 집기', confirmMessage: '선택한 섹터에서 파지를 집어 옮깁니다. 계속할까요?' },
+  pick_from: { label: '집기', confirmMessage: '선택한 섹터에서 파지를 집어 듭니다. 컨베이어에 놓기 전까지 들고 있습니다. 계속할까요?' },
+  place_on_conveyor: { label: '컨베이어에 놓기', confirmMessage: '집어 든 파지를 컨베이어에 놓습니다. 계속할까요?' },
   update_setting: { label: '설정 변경', confirmMessage: '설정값을 바꿉니다. 계속할까요?' },
   ack_alarm: { label: '알람 확인' },
 };
@@ -43,6 +44,7 @@ export const CONTROL_ORDER: readonly CommandType[] = [
   'stop',
   'set_mode',
   'pick_from',
+  'place_on_conveyor',
   'update_setting',
   'ack_alarm',
 ];

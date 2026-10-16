@@ -5,7 +5,7 @@ import { ADMIN, OPERATOR, VIEWER, NOW, renderWithStore } from '../../test/utils'
 import { BatchControls } from './BatchControls';
 const send = vi.fn();
 vi.mock('../../components/controls/useDeviceCommand',()=>({useDeviceCommand:()=>send}));
-const value: ControlledBatch = { batch: {id:'batch-test',stage:'planned',mix:[{sectorId:'tank-a1',percent:100}],avgMoisturePercent:12,targetPressureMpa:28,stageTimes:{planned:NOW},updatedAt:NOW},paused:false,skipped:false,progressPercent:0,currentPressureMpa:0,baleIds:[] };
+const value: ControlledBatch = { batch: {id:'batch-test',stage:'planned',mix:[{sectorId:'tank-a1',percent:100}],actualMix:null,pinning:null,pinChanges:[],avgMoisturePercent:12,targetPressureMpa:28,stageTimes:{planned:NOW},updatedAt:NOW},paused:false,skipped:false,progressPercent:0,currentPressureMpa:0,baleIds:[] };
 const render = (me=ADMIN,unavailable=false)=>renderWithStore(<BatchControls value={value} range={{min:27,max:30}} unavailable={unavailable}/>,{me});
 describe('배치 수동 제어',()=>{
   it('합계와 압력 범위를 검증하고 확인 전에는 전송하지 않는다',()=>{

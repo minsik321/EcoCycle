@@ -77,6 +77,7 @@ export const devices: Record<DeviceId, DeviceState> = {
     pickRecordsRevision: 0,
     phase: 'idle',
     targetTankId: null,
+    heldSectorId: null,
     gripper: { closed: false, holding: false },
     updatedAt: nowIso(),
   } satisfies RobotState,

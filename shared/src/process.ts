@@ -42,12 +42,39 @@ export interface MixPart {
   percent: number;
 }
 
+/** 배치에 걸린 섹터 지정(로봇 `auto_pinned`). ⚠ 제안안 (명세 6절 "로봇팔 7단위") */
+export interface BatchPinning {
+  sectors: TankId[];
+  /** 이 배치에 지정이 걸린 시각 */
+  since: IsoTimestamp;
+  /** 지정한 사람 */
+  actor: string;
+}
+
+/** 배치의 섹터 지정 변경 한 건. `sectors`가 빈 배열이면 지정 해제 */
+export interface BatchPinChange {
+  at: IsoTimestamp;
+  actor: string;
+  sectors: TankId[];
+}
+
 export interface Batch {
   id: string;
   stage: BatchStage;
+  /** 계획 배합 */
   mix: MixPart[];
+  /**
+   * 실제 배합: 섹터 지정이 걸린 적이 있는 배치에서 지금까지 컨베이어에 놓은 부피(m³)의 비율(%, 합 100). 서버가 계산한다.
+   * 아직 놓은 것이 없으면 빈 배열, 지정이 걸린 적 없는 배치(계획대로)는 null.
+   */
+  actualMix: MixPart[] | null;
+  /** 지금 걸린 섹터 지정. 배합 중에만 있고 배합이 끝나면 null */
+  pinning: BatchPinning | null;
+  /** 지정 시작·변경·해제 기록 (오래된 것부터) */
+  pinChanges: BatchPinChange[];
+  /** 평균 수분. 실제 배합이 있으면 실제 배합으로 서버가 다시 계산한 값 */
   avgMoisturePercent: number;
-  /** 서버가 이 배치에 지정한 목표 압력. 실제 압력은 압축기 상태의 `pressureMpa` */
+  /** 서버가 이 배치에 지정한 목표 압력(실제 배합이 있으면 서버가 다시 계산, 사람이 정한 값은 그대로). 실제 압력은 압축기 상태의 `pressureMpa` */
   targetPressureMpa: number;
   stageTimes: StageTimes<BatchStage>;
   updatedAt: IsoTimestamp;
@@ -99,7 +126,7 @@ export interface BatchEvent {
   id: string;
   batchId: string;
   at: IsoTimestamp;
-  type: 'created' | 'mix_changed' | 'pressure_changed' | 'paused' | 'resumed' | 'skipped' | 'bale_produced';
+  type: 'created' | 'mix_changed' | 'pressure_changed' | 'paused' | 'resumed' | 'skipped' | 'bale_produced' | 'pin_started' | 'pin_changed' | 'pin_ended';
   actor: string;
   detail: string;
   baleId?: string;

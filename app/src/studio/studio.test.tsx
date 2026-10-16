@@ -26,7 +26,7 @@ import { APRON, AREAS, BALE_REST, DEFAULT_VIEW, SCALE, TIER_DISTANCE, TRUCK, VIE
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { TopBar } from '../components/layout/TopBar';
-import { ADMIN } from '../test/utils';
+import { ADMIN, OPERATOR, VIEWER } from '../test/utils';
 
 // 스튜디오 탭의 고정 규칙을 점검한다: 연결이 끊기면 모든 움직임이 멈추고 "연결 끊김"과 마지막 수신 시각이 보인다,
 // 화면이 숨겨지거나 CCTV가 열리면 그리기를 멈춘다, 움직임은 서버 단계만 따른다, 조작은 기존 컴포넌트만 쓴다.
@@ -182,7 +182,7 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
 
   it('섹터 더미는 서버 적재율을 따라가고, 압축 연출은 압축 중인 배치와 압축기 가동이 함께일 때만 돈다', () => {
     const d = new Director();
-    const batch: Batch = { id: 'b1', stage: 'compressing', mix: [{ sectorId: 'tank-a1', percent: 100 }], avgMoisturePercent: 11, targetPressureMpa: 28, stageTimes: {}, updatedAt: NOW };
+    const batch: Batch = { id: 'b1', stage: 'compressing', mix: [{ sectorId: 'tank-a1', percent: 100 }], actualMix: null, pinning: null, pinChanges: [], avgMoisturePercent: 11, targetPressureMpa: 28, stageTimes: {}, updatedAt: NOW };
     d.sync(input({ devices: { 'tank-a1': tankState(), 'compressor-1': compressorState() }, batches: [batch] }), T0);
     expect(d.fill['tank-a1']).toBe(72.4); // 처음 받은 값은 바로 보여 준다
     run(d, 1);
@@ -378,25 +378,56 @@ describe('LiveStudio: 기존 store·조작 컴포넌트에 연결한다', () => 
     expect(stage.last?.director.trucks.filter((t) => t.active)).toHaveLength(1);
   });
 
-  it('기기를 고르면 기존 홈용 조작과 기기 페이지 링크만 나온다 (위험 조작·비상정지 모양 버튼 없음)', async () => {
+  it('기기를 고르면 기존 홈용 조작과 기기 페이지 링크만 나온다: 운전 모드 권한이 없으면(작업자) 상태만 보이고 조작은 없다', async () => {
     const user = userEvent.setup();
-    const { store } = renderWithStore(<LiveStudio onFailed={() => {}} />, { devices });
+    const { store } = renderWithStore(<LiveStudio onFailed={() => {}} />, { devices, me: OPERATOR });
     act(() => void store.dispatch(devicesReceived(devices)));
     await user.click(screen.getByLabelText(/로봇팔 이동, 작동 중/));
 
     const panel = screen.getByRole('complementary', { name: '로봇팔 상세' });
     expect(within(panel).getByRole('button', { name: '일시정지' })).toBeInTheDocument();
     expect(within(panel).getByRole('link', { name: '상세 보기' })).toHaveAttribute('href', '/robot');
-    // 모드 전환·수동 집기·설정 변경은 기기 페이지에만 있다
-    expect(within(panel).queryByRole('button', { name: /적용|집기/ })).not.toBeInTheDocument();
-    expect(within(panel).queryByRole('button', { name: /집기/ })).not.toBeInTheDocument();
+    // 권한(robot.manual)이 없으면 운전 모드 조작을 그리지 않는다. 모드는 상세 행에서 본다
+    expect(within(panel).queryByRole('region', { name: '운전 모드' })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: /적용|집기|놓기/ })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('radio')).not.toBeInTheDocument();
+    expect(within(panel).getByText('모드')).toBeInTheDocument();
     expect(screen.queryByText(/비상/)).not.toBeInTheDocument();
+  });
+
+  it('열람자에게도 로봇 패널은 상태(모드·들고 있는 섹터)만 보이고 조작은 없다', async () => {
+    const user = userEvent.setup();
+    const held = [tankState(), robotState({ mode: 'manual', heldSectorId: 'tank-a1', gripper: { closed: true, holding: true } }), conveyorState(), compressorState()];
+    const { store } = renderWithStore(<LiveStudio onFailed={() => {}} />, { devices: held, me: VIEWER });
+    act(() => void store.dispatch(devicesReceived(held)));
+    await user.click(screen.getByLabelText(/로봇팔 대기, 작동 중/));
+    const panel = screen.getByRole('complementary', { name: '로봇팔 상세' });
+    expect(within(panel).getByText('A1에서 집음 · 놓기 대기')).toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: /적용|집기|놓기|일시정지/ })).not.toBeInTheDocument();
+  });
+
+  it('관리자가 로봇을 고르면 기기 페이지와 같은 운전 모드 조작(모드·섹터 지정·집기/놓기)이 패널에 들어간다', async () => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore(<LiveStudio onFailed={() => {}} />, { devices, me: ADMIN });
+    act(() => void store.dispatch(devicesReceived(devices)));
+    await user.click(screen.getByLabelText(/로봇팔 이동, 작동 중/));
+    const panel = screen.getByRole('complementary', { name: '로봇팔 상세' });
+    const mode = within(panel).getByRole('region', { name: '운전 모드' });
+    expect(within(mode).getAllByRole('radio').map((r) => r.firstChild?.textContent)).toEqual(['자동', '자동 · 섹터 지정', '수동']);
+    await user.click(within(mode).getAllByRole('radio')[1]!);
+    expect(within(mode).getByRole('button', { name: '섹터 A1' })).toBeInTheDocument();
+    await user.click(within(mode).getAllByRole('radio')[2]!);
+    expect(within(mode).getByRole('button', { name: '집기' })).toBeDisabled();
+    expect(within(mode).getByRole('button', { name: '컨베이어에 놓기' })).toBeDisabled();
+    // 확인 단계는 같은 ConfirmDialog
+    await user.click(within(mode).getByRole('button', { name: '적용' }));
+    expect(screen.getByRole('dialog', { name: '모드 전환' })).toBeInTheDocument();
   });
 });
 
 describe('공정 추적: 서버 단계를 여섯 칸에 옮겨 적는다', () => {
   it('지금 그 단계에 있는 대상이 있는 칸만 진행 중이다', () => {
-    const batch: Batch = { id: 'batch-0412', stage: 'compressing', mix: [{ sectorId: 'tank-a1', percent: 40 }, { sectorId: 'tank-b1', percent: 60 }], avgMoisturePercent: 11, targetPressureMpa: 28.4, stageTimes: { compressing: NOW }, updatedAt: NOW };
+    const batch: Batch = { id: 'batch-0412', stage: 'compressing', mix: [{ sectorId: 'tank-a1', percent: 40 }, { sectorId: 'tank-b1', percent: 60 }], actualMix: null, pinning: null, pinChanges: [], avgMoisturePercent: 11, targetPressureMpa: 28.4, stageTimes: { compressing: NOW }, updatedAt: NOW };
     const steps = cycleSteps({ vehicles: [vehicle('v1', 'identified', 'tank-a2')], batches: [batch], bales: [] });
     expect(steps.map((s) => s.label)).toEqual(['입고', '차량 인식', '하역', '배합', '압축', '출하']);
     expect(steps.filter((s) => s.active).map((s) => s.key)).toEqual(['identify', 'press']);

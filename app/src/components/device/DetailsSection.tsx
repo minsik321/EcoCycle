@@ -21,7 +21,7 @@ export interface DetailsSectionProps {
 const noop = () => () => {};
 
 /** 미디어 쿼리가 지금 맞는지 (창 크기가 바뀌면 다시 그린다). matchMedia가 없으면(테스트 환경) 늘 false */
-function useMediaQuery(query: string | undefined): boolean {
+export function useMediaQuery(query: string | undefined): boolean {
   const list =
     query && typeof matchMedia === "function" ? matchMedia(query) : null;
   return useSyncExternalStore(

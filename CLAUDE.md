@@ -54,7 +54,7 @@ EcoCycle/
 ## 전체 공통 규칙 (모든 폴더에 적용)
 
 1. **권한은 서버가 판단한다.** 프론트는 `GET /me`의 `permissions`로 버튼 표시·비활성만 정한다. 비활성 버튼은 편의 기능일 뿐 차단 수단이 아니다.
-2. **위험 조작은 기기 페이지에서만.** 홈·확대 화면은 시작/일시정지/재개/정지/알람 확인만. `set_mode`, `pick_from`, `update_setting`은 기기 페이지 + 확인 단계(`confirm: true`)를 거친다.
+2. **위험 조작은 기기 페이지에서만.** 홈·확대 화면은 시작/일시정지/재개/정지/알람 확인만. `set_mode`, `pick_from`, `place_on_conveyor`, `update_setting`은 기기 페이지 + 확인 단계(`confirm: true`)를 거친다. 예외 하나: 3D 홈의 로봇 상세 패널은 기기 페이지와 같은 운전 모드 조작(`RobotModeControl`, 같은 확인 단계)을 둔다(`docs/decisions.md` 2026-10-16 "수동 집기·놓기 두 단계"). 권한이 없으면 그리지 않는다.
 3. **비상정지는 앱의 일이 아니다.** 물리 버튼과 현장 안전 인터록이 담당한다. 앱에 "비상정지"를 안전 수단처럼 보이게 만들지 않는다.
 4. **연결 끊김을 숨기지 않는다.** 15초간 메시지가 없으면 "연결 끊김"과 마지막 수신 시각을 표시하고 로봇팔을 멈춘다. 마지막 값을 정상처럼 계속 보여 주지 않는다. 복구되면 REST로 현재 상태를 다시 받는다.
 5. **값 규칙:** 시각은 ISO 8601 UTC 문자열(표시할 때만 현지 시각), 단위는 %·m³·MPa·°C·도. **무게는 차량·하역 기록에만**(계중대 순중량 t, 총중량·공차·순중량 셋 다 저장), 섹터는 적재율·부피, 로봇 집기는 부피 또는 횟수(명세 6절 "공통 규칙", `docs/decisions.md` 2026-10-15). 상태 판정(`status`)은 서버가 하고 화면은 표시만 한다.
@@ -90,7 +90,7 @@ npm run dev                 # mock-server + app 동시 실행
 npm run dev:app             # app만 (VITE_API_BASE로 실서버 지정)
 npm run mock -- --scenario=disconnect   # 시나리오 지정해 모의 서버 실행
 npm run typecheck && npm run test       # 타입 검사 + 단위·화면 테스트 (서버 불필요, 약 1분)
-npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403·자동 로그인(쿠키·교체·재사용 감지·유예) 점검 + 실제 Chromium으로 새로고침 뒤 로그인 유지 (약 2분, 서버·앱을 스스로 띄움, 로컬 Chromium 필요, 없으면 INTEGRATION_SKIP_BROWSER=1, 브라우저 점검 반복은 INTEGRATION_BROWSER_RUNS=5)
+npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403·로봇 수동 집기→놓기 순서(409)와 섹터 지정 실제 배합·자동 로그인(쿠키·교체·재사용 감지·유예) 점검 + 실제 Chromium으로 새로고침 뒤 로그인 유지 (약 2분, 서버·앱을 스스로 띄움, 로컬 Chromium 필요, 없으면 INTEGRATION_SKIP_BROWSER=1, 브라우저 점검 반복은 INTEGRATION_BROWSER_RUNS=5)
 npm run test:text           # 실제 브라우저로 폰·태블릿 화면의 글 줄바꿈·가로 넘침 점검 (글자 100%·130%, 약 15~25분, 서버를 스스로 띄움, 로컬 Chromium 필요)
 npm run measure:load        # 3D 홈 첫 화면 시간: 프로덕션 빌드, 폰 390×844 + 4G + CPU 4배 느림으로 로그인 → 지표·3D 첫 장 (약 10~20분, 로컬 Chromium 필요)
 npm run poster              # 3D 홈 준비 화면의 포스터(빈 장면)를 다시 찍는다 (약 1분, 로컬 Chromium 필요)
@@ -99,6 +99,7 @@ node app/scripts/recordSearch.mjs   # 기록·알람 검색: 390×844·1440×900
 node app/scripts/layoutPages.mjs   # 페이지 폭·간격: 네 크기에서 섹터 목록·공정 기록·대시보드 스크린샷과 같은 폭 점검 (약 2분, 로컬 Chromium 필요)
 node app/scripts/topBar.mjs        # 상단 바 하나·3D 홈 표: 세 크기(390·820·1440)에서 3D 홈과 일반 화면의 바, 사용자 메뉴, 대시보드, 태블릿·PC 표 접기(기억), 장면에 없는 대상 → 팝업, 베일 "기록 보기" 점검과 스크린샷 (약 5분, 로컬 Chromium 필요)
 node app/scripts/floatingBar.mjs   # 떠 있는 상단 바·사이드바 폭: 세 크기(1440·820·390)에서 3D 홈·대시보드·공정 기록의 바 자리·모양·내용 간격·사이드바 폭이 같은지, 접기 기억, 나란히 놓은 비교 (약 3분, 로컬 Chromium 필요)
+node app/scripts/robotControls.mjs # 로봇팔 7단위: 390×844·1440×900에서 로봇팔 페이지 세 모드·수동 놓기 대기·적용 자리, 섹터 지정 중인 배치의 계획 vs 실제 배합, 사건 기록, 집기 기록 두 단계, 3D 홈 로봇 패널 조작 (약 5분, 로컬 Chromium 필요, 결과 docs/screenshots/robot-controls)
 node app/scripts/recordPopups.mjs  # 기록 상세 팝업: 베일 기록 API, 폰·데스크톱에서 팝업 셋·이어 열기·뒤로 가기·깊은 링크 점검과 스크린샷 (약 2분, 로컬 Chromium 필요)
 npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```

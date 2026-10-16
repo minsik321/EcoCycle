@@ -13,8 +13,8 @@ export interface DeviceControlsProps {
   className?: string;
 }
 
-/** 값을 골라야 해서 버튼 하나로 보낼 수 없는 조작 (다른 컴포넌트가 맡는다) */
-const VALUE_CONTROLS: ReadonlySet<CommandType> = new Set(['update_setting', 'set_mode', 'pick_from']);
+/** 값을 고르거나 순서·확인 단계가 있어 버튼 하나로 보낼 수 없는 조작 (다른 컴포넌트가 맡는다) */
+const VALUE_CONTROLS: ReadonlySet<CommandType> = new Set(['update_setting', 'set_mode', 'pick_from', 'place_on_conveyor']);
 
 /**
  * 한 기기의 조작 버튼 묶음. 홈과 기기 페이지에서 같은 컴포넌트를 쓴다.
@@ -22,7 +22,7 @@ const VALUE_CONTROLS: ReadonlySet<CommandType> = new Set(['update_setting', 'set
  * - 보낼 수 있는 권한이 하나도 없으면 아무것도 그리지 않고, 일부만 없으면 비활성화하고 이유를 보여 준다. (표시일 뿐 차단은 서버가 한다)
  * - 연결이 끊겼거나 기기가 offline이면 모두 비활성화하고 이유를 보여 준다.
  * - 값을 고르는 위험 조작은 각자의 컴포넌트가 확인 단계를 거쳐 confirm: true로 보낸다:
- *   `update_setting`은 기기 페이지의 설정 폼(SettingForm), `set_mode`·`pick_from`은 로봇팔 페이지의 운전 모드(RobotModeControl).
+ *   `update_setting`은 기기 페이지의 설정 폼(SettingForm), `set_mode`·`pick_from`·`place_on_conveyor`는 운전 모드(RobotModeControl: 로봇팔 페이지와 3D 홈 로봇 패널).
  * - "비상정지"는 만들지 않는다. stop은 일반 정지이며 안전 장치가 아니다.
  */
 export function DeviceControls({ deviceId, context, className = '' }: DeviceControlsProps) {

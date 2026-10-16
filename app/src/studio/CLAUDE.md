@@ -28,7 +28,8 @@ glTF 모델, 새 색·재질·배치·핀·패널. 기존 재질·팔레트·배
 2. **데이터는 기존 store·실시간 계층에서만 온다**(`/scene-demo`에서는 `demo/demoData.ts`의 예시 원본). 프론트에 업무 로직을 두지 않는다:
    번호판 → 회사 → 섹터 배정, 등급, 수분, 배합비, 압력은 서버 값이다. 서버가 아직 주지 않는 숫자가 필요하면 **명세와 모의 서버에 먼저 추가**하거나, 화면에 **"예시 데이터"라고 분명히 표시**한다.
 3. **연결 끊김:** 연결이 끊기면 **모든 움직임을 멈추고** "연결 끊김"과 마지막 수신 시각을 보여 준다. 추측을 실제처럼 움직이지 않는다.
-4. **조작:** 기존 조작 컴포넌트(`components/controls`)와 권한만 쓴다. 위험 조작은 기기 페이지에 둔다. 비상정지처럼 보이는 버튼을 만들지 않는다.
+4. **조작:** 기존 조작 컴포넌트(`components/controls`)와 권한만 쓴다. 위험 조작은 기기 페이지에 둔다. 예외는 로봇 상세 패널의 운전 모드(`RobotModeControl variant="panel"`: 모드·섹터 지정·수동 집기/놓기, 기기 페이지와 같은 확인 단계·권한, 2026-10-16 사용자 요청)뿐이다. 비상정지처럼 보이는 버튼을 만들지 않는다.
+   패널의 조작 영역(`.st-actions`)은 스튜디오의 단추 초기화에서 빠져 앱의 버튼 모양 그대로다.
 5. **화면이 숨겨지거나 CCTV가 열리면 그리기를 멈춘다.**
 6. **휴대폰 먼저, 그다음 태블릿, 그다음 데스크톱. 스튜디오도 화질 단계(high/standard/low)를 따른다**(2026-10-14 사용자 요청: 모바일이 주 대상).
    배치는 390×844(폰)에서 먼저 성립해야 하고 820×1180(태블릿)·데스크톱으로 넓힌다. 기본 단계는 폰 `low`, 태블릿 `standard`, 데스크톱 `high`이고
@@ -117,7 +118,7 @@ studio/
 - 홈의 전환 "3D | 대시보드"(`HomeSwitch`)와 lazy import는 `features/home`에 있다. 전환은 `LiveStudio`의 `switcher`로 받아 상단 바 가운데 칸에 넣는다(폰에서도 바로 보인다). `DemoStudio`의 `tabs`는 시연 화면의 측정 버튼 같은 보조 영역이다.
 - 대시보드와 함께 쓰는 것: 공정 문구·6단계 계산(`config/processDisplay.ts`, `overlay/text.ts`가 다시 내보낸다), 지표 추이선(`store/usePlantTrends.ts`).
 - 앱 코드에서 가져다 쓰는 것: `config/robotModel`·`robotCycle`(로봇 기본 모델, 집는 각도·시연 주기), `config/display`(값 형식·기기 이름·상태 문구),
-  `store`의 선택자, `components/controls/DeviceControls`, `api.getPlantHistory`. 모양에 관한 것(재질·팔레트·핀·패널)은 가져다 쓰지 않는다.
+  `store`의 선택자, `components/controls/DeviceControls`·`RobotModeControl`, `api.getPlantHistory`. 모양에 관한 것(재질·팔레트·핀·패널)은 가져다 쓰지 않는다.
 
 ## 값과 연출의 경계 (고정 규칙 2·3을 지키는 방법)
 

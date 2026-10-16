@@ -1,6 +1,6 @@
 import type { IsoTimestamp } from './common';
 import type { TankId } from './ids';
-import type { BaleStage, MixPart, StageTimes, VehicleStage } from './process';
+import type { BaleStage, BatchPinChange, MixPart, StageTimes, VehicleStage } from './process';
 
 /*
  * 공정 기록 (명세 6절 "공정 기록(차량·배치·베일)"): "공정 기록" 화면의 차량·배치·베일 목록과 한 건 조회.
@@ -48,7 +48,12 @@ export interface BatchRecord {
   startedAt: IsoTimestamp;
   /** 진행 중이면 null */
   endedAt: IsoTimestamp | null;
+  /** 계획 배합 */
   mix: MixPart[];
+  /** 실제 배합 (섹터 지정이 걸린 적 없는 배치는 null, `Batch.actualMix`와 같다) */
+  actualMix: MixPart[] | null;
+  /** 섹터 지정 시작·변경·해제 기록 */
+  pinChanges: BatchPinChange[];
   avgMoisturePercent: number;
   targetPressureMpa: number;
   /** 압축 때 실제로 낸 압력 MPa. 압축하지 않았거나 압축 전이면 null */

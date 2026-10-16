@@ -6,10 +6,11 @@ import type {
   DeviceId,
   RobotState,
 } from '@ecocycle/shared';
+import { ACCOUNTS } from '../fixtures/accounts';
 import { publish } from './bus';
-import { applyBatchCommand } from './process';
+import { applyBatchCommand, setRobotPin } from './process';
 import { publishDevice, publishSummary } from './publish';
-import { requestManualPick, resetRobotCycle } from './robot';
+import { requestManualPick, requestManualPlace, resetRobotCycle } from './robot';
 import { alarms, devices, setSetting } from './state';
 
 // 명령 접수(202) → 잠시 뒤 실행 → command.result. 실행 결과는 GET /commands/{id} 로도 조회할 수 있다.
@@ -42,6 +43,9 @@ export const getRecord = (commandId: string): CommandRecord | undefined => recor
 
 const robot = () => devices['robot-1'] as RobotState;
 
+/** 기록에 남길 사람 이름 (모의 계정 이름, 없으면 ID) */
+const actorName = (userId: string) => ACCOUNTS.find((a) => a.id === userId)?.name ?? userId;
+
 /**
  * 지금 상태에서 이 명령을 받을 수 없는 이유 (HTTP 409). 받을 수 있으면 undefined.
  * 형식 검증(422)과 권한(403)은 이미 통과한 뒤에 부른다.
@@ -68,11 +72,18 @@ export function conflictReason(deviceId: DeviceId, command: Command): string | u
       case 'stop':
         return r.status === 'stopped' ? '이미 정지 상태입니다.' : undefined;
       case 'set_mode':
+        // 수동으로 집어 든 채 모드를 바꾸면 들고 있는 것이 어디로 갈지 사람이 모른다
+        if (r.mode === 'manual' && r.heldSectorId) return '집어 든 파지를 먼저 컨베이어에 놓으세요.';
         return r.mode === command.mode && (command.mode !== 'auto_pinned' || (r.pinnedSectors.length === command.pinnedSectors.length && r.pinnedSectors.every(id => command.pinnedSectors.includes(id)))) ? '이미 해당 모드와 지정 섹터입니다.' : undefined;
       case 'pick_from':
+      case 'place_on_conveyor':
         if (r.mode !== 'manual') return '수동 모드에서만 사용할 수 있습니다.';
         if (r.status !== 'running') return '로봇이 작동 중일 때만 사용할 수 있습니다.';
-        return r.phase === 'idle' ? undefined : '로봇이 작업 중입니다. 끝난 뒤 다시 시도하세요.';
+        if (r.phase !== 'idle') return '로봇이 작업 중입니다. 끝난 뒤 다시 시도하세요.';
+        // 집기 → 놓기 순서는 서버가 지킨다
+        if (command.type === 'pick_from' && r.heldSectorId) return '이미 집어 든 파지가 있습니다. 먼저 컨베이어에 놓으세요.';
+        if (command.type === 'place_on_conveyor' && !r.heldSectorId) return '집어 든 파지가 없습니다. 먼저 집기를 하세요.';
+        return undefined;
       default:
         return undefined;
     }
@@ -162,21 +173,29 @@ async function execute({ deviceId, command, userId }: CommandRecord): Promise<Ou
       if (reason) return { status: 'rejected', reason };
       robot().mode = command.mode;
       robot().pinnedSectors = command.mode === 'auto_pinned' ? [...command.pinnedSectors] : [];
+      // 배합 중인 배치에 지정을 걸거나 푼다 (실제 배합·사건 기록)
+      setRobotPin(command.mode === 'auto_pinned' ? command.pinnedSectors : null, actorName(userId));
       publishDevice(robot(), true);
       return { status: 'completed', reason: null };
     }
 
-    case 'pick_from': {
-      if (!requestManualPick(command.tankId)) {
-        return { status: 'rejected', reason: '로봇이 작업 중이거나 수동 모드가 아니어서 실행하지 않았습니다.' };
-      }
-      // 사이클이 시작되어 끝날 때까지 기다린다 (최대 40초)
+    case 'pick_from':
+    case 'place_on_conveyor': {
+      // 접수 뒤에 상태가 바뀌었을 수 있어 실행 때 다시 검사한다
+      const reason = conflictReason(deviceId, command);
+      if (reason) return { status: 'rejected', reason };
+      const actor = actorName(userId);
+      const requested = command.type === 'pick_from' ? requestManualPick(command.tankId, actor) : requestManualPlace(actor);
+      if (!requested) return { status: 'rejected', reason: '로봇이 작업 중이거나 수동 모드가 아니어서 실행하지 않았습니다.' };
+      // 움직임이 시작되어 끝날 때까지 기다린다 (최대 40초)
       const deadline = Date.now() + 40_000;
       while (robot().phase === 'idle' && Date.now() < deadline) await wait(100);
       while (robot().phase !== 'idle' && Date.now() < deadline) await wait(200);
-      return Date.now() < deadline
-        ? { status: 'completed', reason: null }
-        : { status: 'failed', reason: '시간 안에 작업이 끝나지 않았습니다.' };
+      if (Date.now() >= deadline) return { status: 'failed', reason: '시간 안에 작업이 끝나지 않았습니다.' };
+      if (command.type === 'pick_from' && robot().heldSectorId !== command.tankId) {
+        return { status: 'failed', reason: '집지 못했습니다. 섹터가 비어 있거나 도중에 멈췄습니다.' };
+      }
+      return { status: 'completed', reason: null };
     }
 
     case 'update_setting': {

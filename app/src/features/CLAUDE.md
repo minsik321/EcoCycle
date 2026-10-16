@@ -37,6 +37,7 @@
 서버가 제공하지 않아 안내 문구만 둔 항목: 로봇팔 사이클 통계, 압축기 점검 이력, 설정의 현재값 (`docs/questions.md` B18, B21, B22).
 - `robot/`(6단위): 자동·수동·자동 섹터 지정(`auto_pinned`), 지정 목록은 서버 상태와 초안을 구분. `set_mode`의 기존 권한·확인 흐름을 확장한다. 사이클 통계 아래 `PickRecords` = 별도 `RecordList`(`GET /robots/robot-1/picks/records`, 시각·모드·섹터·부피 m³·컨베이어 → 배치). `pickRecordsRevision` 변경 시 같은 기간·쪽을 갱신한다. 재현은 `node app/scripts/robotArm.mjs`, 결과는 `docs/screenshots/robot-arm`.
 - 기기 페이지 재설계(2026-10-16, 같은 날 정리): 네 기기 모두 `DevicePage` 틀이다. 그림(히어로)이 있는 것은 섹터뿐이고(섹터는 주요 수치 칸 없이 그림 안에 수치), 로봇팔·압축기·컨베이어는 정보를 더하지 않는 그림을 지웠다(그림 없이 머리 줄 → 주요 수치 격자 → 지금/다음 → 자세히 → 기록). 폰은 아래에 붙는 조작 줄, "자세히"는 닫힌 채 시작하고 어디서나 위쪽 아래 폭 전체로 놓여 열면 칸 폭(컨테이너 쿼리 `@xl`)이 넉넉할 때 가로로 펼친다(`DetailsSection`: 왼쪽 넓은 칸 = 이력 그래프·진단 표, 오른쪽 = 설정·알람 이력).
+  - 7단위(2026-10-16): 수동은 "집기" → "컨베이어에 놓기" 두 조작(`pick_from` → `place_on_conveyor`, 사이 상태 "A1에서 집음 · 놓기 대기", 서버 `heldSectorId`), 집기 기록은 두 단계(집기·놓기 시각, 수동 조작자). "적용"은 태블릿·데스크톱은 세 칸 오른쪽, 폰은 섹터 칩 줄의 마지막 칩 또는 안내 글 오른쪽. 섹터 지정 중인 배치는 배치·베일 화면·배치 팝업·대시보드·3D 홈 요약에서 계획 배합과 실제 배합(서버 `actualMix`)을 함께 보이고 "섹터 지정 중" 표시(`records/PinBadge`), 배치 팝업에 섹터 지정 기록. 3D 홈 로봇 패널에도 같은 `RobotModeControl`. 재현 `node app/scripts/robotControls.mjs`(`docs/screenshots/robot-controls`).
   - `robot/`: `robotText`(현재 작업·지금 하는 일·지금/다음 문장), `usePicksThisHour`(이번 시간 집기 = 집기 기록 목록에 정각~지금 구간을 한 줄만 요청해 서버 `total`을 그대로). 주요 수치: 모드·현재 작업·이번 시간 집기·그리퍼. 운전 모드는 `components/controls/RobotModeControl`(세 칸: 자동 | 자동 · 섹터 지정 | 수동)을 지금/다음 아래에 둔다(수동의 "집을 섹터"·선택·"집기"는 한 줄, 같은 높이·가운데선). "자세히": 진단(관절 각도 표, `ROBOT_DIAGNOSTICS_PERMISSION`이 있을 때만, 왼쪽), 설정·오류 로그·일반 정지 안내(오른쪽). 맨 아래 사이클 통계(그대로)와 집기 기록.
   - `compressor/`: `compressorText`(지금 배치 고르기: 압축 중 → 배합 중 → 계획). 주요 수치: 압력(칸 안 작은 게이지 — 지금 압력 막대와 지금 배치 목표 눈금, 숫자는 "22.5 / 27.9 MPa"로 한 번만)·온도·오늘 베일(요약)·사이클 단계(서버 `cycleStage`). 지금/다음에 배치·베일 화면 링크. 눈금 범위는 `config/display.ts`의 `PRESSURE_GAUGE_MPA`.
   - `conveyor/`: 주요 수치 가동·적재 정도·압축기로 가는 중, 지금/다음(배합 중 배치 이송, 다음 배치), 자세히(이력 그래프 왼쪽, 설정·알람 이력 오른쪽).
@@ -123,7 +124,7 @@
 
 ### 그 밖
 - 화면은 store 선택자와 `api` 훅으로만 데이터를 얻는다.
-- 위험 조작은 기기 페이지에서만(`components/controls`의 `context='page'`).
+- 위험 조작은 기기 페이지에서만(`components/controls`의 `context='page'`). 예외: 3D 홈 로봇 패널의 운전 모드(같은 컴포넌트·확인 단계, 루트 `CLAUDE.md` 규칙 2).
 - 화면을 떠날 때 그 화면이 연 구독(관절 값 등)을 해제한다.
 
 

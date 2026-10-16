@@ -41,6 +41,8 @@ export interface RobotState {
   phase: Phase;
   /** 작업 중인 탱크. 작업 중이 아니면 null */
   targetTankId: TankId | null;
+  /** 집어 든 파지의 섹터. 들고 있지 않으면 null. 수동 모드에서 `phase: idle`이고 값이 있으면 "놓기 대기" (명세 6절 "로봇팔 7단위") */
+  heldSectorId: TankId | null;
   gripper: Gripper;
   updatedAt: IsoTimestamp;
 }

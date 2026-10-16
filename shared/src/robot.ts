@@ -31,10 +31,17 @@ export interface RobotModel {
   linkLengthsM: number[];
 }
 
-/** 컨베이어에 놓은 집기 기록. 양은 부피(m³). */
+/** 컨베이어에 놓은 집기 기록. 양은 부피(m³). 집기와 놓기 두 단계를 함께 남긴다. */
 export interface PickRecord {
   id: string;
+  /** 놓기 완료 시각 (기록 시각) */
   pickedAt: string;
+  /** 섹터에서 집은 시각 */
+  grabbedAt: string;
+  /** 수동으로 집기를 조작한 사람. 자동이면 null */
+  grabbedBy: string | null;
+  /** 수동으로 놓기를 조작한 사람. 자동이면 null */
+  placedBy: string | null;
   mode: RobotMode;
   sectorId: import('./ids').TankId;
   volumeM3: number;

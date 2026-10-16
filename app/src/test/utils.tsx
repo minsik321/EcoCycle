@@ -25,6 +25,7 @@ export const robotState = (over: Partial<Extract<DeviceState, { type: 'robot' }>
   pickRecordsRevision: 0,
   phase: 'idle',
   targetTankId: null,
+  heldSectorId: null,
   gripper: { closed: false, holding: false },
   updatedAt: NOW,
   ...over,

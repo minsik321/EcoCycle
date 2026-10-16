@@ -35,7 +35,7 @@ processRouter.get('/vehicles/:id', (req, res) => {
 
 // GET /batches/records?from=...&to=...&page=1&pageSize=10 — 배치 기록 (시작 시각 기준)
 processRouter.get('/batches/records', (req, res) => {
-  sendRecordPage(req, res, allBatches(), (r) => r.startedAt, (r) => [r.id, ...r.mix.flatMap((m) => sectorSearchTerms(m.sectorId))]);
+  sendRecordPage(req, res, allBatches(), (r) => r.startedAt, (r) => [r.id, ...[...r.mix, ...(r.actualMix ?? [])].flatMap((m) => sectorSearchTerms(m.sectorId))]);
 });
 
 processRouter.get('/batches/control', (_req, res) => res.json(batchControlState()));

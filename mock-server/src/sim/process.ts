@@ -7,6 +7,7 @@ import {
   COMPANIES,
   MIX_RATIOS,
   PICKS_PER_BATCH,
+  PRESSURE_PER_MOISTURE_MPA,
   RECENT_LIMIT,
   TARGET_PRESSURE_MPA,
   VEHICLE_TIMING_SEC,
@@ -58,7 +59,10 @@ export const batchEvents = () => events;
 function event(batchId: string, type: BatchEvent['type'], actor: string, detail: string, baleId?: string, at = iso(Date.now())) {
   events.push({ id: `batch-event-${events.length + 1}`, batchId, type, actor, detail, ...(baleId ? { baleId } : {}), at });
 }
-const mixLabel = (mix: MixPart[]) => mix.map(m => `${m.sectorId.replace('tank-', '').toUpperCase()} ${m.percent}%`).join(' · ');
+const sectorCode = (id: TankId) => id.replace('tank-', '').toUpperCase();
+const mixLabel = (mix: MixPart[]) => mix.map(m => `${sectorCode(m.sectorId)} ${m.percent}%`).join(' · ');
+/** 베일·기록에 남길 배합: 실제로 놓은 배합이 있으면 그것, 아니면 계획 */
+const pressedMix = (batch: Batch): MixPart[] => structuredClone(batch.actualMix?.length ? batch.actualMix : batch.mix);
 export function baleDetail(id: string): BaleDetail | undefined {
   const detail = baleDetails.get(id);
   const live = bales.find(b => b.id === id);
@@ -88,6 +92,7 @@ export function applyBatchCommand(command: BatchCommand, actor: string): string 
       const before = mixLabel(batch.mix);
       batch.mix = structuredClone(mix);
       batch.avgMoisturePercent = round1(mix.reduce((sum,m)=>sum+tank(m.sectorId).moisturePercent*m.percent,0)/100);
+      basisFor(batch).moisture = batch.avgMoisturePercent;
       event(batch.id, 'mix_changed', actor, `${before} → ${mixLabel(mix)}`);
       break;
     }
@@ -96,6 +101,8 @@ export function applyBatchCommand(command: BatchCommand, actor: string): string 
       if (command.targetPressureMpa < TARGET_PRESSURE_MPA.min || command.targetPressureMpa > TARGET_PRESSURE_MPA.max) return `압력은 ${TARGET_PRESSURE_MPA.min}~${TARGET_PRESSURE_MPA.max} MPa 범위여야 합니다.`;
       event(batch.id, 'pressure_changed', actor, `${batch.targetPressureMpa} → ${command.targetPressureMpa} MPa`);
       batch.targetPressureMpa = command.targetPressureMpa;
+      // 사람이 정한 목표 압력은 실제 배합으로 다시 계산하지 않는다
+      basisFor(batch).pressureByHand = true;
       break;
     case 'pause_batch':
       if (pausedBatches.has(batch.id)) return '이미 일시정지된 배치입니다.';
@@ -113,7 +120,8 @@ export function applyBatchCommand(command: BatchCommand, actor: string): string 
       event(batch.id, 'skipped', actor, command.reason.trim());
       skippedBatches.add(batch.id);
       pausedBatches.delete(batch.id);
-      addBatchRecord({ id: batch.id, result: 'skipped', startedAt: batch.stageTimes.planned ?? batch.updatedAt, endedAt: iso(Date.now()), mix: structuredClone(batch.mix), avgMoisturePercent: batch.avgMoisturePercent, targetPressureMpa: batch.targetPressureMpa, actualPressureMpa: null, baleIds: [], balesProduced: 0 });
+      batch.pinning = null;
+      addBatchRecord({ id: batch.id, result: 'skipped', startedAt: batch.stageTimes.planned ?? batch.updatedAt, endedAt: iso(Date.now()), mix: structuredClone(batch.mix), actualMix: structuredClone(batch.actualMix), pinChanges: structuredClone(batch.pinChanges), avgMoisturePercent: batch.avgMoisturePercent, targetPressureMpa: batch.targetPressureMpa, actualPressureMpa: null, baleIds: [], balesProduced: 0 });
       batch.stage = 'completed';
       countFor(batch).clear();
       break;
@@ -135,6 +143,95 @@ function countFor(batch: Batch): Map<TankId, number> {
   return count;
 }
 let compressSec = 0;
+
+// ── 섹터 지정과 실제 배합 (명세 6절 "로봇팔 7단위") ───────────────────
+// 로봇이 자동 · 섹터 지정이면 배합 중인 배치에 지정을 걸고, 그 배치에 실제로 놓은 부피로 실제 배합을 계산한다.
+// 평균 수분과 목표 압력은 실제 배합으로 여기(서버)서 다시 계산한다. 지정이 끝나면 남은 집기는 계획 배합비를 따른다.
+
+/** 로봇의 지금 섹터 지정 (auto_pinned가 아니면 null) */
+let robotPin: { sectors: TankId[]; actor: string } | null = null;
+/** 배치별로 컨베이어에 놓은 부피(m³, 섹터별) */
+const placedVolumes = new Map<string, Map<TankId, number>>();
+/** 지정이 끝난 때의 놓은 횟수. 남은 집기(배치당 횟수 − 그때까지 놓은 횟수)는 이 뒤로 계획 배합비를 따른다 */
+const resumeBase = new Map<string, { counts: Map<TankId, number>; placed: number }>();
+/** 다시 계산의 기준: 계획 배합의 평균 수분과 계획(또는 사람이 정한) 목표 압력 */
+const bases = new Map<string, { moisture: number; pressure: number; pressureByHand: boolean }>();
+
+function basisFor(batch: Batch) {
+  let basis = bases.get(batch.id);
+  if (!basis) {
+    basis = { moisture: batch.avgMoisturePercent, pressure: batch.targetPressureMpa, pressureByHand: false };
+    bases.set(batch.id, basis);
+  }
+  return basis;
+}
+
+function volumesFor(batch: Batch): Map<TankId, number> {
+  let volumes = placedVolumes.get(batch.id);
+  if (!volumes) { volumes = new Map(); placedVolumes.set(batch.id, volumes); }
+  return volumes;
+}
+
+/** 섹터별 부피 → 정수 % (합 100, 나머지가 큰 섹터부터 1씩 더한다). 섹터 순서는 A1·A2·B1·B2 */
+function percentMix(volumes: Map<TankId, number>): MixPart[] {
+  const total = [...volumes.values()].reduce((a, b) => a + b, 0);
+  if (total <= 0) return [];
+  const parts = TANK_IDS.filter((id) => (volumes.get(id) ?? 0) > 0).map((id) => {
+    const exact = ((volumes.get(id) ?? 0) / total) * 100;
+    return { sectorId: id, percent: Math.floor(exact), rest: exact - Math.floor(exact) };
+  });
+  let missing = 100 - parts.reduce((sum, p) => sum + p.percent, 0);
+  for (const part of [...parts].sort((a, b) => b.rest - a.rest)) {
+    if (missing <= 0) break;
+    part.percent += 1;
+    missing -= 1;
+  }
+  return parts.map(({ sectorId, percent }) => ({ sectorId, percent }));
+}
+
+/** 실제 배합과 그것으로 다시 계산한 평균 수분·목표 압력 */
+function recomputeActual(batch: Batch): void {
+  const volumes = volumesFor(batch);
+  batch.actualMix = percentMix(volumes);
+  const total = [...volumes.values()].reduce((a, b) => a + b, 0);
+  if (total <= 0) return;
+  const basis = basisFor(batch);
+  const moisture = round1([...volumes].reduce((sum, [id, v]) => sum + tank(id).moisturePercent * v, 0) / total);
+  batch.avgMoisturePercent = moisture;
+  if (!basis.pressureByHand) {
+    const target = basis.pressure + PRESSURE_PER_MOISTURE_MPA * (moisture - basis.moisture);
+    batch.targetPressureMpa = round1(Math.min(TARGET_PRESSURE_MPA.max, Math.max(TARGET_PRESSURE_MPA.min, target)));
+  }
+}
+
+function pinBatch(batch: Batch, pin: { sectors: TankId[]; actor: string }, now: number, type: 'pin_started' | 'pin_changed', carried = false): void {
+  basisFor(batch);
+  batch.pinning = { sectors: [...pin.sectors], since: iso(now), actor: pin.actor };
+  batch.pinChanges.push({ at: iso(now), actor: pin.actor, sectors: [...pin.sectors] });
+  resumeBase.delete(batch.id);
+  if (!batch.actualMix) recomputeActual(batch);
+  event(batch.id, type, pin.actor, `${pin.sectors.map(sectorCode).join(' · ')}${carried ? ' (지정 유지, 새 배치)' : ''}`);
+  batch.updatedAt = iso(now);
+}
+
+/** 로봇 모드 전환이 실행될 때 (sim/commands): 지정 섹터(지정 해제는 null)와 바꾼 사람 */
+export function setRobotPin(sectors: TankId[] | null, actor: string): void {
+  robotPin = sectors ? { sectors: [...sectors], actor } : null;
+  const batch = batchIn('mixing');
+  if (!batch) return;
+  const now = Date.now();
+  if (robotPin) {
+    pinBatch(batch, robotPin, now, batch.pinning ? 'pin_changed' : 'pin_started');
+  } else if (batch.pinning) {
+    batch.pinning = null;
+    batch.pinChanges.push({ at: iso(now), actor, sectors: [] });
+    const counts = countFor(batch);
+    resumeBase.set(batch.id, { counts: new Map(counts), placed: [...counts.values()].reduce((a, b) => a + b, 0) });
+    event(batch.id, 'pin_ended', actor, '남은 집기는 계획 배합대로');
+    batch.updatedAt = iso(now);
+  } else return;
+  sendBatch(batch);
+}
 const pendingShip: { bale: Bale; at: number }[] = [];
 
 function remember<T extends { id: string }>(list: T[], item: T): void {
@@ -265,6 +362,9 @@ function recordUnload(run: VehicleRun): void {
 const batchIn = (stage: Batch['stage']) => batches.find((b) => b.stage === stage);
 
 function setBatchStage(batch: Batch, stage: Batch['stage'], now: number): void {
+  // 지정 중에 배합을 시작하는 배치에는 같은 지정을 건다. 배합이 끝나면 지정은 풀린다(기록은 남는다)
+  if (stage === 'mixing' && robotPin) pinBatch(batch, robotPin, now, 'pin_started', true);
+  if (stage !== 'mixing') batch.pinning = null;
   batch.stage = stage;
   batch.stageTimes[stage] = iso(now);
   batch.updatedAt = iso(now);
@@ -294,6 +394,9 @@ function planBatch(now: number): void {
     id: `batch-${pad(batchSeq, 4)}`,
     stage: 'planned',
     mix,
+    actualMix: null,
+    pinning: null,
+    pinChanges: [],
     avgMoisturePercent,
     targetPressureMpa,
     stageTimes: { planned: iso(now) },
@@ -309,10 +412,14 @@ function planBatch(now: number): void {
 export function nextPickSector(): TankId | null {
   const batch = batchIn('mixing');
   if (!batch || pausedBatches.has(batch.id)) return null;
+  // 지정이 끝난 배치는 남은 횟수만 계획 배합비로 나눈다 (지정 중에 놓은 몫을 메우지 않는다)
+  const base = resumeBase.get(batch.id);
+  const remaining = PICKS_PER_BATCH - (base?.placed ?? 0);
   let best: TankId | null = null;
   let bestGap = 0;
   for (const part of batch.mix) {
-    const gap = (part.percent / 100) * PICKS_PER_BATCH - (countFor(batch).get(part.sectorId) ?? 0);
+    const done = (countFor(batch).get(part.sectorId) ?? 0) - (base?.counts.get(part.sectorId) ?? 0);
+    const gap = (part.percent / 100) * remaining - done;
     if (gap > bestGap) {
       bestGap = gap;
       best = part.sectorId;
@@ -328,10 +435,18 @@ export function mixingBatchId(): string | null {
 }
 
 /** 진행 중 집기가 끝나면 원래 배치에만 반영한다. 일시정지 중에도 이미 집은 양은 보존한다. */
-export function notePlaced(sectorId: TankId, batchId: string | null): string | null {
+export function notePlaced(sectorId: TankId, batchId: string | null, volumeM3: number): string | null {
   const batch = batches.find(b => b.id === batchId && b.stage === 'mixing');
   if (!batch) return null;
   countFor(batch).set(sectorId, (countFor(batch).get(sectorId) ?? 0) + 1);
+  const volumes = volumesFor(batch);
+  volumes.set(sectorId, (volumes.get(sectorId) ?? 0) + volumeM3);
+  // 지정이 걸린 적 있는 배치는 실제 배합·수분·목표 압력을 다시 계산해 보낸다
+  if (batch.actualMix) {
+    recomputeActual(batch);
+    batch.updatedAt = iso(Date.now());
+    sendBatch(batch);
+  }
   return batch.id;
 }
 
@@ -376,13 +491,15 @@ function tickBatches(now: number): void {
         startedAt: compressing.stageTimes.planned ?? compressing.updatedAt,
         endedAt: iso(now),
         mix: structuredClone(compressing.mix),
+        actualMix: structuredClone(compressing.actualMix),
+        pinChanges: structuredClone(compressing.pinChanges),
         avgMoisturePercent: compressing.avgMoisturePercent,
         targetPressureMpa: compressing.targetPressureMpa,
         actualPressureMpa: round1(compressor().pressureMpa),
         balesProduced: 1,
         baleIds: [bale.id],
       });
-      baleDetails.set(bale.id, { ...structuredClone(bale), pressureMpa: round1(compressor().pressureMpa), avgMoisturePercent: compressing.avgMoisturePercent, mix: structuredClone(compressing.mix) });
+      baleDetails.set(bale.id, { ...structuredClone(bale), pressureMpa: round1(compressor().pressureMpa), avgMoisturePercent: compressing.avgMoisturePercent, mix: pressedMix(compressing) });
       event(compressing.id, 'bale_produced', '자동 공정', `${bale.id} 생산`, bale.id);
       production.balesToday += 1;
       sendBale(bale);
@@ -439,6 +556,8 @@ export const liveBatchRecords = (): BatchRecord[] =>
       startedAt: b.stageTimes.planned ?? b.updatedAt,
       endedAt: null,
       mix: structuredClone(b.mix),
+      actualMix: structuredClone(b.actualMix),
+      pinChanges: structuredClone(b.pinChanges),
       avgMoisturePercent: b.avgMoisturePercent,
       targetPressureMpa: b.targetPressureMpa,
       actualPressureMpa: null,
@@ -513,6 +632,9 @@ function seedRecent(): void {
         { sectorId: first, percent: ratio[0] },
         { sectorId: second, percent: ratio[1] },
       ],
+      actualMix: null,
+      pinning: null,
+      pinChanges: [],
       avgMoisturePercent: round1(10.4 + i * 0.4),
       targetPressureMpa: round1(27.6 + i * 0.5),
       stageTimes: { planned: iso(at), mixing: iso(at + 3_000), compressing: iso(done - 8_000), completed: iso(done) },
@@ -525,6 +647,8 @@ function seedRecent(): void {
       startedAt: iso(at),
       endedAt: iso(done),
       mix: structuredClone(batch.mix),
+      actualMix: null,
+      pinChanges: [],
       avgMoisturePercent: batch.avgMoisturePercent,
       targetPressureMpa: batch.targetPressureMpa,
       actualPressureMpa: round1(batch.targetPressureMpa - 0.2),

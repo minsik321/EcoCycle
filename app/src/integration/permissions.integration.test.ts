@@ -54,6 +54,7 @@ const PROBES: Record<CommandType, { device: string; body: object }> = {
   stop: { device: 'conveyor-z', body: { type: 'stop' } }, // 아래에서 따로 다룬다 (실제로 실행된다)
   set_mode: { device: 'robot-1', body: { type: 'set_mode', mode: 'manual' } }, // confirm이 없어 422
   pick_from: { device: 'robot-1', body: { type: 'pick_from', confirm: true } }, // tankId가 없어 422
+  place_on_conveyor: { device: 'robot-1', body: { type: 'place_on_conveyor' } }, // confirm이 없어 422
   update_setting: { device: 'tank-a1', body: { type: 'update_setting', key: 'nope', value: 1, confirm: true } }, // 없는 설정이라 422
   ack_alarm: { device: 'tank-a1', body: { type: 'ack_alarm', alarmId: 'none' } }, // 없는 알람이라 422
 };

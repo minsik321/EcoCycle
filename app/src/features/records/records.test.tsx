@@ -63,6 +63,8 @@ const BATCH = (over: Partial<BatchRecord> = {}): BatchRecord => ({
     { sectorId: 'tank-a1', percent: 40 },
     { sectorId: 'tank-b2', percent: 60 },
   ],
+  actualMix: null,
+  pinChanges: [],
   avgMoisturePercent: 11.8,
   targetPressureMpa: 28.5,
   actualPressureMpa: 28.3,

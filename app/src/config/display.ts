@@ -56,7 +56,7 @@ export const ROBOT_MODE_ORDER: readonly RobotMode[] = ['auto', 'auto_pinned', 'm
 export const ROBOT_MODE_HELP: Record<RobotMode, string> = {
   auto: '배합 중인 배치의 배합비를 따라 서버가 집을 섹터를 고릅니다.',
   auto_pinned: '고른 섹터만 차례로 돌며 자동으로 집습니다.',
-  manual: '섹터를 골라 "집기"를 누를 때마다 한 번 집습니다.',
+  manual: '섹터를 골라 "집기"로 집어 든 뒤 "컨베이어에 놓기"로 놓습니다.',
 };
 
 export const gripperText = (gripper: Gripper): string => (gripper.holding ? '잡고 있음' : gripper.closed ? '닫힘' : '열림');

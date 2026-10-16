@@ -63,7 +63,8 @@
   backdrop-filter: blur(18px) saturate(1.4);
 }
 
-.st-root button:not(.st-topbar *) {
+/* 단추 초기화. 앱의 상단 바와 상세 패널의 조작 영역(.st-actions: 기존 조작 컴포넌트·운전 모드)은 앱의 모양 그대로 둔다 */
+.st-root button:not(.st-topbar *):not(.st-actions *) {
   font: inherit;
   color: inherit;
   border: 0;

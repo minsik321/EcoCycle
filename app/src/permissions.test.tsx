@@ -191,8 +191,12 @@ describe.each(ROLES)('역할 %s', (role) => {
       if (m.danger) expect(pick).toBeEnabled();
       else {
         expect(pick).toBeDisabled();
-        expect(within(modeCard!).getByText('권한이 없습니다')).toBeInTheDocument();
+        expect(within(modeCard!).getByText(/집기·놓기: 권한이 없습니다/)).toBeInTheDocument();
       }
+      // 놓기도 같은 권한(robot.manual). 들고 있지 않아 관리자에게도 비활성이고, 작업자에게는 권한이 이유다
+      const place = within(modeCard!).getByRole('button', { name: '컨베이어에 놓기' });
+      expect(place).toBeDisabled();
+
       // 자동 칸을 고르면 "적용"
       act(() => within(modeCard!).getByRole('radio', { name: '자동' }).click());
       const apply = within(modeCard!).getByRole('button', { name: '적용' });
@@ -200,7 +204,7 @@ describe.each(ROLES)('역할 %s', (role) => {
       else {
         // 작업자: 보이지만 비활성이고 이유가 있다
         expect(apply).toBeDisabled();
-        expect(within(modeCard!).getByText('권한이 없습니다')).toBeInTheDocument();
+        expect(within(modeCard!).getByText(/적용: 권한이 없습니다/)).toBeInTheDocument();
       }
     }
     // 진단(관절 각도 표)과 설정은 "자세히" 안. 진단은 관리자에게만 보인다

@@ -4,11 +4,13 @@ import { getBatchRecord } from '../../api';
 import type { PopupTarget } from '../../components/records/recordPopup';
 import { formatLocalTime, formatPercent, formatPressureMpa } from '../../config/display';
 import { batchBalePath } from '../../config/navigation';
-import { mixPercentText } from '../../config/processDisplay';
+import { actualMixText, mixPercentText, sectorsText } from '../../config/processDisplay';
+import { PinBadge } from './PinBadge';
 import { BatchResultPill } from './BatchRecords';
 import { DetailRow, DetailSection, RecordFrame } from './RecordDetail';
 import { useRecord } from './useRecord';
 
+const last = <T,>(list: readonly T[]): T | undefined => list[list.length - 1];
 const stamp = (iso: string | null) => (iso ? <time dateTime={iso}>{formatLocalTime(iso)}</time> : '–');
 
 function Body({ record, onOpen }: { record: BatchRecord; onOpen: (target: PopupTarget) => void }) {
@@ -18,14 +20,33 @@ function Body({ record, onOpen }: { record: BatchRecord; onOpen: (target: PopupT
         <p className="truncate text-lg font-bold text-ink">{record.id}</p>
         <BatchResultPill result={record.result} />
       </div>
+      {record.actualMix !== null && (
+        <PinBadge pinning={record.result === null && last(record.pinChanges)?.sectors.length ? { sectors: last(record.pinChanges)!.sectors } : null} actual />
+      )}
       <dl>
         <DetailRow label="시작">{stamp(record.startedAt)}</DetailRow>
         <DetailRow label="종료">{record.endedAt ? stamp(record.endedAt) : '아직 끝나지 않았습니다'}</DetailRow>
-        <DetailRow label="배합">{mixPercentText(record)}</DetailRow>
+        <DetailRow label={record.actualMix === null ? '배합' : '계획 배합'}>{mixPercentText(record)}</DetailRow>
+        {record.actualMix !== null && <DetailRow label="실제 배합">{actualMixText(record)}</DetailRow>}
         <DetailRow label="평균 수분">{formatPercent(record.avgMoisturePercent)}</DetailRow>
         <DetailRow label="목표 압력">{formatPressureMpa(record.targetPressureMpa)}</DetailRow>
         <DetailRow label="실제 압력">{record.actualPressureMpa === null ? '–' : formatPressureMpa(record.actualPressureMpa)}</DetailRow>
       </dl>
+      {record.pinChanges.length > 0 && (
+        <DetailSection title="섹터 지정 기록">
+          <ul>
+            {record.pinChanges.map((change) => (
+              <li key={change.at} className="flex min-w-0 items-baseline justify-between gap-3 border-b border-line py-2 text-sm last:border-b-0">
+                <span className="min-w-0">
+                  <span className="font-semibold text-ink">{change.sectors.length ? `지정 ${sectorsText(change.sectors)}` : '지정 해제'}</span>
+                  <span className="text-ink-soft"> · {change.actor}</span>
+                </span>
+                {stamp(change.at)}
+              </li>
+            ))}
+          </ul>
+        </DetailSection>
+      )}
       <DetailSection title={`만든 베일 ${record.balesProduced}개`}>
         {record.baleIds.length === 0 ? (
           <p className="pb-1 text-sm text-ink-soft">이 배치에서 만든 베일이 없습니다.</p>

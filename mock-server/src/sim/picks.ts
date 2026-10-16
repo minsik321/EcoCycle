@@ -28,16 +28,25 @@ function seeded(seed: number): () => number {
 }
 
 const now = Date.now();
+/** 지난 수동 기록의 조작자 (모의 계정 이름) */
+const SEED_OPERATOR = '관리자(모의)';
 const seedRandom = seeded(20261015);
 export const pickRecords: PickRecord[] = Array.from({ length: 96 }, (_, i) => {
   const sectorId = TANK_IDS[i % TANK_IDS.length] as TankId;
   const sector = devices[sectorId] as TankState;
   // 지난 기록이라 그때의 적재율을 알 수 없으므로 지금 적재율 근처에서 흔든다
   const fill = clamp(sector.fillPercent + (seedRandom() - 0.5) * 40, 5, 95);
+  const mode = ROBOT_MODES[i % ROBOT_MODES.length]!;
+  const placedMs = now - (i + 1) * 300_000;
+  // 수동 기록은 집기와 놓기 사이에 사람이 누른 간격이 있다
+  const manual = mode === 'manual';
   return {
     id: `pick-seed-${i}`,
-    pickedAt: new Date(now - (i + 1) * 300_000).toISOString(),
-    mode: ROBOT_MODES[i % ROBOT_MODES.length]!,
+    pickedAt: new Date(placedMs).toISOString(),
+    grabbedAt: new Date(placedMs - (manual ? 25_000 + Math.round(seedRandom() * 60_000) : 7_000)).toISOString(),
+    grabbedBy: manual ? SEED_OPERATOR : null,
+    placedBy: manual ? SEED_OPERATOR : null,
+    mode,
     sectorId,
     volumeM3: pickVolumeM3(fill, sector.grade, seedRandom),
     conveyorId: 'conveyor-z',

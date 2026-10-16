@@ -1,4 +1,4 @@
-import type { Bale, BaleStage, Batch, BatchResult, BatchStage, TankId, Vehicle, VehicleRecordStatus, VehicleStage } from '@ecocycle/shared';
+import type { Bale, BaleStage, Batch, BatchResult, BatchStage, MixPart, RobotState, TankId, Vehicle, VehicleRecordStatus, VehicleStage } from '@ecocycle/shared';
 import { formatPressureMpa } from './display';
 
 // 공정 흐름(차량·배치·베일)을 화면에 적는 문구와 "공정 추적" 계산. 서버가 준 stage를 여섯 단계 칸에 옮겨 적을 뿐, 값을 만들지 않는다.
@@ -37,7 +37,30 @@ export const BALE_STAGE_TEXT: Record<BaleStage, string> = {
 export const mixText = (batch: Pick<Batch, 'mix'>): string => batch.mix.map((m) => `${SECTOR_LABEL[m.sectorId]} ${m.percent}`).join(' : ');
 
 /** 배합을 %로 분명히 적은 것 (공정 기록: "A1 40% · B2 60%") */
-export const mixPercentText = (batch: Pick<Batch, 'mix'>): string => batch.mix.map((m) => `${SECTOR_LABEL[m.sectorId]} ${m.percent}%`).join(' · ');
+export const mixPercentText = (batch: Pick<Batch, 'mix'>): string => partsText(batch.mix);
+
+/** 배합 조각 목록을 %로 ("A1 40% · B2 60%"). 실제 배합을 적을 때도 쓴다 */
+export const partsText = (parts: readonly MixPart[]): string => parts.map((m) => `${SECTOR_LABEL[m.sectorId]} ${m.percent}%`).join(' · ');
+
+/** 지정 섹터 목록 ("A1 · B1") */
+export const sectorsText = (ids: readonly TankId[]): string => ids.map((id) => SECTOR_LABEL[id]).join(' · ');
+
+/**
+ * 실제 배합 줄: 서버가 준 `actualMix`를 적는다(화면이 계산하지 않는다). 섹터 지정이 걸린 적 없는 배치(null)는 null,
+ * 아직 놓은 것이 없으면 안내 글.
+ */
+export const actualMixText = (batch: Pick<Batch, 'actualMix'>): string | null =>
+  batch.actualMix === null ? null : batch.actualMix.length ? partsText(batch.actualMix) : '아직 놓은 파지가 없습니다';
+
+/** 로봇이 집어 든 상태 한 줄 ("A1에서 집음 · 놓기 대기"). 들고 있지 않고 집는 중도 아니면 null (서버 `heldSectorId`·`phase`) */
+export function robotHoldText(robot: Pick<RobotState, 'heldSectorId' | 'phase' | 'targetTankId'>): string | null {
+  if (robot.heldSectorId) {
+    const sector = SECTOR_LABEL[robot.heldSectorId];
+    return robot.phase === 'idle' ? `${sector}에서 집음 · 놓기 대기` : `${sector}에서 집음 · 컨베이어로 옮기는 중`;
+  }
+  if (robot.phase === 'pick' && robot.targetTankId) return `${SECTOR_LABEL[robot.targetTankId]}에서 집는 중`;
+  return null;
+}
 
 /** 공정 기록: 차량 상태 (인식 · 하역 · 출차) */
 export const VEHICLE_RECORD_STATUS_TEXT: Record<VehicleRecordStatus, string> = {

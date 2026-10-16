@@ -9,6 +9,8 @@ import { RecordList } from '../../components/records/RecordList';
 import { PopupLink, useOpenRecordPopup } from '../../components/records/recordPopup';
 import { useDeviceLive } from '../../components/device/live';
 import { BATCH_STAGE_TEXT, SECTOR_LABEL } from '../../config/processDisplay';
+import { PinBadge } from './PinBadge';
+import type { MixPart } from '@ecocycle/shared';
 import { RECORD_SEARCH_HINT, formatLocalTime } from '../../config/display';
 import { useAppSelector } from '../../store/hooks';
 import { selectRecentCommands } from '../../store/selectors';
@@ -20,6 +22,22 @@ import { BackToRecords, DetailRow } from './RecordDetail';
 // 사건 줄을 누르면 그 사건의 베일(베일 생산) 또는 배치 팝업이 바로 뜬다 (따로 된 "사건 상세" 없음)
 
 const EVENT_TEXT = BATCH_EVENT_TYPE_TEXT;
+
+/** 배합 막대 묶음 (섹터마다 이름·%·막대). 실제 배합은 서버가 놓은 부피로 계산한 값이다 */
+function MixBars({ label, parts, unavailable, tone }: { label: string; parts: readonly MixPart[]; unavailable: boolean; tone: 'plan' | 'actual' }) {
+  return (
+    <div className="space-y-2" aria-label={label} data-frozen={unavailable}>
+      <p className="text-xs font-semibold text-ink-soft">{label}</p>
+      {parts.length === 0 && <p className="text-sm text-ink-soft">아직 놓은 파지가 없습니다.</p>}
+      {parts.map((m) => (
+        <div key={m.sectorId}>
+          <div className="flex items-baseline justify-between text-sm"><span>섹터 {SECTOR_LABEL[m.sectorId]}</span><span className="tabular-nums">{unavailable ? '–' : m.percent}%</span></div>
+          <div className="mt-1 h-2 rounded-full bg-paper-deep"><div className={`h-2 rounded-full ${tone === 'plan' ? 'bg-accent' : 'bg-kraft'}`} style={{ width: `${unavailable ? 0 : m.percent}%` }} /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
 export function BatchBalePage() {
   const { data, error, offline } = useBatchControl();
   const { lastReceivedAt } = useDeviceLive();
@@ -35,8 +53,11 @@ export function BatchBalePage() {
     {unavailable && <p role="alert">{offline?'연결 끊김':'현재 상태를 불러오지 못했습니다. 다시 연결 중입니다.'} · 마지막 수신 {lastReceivedAt?formatLocalTime(lastReceivedAt):'–'}</p>}
     {!data && !error && <p role="status">불러오는 중…</p>}
     <Card title="현재 배치" aria-label="현재 배치" aside={<span className="whitespace-nowrap text-sm font-semibold">{unavailable?'연결 끊김':current?(current.paused?'일시정지':BATCH_STAGE_TEXT[current.batch.stage]):'대기'}</span>}>
-      {current ? <><p className="mb-3 text-lg font-bold">{show(current.batch.id)}</p>
-        <div className="space-y-2" data-frozen={unavailable}>{current.batch.mix.map(m=><div key={m.sectorId}><div className="flex items-baseline justify-between text-sm"><span>섹터 {SECTOR_LABEL[m.sectorId]}</span><span>{show(m.percent)}%</span></div><div className="mt-1 h-2 rounded-full bg-paper-deep"><div className="h-2 rounded-full bg-accent" style={{width:`${unavailable?0:m.percent}%`}}/></div></div>)}</div>
+      {current ? <><div className="mb-3 flex min-w-0 flex-wrap items-center gap-2"><p className="text-lg font-bold">{show(current.batch.id)}</p><PinBadge pinning={current.batch.pinning} actual={current.batch.actualMix !== null} /></div>
+        {current.batch.actualMix === null
+          ? <MixBars label="배합" parts={current.batch.mix} unavailable={unavailable} tone="plan" />
+          : <div className="grid gap-4 sm:grid-cols-2"><MixBars label="계획 배합" parts={current.batch.mix} unavailable={unavailable} tone="plan" /><MixBars label="실제 배합 (놓은 부피 기준)" parts={current.batch.actualMix} unavailable={unavailable} tone="actual" /></div>}
+        {current.batch.actualMix !== null && <p className="mt-2 text-xs text-ink-soft">평균 수분과 목표 압력은 실제 배합으로 서버가 다시 계산한 값입니다.{current.batch.pinning ? ' 지정이 끝나면 남은 집기는 계획 배합대로 합니다.' : ''}</p>}
         <dl className="mt-3"><DetailRow label="평균 수분">{show(current.batch.avgMoisturePercent)}%</DetailRow><DetailRow label="목표 압력">{show(current.batch.targetPressureMpa)} MPa</DetailRow><DetailRow label="현재 압력">{show(current.currentPressureMpa)} MPa</DetailRow><DetailRow label="진행률">{show(current.progressPercent)}%</DetailRow></dl>
         <div role="progressbar" aria-label="배치 진행률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={unavailable?0:current.progressPercent} className="mt-2 h-2 rounded-full bg-paper-deep"><div className="h-2 rounded-full bg-accent" style={{width:`${unavailable?0:current.progressPercent}%`}}/></div>
         <p className="mt-3 text-sm font-semibold">생산 베일 {show(current.baleIds.length)}개</p>

@@ -74,6 +74,8 @@ function parseCommand(type: CommandType, body: Record<string, unknown>, deviceId
       }
       return { command: { type, tankId: tankId as (typeof TANK_IDS)[number], confirm: true } };
     }
+    case 'place_on_conveyor':
+      return { command: { type, confirm: true } };
     case 'update_setting': {
       const defs = SETTING_DEFS[devices[deviceId].type];
       const def = defs.find((d) => d.key === body.key);

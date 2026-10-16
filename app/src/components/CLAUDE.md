@@ -9,7 +9,7 @@ components/
 ├── common/        Button(48px, 처리 중 비활성), Card, Dialog(초점 가두기·Esc·초점 복귀), GlassPanel(유리 패널: main/minor),
 │                  KpiCard + Sparkline(지표 카드와 작은 추이선), Tabs, DataTable, ToastCard(알림 카드 한 장)
 ├── status/        StatusBadge(색+기호+글자), OfflineNotice, Timestamp, useDisplayStatus(끊기면 모든 상태를 "연결 끊김"으로), tone(색 클래스)
-├── controls/      DeviceControls, RobotModeControl(로봇 운전 모드 세 칸 + 섹터 칩·집기), CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
+├── controls/      DeviceControls, RobotModeControl(로봇 운전 모드 세 칸 + 섹터 칩·수동 집기/놓기, 기기 페이지 `page`·3D 홈 패널 `panel`), CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
 ├── layout/        Sidebar(앱의 유일한 주 메뉴: 폰 아래 탭 바 + "더 보기", md 이상 왼쪽 사이드바·접힘, 강조 `NAV_ACTIVE`), TopBar(앱의 유일한 상단 바, 아래 "상단 바" 절),
 │                  AppShell(슬롯: headerCenter·headerExtra·overlays, 간격 `SHELL_GAP_X`·`SHELL_GAP_TOP`), sidebarPref(사이드바 접힘, 기기에 기억), TopCards,
 │                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 틀의 상단 바·끊김 안내·내용 여백을 거두고 headerExtra를 넘긴다. 3D 홈만 쓴다.
@@ -73,8 +73,8 @@ components/
 
 - `DeviceControls`는 `deviceId`와 `context: 'home' | 'page'`를 받는다. 버튼 하나로 보내는 명령만 그린다.
   - `home`: 위험도 낮음 명령만(`start`, `pause`, `resume`, `stop`, `ack_alarm`).
-  - `page`: 기기 페이지에 둘 수 있는 명령 중 값을 고를 필요가 없는 것. 값을 고르는 위험 조작은 각자 컴포넌트가 맡는다: `update_setting`은 `SettingForm`, `set_mode`·`pick_from`은 `RobotModeControl`. 위험도 높음 명령은 반드시 `ConfirmDialog`를 거쳐 `confirm: true`로 보낸다.
-- `RobotModeControl`: 세 칸(`role="radiogroup"`, 좌우 화살표)을 고르는 것은 초안이고 서버 모드에는 "지금"이 붙는다. 자동 · 섹터 지정은 섹터 칩(여러 개, 적용된 칩 표시)과 "적용" 하나, 수동은 "집을 섹터" 선택과 "집기"가 한 줄(지금 수동이 아니면 먼저 "적용"). 머리에 마지막 모드 전환 결과(적용 대기 → 적용됨·거부됨, 시각). 서버 모드·지정 섹터가 바뀌면 초안을 서버 값으로 되돌린다. 로봇 조작 권한이 하나도 없으면 그리지 않는다.
+  - `page`: 기기 페이지에 둘 수 있는 명령 중 값을 고를 필요가 없는 것. 값을 고르는 위험 조작은 각자 컴포넌트가 맡는다: `update_setting`은 `SettingForm`, `set_mode`·`pick_from`·`place_on_conveyor`는 `RobotModeControl`. 위험도 높음 명령은 반드시 `ConfirmDialog`를 거쳐 `confirm: true`로 보낸다.
+- `RobotModeControl`: 세 칸(`role="radiogroup"`, 좌우 화살표)을 고르는 것은 초안이고 서버 모드에는 "지금"이 붙는다. "적용"은 줄 하나를 차지하지 않는다(md 이상 기기 페이지는 세 칸 오른쪽, 폰·패널은 지정 모드에서 섹터 칩 줄의 마지막 칩, 그 밖에는 안내 글 오른쪽, 바꾼 것이 없으면 비활성). 자동 · 섹터 지정은 섹터 칩(여러 개, 적용된 칩 표시). 수동은 상태 한 줄("A1에서 집음 · 놓기 대기", 서버 `heldSectorId`), "집을 섹터" 선택과 "집기"가 한 줄, 그 아래 "컨베이어에 놓기"(들고 있는 동안 집기, 들고 있지 않은 동안 놓기 비활성. 수동으로 들고 있는 동안 모드 전환도 비활성). 머리에 마지막 로봇 명령(모드 전환·집기·놓기)의 결과. 서버 모드·지정 섹터가 바뀌면 초안을 서버 값으로 되돌린다. `variant="page"`는 로봇 조작 권한이 하나도 없으면, `variant="panel"`(3D 홈)은 이 조작들의 권한(`robot.manual`)이 없으면 그리지 않는다.
 - 명령별 위험도와 필요 권한은 `@ecocycle/shared`의 표에서 읽는다. 컴포넌트 안에 목록을 다시 쓰지 않는다.
 - 권한이 없으면 숨기거나 비활성화(`selectCan`). 이는 표시일 뿐이고 차단은 서버가 한다.
 - 연결 끊김 또는 기기 `offline`이면 조작 버튼을 비활성화하고 이유를 보여 준다.
