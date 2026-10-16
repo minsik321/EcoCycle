@@ -135,9 +135,11 @@ try {
         await go(route);
         await page.getByLabel('지금 하는 일').filter({ hasNotText: '불러오는 중' }).waitFor();
         await shot(`${name}-1-top`, null, { full: true });
-        await page.getByRole('button', { name: '자세히', exact: true }).click();
+        // 섹터는 PC(1280px 이상)에서 늘 펼쳐져 있고 접기 버튼이 없다
+        const toggle = page.getByRole('button', { name: '자세히', exact: true });
+        if ((await toggle.count()) && (await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
         await page.getByRole('img', { name: /이력 그래프|그래프/ }).first().waitFor({ timeout: 15_000 }).catch(() => undefined);
-        await shot(`${name}-2-details`, page.getByRole('button', { name: '자세히', exact: true }), { full: true });
+        await shot(`${name}-2-details`, page.getByText('자세히', { exact: true }), { full: true });
       }
       notes.push(`${width}×${height} 글자 ${zoom * 100}%`);
       await context.close();

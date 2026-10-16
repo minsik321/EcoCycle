@@ -103,7 +103,7 @@ describe('기기 페이지 틀 배치', () => {
       expect(section.parentElement).not.toContainElement(screen.getByLabelText('주요 수치'));
       await userEvent.click(screen.getByRole('button', { name: '자세히' }));
       const body = screen.getByText('그래프').parentElement!.parentElement!;
-      expect(body).toHaveClass('md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]');
+      expect(body).toHaveClass('@xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]');
       expect(screen.getByText('설정')).toBeInTheDocument();
       unmount();
     }

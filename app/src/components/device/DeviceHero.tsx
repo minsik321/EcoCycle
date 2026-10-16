@@ -19,17 +19,20 @@ export interface DeviceHeroProps {
   updatedAt?: string | null;
   /** 목록으로 돌아가는 링크 (탱크) */
   back?: { to: string; label: string };
+  /** 상태 칩 앞에 붙는 작은 칩들 (섹터: 수분·등급). 좁으면 이름 아래 줄로 내려간다 */
+  chips?: ReactNode;
 }
 
 /**
- * 기기 페이지 맨 위: 이름, 큰 상태 칩, 지금 하는 일 한 줄, (있으면) 기기 그림.
+ * 기기 페이지 맨 위: 이름, (있으면) 작은 칩과 큰 상태 칩, 지금 하는 일 한 줄, (있으면) 기기 그림.
+ * 그림 칸은 카드의 남는 높이를 채워, 카드가 옆 칸(섹터 PC의 자세히)에 맞춰 늘어날 때 빈 곳이 아래에 몰리지 않는다.
  * 연결이 끊기면 상태는 "연결 끊김", 하는 일은 "–"로 바꾸고 마지막 수신 시각을 보여 주며 그림을 멈춘다.
  */
-export function DeviceHero({ name, status, statusLabel, activity, illustration, updatedAt, back }: DeviceHeroProps) {
+export function DeviceHero({ name, status, statusLabel, activity, illustration, updatedAt, back, chips }: DeviceHeroProps) {
   const { disconnected, lastReceivedAt } = useDeviceLive();
   return (
     <section aria-label={`${name} 상태`} className="flex flex-col gap-3 rounded-panel border border-line bg-surface p-4 shadow-soft-1">
-      <div className="flex items-start gap-2">
+      <div className="flex flex-wrap items-start gap-2">
         {back && (
           <Link
             to={back.to}
@@ -41,12 +44,16 @@ export function DeviceHero({ name, status, statusLabel, activity, illustration, 
             </svg>
           </Link>
         )}
-        <h1 className="min-w-0 flex-1 self-center text-xl leading-tight font-bold text-ink">{name}</h1>
-        {disconnected ? (
-          <StatusBadge status="offline" size="lg" />
-        ) : (
-          status && <StatusBadge status={status} label={statusLabel} size="lg" />
-        )}
+        {/* 이름은 줄지 않는다: 칩이 모자라면 칩 묶음이 다음 줄(오른쪽)로 내려간다 */}
+        <h1 className="min-w-0 flex-[1_0_auto] self-center text-xl leading-tight font-bold text-ink">{name}</h1>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">
+          {chips}
+          {disconnected ? (
+            <StatusBadge status="offline" size="lg" />
+          ) : (
+            status && <StatusBadge status={status} label={statusLabel} size="lg" />
+          )}
+        </div>
       </div>
       {/* 하는 일은 상태 칩 옆이 아니라 폭 전체로: 좁은 칸에서 짧은 문장이 두 줄로 꺾이지 않게 */}
       <p aria-label="지금 하는 일" className="-mt-2 text-base text-ink-soft">
@@ -56,7 +63,7 @@ export function DeviceHero({ name, status, statusLabel, activity, illustration, 
       {illustration && (
         <div
           data-frozen={disconnected ? 'true' : undefined}
-          className={`relative h-40 overflow-hidden rounded-card bg-paper md:h-72 ${disconnected ? 'opacity-60 grayscale' : ''}`}
+          className={`relative min-h-40 flex-1 overflow-hidden rounded-card bg-paper md:min-h-72 ${disconnected ? 'opacity-60 grayscale' : ''}`}
         >
           {illustration}
         </div>

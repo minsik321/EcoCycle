@@ -87,7 +87,8 @@ describe('TankListPage', () => {
     expect(links).toHaveLength(4);
     expect(links[3]).toHaveTextContent('섹터 B2');
     expect(links[3]).toHaveTextContent('주의');
-    expect(links[3]).toHaveTextContent('82.0%');
+    expect(within(links[3]!).getByTestId('bin-reading')).toHaveTextContent('82.0%5.8 / 8.0 m³');
+    expect(within(links[3]!).getByRole('group', { name: '등급' })).toHaveTextContent('A등급');
 
     await userEvent.click(screen.getByRole('link', { name: /섹터 A2/ }));
     expect(await screen.findByRole('heading', { name: '섹터 A2' })).toBeInTheDocument();
@@ -100,6 +101,7 @@ describe('TankListPage', () => {
     });
     expect(screen.queryByText('주의')).not.toBeInTheDocument();
     expect(screen.getAllByText('연결 끊김')).toHaveLength(4);
+    for (const reading of screen.getAllByTestId('bin-reading')) expect(reading).toHaveTextContent(/^–마지막 수신/);
   });
 
   it('아직 상태를 못 받았으면 불러오는 중이라고 보여 준다', () => {
@@ -109,16 +111,27 @@ describe('TankListPage', () => {
 });
 
 describe('TankPage', () => {
-  it('섹터 그림과 주요 수치(적재율, 부피/용량, 수분, 등급)를 보여 준다', async () => {
+  it('적재율·부피는 칸 그림 안에, 수분·등급은 그림 카드 위 칩에 있고 따로 된 수치 칸은 없다', async () => {
     pages('/tanks/tank-a1');
     expect(screen.getByRole('img', { name: '섹터 A1 적재율 72.4%, 주의 기준 80%' })).toBeInTheDocument();
-    const tiles = screen.getByRole('region', { name: '주요 수치' });
-    expect(within(tiles).getByRole('group', { name: '적재율' })).toHaveTextContent('72.4%');
-    expect(within(tiles).getByRole('group', { name: '부피' })).toHaveTextContent('5.8m³/ 8.0');
-    expect(within(tiles).getByRole('group', { name: '수분' })).toHaveTextContent('11.8%');
-    expect(within(tiles).getByRole('group', { name: '등급' })).toHaveTextContent('A등급');
+    const reading = screen.getByTestId('bin-reading');
+    expect(reading).toHaveTextContent('72.4%');
+    expect(reading).toHaveTextContent('5.8 / 8.0 m³');
+    const hero = screen.getByLabelText('섹터 A1 상태');
+    expect(within(hero).getByRole('group', { name: '수분' })).toHaveTextContent('11.8%');
+    expect(within(hero).getByRole('group', { name: '등급' })).toHaveTextContent('A등급');
+    expect(within(hero).getByText('정상')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '주요 수치' })).not.toBeInTheDocument();
     // 섹터 상태에는 무게를 쓰지 않는다 (무게는 하역 기록에만)
-    expect(within(tiles).queryByText(/ t$|kg|톤/)).not.toBeInTheDocument();
+    expect(within(hero).queryByText(/ t$|kg|톤/)).not.toBeInTheDocument();
+    await screen.findByText('12가 3456 · 한빛자원');
+  });
+
+  it('적재율 글자는 채움 윗선 바로 위에 붙고, 거의 다 차도 파지 위로 내려가지 않는다', async () => {
+    const base = devices()[0] as Extract<DeviceState, { type: 'tank' }>;
+    pages('/tanks/tank-a1', { devices: [{ ...base, fillPercent: 98 }] });
+    // 그림 높이 130 중 윗선은 바닥에서 16(바닥 아래 여백) + 98 = 114 → 87.69%
+    expect(screen.getByTestId('bin-reading').style.bottom).toBe('calc(87.69% + 3px)');
     await screen.findByText('12가 3456 · 한빛자원');
   });
 
@@ -127,7 +140,9 @@ describe('TankPage', () => {
     pages('/tanks/tank-a1', { devices: [custom] });
     // 벽 높이 100 중 비어 있는 45만큼 내린다
     expect(screen.getByTestId('bin-pile').style.transform).toBe('translateY(45px)');
-    expect(within(screen.getByTestId('bin-caution')).getByText('70%')).toBeInTheDocument();
+    const caution = within(screen.getByTestId('bin-caution'));
+    expect(caution.getByText('주의')).toBeInTheDocument();
+    expect(caution.getByText('70%')).toBeInTheDocument();
     await screen.findByText('12가 3456 · 한빛자원');
   });
 
@@ -156,6 +171,19 @@ describe('TankPage', () => {
     expect(vi.mocked(api.getHistory).mock.calls[0]![0]).toMatchObject({ deviceId: 'tank-a1', metric: 'level', interval: '10m' });
   });
 
+  it('PC 폭(xl 이상)에서는 "자세히"가 늘 펼쳐져 있고 접을 수 없다', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: q === '(min-width: 80rem)', media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      pages('/tanks/tank-a1');
+      expect(screen.queryByRole('button', { name: '자세히' })).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '자세히' })).toBeInTheDocument();
+      expect(await chart()).toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('작업자는 설정을 바꿀 수 없고 이유를 본다', async () => {
     pages('/tanks/tank-a1', { me: OPERATOR });
     await openDetails();
@@ -178,13 +206,19 @@ describe('TankPage', () => {
   it('연결이 끊기면 값은 "–", 상태는 연결 끊김, 그림은 멈추고 받은 하역 기록은 그대로 둔다', async () => {
     const { store } = pages('/tanks/tank-b2');
     await screen.findByText('12가 3456 · 한빛자원');
-    expect(screen.getByText('주의')).toBeInTheDocument();
+    expect(screen.getByText('주의', { selector: 'span' })).toBeInTheDocument();
     act(() => {
       store.dispatch(connectionChanged({ status: 'offline', lastReceivedAt: NOW }));
     });
-    expect(screen.queryByText('주의')).not.toBeInTheDocument();
+    expect(screen.queryByText('주의', { selector: 'span' })).not.toBeInTheDocument();
     expect(screen.getByText('연결 끊김')).toBeInTheDocument();
-    expect(within(screen.getByRole('group', { name: '적재율' })).getByText('–')).toBeInTheDocument();
+    const reading = screen.getByTestId('bin-reading');
+    expect(reading).toHaveTextContent('–');
+    expect(reading).toHaveTextContent('마지막 수신');
+    expect(reading).not.toHaveTextContent('82.0%');
+    expect(screen.getByRole('group', { name: '수분' })).toHaveTextContent('–');
+    // 채움 전환을 멈춘다
+    expect(screen.getByTestId('bin-pile').style.transition).toBe('none');
     expect(screen.getByRole('img', { name: '섹터 B2 그림, 연결 끊김' }).closest('[data-frozen]')).toHaveAttribute('data-frozen', 'true');
     expect(screen.getByText('12가 3456 · 한빛자원')).toBeInTheDocument();
   });
