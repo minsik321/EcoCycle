@@ -106,6 +106,8 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
   const kpiOpen = useContext(KpiDetailOpenContext);
   const [selection, setSelection] = useState<string | null>(null);
   const [view, setView] = useState(DEFAULT_VIEW.key);
+  // 출하 마당 칸이 다 차서 압축기가 기다린다 (장면이 알려 준다)
+  const [yardFull, setYardFull] = useState(false);
   const root = useRef<HTMLElement>(null);
   const layout = useLayout(root);
   const pins = useRef<PinElements>({});
@@ -125,7 +127,7 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
   }, []);
 
   // 경로 점선과 목적지 핀은 고른 차량(또는 지게차)에만 그린다 (참고 화면 10)
-  routeKeys.current = selection && (selection.startsWith('veh:') || selection === 'forklift') ? [selection] : [];
+  routeKeys.current = selection && (selection.startsWith('veh:') || selection.startsWith('forklift')) ? [selection] : [];
 
   const gradeKey = TANK_IDS.map((id) => {
     const d = data.devices[id];
@@ -209,6 +211,7 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
             inset={INSET[layout]}
             balerStatus={compressor?.type === 'compressor' ? compressor.status : 'offline'}
             grades={grades}
+            onYardFull={setYardFull}
           />
         )}
       </Suspense>
@@ -228,7 +231,7 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
       <div className="st-canvas">{scene}</div>
       {!ready && <SceneLoading />}
       {/* 핀은 3D 장면이 자리를 계산해 준다: 첫 장 전에는 놓을 곳이 없다 */}
-      {ready && <Pins {...common} pins={pins} />}
+      {ready && <Pins {...common} pins={pins} yardFull={yardFull && !disconnected} />}
       {topBar}
       <div className="st-glass st-area-dock">
         <AreaSwitcher data={data} view={view} onView={goView} stale={disconnected} />

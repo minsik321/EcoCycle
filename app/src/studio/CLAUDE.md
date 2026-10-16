@@ -82,7 +82,9 @@ studio/
 ├── models.ts           모델 불러오기(draco·meshopt), 색 맞추기
 ├── studio.css          이 탭 전용 스타일 (st- 접두사). 앱의 Tailwind·토큰을 쓰지 않는다
 ├── sim/
-│   ├── director.ts     "연출 감독": 서버 단계 → 트럭·지게차·베일·작업자의 움직임. three 미사용, 테스트 가능. motionKey()로 "움직였나"를 알려 준다
+│   ├── director.ts     "연출 감독": 서버 단계 → 트럭·작업자의 움직임과 출하 마당(`yard`) 호출. three 미사용, 테스트 가능. motionKey()로 "움직였나"를 알려 준다
+│   ├── yard.ts         출하 마당: 고정 칸(8열×3단), 지게차 1~2대, 일 나누기·길 한 줄·비켜 가기, 칸이 차면 압축기 대기(`yardFull`), 겹침·정합 점검 `audit`. three 미사용 (`yard.test.ts`가 10~50분어치를 돌린다)
+│   ├── mover.ts        경로를 따라 움직이는 것(트럭·지게차·작업자)의 공통 이동
 │   ├── pace.ts         박자: 단계의 프레임 상한마다 시계를 돌리고(끊기면 안 돌림) 그릴지 정한다. three 미사용, 테스트 가능
 │   └── paths.ts        둥글린 경로와 거리 → 위치·방향
 ├── world/
@@ -94,7 +96,7 @@ studio/
 │   └── ParkedCars.tsx  주차 차량(흰색·은색과 색 있는 몇 대): 코드 모형 → 모델 파일을 받으면 교체
 ├── actors/
 │   ├── build.ts        트럭·지게차·작업자·베일·뭉치 모형 (움직이는 마디마다 그룹)
-│   ├── Actors.tsx      Director 값을 모형에 옮겨 적기 (쏟아지는 파지 포함)
+│   ├── Actors.tsx      Director 값을 모형에 옮겨 적기 (쏟아지는 파지 포함, 지게차 1~2대, 베일은 InstancedMesh)
 │   └── Robot.tsx       로봇팔: robot/의 JointSource·ChainSpec으로 구동
 ├── robot/              로봇팔 관절 사슬(chain), 관절 입력(jointSource: 실시간·시연·고정), 공구 끝 위치(kinematics), robot.test.ts
 │                       (옛 scene/robot에서 옮겼다)

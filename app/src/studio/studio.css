@@ -1188,6 +1188,19 @@ button.st-now:hover {
   white-space: nowrap;
 }
 
+/* 칸이 다 차서 압축기가 기다린다 */
+.st-pin-flag {
+  margin-top: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--st-caution);
+}
+
 .st-pin-dot {
   display: grid;
   place-items: center;

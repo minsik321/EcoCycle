@@ -15,6 +15,7 @@
 | `controls.ts` | 화면에 보일 조작 목록과 위치(홈/기기 페이지) — 위험도·권한 표는 `shared/commands.ts`를 참조 | 대표님 조작 목록 확정 |
 | `display.ts` | 상태 문구·기호, 표시 형식(소수점 자리, 단위 표기), 기기 표시 이름, 단계 바 구성, 기록 목록의 기간 버튼·직접 선택 최대 일수·쪽 번호 수·빈 목록 문구(`RECORD_RANGES`, `RECORD_LIST`) (색 토큰은 `styles/index.css`) | 디자인 피드백 |
 | `navigation.ts` | 주 메뉴(공정 기록 포함)와 메뉴별 필요 권한(`requires`), 공정 기록 주소 만들기(`recordsPath`·`vehicleRecordPath`·`batchRecordPath`), 폰 탭 바에 바로 놓을 메뉴(`phoneTab`, 나머지는 "더 보기"), 메뉴 강조 기준(`isNavActive`), 여백 없이 가득 쓰는 화면(`fullBleed`) | 대표님 권한별 화면 확정 |
+| `yard.ts` | 3D 홈 출하 마당 연출의 흐름: 지게차 수(1~2)·속도, 칸(열×단), 화면 밖 출하 구간. 서버 값이 아니라 연출을 생산 속도에 맞추는 가정 (`studio/sim/yard.test.ts`가 균형을 점검) | 실제 생산 속도·마당 크기 |
 | `realtime.ts` | 끊김 감지 15초, 관절 지연 버퍼 0.15초, store 반영 묶음 주기 | 실서버 특성 |
 
 ## 규칙

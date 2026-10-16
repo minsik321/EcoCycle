@@ -2,8 +2,6 @@ import { TANK_IDS } from '@ecocycle/shared';
 import type { Bale, Batch, DeviceId, DeviceState, TankId, Vehicle, VehicleStage } from '@ecocycle/shared';
 import {
   BALE,
-  BALE_REST,
-  BALER,
   CONVEYOR,
   GATE,
   ROAD,
@@ -12,7 +10,6 @@ import {
   TRUCK_IN,
   TRUCK_OUT,
   TRUCK_SCALE_TO_EXIT,
-  YARD,
   bayCenterZ,
   deviceCenter,
   devicePin,
@@ -20,8 +17,14 @@ import {
   truckToBay,
   truckToExit,
 } from '../world/layout';
+import { FRESH_MS, advance, follow, mover } from './mover';
+import type { Mover } from './mover';
 import { angleDelta, roundedPath, samplePath } from './paths';
 import type { P2, Path, Pose } from './paths';
+import { Yard } from './yard';
+import type { BaleSim, ForkliftSim } from './yard';
+
+export type { BaleSim, BaleState, ForkliftSim } from './yard';
 
 // 스튜디오의 "연출 감독" (three 미사용, 테스트 가능).
 // 서버가 준 단계(stage)·기기 상태를 받아 트럭·지게차·베일·작업자의 움직임으로 옮긴다.
@@ -37,16 +40,6 @@ export interface SimInput {
 }
 
 export type TruckPhase = 'toScale' | 'atScale' | 'toBay' | 'reversing' | 'atBay' | 'toExit' | 'atExit' | 'leaving';
-
-interface Mover extends Pose {
-  path: Path | null;
-  s: number;
-  reverse: boolean;
-  speed: number;
-  waiting: boolean;
-  /** 바퀴 굴림(라디안 누적) */
-  wheel: number;
-}
 
 export interface TruckSim extends Mover {
   active: boolean;
@@ -64,42 +57,6 @@ export interface TruckSim extends Mover {
   variant: number;
   /** 서버가 번호판으로 정한 회사 이름 (인식 전 null). 트럭 띠 색에만 쓴다 */
   company: string | null;
-}
-
-export type BaleState = 'ejecting' | 'chute' | 'carried' | 'stack' | 'gone';
-
-export interface BaleSim {
-  active: boolean;
-  id: string;
-  state: BaleState;
-  x: number;
-  y: number;
-  z: number;
-  rot: number;
-  slot: number;
-  t: number;
-}
-
-type Leg =
-  | { kind: 'drive'; to: P2; reverse: boolean }
-  | { kind: 'turn'; heading: number }
-  | { kind: 'fork'; height: number }
-  | { kind: 'call'; fn: () => void };
-
-interface Task {
-  kind: 'store' | 'ship' | 'home';
-  baleId: string;
-}
-
-export interface ForkliftSim extends Mover {
-  fork: number;
-  carrying: string | null;
-  legs: Leg[];
-  task: Task | null;
-  queue: Task[];
-  idleT: number;
-  /** 화면 밖에 나가 있다 */
-  away: boolean;
 }
 
 export type WorkerPose = 'walk' | 'stand' | 'tablet' | 'wave';
@@ -125,39 +82,19 @@ export interface LumpSim {
 const TRUCK_SPEED = 2.6;
 const TRUCK_REVERSE = 1.25;
 const TRUCK_ACCEL = 2.2;
-const FORK_SPEED = 2.3;
-const FORK_REVERSE = 1.3;
-const FORK_TURN = 2.6;
-const FORK_LIFT = 0.55;
 const WORKER_SPEED = 0.75;
 export const BELT_SPEED = 0.7;
 const TILT_RATE = 0.42;
 const UNLOAD_SEC = 6.5;
-const EJECT_SEC = 3.2;
-const WHEEL_R = 0.26;
-/** 처음 본 단계가 이 시간 안에 시작됐으면 들어오는 모습부터 보여 준다 (그보다 오래됐으면 있어야 할 자리에 바로 놓는다) */
-const FRESH_MS = 8000;
 
 const TRUCK_POOL = 4;
-const BALE_POOL = 14;
 const LUMP_POOL = 12;
 
 const PATH_IN = roundedPath(TRUCK_IN);
 const PATH_OUT = roundedPath(TRUCK_OUT);
 const PATH_SCALE_EXIT = roundedPath(TRUCK_SCALE_TO_EXIT, 1.5);
 
-const FACE_PLUS_Z = -Math.PI / 2;
-export const FORK_REACH = 0.8;
-const SLOT_STOP_Z = YARD.slotZ - FORK_REACH;
-const CHUTE_STOP_Z = BALE_REST[2] - FORK_REACH;
-/** 배출이 시작되는 자리(결속부 안) */
-const EJECT_FROM_Z = BALER.strapZ + 0.3;
-
 const ms = (iso: string | undefined): number => (iso ? Date.parse(iso) : Number.NaN);
-
-function mover(x: number, z: number, heading: number): Mover {
-  return { x, z, heading, path: null, s: 0, reverse: false, speed: 0, waiting: false, wheel: 0 };
-}
 
 interface WorkerSpec {
   route?: P2[];
@@ -179,7 +116,7 @@ const WORKERS: WorkerSpec[] = [
   // 주차장 쪽 보도 → 사무동
   { route: [[13.75, -4.6], [13.75, 5.05], [10.2, 5.05]], pose: 'walk' },
   // 출하 마당 검수
-  { at: [0.75, -4.7], heading: Math.PI, pose: 'tablet' },
+  { at: [3.6, -4.7], heading: Math.PI, pose: 'tablet' },
   // 하역 마당 유도원
   { at: [5.3, -4.55], heading: 0.3, pose: 'wave' },
   // 사무동 앞
@@ -187,13 +124,27 @@ const WORKERS: WorkerSpec[] = [
 ];
 
 export class Director {
+  /** 출하 마당의 베일·지게차 (그리는 쪽이 읽는다) */
+  get bales(): readonly BaleSim[] {
+    return this.yard.bales;
+  }
+
+  get forklifts(): readonly ForkliftSim[] {
+    return this.yard.forklifts;
+  }
+
+  /** 칸이 다 차서 압축기가 베일을 내보내지 못하고 기다린다 */
+  get yardFull(): boolean {
+    return this.yard.yardFull;
+  }
+
   /** 월드 시계(초). 끊긴 동안에는 흐르지 않는다 */
   t = 0;
   readonly trucks: TruckSim[] = [];
-  readonly bales: BaleSim[] = [];
+  /** 출하 마당: 베일·지게차·칸 */
+  readonly yard = new Yard();
   readonly lumps: LumpSim[] = [];
   readonly workers: WorkerSim[] = [];
-  readonly forklift: ForkliftSim;
   /** 섹터별 화면에 그릴 적재율 (서버 값으로 부드럽게 따라간다) */
   readonly fill: Record<TankId, number> = { 'tank-a1': 0, 'tank-a2': 0, 'tank-b1': 0, 'tank-b2': 0 };
   private readonly fillTarget: Record<TankId, number> = { 'tank-a1': 0, 'tank-a2': 0, 'tank-b1': 0, 'tank-b2': 0 };
@@ -210,18 +161,16 @@ export class Director {
   conveyorRunning = false;
   private seq = 0;
   private lumpSeed = 0;
-  private readonly slots: (string | null)[] = Array.from({ length: YARD.slotXs.length * 2 }, () => null);
-  /** 이미 출하되어 다시 만들지 않을 베일 */
-  private readonly shipped = new Set<string>();
   private readonly tmp: Pose = { x: 0, z: 0, heading: 0 };
 
   constructor() {
     for (let i = 0; i < TRUCK_POOL; i += 1) {
       this.trucks.push({ ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'toScale', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: i, company: null });
     }
-    for (let i = 0; i < BALE_POOL; i += 1) this.bales.push({ active: false, id: '', state: 'gone', x: 0, y: 0, z: 0, rot: 0, slot: -1, t: 0 });
     for (let i = 0; i < LUMP_POOL; i += 1) this.lumps.push({ active: false, x: 0, drop: 0, seed: i });
-    this.forklift = { ...mover(YARD.home[0], YARD.home[1], Math.PI), fork: 0.3, carrying: null, legs: [], task: null, queue: [], idleT: 0, away: false };
+    this.yard.events.onEject = () => {
+      this.hopper = 0;
+    };
     WORKERS.forEach((spec, i) => {
       const start = spec.route?.[0] ?? spec.at ?? [0, 0];
       const w: WorkerSim = { ...mover(start[0], start[1], spec.heading ?? 0), pose: spec.pose, dir: 1, pause: 1 + i * 0.7, stride: i, moving: false, look: 0 };
@@ -260,16 +209,7 @@ export class Director {
       }
     }
 
-    for (const b of input.bales) {
-      if (this.shipped.has(b.id)) continue;
-      const bale = this.bales.find((x) => x.active && x.id === b.id);
-      if (!bale) {
-        if (b.stage === 'created') this.spawnBale(b, nowMs);
-        else this.shipped.add(b.id);
-      } else if (b.stage === 'shipped' && !this.hasTask('ship', b.id)) {
-        this.forklift.queue.push({ kind: 'ship', baleId: b.id });
-      }
-    }
+    this.yard.sync(input.bales, nowMs);
   }
 
   private spawnTruck(v: Vehicle, nowMs: number): void {
@@ -300,52 +240,6 @@ export class Director {
       truck.bedTilt = v.stage === 'unloading' ? 1 : 0;
       truck.load = v.stage === 'unloading' ? 0.5 : 0;
     }
-  }
-
-  private spawnBale(b: Bale, nowMs: number): void {
-    const bale = this.bales.find((x) => !x.active);
-    if (!bale) return;
-    bale.active = true;
-    bale.id = b.id;
-    bale.t = 0;
-    bale.rot = FACE_PLUS_Z;
-    if (nowMs - ms(b.stageTimes.created) < FRESH_MS) {
-      bale.state = 'ejecting';
-      bale.slot = -1;
-      bale.x = BALE_REST[0];
-      bale.y = BALE_REST[1];
-      bale.z = EJECT_FROM_Z;
-      this.hopper = 0;
-      this.forklift.queue.push({ kind: 'store', baleId: b.id });
-    } else {
-      this.placeInSlot(bale, this.freeSlot());
-    }
-  }
-
-  private freeSlot(): number {
-    const i = this.slots.indexOf(null);
-    return i < 0 ? 0 : i;
-  }
-
-  private slotPos(slot: number): [number, number, number] {
-    const n = YARD.slotXs.length;
-    return [YARD.slotXs[slot % n] ?? 0, slot >= n ? BALE.h : 0, YARD.slotZ];
-  }
-
-  private placeInSlot(bale: BaleSim, slot: number): void {
-    const [x, y, z] = this.slotPos(slot);
-    this.slots[slot] = bale.id;
-    bale.slot = slot;
-    bale.state = 'stack';
-    bale.x = x;
-    bale.y = y;
-    bale.z = z;
-    bale.rot = FACE_PLUS_Z;
-  }
-
-  private hasTask(kind: Task['kind'], baleId: string): boolean {
-    const f = this.forklift;
-    return (f.task?.kind === kind && f.task.baleId === baleId) || f.queue.some((t) => t.kind === kind && t.baleId === baleId);
   }
 
   /** 로봇이 컨베이어 위에서 집게를 놓았다 (관절 값 스트림에서 알아낸 사실) */
@@ -392,8 +286,7 @@ export class Director {
     }
 
     this.stepTrucks(dt);
-    this.stepBales(dt);
-    this.stepForklift(dt);
+    this.yard.step(dt, this.trucks);
     this.stepWorkers(dt);
 
     let wantIn = 0;
@@ -417,14 +310,10 @@ export class Director {
     this.trucks.forEach((t, i) => {
       if (t.active) k += (t.x * 1.3 + t.z * 2.9 + t.heading * 4.1 + t.bedTilt * 6.7 + t.load * 8.3 + (t.pouring ? t.pourT : 0)) * (i + 1);
     });
-    this.bales.forEach((b, i) => {
-      if (b.active) k += (b.x * 1.1 + b.y * 3.7 + b.z * 2.3 + b.rot) * (i + 11);
-    });
+    k += this.yard.motionKey();
     this.lumps.forEach((l, i) => {
       if (l.active) k += (l.x + l.drop * 3) * (i + 31);
     });
-    const f = this.forklift;
-    k += f.x * 1.9 + f.z * 3.3 + f.heading * 5.1 + f.fork * 7.3;
     this.workers.forEach((w, i) => {
       if (w.moving) k += (w.x * 1.7 + w.z * 2.1 + w.heading) * (i + 51);
     });
@@ -463,31 +352,8 @@ export class Director {
     const px = w.x + Math.cos(w.heading) * 0.7;
     const pz = w.z - Math.sin(w.heading) * 0.7;
     for (const t of this.trucks) if (t.active && Math.hypot(px - t.x, pz - t.z) < 2.3) return true;
-    return Math.hypot(px - this.forklift.x, pz - this.forklift.z) < 1.7;
-  }
-
-  /** 경로를 따라 나아간다. 끝에 닿으면 true */
-  private advance(m: Mover, dt: number, vmax: number, accel: number, blocked: boolean): boolean {
-    const path = m.path;
-    if (!path) return true;
-    const remaining = path.total - m.s;
-    const target = blocked ? 0 : Math.min(vmax, Math.sqrt(2 * accel * Math.max(remaining, 0)) + 0.1);
-    const dv = target - m.speed;
-    m.speed += Math.max(-accel * 2.2 * dt, Math.min(accel * dt, dv));
-    m.waiting = blocked;
-    const ds = Math.min(remaining, m.speed * dt);
-    m.s += ds;
-    m.wheel += (ds / WHEEL_R) * (m.reverse ? -1 : 1);
-    samplePath(path, m.s, m, m.reverse);
-    if (remaining - ds > 1e-3) return false;
-    m.speed = 0;
-    return true;
-  }
-
-  private follow(m: Mover, points: readonly P2[] | Path, reverse = false, radius = 1.7): void {
-    m.path = 'pts' in points ? points : roundedPath(points, radius);
-    m.s = 0;
-    m.reverse = reverse;
+    for (const f of this.yard.forklifts) if (!f.away && Math.hypot(px - f.x, pz - f.z) < 1.7) return true;
+    return false;
   }
 
   // ── 트럭 ────────────────────────────────────────────────────────────
@@ -498,7 +364,7 @@ export class Director {
       t.pouring = false;
       switch (t.phase) {
         case 'toScale':
-          if (this.advance(t, dt, TRUCK_SPEED, TRUCK_ACCEL, this.truckBlocked(t))) {
+          if (advance(t, dt, TRUCK_SPEED, TRUCK_ACCEL, this.truckBlocked(t))) {
             t.phase = 'atScale';
             t.path = null;
           }
@@ -506,20 +372,20 @@ export class Director {
         case 'atScale':
           if (t.stage === 'departed') {
             t.phase = 'toExit';
-            this.follow(t, PATH_SCALE_EXIT);
+            follow(t, PATH_SCALE_EXIT);
           } else if (t.stage !== 'arrived' && t.bay) {
             t.phase = 'toBay';
-            this.follow(t, truckToBay(t.bay));
+            follow(t, truckToBay(t.bay));
           }
           break;
         case 'toBay':
-          if (this.advance(t, dt, TRUCK_SPEED, TRUCK_ACCEL, this.truckBlocked(t)) && t.bay) {
+          if (advance(t, dt, TRUCK_SPEED, TRUCK_ACCEL, this.truckBlocked(t)) && t.bay) {
             t.phase = 'reversing';
-            this.follow(t, truckReverse(t.bay), true);
+            follow(t, truckReverse(t.bay), true);
           }
           break;
         case 'reversing':
-          if (this.advance(t, dt, TRUCK_REVERSE, TRUCK_ACCEL, this.truckBlocked(t))) {
+          if (advance(t, dt, TRUCK_REVERSE, TRUCK_ACCEL, this.truckBlocked(t))) {
             t.phase = 'atBay';
             t.path = null;
           }
@@ -536,12 +402,12 @@ export class Director {
             t.bedTilt = 0;
             t.load = 0;
             t.phase = 'toExit';
-            this.follow(t, truckToExit(t.bay));
+            follow(t, truckToExit(t.bay));
           }
           break;
         }
         case 'toExit':
-          if (this.advance(t, dt, TRUCK_SPEED, TRUCK_ACCEL, this.truckBlocked(t))) {
+          if (advance(t, dt, TRUCK_SPEED, TRUCK_ACCEL, this.truckBlocked(t))) {
             t.phase = 'atExit';
             t.path = null;
           }
@@ -549,11 +415,11 @@ export class Director {
         case 'atExit':
           if (t.stage === 'departed') {
             t.phase = 'leaving';
-            this.follow(t, PATH_OUT);
+            follow(t, PATH_OUT);
           }
           break;
         case 'leaving':
-          if (this.advance(t, dt, TRUCK_SPEED * 1.15, TRUCK_ACCEL, this.truckBlocked(t))) {
+          if (advance(t, dt, TRUCK_SPEED * 1.15, TRUCK_ACCEL, this.truckBlocked(t))) {
             t.active = false;
             t.path = null;
             t.id = '';
@@ -561,181 +427,6 @@ export class Director {
           break;
       }
     }
-  }
-
-  // ── 베일 ────────────────────────────────────────────────────────────
-
-  private stepBales(dt: number): void {
-    const f = this.forklift;
-    for (const b of this.bales) {
-      if (!b.active) continue;
-      if (b.state === 'ejecting') {
-        b.t += dt / EJECT_SEC;
-        const k = Math.min(1, b.t);
-        const ease = k * k * (3 - 2 * k);
-        b.z = EJECT_FROM_Z + (BALE_REST[2] - EJECT_FROM_Z) * ease;
-        if (k >= 1) b.state = 'chute';
-      } else if (b.state === 'carried') {
-        b.x = f.x + Math.cos(f.heading) * FORK_REACH;
-        b.z = f.z - Math.sin(f.heading) * FORK_REACH;
-        b.y = f.fork;
-        b.rot = f.heading;
-      }
-    }
-  }
-
-  // ── 지게차 ──────────────────────────────────────────────────────────
-
-  private baleById(id: string): BaleSim | undefined {
-    return this.bales.find((b) => b.active && b.id === id);
-  }
-
-  private approachLegs(x: number, stopZ: number): Leg[] {
-    const f = this.forklift;
-    const legs: Leg[] = [];
-    if (Math.abs(f.x - x) > 0.05) {
-      legs.push({ kind: 'turn', heading: x > f.x ? 0 : Math.PI }, { kind: 'drive', to: [x, YARD.laneZ], reverse: false });
-    }
-    legs.push({ kind: 'turn', heading: FACE_PLUS_Z }, { kind: 'drive', to: [x, stopZ], reverse: false });
-    return legs;
-  }
-
-  /** 할 일을 동작 목록으로 푼다. 아직 시작할 수 없으면 null (기다린다), 할 것이 없으면 빈 목록 */
-  private planTask(task: Task): Leg[] | null {
-    const f = this.forklift;
-    if (task.kind === 'home') {
-      return [{ kind: 'turn', heading: YARD.home[0] > f.x ? 0 : Math.PI }, { kind: 'drive', to: YARD.home, reverse: false }, { kind: 'turn', heading: Math.PI }, { kind: 'fork', height: 0.3 }];
-    }
-    const bale = this.baleById(task.baleId);
-    if (!bale) return [];
-    if (task.kind === 'store') {
-      if (bale.state !== 'chute') return bale.state === 'ejecting' ? null : [];
-      const slot = this.freeSlot();
-      const [sx, sy] = this.slotPos(slot);
-      this.slots[slot] = bale.id;
-      return [
-        { kind: 'fork', height: BALE_REST[1] },
-        ...this.approachLegs(BALE_REST[0], CHUTE_STOP_Z),
-        {
-          kind: 'call',
-          fn: () => {
-            bale.state = 'carried';
-            f.carrying = bale.id;
-          },
-        },
-        { kind: 'fork', height: BALE_REST[1] + 0.14 },
-        { kind: 'drive', to: [BALE_REST[0], YARD.laneZ], reverse: true },
-        { kind: 'fork', height: Math.max(0.3, sy + 0.12) },
-        { kind: 'turn', heading: 0 },
-        { kind: 'drive', to: [sx, YARD.laneZ], reverse: false },
-        { kind: 'turn', heading: FACE_PLUS_Z },
-        { kind: 'drive', to: [sx, SLOT_STOP_Z], reverse: false },
-        { kind: 'fork', height: sy + 0.03 },
-        {
-          kind: 'call',
-          fn: () => {
-            this.placeInSlot(bale, slot);
-            f.carrying = null;
-          },
-        },
-        { kind: 'drive', to: [sx, YARD.laneZ], reverse: true },
-        { kind: 'fork', height: 0.3 },
-      ];
-    }
-    // 출하: 적치한 자리에서 꺼내 화면 밖으로 싣고 나간다
-    if (bale.state !== 'stack') return bale.state === 'gone' ? [] : null;
-    const [sx, sy] = this.slotPos(bale.slot);
-    return [
-      { kind: 'fork', height: sy + 0.03 },
-      ...this.approachLegs(sx, SLOT_STOP_Z),
-      {
-        kind: 'call',
-        fn: () => {
-          this.slots[bale.slot] = null;
-          bale.slot = -1;
-          bale.state = 'carried';
-          f.carrying = bale.id;
-        },
-      },
-      { kind: 'fork', height: sy + 0.16 },
-      { kind: 'drive', to: [sx, YARD.laneZ], reverse: true },
-      { kind: 'fork', height: 0.3 },
-      { kind: 'turn', heading: Math.PI },
-      { kind: 'drive', to: [YARD.exitX, YARD.laneZ], reverse: false },
-      {
-        kind: 'call',
-        fn: () => {
-          bale.active = false;
-          bale.state = 'gone';
-          this.shipped.add(bale.id);
-          f.carrying = null;
-          f.away = true;
-          f.heading = 0;
-        },
-      },
-      { kind: 'drive', to: [YARD.minX + 3.2, YARD.laneZ], reverse: false },
-      {
-        kind: 'call',
-        fn: () => {
-          f.away = false;
-        },
-      },
-    ];
-  }
-
-  private stepForklift(dt: number): void {
-    const f = this.forklift;
-    if (f.legs.length === 0) {
-      f.task = null;
-      const next = f.queue[0];
-      if (next) {
-        const legs = this.planTask(next);
-        if (legs) {
-          f.queue.shift();
-          f.task = next;
-          f.legs = legs;
-          f.idleT = 0;
-        }
-      } else {
-        f.idleT += dt;
-        if (f.idleT > 2.5 && Math.hypot(f.x - YARD.home[0], f.z - YARD.home[1]) > 0.2) {
-          f.task = { kind: 'home', baleId: '' };
-          f.legs = this.planTask(f.task) ?? [];
-        }
-      }
-    }
-    const leg = f.legs[0];
-    if (!leg) return;
-    let done = false;
-    switch (leg.kind) {
-      case 'call':
-        leg.fn();
-        done = true;
-        break;
-      case 'fork': {
-        const d = leg.height - f.fork;
-        f.fork += Math.max(-FORK_LIFT * dt, Math.min(FORK_LIFT * dt, d));
-        done = Math.abs(leg.height - f.fork) < 1e-3;
-        break;
-      }
-      case 'turn': {
-        const d = angleDelta(f.heading, leg.heading);
-        const stepA = Math.max(-FORK_TURN * dt, Math.min(FORK_TURN * dt, d));
-        f.heading += stepA;
-        f.wheel += stepA * 0.6;
-        done = Math.abs(d - stepA) < 1e-3;
-        if (done) f.heading = leg.heading;
-        break;
-      }
-      case 'drive':
-        if (!f.path) this.follow(f, [[f.x, f.z], leg.to], leg.reverse, 0);
-        if (this.advance(f, dt, leg.reverse ? FORK_REVERSE : FORK_SPEED, 2.4, false)) {
-          f.path = null;
-          done = true;
-        }
-        break;
-    }
-    if (done) f.legs.shift();
   }
 
   // ── 작업자 ──────────────────────────────────────────────────────────
@@ -792,7 +483,7 @@ export class Director {
       return true;
     }
     if (type === 'bale') {
-      const b = this.baleById(id);
+      const b = this.yard.baleById(id);
       if (!b) return false;
       out.x = b.x;
       out.y = b.y + (kind === 'pin' ? BALE.h + 0.55 : BALE.h / 2);
@@ -800,8 +491,8 @@ export class Director {
       return true;
     }
     if (type === 'forklift') {
-      const f = this.forklift;
-      if (f.away) return false;
+      const f = this.yard.forklift(key);
+      if (!f || f.away) return false;
       out.x = f.x;
       out.y = kind === 'pin' ? 2.0 : 0.6;
       out.z = f.z;
@@ -812,15 +503,18 @@ export class Director {
 
   /** 선택 상자용: 대상이 바라보는 방향(라디안). 방향이 없는 대상(기기)은 0 */
   heading(key: string): number {
-    if (key === 'forklift') return this.forklift.heading;
+    if (key.startsWith('forklift')) return this.yard.forklift(key)?.heading ?? 0;
     if (key.startsWith('veh:')) return this.trucks.find((x) => x.active && x.id === key.slice(4))?.heading ?? 0;
-    if (key.startsWith('bale:')) return this.baleById(key.slice(5))?.rot ?? 0;
+    if (key.startsWith('bale:')) return this.yard.baleById(key.slice(5))?.rot ?? 0;
     return 0;
   }
 
   /** 경로 표시용: 이 대상이 지금 따라가는 경로와 남은 구간의 시작 거리 */
   route(key: string): { path: Path; from: number } | null {
-    if (key === 'forklift') return this.forklift.path && !this.forklift.away ? { path: this.forklift.path, from: this.forklift.s } : null;
+    if (key.startsWith('forklift')) {
+      const f = this.yard.forklift(key);
+      return f?.path && !f.away ? { path: f.path, from: f.s } : null;
+    }
     if (!key.startsWith('veh:')) return null;
     const t = this.trucks.find((x) => x.active && x.id === key.slice(4));
     return t?.path ? { path: t.path, from: t.s } : null;

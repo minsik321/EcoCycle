@@ -158,6 +158,7 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
   it('베일은 배출 → 지게차 적치 → (출하 단계가 오면) 지게차가 싣고 화면 밖으로 나간다', () => {
     const d = new Director();
     d.sync(input({ bales: [bale('BL-1', 'created')] }), T0);
+    run(d, 0.1);
     const sim = d.bales.find((b) => b.active)!;
     expect(sim.state).toBe('ejecting');
 
@@ -213,7 +214,7 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
     beats(120, false);
     expect(d.t).toBeGreaterThan(1.5);
 
-    const snapshot = () => JSON.stringify({ t: d.t, trucks: d.trucks.map((t) => [t.x, t.z, t.wheel]), fork: [d.forklift.x, d.forklift.z, d.forklift.heading], belt: d.beltOffset, bales: d.bales.map((b) => [b.x, b.z]), workers: d.workers.map((w) => [w.x, w.z, w.stride]) });
+    const snapshot = () => JSON.stringify({ t: d.t, trucks: d.trucks.map((t) => [t.x, t.z, t.wheel]), fork: d.forklifts.map((f) => [f.x, f.z, f.heading]), belt: d.beltOffset, bales: d.bales.map((b) => [b.x, b.z]), workers: d.workers.map((w) => [w.x, w.z, w.stride]) });
     const before = snapshot();
     // 끊긴 동안: 시계가 멈추고, 움직인 것이 없으니 그리지도 않는다 (첫 박자는 끊긴 순간의 한 장)
     expect(beats(180, true)).toBeLessThanOrEqual(1);

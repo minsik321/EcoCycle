@@ -19,6 +19,7 @@ import {
 import type { PinElements } from '../three/Fx';
 import type { RecordLink, RecordOpen, RecordTarget, RecordsListTab, StudioData } from '../types';
 import { SECTOR_LABEL, actualMixText, sectorsText } from '../../config/processDisplay';
+import { YARD_CAPACITY, YARD_FLOW } from '../../config/yard';
 import { VIEWS } from '../world/views';
 import type { ViewPreset } from '../world/views';
 import { Icon } from './icons';
@@ -490,6 +491,13 @@ export function Detail({ data, disconnected, selection, onSelect, deviceActions,
       <aside className={shell} aria-label="지게차 상세">
         <DetailHead icon="forklift" eyebrow="출하 마당" title="지게차" onClose={close} />
         <p className="st-muted">지게차의 움직임은 베일의 단계(적치 → 출하)를 화면에 옮긴 연출입니다. 지게차 위치는 서버가 보내는 값이 아닙니다.</p>
+        <Rows
+          rows={[
+            ['지게차', `${YARD_FLOW.forkliftCount}대`],
+            ['적치 칸', `${YARD_CAPACITY}칸 (${YARD_FLOW.columns}열 × ${YARD_FLOW.levels}단)`],
+            ['적치 베일', `${data.bales.filter((b) => b.stage === 'created').length}개`],
+          ]}
+        />
       </aside>
     );
   }
@@ -948,6 +956,8 @@ const PIN_NAME: Partial<Record<DeviceId, string>> = { 'robot-1': '로봇팔', 'c
 
 export interface PinsProps extends PanelCommon {
   pins: MutableRefObject<PinElements>;
+  /** 출하 마당 칸이 다 차서 압축기가 기다린다: 압축기 핀에 알린다 */
+  yardFull?: boolean;
 }
 
 /**
@@ -955,7 +965,7 @@ export interface PinsProps extends PanelCommon {
  * 고른 대상은 파랑 칩으로 바뀐다. 멀리서 볼 때(부지 전체)는 섹터는 고리만, 차량·베일은 숨긴다.
  * 연결이 끊기면 값 대신 "–"를 적고 핀 전체가 회색이 된다.
  */
-export function Pins({ data, disconnected, selection, onSelect, pins }: PinsProps) {
+export function Pins({ data, disconnected, selection, onSelect, pins, yardFull = false }: PinsProps) {
   const bind = (key: string) => (el: HTMLElement | null) => {
     if (el) pins.current[key] = el;
     else delete pins.current[key];
@@ -978,7 +988,8 @@ export function Pins({ data, disconnected, selection, onSelect, pins }: PinsProp
         const line = device ? deviceLine(device) : null;
         const tone: DeviceStatus = disconnected || !line ? 'offline' : line.tone;
         const tank = device?.type === 'tank' ? device : null;
-        const spoken = !line ? '불러오는 중' : disconnected ? STATUS_TEXT.offline : `${line.value}, ${line.statusText}`;
+        const full = id === 'compressor-1' && yardFull;
+        const spoken = !line ? '불러오는 중' : disconnected ? STATUS_TEXT.offline : `${line.value}, ${line.statusText}${full ? ', 출하 마당 가득 참' : ''}`;
         return (
           <button key={key} {...pinProps(key, `${DEVICE_NAMES[id]} ${spoken}`)} className={`st-pin st-pin-${tone}${tank ? ' st-pin-sector' : ''}`}>
             <span className="st-pin-card">
@@ -994,6 +1005,7 @@ export function Pins({ data, disconnected, selection, onSelect, pins }: PinsProp
               <span className="st-pin-text">
                 <small>{tank ? `${tank.grade}등급` : (PIN_NAME[id] ?? DEVICE_NAMES[id])}</small>
                 <strong>{!line ? '…' : disconnected ? '–' : line.value}</strong>
+                {full && <em className="st-pin-flag">출하 마당 가득 참</em>}
               </span>
             </span>
           </button>
@@ -1033,14 +1045,19 @@ export function Pins({ data, disconnected, selection, onSelect, pins }: PinsProp
             </button>
           );
         })}
-      <button {...pinProps('forklift', '지게차')} className={`st-pin st-pin-vehicle${selection === 'forklift' ? '' : ' st-pin-quiet'}`}>
-        <span className="st-pin-card">
-          <span className="st-pin-text">
-            <small>지게차</small>
-            <strong>베일 운반</strong>
-          </span>
-        </span>
-      </button>
+      {Array.from({ length: YARD_FLOW.forkliftCount }, (_, i) => {
+        const key = `forklift:${i + 1}`;
+        return (
+          <button key={key} {...pinProps(key, `지게차 ${i + 1}`)} className={`st-pin st-pin-vehicle${selection === key ? '' : ' st-pin-quiet'}`}>
+            <span className="st-pin-card">
+              <span className="st-pin-text">
+                <small>지게차{YARD_FLOW.forkliftCount > 1 ? ` ${i + 1}` : ''}</small>
+                <strong>베일 운반</strong>
+              </span>
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

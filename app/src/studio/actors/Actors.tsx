@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import { Color, Matrix4, Quaternion, Vector3 } from 'three';
-import type { InstancedMesh } from 'three';
+import type { InstancedMesh, Mesh } from 'three';
 import { C, companyStripe } from '../theme';
 import { MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { blobShadow } from '../three/bakedShadow';
@@ -111,50 +111,97 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
   );
 }
 
-export function Forklift({ director, onSelect, blobs = false }: ActorProps) {
-  const model = useMemo(buildForklift, []);
-  useEffect(() => () => disposeTree(model.root), [model]);
+export function Forklifts({ director, onSelect, blobs = false }: ActorProps) {
+  // 지게차는 1~2대(설정). 한 대마다 모형 하나
+  const models = useMemo(() => director.forklifts.map(() => buildForklift()), [director]);
+  useEffect(() => () => models.forEach((m) => disposeTree(m.root)), [models]);
   useEffect(() => {
     if (!blobs) return;
-    const b = blobShadow(1.3, 0.8);
-    model.root.add(b);
-    return () => void b.removeFromParent();
-  }, [model, blobs]);
+    const added = models.map((m) => {
+      const b = blobShadow(1.3, 0.8);
+      m.root.add(b);
+      return b;
+    });
+    return () => added.forEach((b) => b.removeFromParent());
+  }, [models, blobs]);
 
   useFrame(() => {
-    const sim = director.forklift;
-    model.root.visible = !sim.away;
-    model.root.position.set(sim.x, GROUND_Y, sim.z);
-    model.root.rotation.y = sim.heading;
-    model.carriage.position.y = sim.fork + 0.02;
-    for (const w of model.wheels) w.rotation.z = -sim.wheel;
-    model.beacon.visible = (sim.legs.length > 0 || sim.speed > 0.05) && Math.sin(director.t * 9) > 0;
-  });
-
-  return <primitive object={model.root} onClick={(e: ThreeEvent<MouseEvent>) => stop(e, () => onSelect('forklift'))} />;
-}
-
-export function Bales({ director, onSelect }: ActorProps) {
-  const models = useMemo(() => {
-    const first = buildBale();
-    return director.bales.map((_, i) => (i === 0 ? first : first.clone()));
-  }, [director]);
-  useEffect(() => () => disposeTree(models[0]!), [models]);
-
-  useFrame(() => {
-    director.bales.forEach((sim, i) => {
+    director.forklifts.forEach((sim, i) => {
       const model = models[i]!;
-      model.visible = sim.active;
-      if (!sim.active) return;
-      model.position.set(sim.x, sim.y + (sim.state === 'stack' ? 0.03 : 0.02), sim.z);
-      model.rotation.y = sim.rot;
+      model.root.visible = !sim.away;
+      model.root.position.set(sim.x, GROUND_Y, sim.z);
+      model.root.rotation.y = sim.heading;
+      model.carriage.position.y = sim.fork + 0.02;
+      for (const w of model.wheels) w.rotation.z = -sim.wheel;
+      model.beacon.visible = (sim.legs.length > 0 || sim.speed > 0.05) && Math.sin(director.t * 9) > 0;
     });
   });
 
   return (
     <>
       {models.map((model, i) => (
-        <primitive key={i} object={model} onClick={(e: ThreeEvent<MouseEvent>) => stop(e, () => director.bales[i]?.active && onSelect(`bale:${director.bales[i].id}`))} />
+        <primitive key={i} object={model.root} onClick={(e: ThreeEvent<MouseEvent>) => stop(e, () => onSelect(`forklift:${i + 1}`))} />
+      ))}
+    </>
+  );
+}
+
+/** 베일은 모두 한 지오메트리의 인스턴스다: 칸 수 + 여유만큼 만들어 두고, 쓰지 않는 것은 크기 0으로 접는다 */
+export function Bales({ director, onSelect }: ActorProps) {
+  const source = useMemo(() => {
+    const group = buildBale();
+    const meshes: Mesh[] = [];
+    group.traverse((o) => {
+      if ((o as Mesh).isMesh) meshes.push(o as Mesh);
+    });
+    return { group, meshes };
+  }, []);
+  const refs = useRef<Array<InstancedMesh | null>>([]);
+  const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(1, 1, 1), zero: new Vector3(0, 0, 0), up: new Vector3(0, 1, 0) }), []);
+  // 첫 장 전에 모든 인스턴스를 접어 둔다 (기본 행렬은 원점에 크기 1이라 그대로 두면 한 장 동안 원점에 보인다)
+  useEffect(() => {
+    for (const mesh of refs.current) {
+      if (!mesh) continue;
+      for (let i = 0; i < director.bales.length; i += 1) mesh.setMatrixAt(i, tmp.m.compose(tmp.p.set(0, -10, 0), tmp.q.identity(), tmp.zero));
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }, [director, tmp]);
+  useEffect(() => () => disposeTree(source.group), [source]);
+
+  useFrame(() => {
+    const bales = director.bales;
+    for (const mesh of refs.current) {
+      if (!mesh) continue;
+      for (let i = 0; i < bales.length; i += 1) {
+        const sim = bales[i]!;
+        if (!sim.active) {
+          mesh.setMatrixAt(i, tmp.m.compose(tmp.p.set(0, -10, 0), tmp.q.identity(), tmp.zero));
+          continue;
+        }
+        tmp.q.setFromAxisAngle(tmp.up, sim.rot);
+        mesh.setMatrixAt(i, tmp.m.compose(tmp.p.set(sim.x, sim.y + (sim.state === 'stack' ? 0.03 : 0.02), sim.z), tmp.q, tmp.s));
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  });
+
+  const pick = (e: ThreeEvent<MouseEvent>) => {
+    const sim = e.instanceId === undefined ? undefined : director.bales[e.instanceId];
+    if (sim?.active) stop(e, () => onSelect(`bale:${sim.id}`));
+  };
+
+  return (
+    <>
+      {source.meshes.map((mesh, k) => (
+        <instancedMesh
+          key={k}
+          ref={(el) => void (refs.current[k] = el)}
+          args={[mesh.geometry, mesh.material, director.bales.length]}
+          castShadow={mesh.castShadow}
+          receiveShadow={mesh.receiveShadow}
+          frustumCulled={false}
+          onClick={pick}
+        />
       ))}
     </>
   );

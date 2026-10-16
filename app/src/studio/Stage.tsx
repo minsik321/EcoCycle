@@ -8,7 +8,7 @@ import type { DeviceStatus, SectorGrade, TankId } from '@ecocycle/shared';
 import type { QualityTier } from '../config/quality';
 import type { ChainSpec } from './robot/chain';
 import type { JointSource } from './robot/jointSource';
-import { Bales, Forklift, Trucks, Workers } from './actors/Actors';
+import { Bales, Forklifts, Trucks, Workers } from './actors/Actors';
 import { Robot } from './actors/Robot';
 import { STUDIO_PROFILES } from './quality';
 import type { StudioProfile } from './quality';
@@ -186,7 +186,7 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
         <GateArms director={director} />
         <Robot spec={robotSpec} source={jointSource} frozen={frozen} director={director} onSelect={onSelect} />
         <Trucks director={director} onSelect={onSelect} blobs={baked} />
-        <Forklift director={director} onSelect={onSelect} blobs={baked} />
+        <Forklifts director={director} onSelect={onSelect} blobs={baked} />
         <Bales director={director} onSelect={onSelect} />
         <Workers director={director} />
         <DeviceHits onSelect={onSelect} />

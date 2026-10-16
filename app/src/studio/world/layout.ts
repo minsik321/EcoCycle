@@ -1,6 +1,7 @@
 import { TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, TankId } from '@ecocycle/shared';
 import { DEMO_CYCLE, TANK_BASE_DEG } from '../../config/robotCycle';
+import { YARD_FLOW } from '../../config/yard';
 import { chainSpecFor } from '../robot/chain';
 import { tipPosition } from '../robot/kinematics';
 import type { P2 } from '../sim/paths';
@@ -69,9 +70,34 @@ export const BALER = {
 
 export const BALE = { w: 0.75, h: 0.62, d: 0.95 } as const;
 /** 배출된 베일이 멈추는 자리 */
-export const BALE_REST: [number, number, number] = [BALER.x, BALER.chuteY, -5.05];
+export const BALE_REST: [number, number, number] = [BALER.x, BALER.chuteY, -4.85];
 
-export const YARD = { minX: -12.5, maxX: 4.7, minZ: -7.4, maxZ: -4, laneZ: -6.55, slotZ: -4.75, slotXs: [-4.9, -3.95, -3.0, -2.05, -1.1, -0.15], home: [1.9, -6.55] as P2, exitX: -26 } as const;
+/** 지게차가 포크를 내밀어 베일을 드는 거리(지게차 중심 → 베일 중심). 베일 뒤쪽이 포크 받침 바로 앞에 오도록 잡았다 */
+export const FORK_REACH = 1.1;
+
+/**
+ * 출하 마당. 적치 칸은 한 줄(slotZ)에 열(slotXs)을 늘어놓고 칸마다 levels단까지 쌓는다.
+ * 지게차 길(laneZ)은 칸 줄 앞의 한 줄 통로이고, 칸을 드는 지게차는 길에서 앞(+Z)으로 들어가 칸 앞 자리(pocketZ)에 선다.
+ * 간격: 칸 앞 자리(칸 앞 지게차 뒷면 -6.37)와 배출구 앞 자리(뒷면 -6.57)에 선 지게차가 길을 지나가는 지게차(-6.63까지)와 겹치지 않는다.
+ * 그래서 길은 칸 앞·배출구 앞 작업과 동시에 쓸 수 있다. 길 가장자리는 도로 경계(-7.4)를 0.1m쯤 넘는다.
+ */
+const SLOT_X0 = -4.9;
+const SLOT_DX = 0.95;
+const SLOT_Z = -4.65;
+export const YARD = {
+  minX: -12.5,
+  maxX: 4.7,
+  minZ: -7.4,
+  maxZ: -4,
+  laneZ: -7.08,
+  slotZ: SLOT_Z,
+  pocketZ: SLOT_Z - FORK_REACH,
+  slotXs: Array.from({ length: YARD_FLOW.columns }, (_, i) => SLOT_X0 + i * SLOT_DX) as readonly number[],
+  levels: YARD_FLOW.levels,
+  /** 지게차 대기 자리(칸 줄 왼쪽 밖, 배출구 쪽부터). 칸 줄에서 멀리 둬서 대기 중인 지게차가 칸 앞 회전을 막지 않는다 */
+  homes: [[-9.4, SLOT_Z - FORK_REACH], [-11.6, SLOT_Z - FORK_REACH]] as readonly P2[],
+  exitX: YARD_FLOW.exitX,
+} as const;
 
 export const ROAD = { minZ: -10.6, maxZ: -7.4, inZ: -9.8, outZ: -8.0, spawnX: 28 } as const;
 

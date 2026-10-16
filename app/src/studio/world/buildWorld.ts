@@ -3,8 +3,9 @@ import type { Group } from 'three';
 import { C, CAR_PAINTS } from '../theme';
 import { Kit } from '../three/kit';
 import type { Footprint } from '../three/kit';
+import { YARD_FLOW } from '../../config/yard';
 import { APRON, BALE, BALER, BAY, BAY_Z, CONVEYOR, GATE, HALL, OFFICE, PARKING, ROAD, SCALE, SITE, YARD } from './layout';
-import { bale, bush, car, cone, lamp, pallet, tree } from './props';
+import { bush, car, cone, lamp, pallet, tree } from './props';
 
 // 스튜디오 월드의 고정물. 전부 코드로 조립하고 재질별 메시 몇 개로 합친다.
 // 본관 벽은 방향별로 따로 만들어, 카메라 쪽을 향한 벽은 숨긴다 (안이 들여다보이는 "인형의 집" 방식).
@@ -114,8 +115,10 @@ function markings(k: Kit): void {
     k.box(C.yellow, [0.035, 0.012, 1.12], [x - 0.43, y, YARD.slotZ], { r: 0 });
     k.box(C.yellow, [0.035, 0.012, 1.12], [x + 0.43, y, YARD.slotZ], { r: 0 });
   }
-  for (const dz of [-0.6, 0.6]) k.box(C.blue, [1.9, 0.014, 0.04], [YARD.home[0], y, YARD.home[1] + dz], { r: 0 });
-  for (const dx of [-0.95, 0.95]) k.box(C.blue, [0.04, 0.014, 1.2], [YARD.home[0] + dx, y, YARD.home[1]], { r: 0 });
+  YARD.homes.slice(0, YARD_FLOW.forkliftCount).forEach(([hx, hz]) => {
+    for (const dx of [-0.6, 0.6]) k.box(C.blue, [0.04, 0.014, 1.9], [hx + dx, y, hz + 0.3], { r: 0 });
+    for (const dz of [-0.65, 1.25]) k.box(C.blue, [1.24, 0.014, 0.04], [hx, y, hz + dz], { r: 0 });
+  });
 
   // 계중대: 강판 상판과 노란 턱
   const sx = mid(SCALE.minX, SCALE.maxX);
@@ -307,11 +310,7 @@ function baler(k: Kit): void {
 }
 
 function yardProps(k: Kit): void {
-  // 미리 쌓아 둔 베일 더미 (연출용 소품)
-  const sx = -10.6;
-  for (let r = 0; r < 2; r += 1) for (let c = 0; c < 3; c += 1) bale(k, sx + c * 0.84, 0.02, -4.75 - r * 1.02, Math.PI / 2 + c * 0.02);
-  for (let c = 0; c < 2; c += 1) bale(k, sx + 0.42 + c * 0.84, 0.02 + BALE.h, -4.75, Math.PI / 2 + 0.03);
-  bale(k, sx + 0.3, 0.02 + BALE.h, -5.77, Math.PI / 2 - 0.05);
+  // 마당의 베일은 움직이는 베일(지게차가 쌓는 것)뿐이다: 미리 쌓아 둔 소품 더미는 서버 값과 어긋나고 지게차 자리와 겹쳐 뺐다
   pallet(k, 2.9, -4.7, 0);
   pallet(k, 2.9, -4.7, 0, 0.13);
   pallet(k, 3.75, -4.75, 0.1);

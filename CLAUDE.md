@@ -100,6 +100,7 @@ node app/scripts/layoutPages.mjs   # 페이지 폭·간격: 네 크기에서 섹
 node app/scripts/topBar.mjs        # 상단 바 하나·3D 홈 표: 세 크기(390·820·1440)에서 3D 홈과 일반 화면의 바, 사용자 메뉴, 대시보드, 태블릿·PC 표 접기(기억), 장면에 없는 대상 → 팝업, 베일 "기록 보기" 점검과 스크린샷 (약 5분, 로컬 Chromium 필요)
 node app/scripts/floatingBar.mjs   # 떠 있는 상단 바·사이드바 폭: 세 크기(1440·820·390)에서 3D 홈·대시보드·공정 기록의 바 자리·모양·내용 간격·사이드바 폭이 같은지, 접기 기억, 나란히 놓은 비교 (약 3분, 로컬 Chromium 필요)
 node app/scripts/robotControls.mjs # 로봇팔 7단위: 390×844·1440×900에서 로봇팔 페이지 세 모드·수동 놓기 대기·적용 자리, 섹터 지정 중인 배치의 계획 vs 실제 배합, 사건 기록, 집기 기록 두 단계, 3D 홈 로봇 패널 조작 (약 5분, 로컬 Chromium 필요, 결과 docs/screenshots/robot-controls)
+node app/scripts/yardSoak.mjs      # 출하 마당 장시간: /scene-demo?yardprobe=1을 월드 시계 10분(YARD_SOAK_MIN로 조절) 돌리며 5초마다 베일·지게차 겹침과 칸 정합을 보고, 끝나면 1440×900·390×844 스크린샷 (약 12분, 로컬 Chromium 필요, 결과 docs/screenshots/studio/yard)
 node app/scripts/recordPopups.mjs  # 기록 상세 팝업: 베일 기록 API, 폰·데스크톱에서 팝업 셋·이어 열기·뒤로 가기·깊은 링크 점검과 스크린샷 (약 2분, 로컬 Chromium 필요)
 npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```

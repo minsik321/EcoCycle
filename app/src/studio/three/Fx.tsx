@@ -94,7 +94,7 @@ export function SelectionRing({ director, focusKey }: { director: Director; focu
   useClockWaker(director, () => focusKey !== null);
   useFrame(() => {
     const found = focusKey !== null && director.anchor(focusKey, anchor, 'focus');
-    const base = focusKey?.startsWith('dev:tank') ? 1.55 : focusKey?.startsWith('dev:compressor') ? 1.9 : focusKey?.startsWith('dev:conveyor') ? 1.7 : focusKey?.startsWith('bale') ? 0.8 : focusKey === 'forklift' ? 1.0 : 1.7;
+    const base = focusKey?.startsWith('dev:tank') ? 1.55 : focusKey?.startsWith('dev:compressor') ? 1.9 : focusKey?.startsWith('dev:conveyor') ? 1.7 : focusKey?.startsWith('bale') ? 0.8 : focusKey?.startsWith('forklift') ? 1.0 : 1.7;
     rings.current.forEach((ring, i) => {
       if (!ring) return;
       ring.visible = found;
