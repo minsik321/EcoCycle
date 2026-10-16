@@ -16,7 +16,8 @@ shared/
     ├── auth.ts         Role, Permission, Me, 로그인(remember·refreshTokenDelivery)·리프레시·로그아웃·ws-ticket 요청/응답,
     │                   리프레시 쿠키 이름·경로, 리프레시 거부 code(⚠ B28), PushRegisterRequest
     ├── devices.ts      TankState(등급 grade 포함)·RobotState·ConveyorState·CompressorState, DeviceState(type으로 구분), PlantSummary·HistoryResponse·PlantHistoryResponse(제안안)
-    ├── records.ts      기록 목록 페이지 나누기: RecordQuery(from·to·page·pageSize), RecordPage<T>({ items, total, page, pageSize }), RECORD_PAGE_SIZE(10), recordPageCount (제안안)
+    ├── search.ts       기록·알람 검색(`q`) 규칙: normalizeSearch·matchesSearch(공백·대소문자 무시 부분 일치), sectorSearchTerms, DEVICE_SEARCH_NAMES, BATCH_EVENT_TYPE_TEXT, RECORD_SEARCH_MAX_LENGTH(64)
+    ├── records.ts      기록 목록 페이지 나누기: RecordQuery(from·to·page·pageSize·선택 q), RecordPage<T>({ items, total, page, pageSize }), RECORD_PAGE_SIZE(10), recordPageCount (제안안)
     ├── processRecords.ts 공정 기록: VehicleRecord(상태 identified·unloading·departed, 입·출차 시각, 총중량·공차·순중량), BatchRecord(결과 completed·skipped·paused·null=진행 중, 목표·실제 압력, 베일 ID) (제안안)
     ├── process.ts      공정 흐름: Vehicle·Batch·Bale(stage와 stageTimes), ProcessState, PLANT_METRICS (제안안, 서버 합의 전)
     ├── alarms.ts       Alarm, AlarmLevel, AlarmState

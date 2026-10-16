@@ -2,7 +2,7 @@ import type { TankId, UnloadRecord } from '@ecocycle/shared';
 import { getRecords } from '../../api';
 import type { Column } from '../../components/common/DataTable';
 import { RecordList } from '../../components/records/RecordList';
-import { formatFillChange, formatWeightT } from '../../config/display';
+import { RECORD_SEARCH_HINT, formatFillChange, formatWeightT } from '../../config/display';
 
 function FillChange({ record }: { record: UnloadRecord }) {
   const { range, delta } = formatFillChange(record.fillBeforePercent, record.fillAfterPercent);
@@ -45,6 +45,7 @@ export function SectorUnloads({ id }: { id: TankId }) {
       </h2>
       <RecordList<UnloadRecord>
         label="하역 기록"
+        searchPlaceholder={RECORD_SEARCH_HINT.unloads}
         load={(query, signal) => getRecords<UnloadRecord>(`/devices/${id}/unloads/records`, query, signal)}
         rowKey={(r) => r.id}
         time={(r) => r.unloadedAt}

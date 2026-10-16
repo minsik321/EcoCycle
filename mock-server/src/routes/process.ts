@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { BatchRecord, PlantHistoryResponse, PlantMetric, ProcessState, VehicleRecord } from '@ecocycle/shared';
-import { PLANT_METRICS } from '@ecocycle/shared';
+import { BATCH_EVENT_TYPE_TEXT, PLANT_METRICS, sectorSearchTerms } from '@ecocycle/shared';
 import { sendError } from '../errors';
 import { buildPlantHistory, MAX_HISTORY_POINTS, parseInterval } from '../sim/history';
 import { baleRecords, batchControlState, batchEvents, baleDetail, liveBatchRecords, liveVehicleRecords, processState } from '../sim/process';
@@ -23,7 +23,7 @@ const allBatches = (): BatchRecord[] => [...finishedBatchRecords(), ...liveBatch
 
 // GET /vehicles/records?from=...&to=...&page=1&pageSize=10 — 차량 기록 (입차 시각 기준)
 processRouter.get('/vehicles/records', (req, res) => {
-  sendRecordPage(req, res, allVehicles(), (r) => r.arrivedAt);
+  sendRecordPage(req, res, allVehicles(), (r) => r.arrivedAt, (r) => [r.plate, r.companyName]);
 });
 
 // GET /vehicles/{id} — 차량 기록 한 건
@@ -35,13 +35,13 @@ processRouter.get('/vehicles/:id', (req, res) => {
 
 // GET /batches/records?from=...&to=...&page=1&pageSize=10 — 배치 기록 (시작 시각 기준)
 processRouter.get('/batches/records', (req, res) => {
-  sendRecordPage(req, res, allBatches(), (r) => r.startedAt);
+  sendRecordPage(req, res, allBatches(), (r) => r.startedAt, (r) => [r.id, ...r.mix.flatMap((m) => sectorSearchTerms(m.sectorId))]);
 });
 
 processRouter.get('/batches/control', (_req, res) => res.json(batchControlState()));
-processRouter.get('/batches/events/records', (req, res) => sendRecordPage(req, res, batchEvents(), r => r.at));
+processRouter.get('/batches/events/records', (req, res) => sendRecordPage(req, res, batchEvents(), r => r.at, r => [r.batchId, r.baleId, BATCH_EVENT_TYPE_TEXT[r.type], r.actor]));
 // GET /bales/records?from=...&to=...&page=1&pageSize=10 — 베일 기록 (생산 시각 기준). /bales/:id보다 먼저 둔다
-processRouter.get('/bales/records', (req, res) => sendRecordPage(req, res, baleRecords(), (r) => r.createdAt));
+processRouter.get('/bales/records', (req, res) => sendRecordPage(req, res, baleRecords(), (r) => r.createdAt, (r) => [r.id, r.batchId]));
 processRouter.get('/bales/:id', (req, res) => {
   const bale = baleDetail(req.params.id);
   if (!bale) return sendError(res, 404, 'NOT_FOUND', '베일을 찾을 수 없습니다.');

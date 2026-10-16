@@ -1,16 +1,16 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { RECORD_PAGE_SIZE, recordPageCount } from '@ecocycle/shared';
 import type { IsoTimestamp, RecordPage, RecordQuery } from '@ecocycle/shared';
-import { RECORD_LIST, RECORD_RANGES, formatLocalClock, formatLocalTime } from '../../config/display';
+import { RECORD_LIST, formatLocalClock, formatLocalTime } from '../../config/display';
 import type { RecordRangeKey } from '../../config/display';
 import { useAppSelector } from '../../store/hooks';
 import { selectConnection, selectIsDisconnected } from '../../store/selectors';
 import { Button } from '../common/Button';
 import { DataTable } from '../common/DataTable';
 import type { Column } from '../common/DataTable';
-import { addLocalDays, customRange, pageWindow, presetRange, startOfLocalDay, toDateInput } from './range';
-import type { RecordRange } from './range';
+import { EmptyResult, RangeFilter, SearchBox, useRecordRange, useSearchText } from './RecordFilters';
+import { pageWindow } from './range';
 
 export interface RecordListProps<T> {
   /** 목록 이름 (화면 읽기용, 예: "하역 기록") */
@@ -39,6 +39,8 @@ export interface RecordListProps<T> {
   dense?: boolean;
   /** 줄을 누르면 부른다 (상세 화면으로 가기). 주면 폰 줄과 표 줄이 모두 눌린다 */
   onOpen?: (item: T) => void;
+  /** 주면 기간 아래에 검색 상자를 그린다. 이 글이 상자의 안내 글(예: "번호판, 회사 검색")이다. 검색은 서버가 한다(`q`) */
+  searchPlaceholder?: string;
   /** 처음 기간 (기본 config의 defaultRange) */
   initialRange?: RecordRangeKey;
   /** 지금 시각 (테스트용) */
@@ -55,22 +57,18 @@ type LoadState<T> = { status: 'loading'; data: RecordPage<T> | null } | { status
  * 쪽은 서버가 나눈다(`GET .../records?from&to&page&pageSize`, shared/records.ts). 시각은 UTC로 보내고 현지 시각으로 적는다.
  * 지난 기록이라 연결이 끊겨도 받은 줄은 그대로 두고 끊김과 마지막 수신 시각을 알리며, 다시 연결되면 같은 쪽을 새로 받는다.
  */
-export function RecordList<T>({ label, load, rowKey, time, title, detail, extra, columns, timeHeader = '시각', compactTime = false, dense = false, onOpen, initialRange = RECORD_LIST.defaultRange, now = () => new Date(), className = '', refreshToken = '' }: RecordListProps<T>) {
+export function RecordList<T>({ label, load, rowKey, time, title, detail, extra, columns, timeHeader = '시각', compactTime = false, dense = false, onOpen, searchPlaceholder, initialRange = RECORD_LIST.defaultRange, now = () => new Date(), className = '', refreshToken = '' }: RecordListProps<T>) {
   const nowRef = useRef(now);
   nowRef.current = now;
   const loadRef = useRef(load);
   loadRef.current = load;
 
-  const [rangeKey, setRangeKey] = useState<RecordRangeKey>(initialRange);
-  const [customFrom, setCustomFrom] = useState(() => toDateInput(addLocalDays(startOfLocalDay(now()), -6)));
-  const [customTo, setCustomTo] = useState(() => toDateInput(now()));
-  const [customError, setCustomError] = useState<string | null>(null);
-  const [range, setRange] = useState<RecordRange>(() => {
-    if (initialRange !== 'custom') return presetRange(initialRange, now());
-    const custom = customRange(toDateInput(addLocalDays(startOfLocalDay(now()), -6)), toDateInput(now()));
-    return 'error' in custom ? presetRange('today', now()) : custom;
-  });
   const [page, setPage] = useState(1);
+  const resetPage = useCallback(() => setPage(1), []);
+  const rangeState = useRecordRange(initialRange, now, resetPage);
+  const { range, rangeKey, refreshRange } = rangeState;
+  const search = useSearchText(resetPage);
+  const { q } = search;
   const [state, setState] = useState<LoadState<T>>({ status: 'loading', data: null });
   const [attempt, setAttempt] = useState(0);
 
@@ -80,7 +78,7 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, extra,
   useEffect(() => {
     const controller = new AbortController();
     setState((prev) => ({ status: 'loading', data: prev.data }));
-    const query: RecordQuery = { from: range.from.toISOString(), to: range.to.toISOString(), page, pageSize: RECORD_PAGE_SIZE };
+    const query: RecordQuery = { from: range.from.toISOString(), to: range.to.toISOString(), page, pageSize: RECORD_PAGE_SIZE, ...(q ? { q } : {}) };
     loadRef.current(query, controller.signal).then(
       (data) => {
         if (controller.signal.aborted) return;
@@ -98,46 +96,24 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, extra,
       },
     );
     return () => controller.abort();
-  }, [range, page, attempt]);
+  }, [range, page, attempt, q]);
 
   // 새 사건은 현재 쪽을 유지하되 "오늘/최근 7일"의 끝을 지금까지 넓혀 받는다.
   const lastRefreshToken = useRef(refreshToken);
   useEffect(() => {
     if (lastRefreshToken.current === refreshToken) return;
     lastRefreshToken.current = refreshToken;
-    if (rangeKey !== 'custom') setRange(presetRange(rangeKey, nowRef.current()));
-    else setAttempt(n => n + 1);
-  }, [refreshToken, rangeKey]);
+    if (!refreshRange()) setAttempt((n) => n + 1);
+  }, [refreshToken, refreshRange]);
 
   // 다시 연결되면 같은 쪽을 새로 받는다 (정해 둔 기간은 지금 시각으로 다시 계산)
   const wasDisconnected = useRef(disconnected);
   useEffect(() => {
     if (wasDisconnected.current && !disconnected) {
-      if (rangeKey !== 'custom') setRange(presetRange(rangeKey, nowRef.current()));
-      else setAttempt((n) => n + 1);
+      if (!refreshRange()) setAttempt((n) => n + 1);
     }
     wasDisconnected.current = disconnected;
-  }, [disconnected, rangeKey]);
-
-  const choose = (key: RecordRangeKey) => {
-    setRangeKey(key);
-    setCustomError(null);
-    if (key === 'custom') return; // 날짜를 고르고 "적용"을 눌러야 바뀐다
-    setRange(presetRange(key, nowRef.current()));
-    setPage(1);
-  };
-
-  const applyCustom = (event: FormEvent) => {
-    event.preventDefault();
-    const custom = customRange(customFrom, customTo);
-    if ('error' in custom) {
-      setCustomError(custom.error);
-      return;
-    }
-    setCustomError(null);
-    setRange(custom);
-    setPage(1);
-  };
+  }, [disconnected, refreshRange]);
 
   const data = state.data;
   const pages = data ? recordPageCount(data.total, data.pageSize) : 0;
@@ -147,10 +123,8 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, extra,
 
   return (
     <section aria-label={label} aria-busy={busy || undefined} className={`flex flex-col gap-3 ${className}`}>
-      <RangePicker value={rangeKey} onChange={choose} />
-      {rangeKey === 'custom' && (
-        <CustomRangeForm from={customFrom} to={customTo} error={customError} onFrom={setCustomFrom} onTo={setCustomTo} onSubmit={applyCustom} max={toDateInput(now())} />
-      )}
+      <RangeFilter state={rangeState} />
+      {searchPlaceholder && <SearchBox search={search} label={`${label} 검색`} placeholder={searchPlaceholder} />}
 
       <p className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-soft">
         <span className="tabular-nums whitespace-nowrap">
@@ -178,7 +152,7 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, extra,
         </p>
       )}
 
-      {data && data.items.length === 0 && state.status === 'ok' && <p className="py-6 text-center text-sm text-ink-faint">{RECORD_LIST.emptyText}</p>}
+      {data && data.items.length === 0 && state.status === 'ok' && <EmptyResult rangeKey={rangeKey} q={q} />}
 
       {data && data.items.length > 0 && (
         <div className={busy ? 'opacity-60 transition-opacity' : undefined}>
@@ -218,63 +192,6 @@ export function RecordList<T>({ label, load, rowKey, time, title, detail, extra,
 
       {pages > 1 && <Pagination page={page} pageCount={pages} onPage={setPage} disabled={busy} />}
     </section>
-  );
-}
-
-function RangePicker({ value, onChange }: { value: RecordRangeKey; onChange: (key: RecordRangeKey) => void }) {
-  return (
-    // 폰은 2×2(글자를 키워도 꺾이지 않게), 넓으면 한 줄
-    <div role="group" aria-label="기간" className="grid grid-cols-2 gap-1 rounded-control bg-paper-deep p-1 sm:grid-cols-4">
-      {RECORD_RANGES.map((range) => {
-        const selected = range.key === value;
-        return (
-          <button
-            key={range.key}
-            type="button"
-            aria-pressed={selected}
-            onClick={() => onChange(range.key)}
-            className={`min-h-12 truncate rounded-control px-2 text-sm font-semibold whitespace-nowrap select-none ${selected ? 'bg-accent text-white shadow-soft-1' : 'text-ink-soft active:bg-surface'}`}
-          >
-            {range.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-interface CustomRangeFormProps {
-  from: string;
-  to: string;
-  max: string;
-  error: string | null;
-  onFrom: (value: string) => void;
-  onTo: (value: string) => void;
-  onSubmit: (event: FormEvent) => void;
-}
-
-function CustomRangeForm({ from, to, max, error, onFrom, onTo, onSubmit }: CustomRangeFormProps) {
-  const id = useId();
-  const input = 'min-h-12 w-full min-w-0 rounded-control border border-line bg-surface px-2 text-base text-ink tabular-nums';
-  return (
-    <form onSubmit={onSubmit} aria-label="기간 직접 선택" className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
-      <label htmlFor={`${id}-from`} className="flex min-w-0 flex-col gap-1 text-sm font-semibold whitespace-nowrap text-ink-soft">
-        시작일
-        <input id={`${id}-from`} type="date" value={from} max={max} onChange={(e) => onFrom(e.target.value)} className={input} />
-      </label>
-      <label htmlFor={`${id}-to`} className="flex min-w-0 flex-col gap-1 text-sm font-semibold whitespace-nowrap text-ink-soft">
-        종료일
-        <input id={`${id}-to`} type="date" value={to} max={max} onChange={(e) => onTo(e.target.value)} className={input} />
-      </label>
-      <Button type="submit" variant="primary" className="col-span-2 sm:col-span-1">
-        적용
-      </Button>
-      {error && (
-        <p role="alert" className="col-span-2 text-sm text-status-alarm sm:col-span-3">
-          {error}
-        </p>
-      )}
-    </form>
   );
 }
 

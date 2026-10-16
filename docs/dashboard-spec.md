@@ -201,15 +201,15 @@ Oct 13, 2026 · @민식
 | GET `/devices` | 기기 목록과 현재 상태 |
 | GET `/devices/{id}/state` | 기기 하나의 최신 상태 |
 | GET `/devices/{id}/history?metric=level&from=...&to=...&interval=1m` | 이력 시계열 (그래프용) |
-| GET `/devices/{id}/unloads/records?from=...&to=...&page=1&pageSize=10` | 섹터(탱크) 하나의 하역 기록 (섹터 기기 ID만, 아래 "기록 목록" 모양) |
-| GET `/vehicles/records?from=...&to=...&page=1&pageSize=10` | 차량 기록 (입차 시각 기준, 아래 "공정 기록" 모양) |
+| GET `/devices/{id}/unloads/records?from=...&to=...&page=1&pageSize=10&q=...` | 섹터(탱크) 하나의 하역 기록 (섹터 기기 ID만, 아래 "기록 목록" 모양) |
+| GET `/vehicles/records?from=...&to=...&page=1&pageSize=10&q=...` | 차량 기록 (입차 시각 기준, 아래 "공정 기록" 모양) |
 | GET `/vehicles/{id}` | 차량 기록 한 건 (목록 한 줄과 같은 모양). 없으면 404 |
-| GET `/batches/records?from=...&to=...&page=1&pageSize=10` | 배치 기록 (시작 시각 기준, 아래 "공정 기록" 모양) |
+| GET `/batches/records?from=...&to=...&page=1&pageSize=10&q=...` | 배치 기록 (시작 시각 기준, 아래 "공정 기록" 모양) |
 | GET `/batches/{id}` | 배치 기록 한 건 (목록 한 줄과 같은 모양). 없으면 404 |
-| GET `/bales/records?from=...&to=...&page=1&pageSize=10` | 베일 기록 (생산 시각 기준, 아래 "공정 기록" 모양) |
+| GET `/bales/records?from=...&to=...&page=1&pageSize=10&q=...` | 베일 기록 (생산 시각 기준, 아래 "공정 기록" 모양) |
 | GET `/bales/{id}` | 베일 한 건 (생산 당시 압력·수분·배합 스냅샷, 5단위 계약). 없으면 404 |
 | GET `/robots/{id}/model` | 로봇 모델 정보: 축 수, 관절 순서, 링크 길이, 각도 범위, 영점 (기종이 정해지면 이 값으로 화면을 맞춘다) |
-| GET `/alarms?state=active` | 알람 목록 |
+| GET `/alarms?state=active&from=...&to=...&q=...` | 알람 목록 (`state`·`from`·`to`·`q` 모두 선택. 응답은 최신순 배열, 쪽 나누기 없음. `q` 규칙은 아래 "기록 목록"의 검색) |
 | GET `/cameras` | 카메라 목록 |
 
 #### 기록 목록 (페이지 나누기)
@@ -225,14 +225,28 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | `from`, `to` | 구간 `[from, to)`, ISO 8601 UTC. 화면은 현지 날짜(오늘·어제·최근 7일·직접 선택)를 UTC로 바꿔 보낸다 |
 | `page` | 1부터 센다 |
 | `pageSize` | 한 쪽의 줄 수. 화면은 10, 서버 상한 100 |
+| `q` | (선택) 검색어. 기간(`from`~`to`)과 **함께** 적용된다: 결과 = 그 기간의 기록 중 검색어에 맞는 것. 없거나 빈 문자열이면 거르지 않는다. 최대 64자(넘으면 422) |
 
 ```json
 { "items": [ ... ], "total": 23, "page": 1, "pageSize": 10 }
 ```
 
 - `items`는 최신 기록이 먼저(시각 내림차순), `total`은 구간 안 전체 건수다. 쪽 수는 `ceil(total / pageSize)`.
+- 검색(`q`)은 서버가 한다: 대소문자를 가리지 않고, 부분 일치이고, **공백은 검색어와 값 양쪽에서 모두 무시한다**("12가3456"이 "12가 3456"을 찾는다). `total`은 기간과 검색어를 모두 적용한 건수다. 무엇을 찾는지는 기록마다 다르다(아래 표). 화면은 입력을 300ms 기다렸다가 보내고, 검색어나 기간이 바뀌면 1쪽부터 다시 받는다.
 - 전체 쪽 수보다 큰 `page`는 오류가 아니라 빈 `items`를 돌려준다. 빠진 쿼리, `from >= to`, 범위 밖 `page`·`pageSize`는 422.
 - 각 기록의 시각 필드는 ISO 8601 UTC 문자열이다.
+
+검색 대상(`q`):
+
+| 기록 | 찾는 값 |
+| --- | --- |
+| 차량 (`/vehicles/records`) | 번호판, 회사 |
+| 배치 (`/batches/records`) | 배치 ID, 배합 섹터(`tank-a1`·`A1`·`섹터 A1`) |
+| 베일 (`/bales/records`) | 베일 ID, 배치 ID |
+| 섹터 하역 (`/devices/{id}/unloads/records`) | 번호판, 회사 |
+| 로봇 집기 (`/robots/robot-1/picks/records`) | 섹터(`tank-a1`·`A1`·`섹터 A1`), 배치 ID |
+| 배치·베일 사건 (`/batches/events/records`) | 배치 ID, 베일 ID, 사건 종류(배치 생성·배합 변경·압력 변경·일시정지·재개·건너뜀·베일 생산), 수행자 |
+| 알람 (`GET /alarms`) | 기기 이름(`tank-a1`·`섹터 A1`·`압축기` …), 알람 메시지 |
 
 섹터 하역 기록(`GET /devices/{id}/unloads/records`)의 한 줄은 다음과 같다. 차량이 그 섹터에 하역하고 출차 계량(공차)을 마치면 한 줄이 생기고, 기록 시각은 하역 완료 시각(`unloadedAt`)이다.
 
@@ -410,7 +424,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | --- | --- |
 | POST `/push/register` | 안드로이드 기기의 FCM 토큰 등록: `{"fcmToken","platform":"android"}` |
 | DELETE `/push/register` | 로그아웃 시 등록 해제 |
-| GET `/alarms?state=active&from=...` | 알람 목록과 이력 |
+| GET `/alarms?state=active&from=...&to=...&q=...` | 알람 목록과 이력 (기간 `[from, to)`와 검색어 `q`를 함께 적용) |
 
 앱이 켜져 있을 때는 WebSocket의 `alarm` 메시지로, 앱이 닫혀 있을 때는 서버가 FCM으로 알림을 보낸다. 푸시 알림은 지연되거나 누락될 수 있어 안전과 직결된 위험 알림을 이것에만 의존하지 않는다.
 

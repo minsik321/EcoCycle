@@ -3,7 +3,7 @@ import { getRecords } from '../../api';
 import { Card } from '../../components/common/Card';
 import type { Column } from '../../components/common/DataTable';
 import { RecordList } from '../../components/records/RecordList';
-import { DEVICE_NAMES, ROBOT_MODE_TEXT, formatPickVolumeM3 } from '../../config/display';
+import { DEVICE_NAMES, RECORD_SEARCH_HINT, ROBOT_MODE_TEXT, formatPickVolumeM3 } from '../../config/display';
 
 const destination = (r: PickRecord) => `컨베이어 → ${r.batchId ?? '배치 미배정'}`;
 const columns: readonly Column<PickRecord>[] = [
@@ -14,7 +14,7 @@ const columns: readonly Column<PickRecord>[] = [
 ];
 export function PickRecords({ revision }: { revision: number }) {
   return <Card title="집기 기록">
-    <RecordList<PickRecord> label="집기 기록" dense compactTime refreshToken={String(revision)}
+    <RecordList<PickRecord> label="집기 기록" searchPlaceholder={RECORD_SEARCH_HINT.picks} dense compactTime refreshToken={String(revision)}
       load={(query, signal) => getRecords<PickRecord>('/robots/robot-1/picks/records', query, signal)}
       rowKey={r => r.id} time={r => r.pickedAt}
       title={r => `${ROBOT_MODE_TEXT[r.mode]} · ${DEVICE_NAMES[r.sectorId]}`}

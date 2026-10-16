@@ -5,6 +5,7 @@ export * from './auth';
 export * from './devices';
 export * from './process';
 export * from './records';
+export * from './search';
 export * from './processRecords';
 export * from './alarms';
 export * from './cameras';

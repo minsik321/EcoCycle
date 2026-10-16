@@ -15,5 +15,5 @@ export interface Alarm {
   ts: IsoTimestamp;
 }
 
-/** GET /alarms?state=active&from=... */
+/** GET /alarms?state=active&from=...&to=...&q=... (모두 선택. 기간 [from, to)와 검색어 q를 함께 적용, search.ts) */
 export type AlarmListResponse = Alarm[];

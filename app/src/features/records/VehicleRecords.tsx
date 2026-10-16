@@ -3,7 +3,7 @@ import { getRecords } from '../../api';
 import type { Column } from '../../components/common/DataTable';
 import { RecordList } from '../../components/records/RecordList';
 import { useOpenRecordPopup } from '../../components/records/recordPopup';
-import { formatLocalTime, formatWeightT } from '../../config/display';
+import { RECORD_SEARCH_HINT, formatLocalTime, formatWeightT } from '../../config/display';
 import { SECTOR_LABEL, VEHICLE_RECORD_STATUS_TEXT } from '../../config/processDisplay';
 
 const pill = 'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap';
@@ -37,6 +37,7 @@ export function VehicleRecords() {
   return (
     <RecordList<VehicleRecord>
       label="차량 기록"
+      searchPlaceholder={RECORD_SEARCH_HINT.vehicles}
       timeHeader="입차"
       load={(query, signal) => getRecords<VehicleRecord>('/vehicles/records', query, signal)}
       rowKey={(r) => r.id}

@@ -15,7 +15,8 @@ components/
 │                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 틀의 상단 바·끊김 안내·내용 여백을 거두고 headerExtra를 넘긴다. 3D 홈만 쓴다.
 │                  `useHeaderSlot`: 틀의 상단 바 가운데 칸, 화면이 포털로 홈 전환을 넣는다)
 ├── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
-├── records/       RecordList(기간 고르기 → 서버에서 10줄씩 → 폰 쌓인 줄 / md 이상 표 → 쪽 넘기기), Pagination, range(기간·쪽 번호 계산),
+├── records/       RecordList(기간 고르기 + 검색 → 서버에서 10줄씩 → 폰 쌓인 줄 / md 이상 표 → 쪽 넘기기), Pagination, range(기간·쪽 번호 계산),
+│                  RecordFilters(기간·검색 조각: RangeFilter·SearchBox·EmptyResult, 훅 useRecordRange·useSearchText. 알람 화면도 씀),
 │                  recordPopup(기록 상세 팝업의 주소·기록 상태, `PopupLink`·`useOpenRecordPopup`: 그리기는 features/records/popup)
 └── device/        기기 페이지 틀: DevicePage(배치: `illustrated`면 위쪽 두 칸, 아니면 한 줄), DeviceHero(이름·큰 상태 칩·지금 하는 일·선택 그림), KeyTile/KeyTiles(최대 4개, 작은 추이선·게이지, `wide`면 폭 전체 격자),
                    NowNext(지금/다음), ActionBar·DeviceActionBar(위험도 낮은 조작 + 알람 확인), DetailsSection("자세히", 처음엔 닫힘), live(연결 상태)
@@ -43,6 +44,7 @@ components/
 - 처음은 "불러오는 중…", 이후는 이전 목록을 흐리게 두고 받는다. 실패하면 오류와 "다시 시도". 비면 "이 기간에 기록이 없습니다"(쪽 넘기기 없음).
 - 폰은 기간 버튼 2×2(글자 130%에서도 한 줄), 쪽 번호는 지금 쪽 앞뒤 3개, md 이상은 한 줄·5개.
 - 선택: `timeHeader`(시각 칸 머리글), `extra`(폰 줄의 둘째 설명 줄), `dense`(표 칸 여백을 줄여 칸이 많은 목록이 820px에 들어가게), `onOpen`(줄을 누르면 부름: 폰 줄은 버튼, 표 줄은 `DataTable.onRowClick`). 공정 기록이 쓴다.
+- 검색: `searchPlaceholder`를 주면 기간 아래에 검색 상자를 그린다. 결과는 기간 AND 검색어이고 둘 다 서버가 거른다(`RecordQuery.q`, 빈 검색어는 보내지 않는다). 입력 300ms 뒤(Enter·X는 즉시) 확정되고, 확정된 `q`나 기간이 바뀔 때만 쪽을 1로 되돌리며(같은 렌더에서 함께 바꿔 옛 쪽 번호로 새 검색어를 보내지 않는다), 비면 "검색 결과가 없습니다" + 기간·검색어. 검색 상자의 X는 직접 그린 하나뿐이다(브라우저 기본 지우기 버튼은 숨긴다).
 - 미리 보기: `/design/records`(예시 값, `?empty=1`, `?offline=1`).
 - 짧은 기록은 `compactTime`으로 오늘의 시각을 시:분만 표시한다. 로봇 집기 기록이 사용한다.
 

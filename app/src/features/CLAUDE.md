@@ -12,7 +12,7 @@
 | `robot/` | `/robot` | 기기 페이지 틀(그림 없음): 모드·현재 작업·이번 시간 집기·그리퍼, 운전 모드(세 칸), 자세히(진단·설정·오류 로그), 사이클 통계, 집기 기록 |
 | `conveyor/` | `/conveyor` | 기기 페이지 틀(그림 없음): 가동·적재 정도·압축기로 가는 중, 자세히(이력·속도 설정·알람 이력) |
 | `compressor/` | `/compressor` | 기기 페이지 틀(그림 없음): 압력 게이지 칸(지금 vs 목표)·온도·오늘 베일·사이클 단계, 지금 배치(배치·베일 링크), 자세히(이력·설정·알람·점검 이력) |
-| `alarms/` | `/alarms` | 활성·이력 목록, 확인 처리, 누르면 해당 기기 페이지로 |
+| `alarms/` | `/alarms` | 열린 알람 / 알람 이력(기간 탭 + 검색 상자, 서버가 거름), 확인 처리, 누르면 해당 기기 페이지로 |
 | `records/` | `/records`, `/records/batches`, 팝업 주소 `/records/{vehicles,batches,bales}/:id` | 공정 기록: 탭 차량·배치·베일(`?tab=`, 모두 `RecordList`), 배치·베일 제어 화면, 차량·배치·베일 상세 팝업 |
 | `settings/` | `/settings` | 화질 모드(고화질/기본/저사양, 자동으로 다시 고르기), 계정, 앱 정보 |
 | `design/` | `/design` | 디자인 토큰과 공용 컴포넌트 미리 보기 (개발용, 로그인 불필요, 값은 모두 예시) |
@@ -113,6 +113,9 @@
 
 ### 기록 목록
 - 지난 기록은 모두 `components/records/RecordList`로 보여 준다: 기간(오늘·어제·최근 7일·직접 선택), 10줄씩, 이전·쪽 번호·다음, 빈 목록 "이 기간에 기록이 없습니다". 폰은 쌓인 줄(제목·시각 / 설명 한 줄), 태블릿·데스크톱은 작은 표.
+- 검색: `RecordList`에 `searchPlaceholder`를 주면 기간 아래에 검색 상자(돋보기·입력·X)가 붙는다. **기간 AND 검색어**를 서버에 함께 보낸다(`q`, 명세 6절). 입력은 300ms(`SEARCH_DEBOUNCE_MS`) 기다렸다가 보내고(Enter·X는 바로), 검색어나 기간이 바뀌면 1쪽부터 다시 받는다. 결과가 없으면 "검색 결과가 없습니다" 아래에 기간과 검색어를 적는다(검색어 없이 빈 기간은 예전 "이 기간에 기록이 없습니다"). 안내 글(placeholder)은 서버가 찾는 값과 같아야 하고 `config/display.ts`의 `RECORD_SEARCH_HINT`에 둔다: 차량·하역 "번호판, 회사", 배치 "배치 ID, 섹터", 베일 "베일 ID, 배치 ID", 집기 "섹터, 배치 ID", 사건 "배치·베일 ID, 사건 종류, 수행자", 알람 "기기 이름, 알람 내용". 규칙(대소문자·공백 무시 부분 일치, 번호판 "12가3456"이 "12가 3456"을 찾음)은 `shared/src/search.ts`.
+- 알람 화면의 이력 탭은 같은 조각(`components/records/RecordFilters`의 `RangeFilter`·`SearchBox`, 상태 훅 `useRecordRange`·`useSearchText`)을 쓰고 `GET /alarms?from&to&q`(쪽 나누기 없는 배열)로 받는다. 처음은 최근 7일이고 오늘·최근 7일은 `to`를 보내지 않는다("지금까지"). 열린 알람 탭은 실시간 값이라 기간·검색이 없다. `?device=` 거르기는 그대로 앱에서 한다.
+- 재현: `node app/scripts/recordSearch.mjs`(390×844·1440×900: 공정 기록 세 탭·섹터 하역 기록·알람 이력의 검색, 결과 없음, 공백 무시, X, `docs/screenshots/record-search`).
 - 서버 엔드포인트는 `GET .../records?from&to&page&pageSize` → `{ items, total, page, pageSize }`(명세 6절 "기록 목록", `shared/records.ts`). `load`는 `getRecords<T>(경로, query, signal)`로 넘긴다. 모의 서버는 `routes/records.ts`의 `sendRecordPage`로 응답한다.
 
 ### 조작

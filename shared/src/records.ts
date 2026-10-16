@@ -5,6 +5,7 @@ import type { TankId } from './ids';
  * 차량·하역·로봇 집기 같은 지난 기록을 보여 주는 모든 `GET .../records` 엔드포인트가 같은 요청·응답 모양을 쓴다.
  *   GET .../records?from=...&to=...&page=1&pageSize=10
  *   → { items, total, page, pageSize }
+ * 선택 쿼리 `q`로 검색한다(기간과 함께 적용, search.ts).
  * ⚠ 프론트 제안안이다 (서버 담당 확인 전, `docs/questions.md` B29).
  */
 
@@ -22,6 +23,8 @@ export interface RecordQuery {
   /** 1부터 센다 */
   page: number;
   pageSize: number;
+  /** 검색어(선택). 기간과 함께 적용된다. 없거나 비면 거르지 않는다 (규칙은 search.ts) */
+  q?: string;
 }
 
 /**

@@ -190,6 +190,14 @@ async function run(browser) {
         await page.getByRole('region', { name: label }).waitFor({ timeout: 15_000 });
         await page.waitForTimeout(1200);
         await check(page, name, zoom);
+        // 검색: 결과 없음 화면("검색 결과가 없습니다" + 기간·검색어)도 글이 꺾이거나 넘치지 않는지 본다
+        await page.getByRole('searchbox').fill('없는검색어-zzz');
+        await page.getByRole('searchbox').press('Enter');
+        await page.getByText('검색 결과가 없습니다').waitFor({ timeout: 15_000 });
+        await check(page, `${name} 검색 결과 없음`, zoom);
+        await page.getByRole('button', { name: '검색어 지우기' }).click();
+        await page.getByText('검색 결과가 없습니다').waitFor({ state: 'detached', timeout: 15_000 });
+        await page.waitForTimeout(600);
         const first = phone ? page.getByRole('list', { name: label }).getByRole('button').first() : page.getByRole('table', { name: label }).locator('tbody tr').first();
         await first.click();
         const dialog = page.getByRole('dialog');
@@ -211,6 +219,16 @@ async function run(browser) {
         await page.keyboard.press('Escape');
         await dialog.waitFor({ state: 'detached' });
       }
+      // 알람 화면: 이력 탭의 기간 탭 + 검색 상자, 검색 결과 없음
+      await go('/alarms');
+      await page.getByRole('button', { name: '알람 이력' }).click();
+      await page.getByRole('searchbox', { name: '알람 검색' }).waitFor({ timeout: 15_000 });
+      await page.waitForTimeout(800);
+      await check(page, '알람 이력', zoom);
+      await page.getByRole('searchbox', { name: '알람 검색' }).fill('없는검색어-zzz');
+      await page.getByRole('searchbox', { name: '알람 검색' }).press('Enter');
+      await page.getByText('검색 결과가 없습니다').waitFor({ timeout: 15_000 });
+      await check(page, '알람 검색 결과 없음', zoom);
       await go('/records/batches');
       await page.getByLabel('A1 (%)', {exact:true}).waitFor();
       await page.getByLabel('A1 (%)', {exact:true}).fill('99');

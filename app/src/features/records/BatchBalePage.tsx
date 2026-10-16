@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BATCH_EVENT_TYPE_TEXT } from '@ecocycle/shared';
 import type { BatchEvent } from '@ecocycle/shared';
 import { getRecords } from '../../api/records';
 import { Card } from '../../components/common/Card';
@@ -8,7 +9,7 @@ import { RecordList } from '../../components/records/RecordList';
 import { PopupLink, useOpenRecordPopup } from '../../components/records/recordPopup';
 import { useDeviceLive } from '../../components/device/live';
 import { BATCH_STAGE_TEXT, SECTOR_LABEL } from '../../config/processDisplay';
-import { formatLocalTime } from '../../config/display';
+import { RECORD_SEARCH_HINT, formatLocalTime } from '../../config/display';
 import { useAppSelector } from '../../store/hooks';
 import { selectRecentCommands } from '../../store/selectors';
 import { CONTROL_TEXT } from '../../config/controls';
@@ -18,7 +19,7 @@ import { BackToRecords, DetailRow } from './RecordDetail';
 
 // 사건 줄을 누르면 그 사건의 베일(베일 생산) 또는 배치 팝업이 바로 뜬다 (따로 된 "사건 상세" 없음)
 
-const EVENT_TEXT: Record<BatchEvent['type'],string> = {created:'배치 생성',mix_changed:'배합 변경',pressure_changed:'압력 변경',paused:'일시정지',resumed:'재개',skipped:'건너뜀',bale_produced:'베일 생산'};
+const EVENT_TEXT = BATCH_EVENT_TYPE_TEXT;
 export function BatchBalePage() {
   const { data, error, offline } = useBatchControl();
   const { lastReceivedAt } = useDeviceLive();
@@ -46,7 +47,7 @@ export function BatchBalePage() {
     {selected && data ? <BatchControls key={selected.batch.id} value={selected} range={data.pressureRange} unavailable={unavailable}/>:<p className="text-sm text-ink-soft">다음 배치가 아직 계획되지 않았습니다.</p>}
     {commands.length>0 && <Card title="명령 결과"><div aria-live="polite" className="space-y-2">{commands.slice(0,3).map(c=><p key={c.key} className="text-sm">{CONTROL_TEXT[c.type].label} · {c.status==='completed'?'적용됨':c.status==='sending'||c.status==='accepted'?'적용 대기':c.status==='rejected'?'거부됨':c.status==='unknown'?'결과 확인 불가':'실패'}{c.reason?` · ${c.reason}`:''}</p>)}</div></Card>}
     <Card title="배치·베일 사건 기록" aria-label="배치·베일 사건 기록">
-      <RecordList<BatchEvent> label="배치·베일 사건 기록" refreshToken={`${data?.eventsRevision}:${commands.map(c=>`${c.key}:${c.status}`).join()}`} load={(q,s)=>getRecords('/batches/events/records',q,s)} rowKey={e=>e.id} time={e=>e.at} title={e=>`${EVENT_TEXT[e.type]} · ${e.batchId}`} detail={e=>e.detail} extra={e=>e.actor} dense columns={[{key:'event',header:'사건·수행자',cell:e=><div className="max-w-28 py-2"><p>{EVENT_TEXT[e.type]}</p><p className="truncate">{e.batchId}</p><p className="truncate text-xs text-ink-soft">{e.actor}</p></div>},{key:'detail',header:'변경·사유',cell:e=><p className="max-w-48 whitespace-normal py-2 text-sm">{e.detail}</p>}]} onOpen={e=>openPopup(e.baleId?{kind:'bale',id:e.baleId}:{kind:'batch',id:e.batchId})}/>
+      <RecordList<BatchEvent> label="배치·베일 사건 기록" searchPlaceholder={RECORD_SEARCH_HINT.batchEvents} refreshToken={`${data?.eventsRevision}:${commands.map(c=>`${c.key}:${c.status}`).join()}`} load={(q,s)=>getRecords('/batches/events/records',q,s)} rowKey={e=>e.id} time={e=>e.at} title={e=>`${EVENT_TEXT[e.type]} · ${e.batchId}`} detail={e=>e.detail} extra={e=>e.actor} dense columns={[{key:'event',header:'사건·수행자',cell:e=><div className="max-w-28 py-2"><p>{EVENT_TEXT[e.type]}</p><p className="truncate">{e.batchId}</p><p className="truncate text-xs text-ink-soft">{e.actor}</p></div>},{key:'detail',header:'변경·사유',cell:e=><p className="max-w-48 whitespace-normal py-2 text-sm">{e.detail}</p>}]} onOpen={e=>openPopup(e.baleId?{kind:'bale',id:e.baleId}:{kind:'batch',id:e.batchId})}/>
     </Card>
   </PageContainer>;
 }

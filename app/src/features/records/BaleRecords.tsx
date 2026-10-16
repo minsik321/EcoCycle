@@ -3,7 +3,7 @@ import { getRecords } from '../../api';
 import type { Column } from '../../components/common/DataTable';
 import { RecordList } from '../../components/records/RecordList';
 import { useOpenRecordPopup } from '../../components/records/recordPopup';
-import { formatPercent, formatPressureMpa } from '../../config/display';
+import { RECORD_SEARCH_HINT, formatPercent, formatPressureMpa } from '../../config/display';
 import { BALE_STAGE_TEXT, shortId } from '../../config/processDisplay';
 
 const pill = 'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap';
@@ -30,6 +30,7 @@ export function BaleRecords() {
   return (
     <RecordList<BaleRecord>
       label="베일 기록"
+      searchPlaceholder={RECORD_SEARCH_HINT.bales}
       timeHeader="생산"
       load={(query, signal) => getRecords<BaleRecord>('/bales/records', query, signal)}
       rowKey={(r) => r.id}

@@ -127,6 +127,38 @@ export const alarms: Alarm[] = [
     state: 'cleared',
     ts: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
   },
+  {
+    id: 'al-3281',
+    level: 'caution',
+    deviceId: 'tank-a1',
+    message: '수분 높음',
+    state: 'cleared',
+    ts: new Date(Date.now() - 1000 * 60 * 60 * 50).toISOString(),
+  },
+  {
+    id: 'al-3276',
+    level: 'caution',
+    deviceId: 'conveyor-z',
+    message: '과적재',
+    state: 'cleared',
+    ts: new Date(Date.now() - 1000 * 60 * 60 * 74).toISOString(),
+  },
+  {
+    id: 'al-3270',
+    level: 'alarm',
+    deviceId: 'robot-1',
+    message: '그리퍼 오류',
+    state: 'cleared',
+    ts: new Date(Date.now() - 1000 * 60 * 60 * 100).toISOString(),
+  },
+  {
+    id: 'al-3262',
+    level: 'caution',
+    deviceId: 'tank-b1',
+    message: '적재율 80% 초과',
+    state: 'cleared',
+    ts: new Date(Date.now() - 1000 * 60 * 60 * 146).toISOString(),
+  },
 ];
 
 export const listDevices = (): DeviceState[] => Object.values(devices);

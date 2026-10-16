@@ -3,7 +3,7 @@ import { getRecords } from '../../api';
 import type { Column } from '../../components/common/DataTable';
 import { RecordList } from '../../components/records/RecordList';
 import { useOpenRecordPopup } from '../../components/records/recordPopup';
-import { formatLocalTime, formatPercent, formatPressureMpa } from '../../config/display';
+import { RECORD_SEARCH_HINT, formatLocalTime, formatPercent, formatPressureMpa } from '../../config/display';
 import { batchResultText, mixPercentText, shortId } from '../../config/processDisplay';
 
 const pill = 'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap';
@@ -44,6 +44,7 @@ export function BatchRecords() {
   return (
     <RecordList<BatchRecord>
       label="배치 기록"
+      searchPlaceholder={RECORD_SEARCH_HINT.batches}
       timeHeader="시작"
       load={(query, signal) => getRecords<BatchRecord>('/batches/records', query, signal)}
       rowKey={(r) => r.id}

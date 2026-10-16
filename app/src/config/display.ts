@@ -235,6 +235,17 @@ export const RECORD_RANGES: ReadonlyArray<{ key: RecordRangeKey; label: string }
   { key: 'custom', label: '직접 선택' },
 ];
 
+/** 기록 목록별 검색 상자의 안내 글. 서버가 찾는 값과 같아야 한다 (명세 6절 "기록 목록"의 검색 대상 표) */
+export const RECORD_SEARCH_HINT = {
+  vehicles: '번호판, 회사 검색',
+  batches: '배치 ID, 섹터 검색',
+  bales: '베일 ID, 배치 ID 검색',
+  unloads: '번호판, 회사 검색',
+  picks: '섹터, 배치 ID 검색',
+  batchEvents: '배치·베일 ID, 사건 종류, 수행자 검색',
+  alarms: '기기 이름, 알람 내용 검색',
+} as const;
+
 export const RECORD_LIST = {
   /** 처음 열 때의 기간 */
   defaultRange: 'today' as RecordRangeKey,
@@ -243,4 +254,6 @@ export const RECORD_LIST = {
   /** 쪽 번호를 몇 개까지 보여 주나 (폰에서는 가운데 3개만) */
   pageWindow: 5,
   emptyText: '이 기간에 기록이 없습니다',
+  /** 검색어가 있는데 결과가 없을 때 (기간과 검색어를 아래에 함께 적는다) */
+  emptySearchText: '검색 결과가 없습니다',
 } as const;

@@ -110,7 +110,7 @@ describe('AlarmsPage: 열린 알람', () => {
 describe('AlarmsPage: 최근 7일 이력', () => {
   it('모든 기기의 이력을 최신순으로 보여 주고 상태를 글자로 알린다', async () => {
     page();
-    await userEvent.click(screen.getByRole('button', { name: '최근 7일 이력' }));
+    await userEvent.click(screen.getByRole('button', { name: '알람 이력' }));
     const items = await within(screen.getByLabelText('알람 이력')).findAllByRole('listitem');
     expect(items).toHaveLength(2);
     expect(items[0]).toHaveTextContent('섹터 A1 · al-2 메시지');
@@ -122,7 +122,7 @@ describe('AlarmsPage: 최근 7일 이력', () => {
 
   it('이력 알람을 누르면 그 기기 페이지로 간다', async () => {
     page();
-    await userEvent.click(screen.getByRole('button', { name: '최근 7일 이력' }));
+    await userEvent.click(screen.getByRole('button', { name: '알람 이력' }));
     await userEvent.click(await screen.findByRole('link', { name: /압축기/ }));
     expect(screen.getByText('압축기 페이지')).toBeInTheDocument();
   });
@@ -130,10 +130,10 @@ describe('AlarmsPage: 최근 7일 이력', () => {
   it('불러오지 못하면 오류와 다시 시도 버튼을 보여 준다', async () => {
     vi.mocked(api.getAlarms).mockRejectedValueOnce(new api.ApiError(503, 'X', '')).mockResolvedValue([]);
     page();
-    await userEvent.click(screen.getByRole('button', { name: '최근 7일 이력' }));
+    await userEvent.click(screen.getByRole('button', { name: '알람 이력' }));
     const alert = await screen.findByRole('alert');
     await userEvent.click(within(alert).getByRole('button', { name: '다시 시도' }));
-    expect(await screen.findByText('최근 7일간 알람이 없습니다.')).toBeInTheDocument();
+    expect(await screen.findByText('이 기간에 알람이 없습니다')).toBeInTheDocument();
   });
 });
 
@@ -141,7 +141,7 @@ describe('AlarmsPage: 기기로 거르기 (?device=)', () => {
   it('기기 페이지에서 오면 그 기기 알람만 이력 탭으로 보여 주고, 모든 기기 보기로 풀 수 있다', async () => {
     page({ route: '/alarms?device=compressor-1' });
     expect(screen.getByText('압축기 알람만 보는 중')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '최근 7일 이력' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '알람 이력' })).toHaveAttribute('aria-pressed', 'true');
     const items = await within(await screen.findByLabelText('알람 이력')).findAllByRole('listitem');
     expect(items).toHaveLength(1);
     expect(items[0]).toHaveTextContent('al-1 메시지');

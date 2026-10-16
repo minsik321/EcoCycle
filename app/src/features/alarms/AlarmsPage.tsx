@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { Link, useSearchParams } from 'react-router-dom';
 import { DEVICE_IDS } from '@ecocycle/shared';
@@ -8,12 +8,15 @@ import { Card } from '../../components/common/Card';
 import { AckAlarmButton } from '../../components/controls/AckAlarmButton';
 import { StatusBadge } from '../../components/status/StatusBadge';
 import { Timestamp } from '../../components/status/Timestamp';
-import { DEVICE_NAMES } from '../../config/display';
+import { EmptyResult, RangeFilter, SearchBox, useRecordRange, useSearchText } from '../../components/records/RecordFilters';
+import { DEVICE_NAMES, RECORD_SEARCH_HINT } from '../../config/display';
 import { alarmsPath, devicePagePath } from '../../config/navigation';
 import { useAppSelector } from '../../store/hooks';
 import { selectIsDisconnected, selectOpenAlarms } from '../../store/selectors';
 import { ALARM_STATE_TEXT } from '../history/DeviceAlarmHistory';
 import { useAlarmHistory } from '../history/useAlarmHistory';
+
+const noop = () => {};
 
 type Tab = 'open' | 'history';
 
@@ -22,9 +25,13 @@ function AlarmRow({ alarm }: { alarm: Alarm }) {
     <li className="flex flex-wrap items-center gap-3 py-3">
       <StatusBadge status={alarm.level} size="sm" />
       {/* 누르면 해당 기기 페이지로 간다 */}
-      <Link to={devicePagePath(alarm.deviceId)} className="flex min-h-12 min-w-0 flex-1 flex-col justify-center">
+      <Link to={devicePagePath(alarm.deviceId)} className="flex min-h-12 min-w-[min(100%,16rem)] flex-1 flex-col justify-center">
         <span className="font-semibold text-slate-900">
-          {DEVICE_NAMES[alarm.deviceId]} · {alarm.message}
+          <span className="block">
+            {DEVICE_NAMES[alarm.deviceId]}
+            <span className="sr-only"> · </span>
+          </span>
+          <span className="block">{alarm.message}</span>
         </span>
         <span className="text-xs text-slate-500">
           <Timestamp iso={alarm.ts} />
@@ -49,7 +56,17 @@ export function AlarmsPage() {
   const allOpen = useAppSelector(selectOpenAlarms);
   const open = deviceId ? allOpen.filter((a) => a.deviceId === deviceId) : allOpen;
   const disconnected = useAppSelector(selectIsDisconnected);
-  const history = useAlarmHistory({ deviceId });
+  // 이력 탭의 기간 + 검색 (서버가 `from`·`to`·`q`로 함께 거른다). 처음은 예전처럼 최근 7일
+  const rangeState = useRecordRange('last7d', () => new Date(), noop);
+  const search = useSearchText(noop);
+  const { range, rangeKey } = rangeState;
+  // 오늘·최근 7일은 "지금까지"라 끝을 보내지 않는다 (그 뒤에 생긴 알람도 바로 들어오게)
+  const openEnded = rangeKey === 'today' || rangeKey === 'last7d';
+  const filter = useMemo(
+    () => ({ from: range.from.toISOString(), ...(openEnded ? {} : { to: range.to.toISOString() }), q: search.q }),
+    [range, openEnded, search.q],
+  );
+  const history = useAlarmHistory({ deviceId, filter });
 
   return (
     <PageContainer>
@@ -67,9 +84,16 @@ export function AlarmsPage() {
           열린 알람 {open.length}건
         </Button>
         <Button variant={tab === 'history' ? 'primary' : 'secondary'} aria-pressed={tab === 'history'} onClick={() => setTab('history')}>
-          최근 7일 이력
+          알람 이력
         </Button>
       </div>
+      {tab === 'history' && (
+        <div className="flex flex-col gap-3">
+          <RangeFilter state={rangeState} />
+          <SearchBox search={search} label="알람 검색" placeholder={RECORD_SEARCH_HINT.alarms} />
+          {history.alarms && <p className="text-sm font-semibold text-ink">총 {history.alarms.length}건</p>}
+        </div>
+      )}
 
       {tab === 'open' ? (
         <Card aria-label="열린 알람">
@@ -81,7 +105,7 @@ export function AlarmsPage() {
           {open.length === 0 ? <p className="text-slate-500">열린 알람이 없습니다.</p> : <ul className="divide-y divide-slate-100">{open.map((a) => <AlarmRow key={a.id} alarm={a} />)}</ul>}
         </Card>
       ) : (
-        <Card aria-label="알람 이력">
+        <Card aria-label="알람 이력" aria-busy={history.loading || undefined}>
           {history.error ? (
             <div role="alert" className="flex items-center gap-3">
               <span className="text-status-alarm">알람 이력을 불러오지 못했습니다.</span>
@@ -92,9 +116,9 @@ export function AlarmsPage() {
               불러오는 중…
             </p>
           ) : history.alarms.length === 0 ? (
-            <p className="text-slate-500">최근 7일간 알람이 없습니다.</p>
+            <EmptyResult rangeKey={rangeKey} q={search.q} emptyText="이 기간에 알람이 없습니다" />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className={`divide-y divide-slate-100 ${history.loading ? 'opacity-60 transition-opacity' : ''}`}>
               {history.alarms.map((a) => (
                 <AlarmRow key={a.id} alarm={a} />
               ))}

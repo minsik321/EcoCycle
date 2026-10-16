@@ -65,9 +65,9 @@ devicesRouter.get('/devices/:id/history', (req, res) => {
 
 const isTankId = (value: string): value is TankId => (TANK_IDS as readonly string[]).includes(value);
 
-// GET /devices/{id}/unloads/records?from=...&to=...&page=1&pageSize=10 — 섹터(탱크) 하나의 하역 기록
+// GET /devices/{id}/unloads/records?from=...&to=...&page=1&pageSize=10&q=... — 섹터(탱크) 하나의 하역 기록
 devicesRouter.get('/devices/:id/unloads/records', (req, res) => {
   const id = req.params.id;
   if (!isTankId(id)) return sendError(res, 422, 'VALIDATION_FAILED', `하역 기록은 섹터(탱크) 기기에만 있습니다: ${id}`);
-  sendRecordPage(req, res, unloadRecords(id), (r) => r.unloadedAt);
+  sendRecordPage(req, res, unloadRecords(id), (r) => r.unloadedAt, (r) => [r.plate, r.companyName]);
 });
