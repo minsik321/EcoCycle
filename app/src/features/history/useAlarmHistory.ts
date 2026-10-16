@@ -13,10 +13,10 @@ export interface AlarmHistory {
 }
 
 /**
- * 최근 7일 알람 이력. 기기를 주면 그 기기 것만 고른다 (서버 조회에는 기기 조건이 없다).
+ * 최근 7일 알람 이력. 기기를 주면 그 기기 것만 고르고, `limit`을 주면 최신 그 개수만 남긴다 (서버 조회에는 기기·개수 조건이 없어 앱에서 줄인다).
  * 열린 알람의 구성이 바뀔 때마다(발생·확인·해제) 다시 불러와 실시간으로 맞춘다.
  */
-export function useAlarmHistory({ deviceId, now = Date.now }: { deviceId?: DeviceId; now?: () => number } = {}): AlarmHistory {
+export function useAlarmHistory({ deviceId, limit, now = Date.now }: { deviceId?: DeviceId; limit?: number; now?: () => number } = {}): AlarmHistory {
   const [alarms, setAlarms] = useState<Alarm[] | null>(null);
   const [error, setError] = useState(false);
   const [reload, setReload] = useState(0);
@@ -36,7 +36,8 @@ export function useAlarmHistory({ deviceId, now = Date.now }: { deviceId?: Devic
         setAlarms(
           list
             .filter((a) => !deviceId || a.deviceId === deviceId)
-            .sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0)),
+            .sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0))
+            .slice(0, limit),
         );
         setError(false);
       })
@@ -46,7 +47,7 @@ export function useAlarmHistory({ deviceId, now = Date.now }: { deviceId?: Devic
     return () => {
       cancelled = true;
     };
-  }, [deviceId, signature, reload, now]);
+  }, [deviceId, limit, signature, reload, now]);
 
   return { alarms, error, retry: () => setReload((n) => n + 1) };
 }

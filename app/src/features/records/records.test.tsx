@@ -251,7 +251,7 @@ describe('기록 상세 팝업: 열기·닫기', () => {
     // 뒤의 공정 기록 화면은 그대로 (같은 탭, 다시 받지 않음)
     expect(screen.getByRole('heading', { name: '공정 기록', hidden: true })).toBeInTheDocument();
     expect(api.getRecords).toHaveBeenCalledTimes(1);
-    await userEvent.click(within(popup()).getByRole('button', { name: '차량 기록 닫기' }));
+    await userEvent.click(within(popup()).getByRole('button', { name: '닫기' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(where()).toBe('/records');
     expect(api.getRecords).toHaveBeenCalledTimes(1);
@@ -298,7 +298,7 @@ describe('기록 상세 팝업: 열기·닫기', () => {
     expect(where()).toBe('/records/batches/batch-0407');
     expect(screen.getByRole('heading', { name: '홈', hidden: true })).toBeInTheDocument();
     expect(await within(popup()).findByText('만든 베일 2개')).toBeInTheDocument();
-    await userEvent.click(within(popup()).getByRole('button', { name: '배치 상세 닫기' }));
+    await userEvent.click(within(popup()).getByRole('button', { name: '닫기' }));
     expect(where()).toBe('/');
     expect(screen.getByRole('heading', { name: '홈' })).toBeInTheDocument();
   });
@@ -335,12 +335,12 @@ describe('기록 상세 팝업: 이어 열기 (기억은 지금 것과 바로 �
   it('닫기: 배치 Y → 베일 B가 다시 보이고 → 한 번 더 닫으면 모두 닫힌다 (베일 A·배치 X는 잊었다)', async () => {
     await openSequence();
     expect(within(popup()).getByText('닫으면 이전 팝업(베일 #0411)이 다시 보입니다')).toBeInTheDocument();
-    await userEvent.click(within(popup()).getByRole('button', { name: '배치 상세 닫기' }));
+    await userEvent.click(within(popup()).getByRole('button', { name: '닫기' }));
     expect(where()).toBe(`/records/bales/${BALE_B}`);
     expect(within(popup()).getByRole('heading', { name: '베일 상세' })).toBeInTheDocument();
     expect(await within(popup()).findByText(BALE_B)).toBeInTheDocument();
     expect(within(popup()).queryByText(/닫으면 이전 팝업/)).not.toBeInTheDocument();
-    await userEvent.click(within(popup()).getByRole('button', { name: '베일 상세 닫기' }));
+    await userEvent.click(within(popup()).getByRole('button', { name: '닫기' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(where()).toBe('/records?tab=bales');
   });
@@ -377,7 +377,7 @@ describe('개발 모드(StrictMode)에서 효과가 두 번 돌아도 기록을 
     await openSequence(true);
     await goBack();
     await waitFor(() => expect(where()).toBe(`/records/bales/${BALE_B}`));
-    await userEvent.click(within(popup()).getByRole('button', { name: '베일 상세 닫기' }));
+    await userEvent.click(within(popup()).getByRole('button', { name: '닫기' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(where()).toBe('/records?tab=bales');
   });
@@ -403,7 +403,7 @@ describe('기록 상세 팝업: 깊은 링크', () => {
     expect(within(popup()).getByRole('heading', { name: title })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: tab, hidden: true })).toHaveAttribute('aria-selected', 'true');
     await waitFor(() => expect(where()).toBe(`/records/${segment}/${id}`));
-    await userEvent.click(within(popup()).getByRole('button', { name: `${title} 닫기` }));
+    await userEvent.click(within(popup()).getByRole('button', { name: "닫기" }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(where()).toBe(`/records?tab=${segment}`);
   });
@@ -430,7 +430,7 @@ describe('기록 상세 팝업: 초점 (접근성)', () => {
     const row = within(list).getAllByRole('button')[0] as HTMLElement;
     await userEvent.click(row);
     await within(popup()).findByText('만든 베일 2개');
-    expect(within(popup()).getByRole('button', { name: '배치 상세 닫기' })).toHaveFocus();
+    expect(within(popup()).getByRole('button', { name: '닫기' })).toHaveFocus();
     const count = within(popup()).getAllByRole('button').length + within(popup()).getAllByRole('link').length;
     for (let i = 0; i < count + 2; i += 1) {
       await userEvent.tab();
@@ -449,9 +449,9 @@ describe('기록 상세 팝업: 초점 (접근성)', () => {
     const row = within(list).getAllByRole('button')[0] as HTMLElement;
     await userEvent.click(row);
     await userEvent.click(await within(popup()).findByRole('button', { name: `배치 ${BATCH_X} 보기` }));
-    expect(within(popup()).getByRole('button', { name: '배치 상세 닫기' })).toHaveFocus();
+    expect(within(popup()).getByRole('button', { name: '닫기' })).toHaveFocus();
     await userEvent.keyboard('{Escape}');
-    expect(within(popup()).getByRole('button', { name: '베일 상세 닫기' })).toHaveFocus();
+    expect(within(popup()).getByRole('button', { name: '닫기' })).toHaveFocus();
     await userEvent.keyboard('{Escape}');
     expect(row).toHaveFocus();
   });

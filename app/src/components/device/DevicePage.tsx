@@ -44,7 +44,7 @@ export function DevicePage({ hero, illustrated = false, tiles, now, actions, det
     // 조작 줄은 자세히 아래, 기록은 아래 폭 전체.
     // 행에 걸치는(row-span) 칸을 두지 않는다: 걸치면 둘째 행이 필요 이상 커져 기록 위에 빈 곳이 생긴다. 기록은 자동 배치라 조작 줄이 없으면 바로 둘째 행에 온다
     return (
-      <div className={`${PAGE_CONTAINER} min-h-full md:min-h-0 xl:grid xl:grid-cols-2 xl:content-start xl:items-stretch xl:gap-6`}>
+      <div className={`${PAGE_CONTAINER} min-h-full md:min-h-0 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] xl:content-start xl:items-stretch xl:gap-6`}>
         <div className="flex flex-col gap-3 md:gap-0 md:overflow-hidden md:rounded-panel md:border md:border-line md:bg-surface md:shadow-soft-1 md:*:rounded-none md:*:border-0 md:*:bg-transparent md:*:shadow-none md:[&>*+*]:border-t md:[&>*+*]:border-line xl:col-start-1 xl:row-start-1 xl:*:first:flex-1">
           {hero}
           {tiles}

@@ -64,7 +64,7 @@ export async function runAuthReload({ exe, appUrl, apiBase }) {
   async function login(page, remember) {
     await page.goto(`${appUrl}/login`);
     await page.getByLabel('아이디').fill('operator');
-    await page.getByLabel('비밀번호').fill('mock-operator');
+    await page.getByLabel('비밀번호').fill('1234');
     const box = page.getByRole('checkbox', { name: '자동 로그인' });
     check(!(await box.isChecked()), '자동 로그인은 기본으로 꺼져 있다');
     if (remember) await box.check();

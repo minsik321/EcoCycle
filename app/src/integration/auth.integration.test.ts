@@ -45,7 +45,7 @@ async function post(path: string, body: object, { cookie, origin = ORIGIN }: { c
 }
 
 async function webLogin(remember: boolean) {
-  const res = await post('/auth/login', { id: 'operator', password: 'mock-operator', remember, refreshTokenDelivery: 'cookie' });
+  const res = await post('/auth/login', { id: 'operator', password: '1234', remember, refreshTokenDelivery: 'cookie' });
   expect(res.status).toBe(200);
   const body = (await res.json()) as { accessToken: string; refreshToken?: string };
   const cookie = parseSetCookie(res);
@@ -54,7 +54,7 @@ async function webLogin(remember: boolean) {
 }
 
 async function bodyLogin(remember = true) {
-  const res = await post('/auth/login', { id: 'operator', password: 'mock-operator', remember, refreshTokenDelivery: 'body' });
+  const res = await post('/auth/login', { id: 'operator', password: '1234', remember, refreshTokenDelivery: 'body' });
   expect(res.status).toBe(200);
   return (await res.json()) as { accessToken: string; refreshToken: string };
 }
@@ -203,7 +203,7 @@ describe('자동 로그인: 쿠키 (웹)', () => {
     expect((await post('/auth/refresh', {}, { cookie: cookie.value, origin: 'https://evil.example' })).status).toBe(403);
     const login = await post(
       '/auth/login',
-      { id: 'operator', password: 'mock-operator', refreshTokenDelivery: 'cookie' },
+      { id: 'operator', password: '1234', refreshTokenDelivery: 'cookie' },
       { origin: 'https://evil.example' },
     );
     expect(login.status).toBe(403);
@@ -225,7 +225,7 @@ describe('자동 로그인: 쿠키 (웹)', () => {
 
 describe('자동 로그인: 본문 (안드로이드)', () => {
   it('본문으로 주고받고 쿠키는 쓰지 않는다. 교체 후 이전 토큰을 다시 쓰면 세션 전체 폐기', async () => {
-    const login = await post('/auth/login', { id: 'operator', password: 'mock-operator', remember: true, refreshTokenDelivery: 'body' });
+    const login = await post('/auth/login', { id: 'operator', password: '1234', remember: true, refreshTokenDelivery: 'body' });
     expect(parseSetCookie(login)).toBeNull();
     const first = (await login.json()) as { accessToken: string; refreshToken: string };
     expect(first.refreshToken).toMatch(/^rt_/);
@@ -263,13 +263,13 @@ describe('자동 로그인: 본문 (안드로이드)', () => {
   });
 
   it('옛 클라이언트처럼 remember·방식을 빼면 본문 방식으로 동작한다', async () => {
-    const res = await post('/auth/login', { id: 'viewer', password: 'mock-viewer' });
+    const res = await post('/auth/login', { id: 'viewer', password: '1234' });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { refreshToken?: string }).refreshToken).toMatch(/^rt_/);
   });
 
   it('잘못된 remember·방식은 422', async () => {
-    expect((await post('/auth/login', { id: 'viewer', password: 'mock-viewer', remember: 'yes' })).status).toBe(422);
-    expect((await post('/auth/login', { id: 'viewer', password: 'mock-viewer', refreshTokenDelivery: 'url' })).status).toBe(422);
+    expect((await post('/auth/login', { id: 'viewer', password: '1234', remember: 'yes' })).status).toBe(422);
+    expect((await post('/auth/login', { id: 'viewer', password: '1234', refreshTokenDelivery: 'url' })).status).toBe(422);
   });
 });

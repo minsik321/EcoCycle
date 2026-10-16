@@ -14,7 +14,7 @@ const NAME: Record<RecordKind, string> = { vehicle: '차량', batch: '배치', b
  */
 export function RecordPopup({ target, previous, onClose, onOpen }: { target: PopupTarget; previous: PopupTarget | null; onClose: () => void; onOpen: (target: PopupTarget) => void }) {
   return (
-    <Dialog open title={TITLE[target.kind]} onClose={onClose} size={target.kind === 'bale' ? 'popupNarrow' : 'popup'} closeLabel={`${TITLE[target.kind]} 닫기`}>
+    <Dialog open title={TITLE[target.kind]} onClose={onClose} size={target.kind === 'bale' ? 'popupNarrow' : 'popup'} closeLabel="닫기">
       {previous && (
         <p className="-mt-1 mb-2 text-xs text-ink-faint">
           닫으면 이전 팝업({NAME[previous.kind]} {previous.kind === 'vehicle' ? previous.id : shortId(previous.id)})이 다시 보입니다

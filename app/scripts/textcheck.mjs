@@ -49,7 +49,7 @@ async function login(context) {
   const page = await context.newPage();
   await page.goto(`http://localhost:${APP_PORT}/login`);
   await page.getByLabel('아이디').fill('admin');
-  await page.getByLabel('비밀번호').fill('mock-admin');
+  await page.getByLabel('비밀번호').fill('1234');
   await page.getByRole('button', { name: '로그인' }).click();
   await page.waitForURL((u) => !u.pathname.startsWith('/login'));
   return page;
@@ -227,7 +227,11 @@ async function run(browser) {
       }
       // 대시보드: 3D가 다시 열리면 전환을 누르고, 3D가 실패해 이미 대시보드로 바뀌었으면 그대로 본다
       await go('/');
-      await page.locator('.st-root, [aria-label="상태 요약"]').first().waitFor({ timeout: 60_000 });
+      await page.locator('.st-root, [aria-label="상태 요약"]').first().waitFor({ timeout: 60_000 }).catch(async (error) => {
+        fs.mkdirSync(outDir, { recursive: true });
+        await page.screenshot({ path: path.join(outDir, 'home-failed.png'), timeout: 120_000 });
+        throw new Error(`홈으로 돌아오지 못했습니다 (${page.url()}): ${(await page.locator('body').innerText()).slice(0, 400)}`, { cause: error });
+      });
       // 3D 장면을 다시 만드는 동안 메인 스레드가 바빠 실제 클릭이 오래 걸릴 수 있다 (핀처럼 click 이벤트를 바로 보낸다)
       if (await page.locator('.st-root').count()) await page.getByRole('tab', { name: '대시보드' }).dispatchEvent('click');
       await page.getByRole('region', { name: '상태 요약' }).waitFor();

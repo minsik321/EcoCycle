@@ -224,9 +224,9 @@
 .st-area-badge {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
   background: var(--st-blue);
   color: #fff;
   flex: none;
@@ -301,12 +301,26 @@
   background: rgb(255 255 255 / 0.92);
 }
 
+.st-area-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 목록의 파란 아이콘은 작게, 줄 사이를 띄운다(붙어 보이지 않게) */
+.st-area .st-area-list .st-area-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+
 .st-area-list button {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 7px 8px;
+  min-height: 44px;
+  padding: 6px 8px !important;
   border-radius: 12px;
   text-align: left;
 }

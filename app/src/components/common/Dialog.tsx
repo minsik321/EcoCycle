@@ -17,7 +17,7 @@ export interface DialogProps {
    * popup·popupNarrow: 기록 상세 팝업. 폰은 아래 시트(내용이 길면 화면 높이 전체), 640px 이상은 가운데 대화상자(narrow는 좁게)
    */
   size?: 'md' | 'xl' | 'sheet' | 'popup' | 'popupNarrow';
-  /** 주면 제목 줄 오른쪽에 닫기 버튼을 둔다 (이름표는 화면 읽기용 이름) */
+  /** 주면 제목 줄 오른쪽에 X 아이콘 닫기 버튼을 둔다 (이름표는 화면 읽기용 이름, 모든 팝업이 "닫기"로 같다) */
   closeLabel?: string;
 }
 
@@ -97,9 +97,11 @@ export function Dialog({ open, title, onClose, dismissible = true, children, act
               type="button"
               onClick={onClose}
               aria-label={closeLabel}
-              className="-mr-1 inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-control border border-line px-3 text-sm font-semibold whitespace-nowrap text-ink active:bg-paper-deep"
+              className="-mr-2 inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-control text-ink-soft active:bg-paper-deep"
             >
-              닫기
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
             </button>
           </div>
         ) : (

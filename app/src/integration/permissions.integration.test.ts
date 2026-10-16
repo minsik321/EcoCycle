@@ -17,7 +17,7 @@ async function login(role: Role): Promise<string> {
   const res = await fetch(`${API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: role, password: `mock-${role}` }),
+    body: JSON.stringify({ id: role, password: "1234" }),
   });
   expect(res.status).toBe(200);
   return ((await res.json()) as { accessToken: string }).accessToken;

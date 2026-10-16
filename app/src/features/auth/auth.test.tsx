@@ -155,11 +155,11 @@ describe('LoginPage', () => {
   it('로그인에 성공하면 홈으로 간다', async () => {
     vi.mocked(api.login).mockResolvedValue({ accessToken: 'a', refreshToken: 'r', expiresIn: 900, user: ADMIN });
     const { store } = renderWithStore(app(), { me: null, route: '/login' });
-    await type('admin', 'mock-admin');
+    await type('admin', '1234');
     await userEvent.click(screen.getByRole('button', { name: '로그인' }));
 
     await vi.waitFor(() => expect(where()).toBe('/'));
-    expect(api.login).toHaveBeenCalledWith('admin', 'mock-admin', false);
+    expect(api.login).toHaveBeenCalledWith('admin', '1234', false);
     expect(store.getState().auth.status).toBe('loggedIn');
     expect(screen.getByRole('main')).toHaveTextContent('홈 내용');
   });
@@ -172,18 +172,18 @@ describe('LoginPage', () => {
   it('자동 로그인을 켜고 로그인하면 remember: true로 보낸다', async () => {
     vi.mocked(api.login).mockResolvedValue({ accessToken: 'a', expiresIn: 900, user: ADMIN });
     renderWithStore(app(), { me: null, route: '/login' });
-    await type('admin', 'mock-admin');
+    await type('admin', '1234');
     await userEvent.click(screen.getByRole('checkbox', { name: '자동 로그인' }));
     await userEvent.click(screen.getByRole('button', { name: '로그인' }));
     await vi.waitFor(() => expect(where()).toBe('/'));
-    expect(api.login).toHaveBeenCalledWith('admin', 'mock-admin', true);
+    expect(api.login).toHaveBeenCalledWith('admin', '1234', true);
   });
 
   it('보호된 화면에서 튕겨 왔다면 로그인 후 그 화면으로 돌아간다', async () => {
     vi.mocked(api.login).mockResolvedValue({ accessToken: 'a', refreshToken: 'r', expiresIn: 900, user: ADMIN });
     renderWithStore(app(), { me: null, route: '/alarms' });
     expect(where()).toBe('/login');
-    await type('admin', 'mock-admin');
+    await type('admin', '1234');
     await userEvent.click(screen.getByRole('button', { name: '로그인' }));
     await vi.waitFor(() => expect(where()).toBe('/alarms'));
   });

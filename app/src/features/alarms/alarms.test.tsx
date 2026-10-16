@@ -136,3 +136,22 @@ describe('AlarmsPage: 최근 7일 이력', () => {
     expect(await screen.findByText('최근 7일간 알람이 없습니다.')).toBeInTheDocument();
   });
 });
+
+describe('AlarmsPage: 기기로 거르기 (?device=)', () => {
+  it('기기 페이지에서 오면 그 기기 알람만 이력 탭으로 보여 주고, 모든 기기 보기로 풀 수 있다', async () => {
+    page({ route: '/alarms?device=compressor-1' });
+    expect(screen.getByText('압축기 알람만 보는 중')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '최근 7일 이력' })).toHaveAttribute('aria-pressed', 'true');
+    const items = await within(await screen.findByLabelText('알람 이력')).findAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent('al-1 메시지');
+    expect(screen.getByRole('link', { name: '모든 기기 보기' })).toHaveAttribute('href', '/alarms');
+  });
+
+  it('알 수 없는 기기 값은 무시하고 전체를 보여 준다', async () => {
+    page({ route: '/alarms?device=nope' });
+    expect(screen.queryByText(/알람만 보는 중/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /열린 알람/ })).toHaveAttribute('aria-pressed', 'true');
+    await vi.waitFor(() => expect(api.getAlarms).toHaveBeenCalled());
+  });
+});

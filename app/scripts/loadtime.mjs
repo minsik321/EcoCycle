@@ -80,7 +80,7 @@ async function once(browser, dwell) {
   const beforeLogin = requests.filter((u) => u.includes(`:${MOCK_PORT}`)).length;
   const prefetched = requests.filter((u) => u.includes(`:${APP_PORT}/`)).map((u) => new URL(u).pathname);
   await page.getByLabel('아이디').fill('admin');
-  await page.getByLabel('비밀번호').fill('mock-admin');
+  await page.getByLabel('비밀번호').fill('1234');
   loggedIn = true;
   await page.getByRole('button', { name: '로그인' }).click();
   await page.waitForFunction(() => window.__loadtime.kpi !== null && window.__loadtime.frame !== null, null, { timeout: 120_000, polling: 100 });

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { BatchEvent } from '@ecocycle/shared';
 import { getRecords } from '../../api/records';
 import { Card } from '../../components/common/Card';
+import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
 import { RecordList } from '../../components/records/RecordList';
 import { PopupLink, useOpenRecordPopup } from '../../components/records/recordPopup';
@@ -28,7 +29,7 @@ export function BatchBalePage() {
   const commands = useAppSelector(selectRecentCommands).filter(e=>e.type.includes('batch'));
   const unavailable = offline || error;
   const show = (value: string|number|undefined) => unavailable?'–':value ?? '–';
-  return <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col gap-4">
+  return <PageContainer>
     <BackToRecords tab="batches"/><h1 className="text-xl font-bold">배치·베일</h1>
     {unavailable && <p role="alert">{offline?'연결 끊김':'현재 상태를 불러오지 못했습니다. 다시 연결 중입니다.'} · 마지막 수신 {lastReceivedAt?formatLocalTime(lastReceivedAt):'–'}</p>}
     {!data && !error && <p role="status">불러오는 중…</p>}
@@ -47,5 +48,5 @@ export function BatchBalePage() {
     <Card title="배치·베일 사건 기록" aria-label="배치·베일 사건 기록">
       <RecordList<BatchEvent> label="배치·베일 사건 기록" refreshToken={`${data?.eventsRevision}:${commands.map(c=>`${c.key}:${c.status}`).join()}`} load={(q,s)=>getRecords('/batches/events/records',q,s)} rowKey={e=>e.id} time={e=>e.at} title={e=>`${EVENT_TEXT[e.type]} · ${e.batchId}`} detail={e=>e.detail} extra={e=>e.actor} dense columns={[{key:'event',header:'사건·수행자',cell:e=><div className="max-w-28 py-2"><p>{EVENT_TEXT[e.type]}</p><p className="truncate">{e.batchId}</p><p className="truncate text-xs text-ink-soft">{e.actor}</p></div>},{key:'detail',header:'변경·사유',cell:e=><p className="max-w-48 whitespace-normal py-2 text-sm">{e.detail}</p>}]} onOpen={e=>openPopup(e.baleId?{kind:'bale',id:e.baleId}:{kind:'batch',id:e.batchId})}/>
     </Card>
-  </div>;
+  </PageContainer>;
 }

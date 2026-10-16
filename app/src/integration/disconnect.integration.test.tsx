@@ -67,7 +67,7 @@ describe('연결 끊김 통합 점검 (disconnect 시나리오)', () => {
   it('끊김 표시 → 대시보드·3D 홈·조작·관절 값 정지 → 명령 결과 조회 → 복구 후 재동기화', async () => {
     localStorage.setItem('ecocycle.homeMode', 'dashboard');
     const store = createAppStore();
-    await store.dispatch(loginUser({ id: 'operator', password: 'mock-operator' }));
+    await store.dispatch(loginUser({ id: 'operator', password: '1234' }));
     expect(store.getState().auth.status).toBe('loggedIn');
     expect(store.getState().ui.homeMode).toBe('dashboard');
 

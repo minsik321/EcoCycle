@@ -46,6 +46,11 @@ export function resolveNavItems(permissions: readonly Permission[], items: reado
   });
 }
 
+/** 알람 화면 주소. 기기를 주면 그 기기 알람만 걸러 보여 준다(`?device=`, 이력 탭으로 열림). */
+export function alarmsPath(deviceId?: DeviceId): string {
+  return deviceId ? `/alarms?device=${deviceId}` : '/alarms';
+}
+
 /** 기기 하나의 상세 페이지 주소. 탱크는 기기마다, 나머지는 종류당 한 페이지다. */
 export function devicePagePath(id: DeviceId): string {
   switch (deviceTypeOf(id)) {

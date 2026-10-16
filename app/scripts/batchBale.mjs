@@ -61,7 +61,7 @@ try {
    const context=await browser.newContext({viewport:{width,height},locale:'ko-KR',timezoneId:'Asia/Seoul'});
    await context.addInitScript(()=>localStorage.setItem('ecocycle.homeMode','dashboard'));
    const page=await context.newPage();await page.goto('http://localhost:15202/login');
-   await page.getByLabel('아이디').fill('admin');await page.getByLabel('비밀번호').fill('mock-admin');await page.getByRole('button',{name:'로그인'}).click();await page.waitForURL(u=>u.pathname==='/');
+   await page.getByLabel('아이디').fill('admin');await page.getByLabel('비밀번호').fill('1234');await page.getByRole('button',{name:'로그인'}).click();await page.waitForURL(u=>u.pathname==='/');
    await go(page,'/records/batches');await page.getByLabel('A1 (%)',{exact:true}).waitFor();await pause(400);
    const shot=async(name)=>{await audit(page,`${width}-${zoom}-${name}`,zoom);if(zoom===1)await page.screenshot({path:path.join(out,`${width}x${height}-${name}.png`)});};
    await shot('1-current');

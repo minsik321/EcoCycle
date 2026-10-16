@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { PageContainer } from '../../components/layout/PageContainer';
-import { Link } from 'react-router-dom';
-import type { Alarm } from '@ecocycle/shared';
+import { Link, useSearchParams } from 'react-router-dom';
+import { DEVICE_IDS } from '@ecocycle/shared';
+import type { Alarm, DeviceId } from '@ecocycle/shared';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { AckAlarmButton } from '../../components/controls/AckAlarmButton';
 import { StatusBadge } from '../../components/status/StatusBadge';
 import { Timestamp } from '../../components/status/Timestamp';
 import { DEVICE_NAMES } from '../../config/display';
-import { devicePagePath } from '../../config/navigation';
+import { alarmsPath, devicePagePath } from '../../config/navigation';
 import { useAppSelector } from '../../store/hooks';
 import { selectIsDisconnected, selectOpenAlarms } from '../../store/selectors';
 import { ALARM_STATE_TEXT } from '../history/DeviceAlarmHistory';
@@ -40,14 +41,27 @@ function AlarmRow({ alarm }: { alarm: Alarm }) {
  * 열린 알람은 실시간으로 바뀌고, 누르면 해당 기기 페이지로 간다. 확인 처리는 위험도가 낮아 여기서도 한다.
  */
 export function AlarmsPage() {
-  const [tab, setTab] = useState<Tab>('open');
-  const open = useAppSelector(selectOpenAlarms);
+  // 기기 페이지의 "전체 알람 보기"로 오면 `?device=`가 붙어 그 기기 알람만 보이고 이력 탭으로 열린다
+  const [params] = useSearchParams();
+  const requested = params.get('device');
+  const deviceId = DEVICE_IDS.find((id) => id === requested) as DeviceId | undefined;
+  const [tab, setTab] = useState<Tab>(deviceId ? 'history' : 'open');
+  const allOpen = useAppSelector(selectOpenAlarms);
+  const open = deviceId ? allOpen.filter((a) => a.deviceId === deviceId) : allOpen;
   const disconnected = useAppSelector(selectIsDisconnected);
-  const history = useAlarmHistory();
+  const history = useAlarmHistory({ deviceId });
 
   return (
     <PageContainer>
       <h1 className="text-xl font-bold">알람</h1>
+      {deviceId && (
+        <p className="flex flex-wrap items-center gap-x-3 text-sm text-ink-soft">
+          <span>{DEVICE_NAMES[deviceId]} 알람만 보는 중</span>
+          <Link to={alarmsPath()} className="inline-flex min-h-12 items-center font-semibold text-accent-strong underline">
+            모든 기기 보기
+          </Link>
+        </p>
+      )}
       <div role="group" aria-label="보기" className="flex gap-2">
         <Button variant={tab === 'open' ? 'primary' : 'secondary'} aria-pressed={tab === 'open'} onClick={() => setTab('open')}>
           열린 알람 {open.length}건

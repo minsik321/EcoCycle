@@ -4,7 +4,7 @@ export interface Account {
   id: string;
   name: string;
   role: Role;
-  /** 모의 서버 전용 값. 실제 비밀번호가 아니다. */
+  /** 모의 서버 전용 값(모두 1234). 실제 비밀번호가 아니고 실서버에는 영향이 없다. */
   password: string;
 }
 
@@ -16,7 +16,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 };
 
 export const ACCOUNTS: Account[] = [
-  { id: 'admin', name: '관리자(모의)', role: 'admin', password: 'mock-admin' },
-  { id: 'operator', name: '작업자(모의)', role: 'operator', password: 'mock-operator' },
-  { id: 'viewer', name: '열람자(모의)', role: 'viewer', password: 'mock-viewer' },
+  { id: 'admin', name: '관리자(모의)', role: 'admin', password: '1234' },
+  { id: 'operator', name: '작업자(모의)', role: 'operator', password: '1234' },
+  { id: 'viewer', name: '열람자(모의)', role: 'viewer', password: '1234' },
 ];

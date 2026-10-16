@@ -70,7 +70,7 @@ try {
     page.on('pageerror', (e) => console.log('PAGE ERROR', e.message));
     await page.goto(`${origin}/login`);
     await page.getByLabel('아이디').fill('admin');
-    await page.getByLabel('비밀번호').fill('mock-admin');
+    await page.getByLabel('비밀번호').fill('1234');
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     await page.waitForURL((u) => u.pathname === '/');
     const go = async (route) => {

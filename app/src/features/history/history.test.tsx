@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { Alarm, HistoryResponse } from '@ecocycle/shared';
 import * as api from '../../api';
@@ -264,6 +265,20 @@ describe('DeviceAlarmHistory', () => {
     expect(api.getAlarms).toHaveBeenCalledWith({ from: new Date(NOW - 7 * 86_400_000).toISOString() });
   });
 
+  it('최신 5건만 보여 주고, 목록은 스스로 스크롤하며, "전체 알람 보기"는 그 기기로 거른 알람 화면을 연다', async () => {
+    vi.mocked(api.getAlarms).mockResolvedValue(
+      Array.from({ length: 8 }, (_, i) => alarm(`al-${i + 1}`, 'tank-a1', 'cleared', `2026-10-1${i}T05:00:00.000Z`)),
+    );
+    renderWithStore(<DeviceAlarmHistory deviceId="tank-a1" now={now} />);
+
+    const items = await screen.findAllByRole('listitem');
+    expect(items).toHaveLength(5);
+    expect(items[0]).toHaveTextContent('al-8 메시지');
+    expect(items[4]).toHaveTextContent('al-4 메시지');
+    expect(screen.getByRole('list')).toHaveClass('max-h-56', 'overflow-y-auto');
+    expect(screen.getByRole('link', { name: '전체 알람 보기' })).toHaveAttribute('href', '/alarms?device=tank-a1');
+  });
+
   it('알람이 없으면 없다고 알린다', async () => {
     vi.mocked(api.getAlarms).mockResolvedValue([]);
     renderWithStore(<DeviceAlarmHistory deviceId="tank-a1" now={now} />);
@@ -284,7 +299,9 @@ describe('DeviceAlarmHistory', () => {
     const store = createAppStore();
     render(
       <Provider store={store}>
-        <DeviceAlarmHistory deviceId="tank-a1" now={now} />
+        <MemoryRouter>
+          <DeviceAlarmHistory deviceId="tank-a1" now={now} />
+        </MemoryRouter>
       </Provider>,
     );
     await screen.findByText('최근 7일간 알람이 없습니다.');
