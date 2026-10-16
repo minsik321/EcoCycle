@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { RecordPage, RecordQuery } from '@ecocycle/shared';
 import { Card } from '../../components/common/Card';
 import { Sidebar } from '../../components/layout/Sidebar';
+import { SHELL_GAP_TOP, SHELL_GAP_X } from '../../components/layout/AppShell';
 import { TopBar } from '../../components/layout/TopBar';
 import { RecordList } from '../../components/records/RecordList';
 import { connectionChanged } from '../../store';
@@ -63,8 +64,10 @@ export function RecordsPreviewPage() {
     <div className="flex h-full flex-col bg-paper text-ink md:flex-row">
       <Sidebar className="order-last md:order-first" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <TopBar />
-        <main className="min-h-0 flex-1 overflow-auto p-4">
+        <div className={`${SHELL_GAP_X} ${SHELL_GAP_TOP}`}>
+          <TopBar />
+        </div>
+        <main className={`min-h-0 flex-1 overflow-auto pb-4 ${SHELL_GAP_X} ${SHELL_GAP_TOP}`}>
           <Card className="mx-auto max-w-5xl">
             <h1 className="mb-3 text-lg font-bold">
               하역 기록 <span className="text-sm font-semibold text-ink-faint">(예시 데이터)</span>

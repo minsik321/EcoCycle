@@ -124,7 +124,7 @@ try {
     assert.equal(await bar.getAttribute('data-topbar'), 'page');
     await shot('5-bales-record-link');
 
-    // 5) 일반 화면: 같은 바가 화면 맨 위에 붙는다. 홈 전환은 없다. 사용자 메뉴(설정·화질, 폰은 CCTV, 로그아웃)
+    // 5) 일반 화면: 같은 바가 흰 떠 있는 판으로 그려진다. 홈 전환은 없다. 사용자 메뉴(설정·화질, 폰은 CCTV, 로그아웃)
     await go('/robot');
     await page.getByRole('heading', { name: '로봇팔' }).first().waitFor({ timeout: 15_000 });
     await page.waitForTimeout(800);

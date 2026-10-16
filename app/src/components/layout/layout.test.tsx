@@ -160,6 +160,9 @@ describe('AppShell', () => {
   it('상단 바 하나: 로고 · 연결과 시계 · 알람 · 사용자. 연결이 끊기면 같은 자리에 "연결 끊김"과 마지막 수신 시각', () => {
     const { store } = shell('/alarms');
     const bar = document.querySelector<HTMLElement>('[data-topbar="page"]')!;
+    // 3D 홈과 같은 떠 있는 둥근 판(높이·모서리·그림자), 일반 화면에서는 흰 단색
+    expect(bar).toHaveClass('h-14', 'rounded-panel', 'shadow-soft-2', 'bg-surface');
+    expect(bar).not.toHaveClass('glass');
     expect(within(bar).getByText('EcoCycle')).toBeInTheDocument();
     expect(within(bar).getByRole('link', { name: /알람 보기/ })).toHaveAttribute('href', '/alarms');
     act(() => {
@@ -206,7 +209,7 @@ function Immersive() {
 }
 
 describe('AppShell: 화면이 틀을 넘겨받는다 (shellChrome)', () => {
-  it('넘겨받은 화면이 있는 동안 상단 바·끊김 안내를 숨기고 틀의 extra를 그 화면에 넘긴다. 주 메뉴는 남고 아이콘만으로 접힌다', async () => {
+  it('넘겨받은 화면이 있는 동안 상단 바·끊김 안내를 숨기고 틀의 extra를 그 화면에 넘긴다. 주 메뉴는 그대로 남는다', async () => {
     const { store } = renderWithStore(
       <Routes>
         <Route element={<AppShell headerExtra={<button type="button">CCTV</button>} />}>
@@ -217,12 +220,7 @@ describe('AppShell: 화면이 틀을 넘겨받는다 (shellChrome)', () => {
       { route: '/', me: OPERATOR },
     );
     const nav = screen.getByRole('navigation', { name: '주 메뉴' });
-    expect(nav).toHaveAttribute('data-collapsed', 'true');
-    // 누르면 화면 위로 펼치고(3D 크기는 그대로), 메뉴를 고르면 다시 접는다
-    await userEvent.click(within(nav).getByRole('button', { name: '메뉴 펼치기' }));
-    expect(nav).not.toHaveAttribute('data-collapsed');
-    expect(nav.firstElementChild).toHaveClass('md:absolute');
-    expect(nav).toHaveClass('md:w-[4.5rem]');
+    expect(within(nav).getByRole('button', { name: '메뉴 펼치기' })).toBeInTheDocument();
     expect(document.querySelector('[data-topbar]')).toBeNull();
     expect(within(screen.getByRole('main')).getByRole('button', { name: 'CCTV' })).toBeInTheDocument();
     // 끊김 안내는 넘겨받은 화면이 스스로 보여 준다 (스튜디오의 "연결 끊김" 알림)
@@ -232,7 +230,7 @@ describe('AppShell: 화면이 틀을 넘겨받는다 (shellChrome)', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('그 화면을 벗어나면 틀이 돌아온다', async () => {
+  it('그 화면을 벗어나면 틀의 바가 돌아오고, 사이드바 폭은 바뀌지 않는다', async () => {
     renderWithStore(
       <Routes>
         <Route element={<AppShell />}>
@@ -250,31 +248,75 @@ describe('AppShell: 화면이 틀을 넘겨받는다 (shellChrome)', () => {
       </Routes>,
       { route: '/', me: OPERATOR },
     );
-    expect(screen.getByRole('navigation', { name: '주 메뉴' })).toHaveAttribute('data-collapsed', 'true');
+    const nav = () => screen.getByRole('navigation', { name: '주 메뉴' });
+    const width = nav().className;
+    const collapsed = nav().getAttribute('data-collapsed');
     await userEvent.click(screen.getByRole('link', { name: '알람으로' }));
     expect(screen.getByRole('main')).toHaveTextContent('알람 내용');
-    // 다른 화면에서는 펼친 사이드바가 기본이다
-    expect(screen.getByRole('navigation', { name: '주 메뉴' })).not.toHaveAttribute('data-collapsed');
-    expect(screen.getByRole('button', { name: '메뉴 접기' })).toBeInTheDocument();
+    expect(nav().className).toBe(width);
+    expect(nav().getAttribute('data-collapsed')).toBe(collapsed);
     expect(document.querySelector('[data-topbar="page"]')).not.toBeNull();
   });
+});
 
-  it('3D 위로 펼친 메뉴는 바깥을 누르면 다시 접힌다', async () => {
-    renderWithStore(
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={<Immersive />} />
-        </Route>
-      </Routes>,
-      { route: '/', me: OPERATOR },
-    );
-    const nav = screen.getByRole('navigation', { name: '주 메뉴' });
-    await userEvent.click(within(nav).getByRole('button', { name: '메뉴 펼치기' }));
-    expect(nav).not.toHaveAttribute('data-collapsed');
-    await userEvent.click(screen.getByText('몰입 화면'));
-    expect(nav).toHaveAttribute('data-collapsed', 'true');
+describe('AppShell: 사이드바 접기 (기기에 기억)', () => {
+  const routes = (
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route
+          index
+          element={
+            <>
+              <Immersive />
+              <Link to="/alarms">알람으로</Link>
+            </>
+          }
+        />
+        <Route path="alarms" element={<Link to="/">홈으로</Link>} />
+      </Route>
+    </Routes>
+  );
+  const nav = () => screen.getByRole('navigation', { name: '주 메뉴' });
+
+  it('고른 적이 없으면 태블릿(xl 미만)은 아이콘만, 데스크톱(xl 이상)은 펼침', () => {
+    const view = renderWithStore(routes, { route: '/alarms', me: OPERATOR });
+    expect(nav()).toHaveAttribute('data-collapsed', 'true');
+    view.unmount();
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: query.includes('80rem'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      renderWithStore(routes, { route: '/alarms', me: OPERATOR });
+      expect(nav()).not.toHaveAttribute('data-collapsed');
+      expect(nav()).toHaveClass('md:w-48');
+    } finally {
+      window.matchMedia = original;
+    }
   });
 
+  it('접기·펼치기는 3D 홈을 포함한 모든 화면에 같이 적용되고 다시 열어도 기억한다', async () => {
+    const view = renderWithStore(routes, { route: '/', me: OPERATOR });
+    await userEvent.click(within(nav()).getByRole('button', { name: '메뉴 펼치기' }));
+    expect(nav()).not.toHaveAttribute('data-collapsed');
+    expect(nav()).toHaveClass('md:w-48');
+    expect(localStorage.getItem('ecocycle.sidebar')).toBe('expanded');
+    // 메뉴는 3D 위에 뜨지 않고 자리를 차지한다: 3D를 눌러도 접히지 않는다
+    await userEvent.click(screen.getByText('몰입 화면'));
+    expect(nav()).not.toHaveAttribute('data-collapsed');
+    await userEvent.click(screen.getByRole('link', { name: '알람으로' }));
+    expect(nav()).not.toHaveAttribute('data-collapsed');
+    // 접기 단추는 어느 화면에서나 같은 자리(메뉴 맨 위)에 같은 모양이다
+    const button = within(nav()).getByRole('button', { name: '메뉴 접기' });
+    expect(nav().firstElementChild?.firstElementChild).toBe(button);
+    await userEvent.click(button);
+    expect(localStorage.getItem('ecocycle.sidebar')).toBe('collapsed');
+    view.unmount();
+    renderWithStore(routes, { route: '/', me: OPERATOR });
+    expect(nav()).toHaveAttribute('data-collapsed', 'true');
+    expect(nav()).toHaveClass('md:w-[4.5rem]');
+  });
+});
+
+describe('useImmersiveShell', () => {
   it('틀 밖에서는 아무 일도 하지 않는다', () => {
     renderWithStore(<Immersive />, { me: OPERATOR });
     expect(screen.getByText('몰입 화면')).toBeInTheDocument();

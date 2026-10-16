@@ -11,8 +11,8 @@ components/
 ├── status/        StatusBadge(색+기호+글자), OfflineNotice, Timestamp, useDisplayStatus(끊기면 모든 상태를 "연결 끊김"으로), tone(색 클래스)
 ├── controls/      DeviceControls, RobotModeControl(로봇 운전 모드 세 칸 + 섹터 칩·집기), CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
 ├── layout/        Sidebar(앱의 유일한 주 메뉴: 폰 아래 탭 바 + "더 보기", md 이상 왼쪽 사이드바·접힘, 강조 `NAV_ACTIVE`), TopBar(앱의 유일한 상단 바, 아래 "상단 바" 절),
-│                  AppShell(슬롯: headerCenter·headerExtra·overlays), TopCards,
-│                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 틀의 상단 바·끊김 안내를 숨기고 headerExtra를 넘기며 주 메뉴를 접는다. 3D 홈만 쓴다.
+│                  AppShell(슬롯: headerCenter·headerExtra·overlays, 간격 `SHELL_GAP_X`·`SHELL_GAP_TOP`), sidebarPref(사이드바 접힘, 기기에 기억), TopCards,
+│                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 틀의 상단 바·끊김 안내·내용 여백을 거두고 headerExtra를 넘긴다. 3D 홈만 쓴다.
 │                  `useHeaderSlot`: 틀의 상단 바 가운데 칸, 화면이 포털로 홈 전환을 넣는다)
 ├── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
 ├── records/       RecordList(기간 고르기 → 서버에서 10줄씩 → 폰 쌓인 줄 / md 이상 표 → 쪽 넘기기), Pagination, range(기간·쪽 번호 계산),
@@ -23,17 +23,17 @@ components/
 
 ## 상단 바 (`layout/TopBar`, 2026-10-16 "상단 바 하나로")
 
-- 앱에 상단 바는 하나다. 일반 화면은 `AppShell`이 화면 맨 위에 붙여 그리고(`data-topbar="page"`), 3D 홈은 틀의 바를 넘겨받아 같은 컴포넌트를 `overlay` 모양(떠 있는 성에 낀 판, `data-topbar="overlay"`)으로 3D 위에 그린다. 화면이 따로 상단 바를 만들지 않는다.
+- 앱에 상단 바는 하나이고 어디서나 떠 있는 둥근 판이다(2026-10-16 "떠 있는 상단 바"): 화면 가장자리에서 폰 8px·그 밖 10px, 높이 56px, `rounded-panel`, `shadow-soft-2`. 일반 화면은 `AppShell`이 흰 단색 판으로 그리고(`data-topbar="page"`), 3D 홈은 틀의 바를 넘겨받아 같은 컴포넌트를 `overlay` 모양(성에 낀 유리, `data-topbar="overlay"`)으로 3D 위에 그린다. 화면 내용은 바 아래 같은 간격에서 시작하고 좌우 끝이 바와 맞는다(`SHELL_GAP_X`·`SHELL_GAP_TOP`, 3D 홈 패널의 `--st-gap`과 같은 값). 화면이 따로 상단 바를 만들지 않는다.
 - 순서: 로고 · "예시 데이터"(값이 모의 서버에서 올 때) · 가운데 칸(홈에서만 3D | 대시보드 전환. 대시보드는 `useHeaderSlot` 포털, 3D 홈은 `center`) · 연결·시계 알약(연결되면 지금 시각, 끊기면 "연결 끊김"과 마지막 수신 시각) · 알람 · CCTV(`extra`) · 사용자 메뉴(이름·권한, 설정(화질), 로그아웃).
 - 폰(md 미만): 알람은 아래 탭 바의 "알람" 배지가 맡아 바에서 빼고 CCTV는 사용자 메뉴 안. 로고 글자는 전환이 있으면 xl 미만에서 뺀다(사이드바를 펼친 태블릿에서도 전환이 잘리지 않게). 사용자 이름은 xl부터.
 - 서버 없는 시연 화면은 `live`(연결 상태)와 `example`을 직접 넘긴다. 높이는 56px(`h-14`): 3D 홈 패널 자리(`studio.css`)가 이 높이를 기준으로 한다.
-- 점검: `node app/scripts/topBar.mjs`(세 크기, 결과 `docs/screenshots/top-bar`).
+- 점검: `node app/scripts/topBar.mjs`(세 크기, 결과 `docs/screenshots/top-bar`), `node app/scripts/floatingBar.mjs`(3D 홈·대시보드·공정 기록에서 바 자리·모양·사이드바 폭이 같은지, 나란히 놓은 비교 `docs/screenshots/floating-bar`).
 
 ## 주 메뉴 (`layout/Sidebar`)
 
 - 앱에 메뉴는 하나다. `AppShell`이 모든 로그인 화면(3D 홈 포함)에 그리고, 화면이나 스튜디오는 메뉴를 따로 만들지 않는다.
 - 같은 `<nav aria-label="주 메뉴">`가 CSS로 모양만 바꾼다: md 미만은 아래 탭 바(`phoneTab` 메뉴 + "더 보기"가 나머지를 위로 펼침), md 이상은 왼쪽 사이드바.
-- 사이드바는 접을 수 있다(아이콘만, 이름은 화면 읽기용으로 남음). 3D 홈(`useImmersiveShell`)에서는 접힌 것이 기본이고 펼치면 3D 크기를 바꾸지 않고 그 위에 뜬다(바깥을 누르거나 메뉴를 고르면 접힘). 내용 영역은 `isolate`라 3D 패널이 메뉴 위로 올라오지 않는다.
+- 사이드바는 접을 수 있다(아이콘만, 이름은 화면 읽기용으로 남음). 폭은 어느 화면에서나(3D 홈 포함) 같다: 접힘 여부는 앱 틀의 값 하나(`layout/sidebarPref.ts`, `ecocycle.sidebar`)이고, 고른 적이 없으면 태블릿(xl 미만) 아이콘만·데스크톱(xl 이상) 펼침, 누르면 기기에 기억한다. 접기 단추는 늘 메뉴 맨 위 같은 모양. 펼친 메뉴는 3D 위에 뜨지 않고 자리를 차지한다. 내용 영역은 `isolate`라 3D 패널이 메뉴 위로 올라오지 않는다.
 - 지금 화면의 메뉴 강조는 `NAV_ACTIVE` 하나(펼침·접힘·탭·"더 보기" 모두). "더 보기" 안의 화면을 보고 있으면 "더 보기" 버튼이 켜진다.
 
 ## 기록 목록 (`records/`)

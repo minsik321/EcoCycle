@@ -9,8 +9,9 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { selectActiveAlarmCount, selectConnection, selectMe } from '../../store/selectors';
 
 /*
- * 앱의 상단 바는 이것 하나다(2026-10-16, docs/decisions.md "상단 바 하나로"). 일반 화면은 틀(AppShell)이 그리고,
- * 3D 홈은 틀의 바를 넘겨받아 같은 컴포넌트를 3D 위에 띄운다(`overlay`: 성에 낀 떠 있는 바, studio.css가 자리만 정한다).
+ * 앱의 상단 바는 이것 하나다(2026-10-16, docs/decisions.md "상단 바 하나로", "떠 있는 상단 바"). 어디서나 화면 가장자리에서
+ * 떨어져 뜬 둥근 판(같은 높이·모서리·그림자)이다. 일반 화면은 틀(AppShell)이 흰 판으로 그리고,
+ * 3D 홈은 틀의 바를 넘겨받아 같은 컴포넌트를 3D 위에 띄운다(`overlay`: 성에 낀 유리, studio.css가 자리만 정한다).
  * 왼쪽부터 로고 · 예시 데이터 · 가운데 칸(홈에서만 3D | 대시보드 전환) · 연결과 시계 · 알람 · CCTV · 사용자 메뉴.
  *  - 폰(md 미만): 알람은 아래 탭 바의 "알람" 배지가 맡아 바에서 뺀다. CCTV는 사용자 메뉴 안으로 들어간다.
  *  - 화질·설정·로그아웃은 사용자 메뉴 안. 사용자 이름은 넓은 화면(xl)에서만 바에 적는다.
@@ -146,7 +147,7 @@ export interface TopBarProps {
   center?: ReactNode;
   /** 오른쪽에 더 둘 것 (CCTV 버튼). 폰에서는 사용자 메뉴 안에 들어간다 */
   extra?: ReactNode;
-  /** 3D 위에 띄우는 모양: 떠 있는 성에 낀 바(모서리 둥근 판). 아니면 화면 맨 위에 붙은 바 */
+  /** 3D 위에 띄우는 모양: 성에 낀 유리 판. 아니면 같은 모양의 흰 판(자리는 틀이 정한다) */
   overlay?: boolean;
   /** 연결 상태를 store 대신 이 값으로 (서버 없는 시연 화면) */
   live?: { disconnected: boolean; lastReceivedAt: string | null };
@@ -165,10 +166,11 @@ export function TopBar({ center, extra, overlay = false, live, example = USE_MOC
   const activeAlarms = useAppSelector(selectActiveAlarmCount);
   const status = live ? (live.disconnected ? 'offline' : 'online') : connection.status;
   const lastReceivedAt = live ? live.lastReceivedAt : connection.lastReceivedAt;
-  const shape = overlay ? 'rounded-panel px-2 sm:px-3' : 'rounded-none border-x-0 border-t-0 px-3 sm:px-4';
+  // 어디서나 같은 떠 있는 둥근 판(높이·모서리·그림자·안쪽 여백). 3D 위에서는 성에 낀 유리, 일반 화면에서는 흰 단색
+  const surface = overlay ? 'glass' : 'border border-line bg-surface shadow-soft-2';
 
   return (
-    <header data-topbar={overlay ? 'overlay' : 'page'} className={`group glass z-30 flex h-14 min-w-0 items-center gap-1.5 sm:gap-3 ${shape} ${className}`}>
+    <header data-topbar={overlay ? 'overlay' : 'page'} className={`group z-30 flex h-14 min-w-0 items-center gap-1.5 rounded-panel px-2 sm:gap-3 sm:px-3 ${surface} ${className}`}>
       {/* 가운데 칸에 홈 전환(tablist)이 들어 있으면 xl 미만에서는 로고 글자를 빼 자리를 만든다 (사이드바를 펼친 태블릿 포함) */}
       <Logo wordmark="hidden min-[22rem]:inline max-xl:group-has-[[role=tablist]]:hidden" />
       {example && (

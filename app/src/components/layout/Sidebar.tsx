@@ -9,12 +9,10 @@ export interface SidebarProps {
   /** 메뉴 목록. 기본은 config/navigation.ts */
   items?: readonly NavItem[];
   className?: string;
-  /** 태블릿·데스크톱: 아이콘만 남긴 좁은 메뉴 (3D 홈의 기본) */
+  /** 태블릿·데스크톱: 아이콘만 남긴 좁은 메뉴 (태블릿의 기본, 앱 틀이 기기에 기억한 값을 넘긴다) */
   collapsed?: boolean;
   /** 접기·펼치기 버튼을 누를 때. 없으면 버튼을 두지 않는다 */
   onToggle?: () => void;
-  /** 펼쳤을 때 옆 화면을 밀지 않고 그 위에 띄운다 (3D 홈: 3D 화면 크기를 바꾸지 않게) */
-  overlay?: boolean;
 }
 
 /**
@@ -50,10 +48,11 @@ function Icon({ id }: { id: string }) {
 /**
  * 주 메뉴 하나가 화면 폭에 따라 모양만 바꾼다(앱 어디서나, 3D 홈 포함):
  * - 폰(md 미만): 아래 탭 바. 가장 자주 쓰는 메뉴(`phoneTab`) + "더 보기"(나머지를 위로 펼친다).
- * - 태블릿·데스크톱(md 이상): 왼쪽 사이드바. 접으면 아이콘만 남고, 3D 홈에서는 접힌 것이 기본이며 펼치면 3D 위에 뜬다.
+ * - 태블릿·데스크톱(md 이상): 왼쪽 사이드바. 접으면 아이콘만 남는다. 폭은 어느 화면에서나(3D 홈 포함) 같다:
+ *   접힘 여부는 앱 틀이 기기에 기억한 값 하나(components/layout/sidebarPref.ts)이고 화면마다 따로 정하지 않는다.
  * 권한이 없는 메뉴는 설정(config/navigation.ts)에 따라 숨기거나 비활성화한다. 이것은 표시일 뿐이고 접근 차단은 서버가 한다.
  */
-export function Sidebar({ items = NAV_ITEMS, className = '', collapsed = false, onToggle, overlay = false }: SidebarProps) {
+export function Sidebar({ items = NAV_ITEMS, className = '', collapsed = false, onToggle }: SidebarProps) {
   const permissions = useAppSelector(selectPermissions);
   const activeAlarms = useAppSelector(selectActiveAlarmCount);
   const { pathname } = useLocation();
@@ -61,18 +60,6 @@ export function Sidebar({ items = NAV_ITEMS, className = '', collapsed = false, 
   const more = resolved.filter((item) => !item.phoneTab);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
-  const navRef = useRef<HTMLElement>(null);
-  const floating = overlay && !collapsed;
-
-  // 3D 위에 펼친 메뉴는 바깥(3D)을 누르면 다시 접는다
-  useEffect(() => {
-    if (!floating || !onToggle) return;
-    const onDown = (event: PointerEvent) => {
-      if (navRef.current && !navRef.current.contains(event.target as Node)) onToggle();
-    };
-    document.addEventListener('pointerdown', onDown);
-    return () => document.removeEventListener('pointerdown', onDown);
-  }, [floating, onToggle]);
 
   // 화면을 옮기면 "더 보기"를 닫는다
   useEffect(() => setMoreOpen(false), [pathname]);
@@ -97,16 +84,11 @@ export function Sidebar({ items = NAV_ITEMS, className = '', collapsed = false, 
 
   return (
     <nav
-      ref={navRef}
       aria-label="주 메뉴"
       data-collapsed={collapsed || undefined}
-      className={`relative z-30 shrink-0 ${collapsed || overlay ? 'md:w-[4.5rem]' : 'md:w-48'} ${className}`}
+      className={`relative z-30 shrink-0 ${collapsed ? 'md:w-[4.5rem]' : 'md:w-48'} ${className}`}
     >
-      <div
-        className={`glass flex h-full gap-1 rounded-none border-x-0 border-b-0 px-1 py-1 md:flex-col md:border-y-0 md:border-l-0 md:p-2 ${
-          floating ? 'md:absolute md:inset-y-0 md:left-0 md:w-48 md:shadow-soft-3' : ''
-        }`}
-      >
+      <div className="glass flex h-full gap-1 rounded-none border-x-0 border-b-0 px-1 py-1 md:flex-col md:border-y-0 md:border-l-0 md:p-2">
         {onToggle && (
           <button
             type="button"
@@ -120,7 +102,7 @@ export function Sidebar({ items = NAV_ITEMS, className = '', collapsed = false, 
           </button>
         )}
         {resolved.map((item) => (
-          <MenuItem key={item.id} item={item} badge={badgeOf(item)} collapsed={collapsed} phoneHidden={!item.phoneTab} onNavigate={floating ? onToggle : undefined} />
+          <MenuItem key={item.id} item={item} badge={badgeOf(item)} collapsed={collapsed} phoneHidden={!item.phoneTab} />
         ))}
         {more.length > 0 && (
           <div ref={moreRef} className="flex flex-1 md:hidden">
@@ -156,11 +138,9 @@ interface MenuItemProps {
   phoneHidden?: boolean;
   /** "더 보기" 안의 줄 */
   inMore?: boolean;
-  /** 눌러 화면을 옮긴 뒤(3D 위에 펼친 메뉴를 접는다) */
-  onNavigate?: (() => void) | undefined;
 }
 
-function MenuItem({ item, badge, collapsed, phoneHidden = false, inMore = false, onNavigate }: MenuItemProps) {
+function MenuItem({ item, badge, collapsed, phoneHidden = false, inMore = false }: MenuItemProps) {
   // 폰 탭: 그림 위·글자 아래로 나눠 쓰고, md 이상에서는 한 줄(접히면 그림만). "더 보기" 안은 늘 한 줄
   const shape = inMore
     ? 'flex min-h-12 items-center gap-2.5 px-3 text-base'
@@ -200,7 +180,6 @@ function MenuItem({ item, badge, collapsed, phoneHidden = false, inMore = false,
       to={item.path}
       end={item.path === '/'}
       title={collapsed ? item.label : undefined}
-      onClick={onNavigate}
       className={({ isActive }) => `${base} ${isActive ? NAV_ACTIVE : NAV_IDLE}`}
     >
       {content}

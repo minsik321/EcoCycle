@@ -44,8 +44,8 @@ function HomeContent() {
 
   if (show3d) {
     return (
-      // 3D 홈은 홈 화면 전체를 쓴다 (틀의 안쪽 여백을 지운다)
-      <div className="-m-4 h-[calc(100%+2rem)]">
+      // 3D 홈은 홈 화면 전체를 쓴다 (틀을 넘겨받은 동안 틀은 안쪽 여백을 두지 않는다)
+      <div className="h-full">
         <h1 className="sr-only">홈</h1>
         <Suspense fallback={<StudioFallback />}>
           <LiveStudio switcher={switcher} onFailed={() => setFailed(true)} />

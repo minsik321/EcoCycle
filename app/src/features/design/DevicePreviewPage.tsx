@@ -8,6 +8,7 @@ import { KeyTiles } from '../../components/device/KeyTile';
 import { DeviceLiveOverride } from '../../components/device/live';
 import { NowNext } from '../../components/device/NowNext';
 import { Sidebar } from '../../components/layout/Sidebar';
+import { SHELL_GAP_TOP, SHELL_GAP_X } from '../../components/layout/AppShell';
 import { TopBar } from '../../components/layout/TopBar';
 
 // 기기 페이지 틀 미리 보기(/design/device, 개발용). 값은 모두 보기용 예시이고 조작 버튼은 명령을 보내지 않는다.
@@ -34,8 +35,10 @@ export function DevicePreviewPage() {
       <div className="flex h-full flex-col bg-paper text-ink md:flex-row">
         <Sidebar className="order-last md:order-first" />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <TopBar />
-          <main className="min-h-0 flex-1 overflow-auto p-4">
+          <div className={`${SHELL_GAP_X} ${SHELL_GAP_TOP}`}>
+            <TopBar />
+          </div>
+          <main className={`min-h-0 flex-1 overflow-auto pb-4 ${SHELL_GAP_X} ${SHELL_GAP_TOP}`}>
             <DevicePage
               hero={
                 <DeviceHero

@@ -96,6 +96,7 @@ npm run measure:load        # 3D 홈 첫 화면 시간: 프로덕션 빌드, 폰
 npm run poster              # 3D 홈 준비 화면의 포스터(빈 장면)를 다시 찍는다 (약 1분, 로컬 Chromium 필요)
 node app/scripts/layoutPages.mjs   # 페이지 폭·간격: 네 크기에서 섹터 목록·공정 기록·대시보드 스크린샷과 같은 폭 점검 (약 2분, 로컬 Chromium 필요)
 node app/scripts/topBar.mjs        # 상단 바 하나·3D 홈 표: 세 크기(390·820·1440)에서 3D 홈과 일반 화면의 바, 사용자 메뉴, 대시보드, 태블릿·PC 표 접기(기억), 장면에 없는 대상 → 팝업, 베일 "기록 보기" 점검과 스크린샷 (약 5분, 로컬 Chromium 필요)
+node app/scripts/floatingBar.mjs   # 떠 있는 상단 바·사이드바 폭: 세 크기(1440·820·390)에서 3D 홈·대시보드·공정 기록의 바 자리·모양·내용 간격·사이드바 폭이 같은지, 접기 기억, 나란히 놓은 비교 (약 3분, 로컬 Chromium 필요)
 node app/scripts/recordPopups.mjs  # 기록 상세 팝업: 베일 기록 API, 폰·데스크톱에서 팝업 셋·이어 열기·뒤로 가기·깊은 링크 점검과 스크린샷 (약 2분, 로컬 Chromium 필요)
 npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```
