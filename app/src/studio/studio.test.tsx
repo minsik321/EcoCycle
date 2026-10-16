@@ -15,7 +15,7 @@ import type { StageProps } from './Stage';
 import { SCENE_START, StudioView } from './StudioView';
 import { Robot } from './actors/Robot';
 import { demoData } from './demo/demoData';
-import { Detail, PhoneSheet, Tables, TrackerBar } from './overlay/Panels';
+import { Detail, PhoneSheet, TABLE_COLLAPSED_KEY, Tables, TrackerBar } from './overlay/Panels';
 import { cycleSteps } from './overlay/text';
 import { Director } from './sim/director';
 import { Pace } from './sim/pace';
@@ -25,6 +25,7 @@ import { EMPTY_DATA } from './types';
 import { APRON, AREAS, BALE_REST, DEFAULT_VIEW, SCALE, TIER_DISTANCE, TRUCK, VIEWS, WIDE_VIEW, YARD, bayCenterZ, closeDistance, tierOf } from './world/layout';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
+import { TopBar } from '../components/layout/TopBar';
 import { ADMIN } from '../test/utils';
 
 // 스튜디오 탭의 고정 규칙을 점검한다: 연결이 끊기면 모든 움직임이 멈추고 "연결 끊김"과 마지막 수신 시각이 보인다,
@@ -80,7 +81,7 @@ function run(director: Director, seconds: number, each?: () => void): void {
 beforeAll(async () => {
   // 여기서는 무대에 넘기는 값을 본다: 첫 값을 기다리지 않고 바로 올린다 (기다리는 동작은 loading.test.tsx)
   SCENE_START.waitMs = 0;
-  render(<StudioView data={EMPTY_DATA} jointSource={fixedSource()} tier="low" disconnected={false} lastReceivedAt={null} paused={false} example={false} onFailed={() => {}} />);
+  render(<StudioView data={EMPTY_DATA} jointSource={fixedSource()} tier="low" disconnected={false} lastReceivedAt={null} paused={false} onFailed={() => {}} />);
   await screen.findByTestId('stage');
   cleanup();
 });
@@ -279,7 +280,7 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
   });
 
   const view = (over: Partial<Parameters<typeof StudioView>[0]> = {}) => (
-    <StudioView data={demoData(T0, 30)} jointSource={fixedSource()} tier="high" disconnected={false} lastReceivedAt={NOW} paused={false} example={false} onFailed={() => {}} {...over} />
+    <StudioView data={demoData(T0, 30)} jointSource={fixedSource()} tier="high" disconnected={false} lastReceivedAt={NOW} paused={false} onFailed={() => {}} {...over} />
   );
 
   it('"연결 끊김"과 마지막 수신 시각을 보여 주고, 무대를 멈추게 하고, 핀은 마지막 값을 감춘다', () => {
@@ -315,11 +316,39 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
     expect(stage.last?.director.trucks.filter((t) => t.active)).toHaveLength(1);
   });
 
-  it('예시 값이면 "예시 데이터"라고 표시한다', () => {
-    const { rerender } = render(view({ example: true }));
-    expect(screen.getByText('예시 데이터')).toBeInTheDocument();
-    rerender(view({ example: false }));
-    expect(screen.queryByText('예시 데이터')).not.toBeInTheDocument();
+  it('상단 바는 앱 쪽이 넘겨 준 것(앱 전체의 상단 바)을 3D 위에 그린다. 예시 값이면 "예시 데이터"', () => {
+    const { unmount } = renderWithStore(view({ topBar: <TopBar overlay className="st-topbar" example live={{ disconnected: false, lastReceivedAt: NOW }} /> }));
+    const bar = document.querySelector<HTMLElement>('[data-topbar="overlay"]')!;
+    expect(bar.closest('.st-root')).not.toBeNull();
+    expect(bar).toHaveTextContent('예시 데이터');
+    expect(within(bar).getByRole('status')).toHaveTextContent('연결됨');
+    unmount();
+    renderWithStore(view({ topBar: <TopBar overlay className="st-topbar" example={false} live={{ disconnected: true, lastReceivedAt: NOW }} /> }));
+    expect(document.querySelector('[data-topbar]')).not.toHaveTextContent('예시');
+    expect(within(document.querySelector<HTMLElement>('[data-topbar]')!).getByRole('status')).toHaveTextContent('연결 끊김');
+  });
+
+  it('장면에서 찾기(검색)는 없다. 지역 전환은 상단 바 밖, 지도 도구 곁에 있다', () => {
+    render(view());
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.getByRole('button', { name: /^지역:/ }).closest('.st-area-dock')).not.toBeNull();
+  });
+
+  it('표에서 장면에 없는 대상(출차한 차량)을 누르면 카메라는 그대로 두고 기록 팝업만 연다', async () => {
+    const user = userEvent.setup();
+    const openRecord = vi.fn();
+    const gone: Vehicle = { ...vehicle('v-gone', 'departed', 'tank-a1'), plate: '34나 7788' };
+    render(view({ data: input({ vehicles: [gone, vehicle('v1', 'unloading', 'tank-b1')] }), openRecord }));
+    const table = screen.getByRole('region', { name: '공정 기록' });
+    await user.click(within(table).getByText('34나 7788'));
+    expect(openRecord).toHaveBeenCalledWith({ kind: 'vehicle', id: 'v-gone' });
+    expect(screen.queryByRole('complementary', { name: '차량 상세' })).toBeNull();
+    expect(stage.last?.routeKeys.current).toEqual([]);
+    // 장면에 있는 차량은 지금처럼 고른다 (카메라가 다가가고 상세)
+    await user.click(within(table).getByText('12가 3456'));
+    expect(openRecord).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('complementary', { name: '차량 상세' })).toBeInTheDocument();
+    expect(stage.last?.routeKeys.current).toEqual(['veh:v1']);
   });
 });
 
@@ -379,7 +408,7 @@ describe('공정 추적: 서버 단계를 여섯 칸에 옮겨 적는다', () =>
 
 describe('참고 화면에 맞춘 화면 구성', () => {
   const view = (over: Partial<Parameters<typeof StudioView>[0]> = {}) => (
-    <StudioView data={demoData(T0, 30)} jointSource={fixedSource()} tier="high" disconnected={false} lastReceivedAt={NOW} paused={false} example={false} onFailed={() => {}} {...over} />
+    <StudioView data={demoData(T0, 30)} jointSource={fixedSource()} tier="high" disconnected={false} lastReceivedAt={NOW} paused={false} onFailed={() => {}} {...over} />
   );
 
   it('카메라 거리는 세 단계다: 부지 전체(wide) > 구역(mid, 기본) > 대상(close)', () => {
@@ -416,14 +445,6 @@ describe('참고 화면에 맞춘 화면 구성', () => {
     expect(within(panel).getByText('출차')).toBeInTheDocument(); // 접혀 있어도 내용은 있다
   });
 
-  it('검색으로 번호판을 찾아 고른다', async () => {
-    const user = userEvent.setup();
-    render(view({ data: input({ vehicles: [vehicle('v1', 'identified', 'tank-a1')] }) }));
-    await user.type(screen.getByRole('searchbox', { name: '장면에서 찾기' }), '3456');
-    await user.click(screen.getByRole('option', { name: /12가 3456/ }));
-    expect(screen.getByRole('complementary', { name: '차량 상세' })).toBeInTheDocument();
-  });
-
   it('홈에서 열면 앱의 상단 바를 넘겨받아 상단 바 하나만 남고(알람·사용자·로그아웃·CCTV는 그 바에), 화면 이동은 앱의 주 메뉴 하나로 한다', async () => {
     const user = userEvent.setup();
     renderWithStore(
@@ -442,7 +463,9 @@ describe('참고 화면에 맞춘 화면 구성', () => {
     // 앱 상단 바(로고·로그아웃 버튼)는 없고 스튜디오 상단 바 하나뿐이다
     expect(screen.getAllByText('EcoCycle')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument();
-    const bar = document.querySelector<HTMLElement>('.st-top')!;
+    // 3D 위의 바는 다른 화면과 같은 상단 바(components/layout/TopBar)를 떠 있는 모양으로 그린 것이다
+    const bar = document.querySelector<HTMLElement>('[data-topbar="overlay"]')!;
+    expect(bar.closest('.st-root')).not.toBeNull();
     expect(within(bar).getByRole('link', { name: /알람 보기/ })).toHaveAttribute('href', '/alarms');
     expect(within(bar).getByRole('button', { name: 'CCTV' })).toBeInTheDocument();
     expect(within(bar).queryByRole('button', { name: '메뉴' })).not.toBeInTheDocument();
@@ -489,7 +512,7 @@ describe('화질 단계: 휴대폰 먼저 (고정 규칙 6)', () => {
   });
 
   it('화면은 단계를 data-tier로 적어 패널 흐림이 단계를 따른다', () => {
-    const { container } = render(<StudioView data={demoData(T0, 30)} jointSource={fixedSource()} tier="low" disconnected={false} lastReceivedAt={NOW} paused={false} example={false} onFailed={() => {}} />);
+    const { container } = render(<StudioView data={demoData(T0, 30)} jointSource={fixedSource()} tier="low" disconnected={false} lastReceivedAt={NOW} paused={false} onFailed={() => {}} />);
     expect(container.querySelector('.st-root')?.getAttribute('data-tier')).toBe('low');
     expect(stage.last?.tier).toBe('low');
   });
@@ -559,7 +582,7 @@ describe('공정 기록 링크 (앱이 주소를 그려 넘긴다)', () => {
     </a>
   );
 
-  it('차량 표(넓은 화면·세로 태블릿)는 머리에 "기록 보기", 배치 탭도 같고 섹터·베일 탭에는 없다', async () => {
+  it('차량 표(넓은 화면·세로 태블릿)는 머리에 "기록 보기", 배치·베일 탭도 같고(베일은 공정 기록의 베일 탭) 섹터 탭에는 없다', async () => {
     const user = userEvent.setup();
     render(<Tables data={demoData(T0, 30)} disconnected={false} selection={null} onSelect={() => {}} recordLink={recordLink} />);
     expect(screen.getByRole('link', { name: '기록 보기' })).toHaveAttribute('href', '#list:vehicles');
@@ -568,7 +591,7 @@ describe('공정 기록 링크 (앱이 주소를 그려 넘긴다)', () => {
     await user.click(screen.getByRole('tab', { name: /^섹터/ }));
     expect(screen.queryByRole('link', { name: '기록 보기' })).toBeNull();
     await user.click(screen.getByRole('tab', { name: /^베일/ }));
-    expect(screen.queryByRole('link', { name: '기록 보기' })).toBeNull();
+    expect(screen.getByRole('link', { name: '기록 보기' })).toHaveAttribute('href', '#list:bales');
   });
 
   it('고른 차량의 상세에는 "이 차량 기록", 고른 베일의 상세와 지금 배치 요약에는 "이 배치 상세"', () => {
@@ -586,7 +609,7 @@ describe('공정 기록 링크 (앱이 주소를 그려 넘긴다)', () => {
     expect(screen.getByRole('link', { name: '이 배치 상세' })).toHaveAttribute('href', `#batch:${current.id}`);
   });
 
-  it('폰 시트: 배치·차량 탭에 "기록 보기", 섹터 탭에는 없다. 링크를 넘기지 않으면(시연 화면) 어디에도 없다', async () => {
+  it('폰 시트: 배치·차량·베일 탭에 "기록 보기", 섹터 탭에는 없다. 링크를 넘기지 않으면(시연 화면) 어디에도 없다', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<PhoneSheet data={demoData(T0, 30)} disconnected={false} selection={null} onSelect={() => {}} recordLink={recordLink} />);
     await user.click(screen.getByRole('button', { name: '공정 정보 펼치기' }));
@@ -596,11 +619,81 @@ describe('공정 기록 링크 (앱이 주소를 그려 넘긴다)', () => {
     expect(screen.getByRole('link', { name: '기록 보기' })).toHaveAttribute('href', '#list:batches');
     await user.click(screen.getByRole('tab', { name: /^섹터/ }));
     expect(screen.queryByRole('link', { name: '기록 보기' })).toBeNull();
+    await user.click(screen.getByRole('tab', { name: /^베일/ }));
+    expect(screen.getByRole('link', { name: '기록 보기' })).toHaveAttribute('href', '#list:bales');
     unmount();
 
     render(<PhoneSheet data={demoData(T0, 30)} disconnected={false} selection={null} onSelect={() => {}} />);
     await user.click(screen.getByRole('button', { name: '공정 정보 펼치기' }));
     await user.click(screen.getByRole('tab', { name: /^차량/ }));
     expect(screen.queryByRole('link')).toBeNull();
+  });
+});
+
+describe('표: 접기·펼치기와 장면에 없는 대상', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('접기 단추로 요약 한 줄까지 접고, 접은 상태를 기기에 기억한다', async () => {
+    const user = userEvent.setup();
+    const data = demoData(T0, 30);
+    const { unmount } = render(<Tables data={data} disconnected={false} selection={null} onSelect={() => {}} />);
+    await user.click(screen.getByRole('button', { name: '공정 기록 표 접기' }));
+    expect(screen.queryByRole('tablist', { name: '기록 종류' })).toBeNull();
+    const summary = screen.getByRole('button', { name: /공정 기록 표 펼치기/ });
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
+    const onSite = data.vehicles.filter((v) => v.stage !== 'departed').length;
+    expect(summary).toHaveTextContent(`차량 ${onSite}대`);
+    expect(localStorage.getItem(TABLE_COLLAPSED_KEY)).toBe('1');
+    unmount();
+
+    // 다시 열어도 접혀 있다. 펼치면 기억도 지운다
+    render(<Tables data={data} disconnected={false} selection={null} onSelect={() => {}} />);
+    await user.click(screen.getByRole('button', { name: /공정 기록 표 펼치기/ }));
+    expect(screen.getByRole('tablist', { name: '기록 종류' })).toBeInTheDocument();
+    expect(localStorage.getItem(TABLE_COLLAPSED_KEY)).toBeNull();
+  });
+
+  it('배치 줄과 출하된 베일 줄은 팝업을 열고, 적치 중인 베일은 장면에서 고른다. 여는 함수가 없으면(시연 화면) 누를 수 없다', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const openRecord = vi.fn();
+    const batch = { ...demoData(T0, 30).batches[0]!, id: 'batch-0777' };
+    const data = input({ batches: [batch], bales: [bale('BL-1', 'shipped'), bale('BL-2', 'created')] });
+    const { unmount } = render(<Tables data={data} disconnected={false} selection={null} onSelect={onSelect} openRecord={openRecord} />);
+    await user.click(screen.getByRole('tab', { name: /^배치/ }));
+    await user.click(screen.getByText('0777', { exact: false }));
+    expect(openRecord).toHaveBeenLastCalledWith({ kind: 'batch', id: 'batch-0777' });
+    await user.click(screen.getByRole('tab', { name: /^베일/ }));
+    const rows = screen.getAllByRole('row');
+    await user.click(rows.find((r) => r.textContent?.includes('출하'))!);
+    expect(openRecord).toHaveBeenLastCalledWith({ kind: 'bale', id: 'BL-1' });
+    // 키보드로도 연다
+    rows.find((r) => r.textContent?.includes('출하'))!.focus();
+    await user.keyboard('{Enter}');
+    expect(openRecord).toHaveBeenCalledTimes(3);
+    await user.click(rows.find((r) => r.textContent?.includes('적치'))!);
+    expect(onSelect).toHaveBeenCalledWith('bale:BL-2');
+    expect(openRecord).toHaveBeenCalledTimes(3);
+    unmount();
+
+    render(<Tables data={data} disconnected={false} selection={null} onSelect={onSelect} />);
+    await user.click(screen.getByRole('tab', { name: /^배치/ }));
+    expect(screen.getAllByRole('row').every((r) => !r.hasAttribute('tabindex'))).toBe(true);
+  });
+
+  it('3D 홈(LiveStudio)에서는 장면에 없는 차량 줄이 그 차량의 기록 팝업 주소를 연다', async () => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore(
+      <Routes>
+        <Route index element={<LiveStudio onFailed={() => {}} />} />
+        <Route path="/records/vehicles/:id" element={<p>차량 기록 팝업 주소</p>} />
+      </Routes>,
+      { devices: [tankState(), robotState(), conveyorState()], me: ADMIN },
+    );
+    act(() => {
+      store.dispatch(vehicleReceived({ ...vehicle('v-gone', 'departed', 'tank-a1'), plate: '34나 7788' }));
+    });
+    await user.click(within(screen.getByRole('region', { name: '공정 기록' })).getByText('34나 7788'));
+    expect(screen.getByText('차량 기록 팝업 주소')).toBeInTheDocument();
   });
 });

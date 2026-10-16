@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 /**
  * 화면이 틀의 상단 바를 잠시 넘겨받는 약속. 3D 홈처럼 자기 상단 바 하나로 화면 전체를 쓰는 곳이 쓴다.
- * 넘겨받은 화면은 틀의 상단 바가 하던 일(알람·연결 상태·시계·사용자·로그아웃·CCTV)을 자기 상단 바에서 해야 한다.
+ * 넘겨받은 화면은 같은 상단 바(TopBar)를 자기 화면 위에 그린다(3D 홈은 overlay 모양으로). 틀이 끼워 넣던 extra(CCTV)도 그 바에 넘긴다.
  * 주 메뉴(Sidebar)는 넘겨받지 않는다: 앱 어디서나 같은 메뉴 하나를 쓴다(태블릿·데스크톱에서는 아이콘만 남게 접힌다).
  */
 export interface ShellChrome {
@@ -11,6 +11,8 @@ export interface ShellChrome {
   setImmersive: (on: boolean) => void;
   /** 틀의 상단 바에 끼워 넣던 것(예: CCTV 버튼). 넘겨받은 화면이 대신 보여 준다 */
   extra: ReactNode;
+  /** 틀의 상단 바 가운데 칸. 화면이 자기 것(대시보드 홈의 3D | 대시보드 전환)을 포털로 넣는다(useHeaderSlot). 아직 없으면 null */
+  headerSlot: HTMLElement | null;
 }
 
 export const ShellChromeContext = createContext<ShellChrome | null>(null);
@@ -28,4 +30,12 @@ export function useImmersiveShell(): ShellChrome | null {
     return () => setImmersive(false);
   }, [setImmersive]);
   return chrome;
+}
+
+/**
+ * 틀의 상단 바 가운데 칸(홈 전환 자리). 틀 안이면 그 칸의 요소, 틀 밖(테스트·미리 보기)이거나 아직 그려지지 않았으면 null.
+ * 쓰는 쪽: `slot ? createPortal(node, slot) : node` (틀 밖에서는 제자리에 그린다).
+ */
+export function useHeaderSlot(): HTMLElement | null {
+  return useContext(ShellChromeContext)?.headerSlot ?? null;
 }

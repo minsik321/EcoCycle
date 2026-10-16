@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { TopBar } from '../components/layout/TopBar';
 import { QUALITY_TIERS, tierFromProbe } from '../config/quality';
 import type { QualityTier } from '../config/quality';
 import { demoSource, fixedSource } from './robot/jointSource';
@@ -86,8 +87,7 @@ export function DemoStudio({ tabs, disconnected, paused, onFailed }: { tabs?: Re
       disconnected={disconnected}
       lastReceivedAt={lastReceivedAt}
       paused={paused}
-      example
-      tabs={slot}
+      topBar={<TopBar overlay className="st-topbar" center={slot} example live={{ disconnected, lastReceivedAt }} />}
       onFailed={onFailed}
     />
   );
@@ -99,5 +99,5 @@ export function DemoStudio({ tabs, disconnected, paused, onFailed }: { tabs?: Re
  */
 export function PosterStudio({ onFailed }: { onFailed: () => void }) {
   const jointSource = useMemo(() => fixedSource(), []);
-  return <StudioView data={EMPTY_DATA} jointSource={jointSource} tier={tierFromUrl() ?? 'high'} disconnected={false} lastReceivedAt={null} paused={false} example={false} onFailed={onFailed} poster />;
+  return <StudioView data={EMPTY_DATA} jointSource={jointSource} tier={tierFromUrl() ?? 'high'} disconnected={false} lastReceivedAt={null} paused={false} onFailed={onFailed} poster />;
 }

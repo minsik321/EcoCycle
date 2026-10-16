@@ -14,11 +14,11 @@ export interface HomeSwitchProps {
 
 /**
  * 홈 맨 위의 전환 하나: 3D(3D 장면) | 대시보드(3D 없는 화면).
- * 3D 안에서는 3D 홈 상단 바에 들어가고(모양은 studio.css가 맞춘다), 대시보드에서는 화면 맨 위에 놓인다.
+ * 어느 쪽에서나 앱 상단 바(components/layout/TopBar)의 가운데 칸에 들어간다: 3D는 3D 위에 뜬 바, 대시보드는 틀의 바(useHeaderSlot).
  */
 export function HomeSwitch({ mode, onChange, can3d }: HomeSwitchProps) {
   return (
-    <div role="tablist" aria-label="홈 보기" className="inline-flex shrink-0 gap-1 rounded-control border border-line bg-surface p-1 shadow-soft-1">
+    <div role="tablist" aria-label="홈 보기" className="inline-flex shrink-0 gap-0.5 rounded-control bg-ink/5 p-1">
       {OPTIONS.map((o) => {
         const disabled = o.key === '3d' && !can3d;
         return (
@@ -30,8 +30,8 @@ export function HomeSwitch({ mode, onChange, can3d }: HomeSwitchProps) {
             aria-disabled={disabled || undefined}
             disabled={disabled}
             onClick={() => onChange(o.key)}
-            className={`min-h-10 min-w-16 rounded-control px-4 text-sm font-semibold whitespace-nowrap disabled:opacity-40 ${
-              mode === o.key ? 'bg-ink text-surface' : 'text-ink-soft'
+            className={`min-h-10 min-w-12 rounded-[0.6rem] px-3 text-sm font-semibold whitespace-nowrap disabled:opacity-40 sm:px-4 ${
+              mode === o.key ? 'bg-surface text-accent shadow-soft-1' : 'text-ink-soft'
             }`}
           >
             {o.label}

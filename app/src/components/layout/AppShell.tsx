@@ -16,7 +16,7 @@ import { TopBar } from './TopBar';
  * 홈처럼 화면을 가득 쓰는 곳(config/navigation.ts의 fullBleed)은 안쪽 여백 없이 내용을 깔고, 안내는 그 위에 띄운다.
  */
 export interface AppShellProps {
-  /** 상단 바 가운데에 둘 것(예: 홈의 검색·지역 전환) */
+  /** 상단 바 가운데에 둘 것. 화면이 넣는 것(홈 전환)은 useHeaderSlot으로 */
   headerCenter?: ReactNode;
   /** 상단 바에 더 둘 것(예: CCTV 버튼). 틀은 화면(features)을 직접 알지 못하므로 위에서 끼워 넣는다. */
   headerExtra?: ReactNode;
@@ -29,7 +29,9 @@ export function AppShell({ headerCenter, headerExtra, overlays }: AppShellProps 
   const bleed = isFullBleedPath(pathname);
   // 3D 홈처럼 자기 상단 바 하나로 화면 전체를 쓰는 화면이 있으면 상단 바·끊김 안내를 그 화면에 맡긴다 (shellChrome.tsx). 주 메뉴는 남는다
   const [immersive, setImmersive] = useState(false);
-  const chrome = useMemo<ShellChrome>(() => ({ setImmersive, extra: headerExtra }), [headerExtra]);
+  // 상단 바 가운데 칸: 화면이 포털로 자기 것(홈 전환)을 넣는다 (useHeaderSlot)
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  const chrome = useMemo<ShellChrome>(() => ({ setImmersive, extra: headerExtra, headerSlot }), [headerExtra, headerSlot]);
   // 태블릿·데스크톱 사이드바: 3D 홈에서는 아이콘만(3D 자리를 지킨다), 누르면 3D 위로 펼친다. 다른 화면에서는 펼친 것이 기본
   const [expandedOver3d, setExpandedOver3d] = useState(false);
   const [collapsedElsewhere, setCollapsedElsewhere] = useState(false);
@@ -46,7 +48,17 @@ export function AppShell({ headerCenter, headerExtra, overlays }: AppShellProps 
       />
       {/* isolate: 3D 홈 패널의 z-index가 이 안에서만 겨루게 해 3D 위로 펼친 메뉴가 늘 위에 온다 */}
       <div className="isolate flex min-h-0 min-w-0 flex-1 flex-col">
-        {!immersive && <TopBar center={headerCenter} extra={headerExtra} />}
+        {!immersive && (
+          <TopBar
+            center={
+              <>
+                <div ref={setHeaderSlot} className="flex min-w-0 items-center gap-2 empty:hidden" />
+                {headerCenter}
+              </>
+            }
+            extra={headerExtra}
+          />
+        )}
         <div className="relative flex min-h-0 flex-1 flex-col">
           {!immersive && <OfflineNotice className={bleed ? 'absolute inset-x-4 top-3 z-20' : 'mx-4 mt-3'} />}
           {/* 틀을 넘겨받은 화면은 스스로 가득 채운다(홈은 안쪽 여백을 음수 여백으로 지운다). 스크롤만 막는다 */}

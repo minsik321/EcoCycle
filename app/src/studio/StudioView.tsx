@@ -5,11 +5,11 @@ import { TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, RobotModel, SectorGrade, TankId } from '@ecocycle/shared';
 import type { JointSource } from './robot/jointSource';
 import type { QualityTier } from '../config/quality';
-import { Detail, DisconnectBanner, Kpis, MapTools, PhoneSheet, Pins, Tables, TopBar, Tracker } from './overlay/Panels';
+import { AreaSwitcher, Detail, DisconnectBanner, Kpis, MapTools, PhoneSheet, Pins, Tables, Tracker } from './overlay/Panels';
 import { POSTER, prefetchStudio } from './preload';
 import type { PinElements } from './three/Fx';
 import type { RigApi } from './three/Rig';
-import type { RecordLink, StudioData } from './types';
+import type { RecordLink, RecordOpen, StudioData } from './types';
 import { DEFAULT_VIEW } from './world/views';
 import type { ViewPreset } from './world/views';
 import './studio.css';
@@ -53,18 +53,17 @@ export interface StudioViewProps {
   lastReceivedAt: string | null;
   /** 화면이 숨겨졌거나 CCTV가 열렸다: 그리기를 멈춘다 */
   paused: boolean;
-  /** 값이 예시(모의 서버·시연)다 */
-  example: boolean;
-  /** 상단 바의 홈 전환(3D | 대시보드). 어느 폭에서도 바로 보인다 */
-  switcher?: ReactNode;
-  /** 상단 바의 보조 영역 (시연 화면의 측정 버튼 등, 폰에서는 "더 보기" 안) */
-  tabs?: ReactNode;
-  /** 상단 바 오른쪽 끝: 앱 틀을 넘겨받았을 때의 알람·CCTV·사용자 (LiveStudio가 채운다) */
-  account?: ReactNode;
+  /**
+   * 상단 바: 앱 전체의 상단 바 하나(components/layout/TopBar의 overlay 모양)를 앱 쪽이 그려 넘긴다
+   * (홈은 LiveStudio가 3D | 대시보드 전환을 넣어서, 시연 화면은 DemoStudio가 측정 버튼을 넣어서). 자리는 studio.css의 st-topbar
+   */
+  topBar?: ReactNode;
   /** 기기 상세 패널에 넣을 조작 영역. 기존 조작 컴포넌트를 그대로 끼운다 */
   deviceActions?: (id: DeviceId) => ReactNode;
   /** 공정 기록 화면으로 가는 링크를 그린다 ("기록 보기", "이 차량 기록", "이 배치 상세"). 없으면(시연 화면) 링크를 그리지 않는다 */
   recordLink?: RecordLink;
+  /** 표에서 3D 장면에 없는 대상(출차한 차량, 출하된 베일, 배치)을 누르면 그 기록 상세 팝업을 연다. 없으면(시연 화면) 누를 수 없다 */
+  openRecord?: RecordOpen;
   onFailed: () => void;
   /** 포스터 찍기(/scene-demo?poster=1): 3D 장면만 그리고 패널·핀·준비 화면은 그리지 않는다. 첫 장을 그리면 data-poster-ready */
   poster?: boolean;
@@ -103,7 +102,7 @@ function useLayout(ref: RefObject<HTMLElement | null>): Layout {
  * 스튜디오 화면: 가득 찬 3D 무대와 그 위의 유리 패널. 데이터는 모두 props로 받는다
  * (store 연결은 LiveStudio, 서버 없는 시연은 DemoStudio).
  */
-export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, disconnected, lastReceivedAt, paused, example, switcher, tabs, account, deviceActions, recordLink, onFailed, poster = false }: StudioViewProps) {
+export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, disconnected, lastReceivedAt, paused, topBar, deviceActions, recordLink, openRecord, onFailed, poster = false }: StudioViewProps) {
   const kpiOpen = useContext(KpiDetailOpenContext);
   const [selection, setSelection] = useState<string | null>(null);
   const [view, setView] = useState(DEFAULT_VIEW.key);
@@ -230,17 +229,20 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
       {!ready && <SceneLoading />}
       {/* 핀은 3D 장면이 자리를 계산해 준다: 첫 장 전에는 놓을 곳이 없다 */}
       {ready && <Pins {...common} pins={pins} />}
-      <TopBar data={data} switcher={switcher} tabs={tabs} account={account} disconnected={disconnected} lastReceivedAt={lastReceivedAt} example={example} view={view} onView={goView} onSelect={select} compact={phone} />
+      {topBar}
+      <div className="st-glass st-area-dock">
+        <AreaSwitcher data={data} view={view} onView={goView} stale={disconnected} />
+      </div>
       {disconnected && <DisconnectBanner lastReceivedAt={lastReceivedAt} />}
       <Kpis data={data} disconnected={disconnected} />
       <MapTools onZoom={zoom} onRotate={(deg) => rig.current?.rotate(deg)} onHome={() => goView(DEFAULT_VIEW)} />
       {phone ? (
-        <PhoneSheet {...common} deviceActions={deviceActions} recordLink={recordLink} />
+        <PhoneSheet {...common} deviceActions={deviceActions} recordLink={recordLink} openRecord={openRecord} />
       ) : (
         <>
           <Detail {...common} deviceActions={deviceActions} recordLink={recordLink} collapsible={layout === 'narrow'} />
           <Tracker {...common} />
-          <Tables {...common} recordLink={recordLink} />
+          <Tables {...common} recordLink={recordLink} openRecord={openRecord} />
         </>
       )}
       {jointSource.kind === 'demo' && <p className="st-demo-note">로봇팔은 시연 동작입니다 (실제 로봇 값이 아닙니다)</p>}

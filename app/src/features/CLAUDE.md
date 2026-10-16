@@ -25,14 +25,14 @@
 
 위 표의 화면은 모두 2D로 구현했고, 2단계에서 홈에 3D 장면(`app/src/studio`)을 얹었다. 처음 만든 3D 장면(`scene/`, 홈의 "기본" 탭)은 2026-10-14에 삭제했다(`docs/decisions.md`).
 
-- `home/HomePage.tsx`, `home/HomeSwitch.tsx`: 맨 위 전환 하나 "3D | 대시보드". 고른 쪽은 기기에 기억하고(`ui.homeMode`, `ecocycle.homeMode`, 기본 3D) 옛 키(`homeTab`·`homeView`)는 처음 읽을 때 옮긴다. 3D는 `app/src/studio`를 lazy로 불러와 홈 화면 전체를 쓰고(패널이 먼저, 3D 장면은 그 아래에 나중에), 전환은 그 상단 바 안(폰에서도 바로 보임)에 들어간다. 그래픽(WebGL)을 못 쓰거나 3D에서 오류가 나면 기억한 값은 두고 대시보드로 보여 주며 짧게 알린다("3D"는 누를 수 없게).
+- `home/HomePage.tsx`, `home/HomeSwitch.tsx`: 맨 위 전환 하나 "3D | 대시보드". 고른 쪽은 기기에 기억하고(`ui.homeMode`, `ecocycle.homeMode`, 기본 3D) 옛 키(`homeTab`·`homeView`)는 처음 읽을 때 옮긴다. 3D는 `app/src/studio`를 lazy로 불러와 홈 화면 전체를 쓰고(패널이 먼저, 3D 장면은 그 아래에 나중에), 전환은 앱 상단 바(`components/layout/TopBar`)의 가운데 칸에 들어간다(3D는 3D 위에 뜬 같은 바, 대시보드는 틀의 바에 `useHeaderSlot` 포털, 폰에서도 바로 보임). 그래픽(WebGL)을 못 쓰거나 3D에서 오류가 나면 기억한 값은 두고 대시보드로 보여 주며 짧게 알린다("3D"는 누를 수 없게).
 - `home/useStudioPrefetch.ts`: 앱 틀(`App.tsx`)이 쓴다. 홈을 3D로 기억한 기기면 로그인 화면에서 한가할 때 3D 파일(정적 파일만)을 미리 받는다(`studio/preload.ts`). 로그인 전에는 API·WebSocket을 부르지 않는다.
 - `home/dashboard/`: 대시보드 홈(`Dashboard.tsx`, 값 고르기 `dashboardData.ts`). three.js를 import하지 않는다. 공정 문구·6단계 계산은 3D 홈과 함께 쓰는 `config/processDisplay.ts`, 추이선은 `store/usePlantTrends.ts`. `features/home`은 `studio`를 정적으로 import하지 않는다(예외: three를 import하지 않는 `studio/three/stats`와 `studio/preload`).
 - `home/SceneDemoPage.tsx`: 서버·로그인 없이 3D 홈만 보여 주는 시연·프레임 측정 화면(`/scene-demo`). 값은 예시이고 화면에 그렇게 표시한다. 이 주소를 열 때만 불러온다(lazy).
 - 3D 홈의 모양·배치 규칙은 `app/src/studio/CLAUDE.md`. 아래 home/ 규칙은 대시보드의 규칙이다.
 - 홈 주소에 `?demo=1`을 붙이면 서버 관절 값 대신 정해진 시연 동작을 보여 준다(명세의 최후 수단, "시연 동작" 표시).
 - `tank/`: `SectorBin`(납작한 2D 사각 칸 그림 SVG: 아래에서 적재율만큼 차는 평평한 크라프트 채움 + 윗가장자리 짙은 선 + 은은한 파지 무늬, 서버 주의 기준선은 가는 점선과 "주의 N%" 글자, 값이 바뀌면 `transform` 전환, 섹터 목록(`size="sm"`)과 상세(`lg`)가 같은 컴포넌트). 적재율(큰 글자)과 부피 "4.8 / 8.0 m³"는 그림 안, 채움 윗선 바로 위 밝은 빈 곳에 붙고, 거의 차면 칸 위 여백까지 올라가 파지 무늬 위에 놓이지 않는다. 끊기면(`frozen`) 전환을 멈추고 "–"와 마지막 수신 시각. `SectorChips`(수분·등급 작은 칩, 상세는 머리 줄의 상태 칩 앞, 목록은 카드 아래), `TankListPage`(폰 2개씩, 카드: 이름·상태 → 칸 그림 → 칩), `TankPage`(`DevicePage` 틀, 따로 된 주요 수치 칸 없음(추이는 자세히의 이력 그래프), 태블릿·데스크톱은 그림 카드 하나 안에 그림과 그 아래 지금/다음, PC(xl, 1280px 이상)는 "자세히"를 그림 카드 오른쪽에 늘 펼친 채, 접기 버튼 없이(`DetailsSection pinnedWhen={WIDE_QUERY}`, 안은 컨테이너 폭이 좁아 세로로 쌓임), 두 칸은 같은 높이(낮은 쪽이 늘어나고 그림 카드는 그림 칸이 늘어남), 폰은 그림 카드 → 지금/다음(따로 된 카드) → 자세히 → 하역 기록, 맨 아래 `SectorUnloads` = `RecordList`로 `GET /devices/{id}/unloads/records`), `sectorText`(그림 설명, 지금/다음 문장). 화면 글은 "섹터", 코드·주소·ID는 tank 그대로.
-- `records/`(4단위): `RecordsPage`(탭은 주소의 `?tab=vehicles|batches|bales`라 홈의 링크가 탭을 골라 열고 뒤로 가기에도 유지), `VehicleRecords`(입차·출차 시각, 번호판, 회사, 섹터, 총중량·공차·순중량 t, 상태 인식·하역·출차, `GET /vehicles/records`), `BatchRecords`(시작·종료, 배합 섹터 %, 평균 수분, 목표→실제 압력, 결과 완료·건너뜀·일시정지됨·진행 중, 만든 베일, `GET /batches/records`), `BaleRecords`(베일 ID, 생산 시각, 배치, 압력, 평균 수분, 상태 적치·출하, `GET /bales/records`). 줄을 누르면 상세 팝업(아래 "기록 상세 팝업"). 주소 만들기는 `config/navigation.ts`(`recordsPath`, `vehicleRecordPath`, `batchRecordPath`, `baleRecordPath`). 폰은 "더 보기" 안의 메뉴. 홈에서 오는 링크: 대시보드 "전체 보기"(지금 배치 카드 → 배치·베일 화면, 최근 차량·베일 카드 → 차량 탭)와 "이 배치 상세"·최근 차량·베일 줄(팝업), 3D 홈 "기록 보기"·"이 차량 기록"·"이 배치 상세"·"이 베일 상세"(`studio`의 `RecordLink`, 링크 그리기는 `LiveStudio`가 넘긴다).
+- `records/`(4단위): `RecordsPage`(탭은 주소의 `?tab=vehicles|batches|bales`라 홈의 링크가 탭을 골라 열고 뒤로 가기에도 유지), `VehicleRecords`(입차·출차 시각, 번호판, 회사, 섹터, 총중량·공차·순중량 t, 상태 인식·하역·출차, `GET /vehicles/records`), `BatchRecords`(시작·종료, 배합 섹터 %, 평균 수분, 목표→실제 압력, 결과 완료·건너뜀·일시정지됨·진행 중, 만든 베일, `GET /batches/records`), `BaleRecords`(베일 ID, 생산 시각, 배치, 압력, 평균 수분, 상태 적치·출하, `GET /bales/records`). 줄을 누르면 상세 팝업(아래 "기록 상세 팝업"). 주소 만들기는 `config/navigation.ts`(`recordsPath`, `vehicleRecordPath`, `batchRecordPath`, `baleRecordPath`). 폰은 "더 보기" 안의 메뉴. 홈에서 오는 링크: 대시보드 "전체 보기"(지금 배치 카드 → 배치·베일 화면, 최근 차량·베일 카드 → 차량 탭)와 "이 배치 상세"·최근 차량·베일 줄(팝업), 3D 홈 "기록 보기"(차량·배치·베일 탭)·표에서 장면에 없는 대상(출차한 차량, 출하된 베일, 배치)의 줄·"이 차량 기록"·"이 배치 상세"·"이 베일 상세"(`studio`의 `RecordLink`, 링크 그리기는 `LiveStudio`가 넘긴다).
 추가된 폴더: `history/`(이력 그래프 패널·구간 훅·알람 이력 훅·주요 수치 추이선 `useDeviceTrend`, 섹터·컨베이어·압축기 페이지가 공유), `devices/`(로봇팔·컨베이어·압축기 페이지 화면 테스트만. 옛 공통 틀 `MachinePage`는 2026-10-16 기기 페이지 재설계로 지웠다).
 서버가 제공하지 않아 안내 문구만 둔 항목: 로봇팔 사이클 통계, 압축기 점검 이력, 설정의 현재값 (`docs/questions.md` B18, B21, B22).
 - `robot/`(6단위): 자동·수동·자동 섹터 지정(`auto_pinned`), 지정 목록은 서버 상태와 초안을 구분. `set_mode`의 기존 권한·확인 흐름을 확장한다. 사이클 통계 아래 `PickRecords` = 별도 `RecordList`(`GET /robots/robot-1/picks/records`, 시각·모드·섹터·부피 m³·컨베이어 → 배치). `pickRecordsRevision` 변경 시 같은 기간·쪽을 갱신한다. 재현은 `node app/scripts/robotArm.mjs`, 결과는 `docs/screenshots/robot-arm`.
@@ -54,6 +54,7 @@
 - 순서: 열린 알람(있을 때, 맨 위) → 상태 요약(시스템 상태 · 연결 · 마지막 갱신) → 지표 3장(오늘 생산 베일 · 평균 수분 · 압축기 가동률, 작은 추이선) → 섹터 4칸(적재율 막대 · 등급 · 수분 · 상태, 누르면 섹터 페이지) → 지금 배치(배합 · 평균 수분 · 목표/현재 압력, "전체 보기"는 배치·베일 화면 하나) → 6단계 공정 추적(입고 → 차량 인식 → 하역 → 배합 → 압축 → 출하, 지금 단계 표시) → 최근 차량·베일 5건.
 - 상태 요약은 어느 크기에서나 내용 높이만큼의 폭 전체 띠, 지표 3장은 태블릿부터 한 줄(3칸). 아래 카드는 폰 1단, 태블릿(md) 2단(섹터 폭 전체 → 지금 배치 | 최근 차량·베일 → 공정 추적 폭 전체), 데스크톱(xl) 3단(섹터 2칸·2×2 | 지금 배치, 공정 추적 1칸 | 최근 차량·베일 2칸). 같은 줄 카드의 내용 높이를 비슷하게 맞춰 카드 안에 큰 빈 곳을 두지 않는다. 공정 추적은 카드 폭(컨테이너 쿼리 `@lg`)이 좁으면 세로 단계, 넓으면 가로 6칸. 가로 스크롤 없음. 디자인 토큰의 흰 카드(`rounded-card border-line bg-surface shadow-soft-1`).
 - 연결 끊김: 숫자는 "–", 상태는 "연결 끊김", 마지막 수신 시각을 함께. 지금 단계 강조도 없앤다. "예시 데이터"는 앱 상단 바가 보여 준다.
+- 맨 위 전환(3D | 대시보드)은 화면 안이 아니라 앱 상단 바의 가운데 칸에 있다(틀 밖에서 그리는 테스트·미리 보기에서만 화면 맨 위).
 - 조작 버튼은 두지 않는다(알람 확인만). 시작·일시정지 같은 홈 조작은 3D 홈의 상세 패널, 위험 조작은 기기 페이지.
 - 좁은 칸의 시각은 `formatLocalClock`(오늘이면 시:분만)으로 적어 두 줄로 꺾이지 않게 한다.
 
@@ -94,7 +95,7 @@
 
 ### 값은 서버에서
 - 새 값은 모두 서버가 준다. 순서는 명세(`docs/dashboard-spec.md`) → `shared/` 타입 → 모의 서버 → 앱. 화면이 값을 계산·지어내지 않는다.
-- 모의 서버는 실제처럼 보이는 예시 값을 만든다(가상의 회사·번호판, 그럴듯한 범위와 시각). 값이 모의 서버에서 오는 동안 "예시 데이터" 표시를 유지한다(앱 상단 바·3D 홈 상단 바).
+- 모의 서버는 실제처럼 보이는 예시 값을 만든다(가상의 회사·번호판, 그럴듯한 범위와 시각). 값이 모의 서버에서 오는 동안 "예시 데이터" 표시를 유지한다(앱 상단 바 하나, 3D 홈에서도 같은 바).
 - 시각은 UTC ISO 문자열로 받고 저장하며, 화면에만 현지 시각으로 적는다(`formatLocalTime`, 좁은 칸은 `formatLocalClock`).
 
 ### 연결 끊김

@@ -145,14 +145,39 @@ describe('AppShell', () => {
     expect(screen.getByRole('main')).toHaveTextContent('알람 내용');
   });
 
-  it('로그인한 사용자 이름과 권한 이름을 보여 준다', () => {
+  it('상단 바의 사용자 메뉴에 이름과 권한 이름, 설정(화질), 로그아웃이 있다', async () => {
     shell('/', { ...OPERATOR, name: '김현장' });
-    expect(screen.getByText(/김현장/)).toHaveTextContent('김현장 (작업자)');
+    const bar = document.querySelector<HTMLElement>('[data-topbar="page"]')!;
+    await userEvent.click(within(bar).getByRole('button', { name: '김현장 (작업자) 메뉴' }));
+    const menu = screen.getByRole('menu', { name: '사용자 메뉴' });
+    expect(menu).toHaveTextContent('김현장 (작업자)');
+    expect(within(menu).getByRole('menuitem', { name: /설정/ })).toHaveAttribute('href', '/settings');
+    expect(within(menu).getByRole('menuitem', { name: '로그아웃' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('상단 바 하나: 로고 · 연결과 시계 · 알람 · 사용자. 연결이 끊기면 같은 자리에 "연결 끊김"과 마지막 수신 시각', () => {
+    const { store } = shell('/alarms');
+    const bar = document.querySelector<HTMLElement>('[data-topbar="page"]')!;
+    expect(within(bar).getByText('EcoCycle')).toBeInTheDocument();
+    expect(within(bar).getByRole('link', { name: /알람 보기/ })).toHaveAttribute('href', '/alarms');
+    act(() => {
+      store.dispatch({ type: 'connection/connectionChanged', payload: { status: 'online', lastReceivedAt: '2026-10-13T05:23:11.250Z' } });
+    });
+    expect(within(bar).getByRole('status')).toHaveTextContent('연결됨');
+    expect(within(bar).getByLabelText('현재 시각')).toBeInTheDocument();
+    act(() => {
+      store.dispatch({ type: 'connection/connectionChanged', payload: { status: 'offline', lastReceivedAt: '2026-10-13T05:23:11.250Z' } });
+    });
+    expect(within(bar).getByRole('status')).toHaveTextContent('연결 끊김');
+    expect(within(bar).getByLabelText('마지막 수신 시각')).toHaveAttribute('datetime', '2026-10-13T05:23:11.250Z');
   });
 
   it('로그아웃 버튼을 누르면 로그아웃된다', async () => {
     const { store } = shell('/');
-    await userEvent.click(screen.getByRole('button', { name: '로그아웃' }));
+    await userEvent.click(screen.getByRole('button', { name: /메뉴$/ }));
+    await userEvent.click(screen.getByRole('menuitem', { name: '로그아웃' }));
     await vi.waitFor(() => expect(store.getState().auth.status).toBe('loggedOut'));
     expect(api.logout).toHaveBeenCalled();
   });
@@ -198,7 +223,7 @@ describe('AppShell: 화면이 틀을 넘겨받는다 (shellChrome)', () => {
     expect(nav).not.toHaveAttribute('data-collapsed');
     expect(nav.firstElementChild).toHaveClass('md:absolute');
     expect(nav).toHaveClass('md:w-[4.5rem]');
-    expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-topbar]')).toBeNull();
     expect(within(screen.getByRole('main')).getByRole('button', { name: 'CCTV' })).toBeInTheDocument();
     // 끊김 안내는 넘겨받은 화면이 스스로 보여 준다 (스튜디오의 "연결 끊김" 알림)
     act(() => {
@@ -231,7 +256,7 @@ describe('AppShell: 화면이 틀을 넘겨받는다 (shellChrome)', () => {
     // 다른 화면에서는 펼친 사이드바가 기본이다
     expect(screen.getByRole('navigation', { name: '주 메뉴' })).not.toHaveAttribute('data-collapsed');
     expect(screen.getByRole('button', { name: '메뉴 접기' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument();
+    expect(document.querySelector('[data-topbar="page"]')).not.toBeNull();
   });
 
   it('3D 위로 펼친 메뉴는 바깥을 누르면 다시 접힌다', async () => {

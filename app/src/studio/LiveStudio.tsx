@@ -4,9 +4,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import type { DeviceId } from '@ecocycle/shared';
 import { DeviceControls } from '../components/controls/DeviceControls';
 import { useImmersiveShell } from '../components/layout/shellChrome';
-import { USE_MOCK } from '../config/env';
+import { TopBar } from '../components/layout/TopBar';
 import { batchBalePath, devicePagePath, recordsPath } from '../config/navigation';
-import { PopupLink } from '../components/records/recordPopup';
+import { PopupLink, useOpenRecordPopup } from '../components/records/recordPopup';
 import { useRobotModel } from '../features/robot/useRobot';
 import { demoSource, liveSource } from './robot/jointSource';
 import { useAppSelector } from '../store/hooks';
@@ -15,7 +15,6 @@ import { getJointBuffer } from '../store/realtimeClient';
 import { selectConnection, selectIsDisconnected, selectOpenAlarms, selectPlantSummary } from '../store/selectors';
 import { useRobotJointsSubscription } from '../store/useRealtime';
 import { StudioView } from './StudioView';
-import { StudioAccount } from './overlay/Account';
 import { useStudioTier } from './useStudioTier';
 import type { RecordLink, StudioData } from './types';
 
@@ -37,7 +36,7 @@ const recordLink: RecordLink = (target, label, className) => {
  * 3D 홈: 기존 store·실시간 계층의 값을 그대로 스튜디오 화면에 넘긴다.
  * 조작은 기존 조작 컴포넌트(홈용: 위험도 낮은 것만)와 기기 페이지 링크만 쓴다. 권한·차단은 그 컴포넌트와 서버가 맡는다.
  * 열려 있는 동안 앱 틀의 상단 바를 넘겨받아(shellChrome) 상단 바 하나로 화면을 쓴다(앱의 주 메뉴는 그대로 남아 접힌다).
- * 그 대신 틀의 상단 바가 하던 알람·CCTV·사용자를 스튜디오 상단 바 오른쪽 끝에 둔다.
+ * 넘겨받은 바는 앱 전체와 같은 상단 바(components/layout/TopBar)를 3D 위에 띄우는 모양(overlay)으로 그린 것이고, 가운데 칸에 홈 전환이 들어간다.
  */
 export function LiveStudio({ switcher, onFailed }: { switcher?: ReactNode; onFailed: () => void }) {
   useRobotJointsSubscription();
@@ -60,6 +59,8 @@ export function LiveStudio({ switcher, onFailed }: { switcher?: ReactNode; onFai
   const [visible, setVisible] = useState(() => !document.hidden);
   const [params] = useSearchParams();
   const demo = params.get('demo') === '1';
+  // 표에서 3D 장면에 없는 대상(출차한 차량, 출하된 베일, 배치)을 누르면 카메라는 두고 기록 상세 팝업만 띄운다
+  const openRecord = useOpenRecordPopup();
 
   useEffect(() => {
     const update = () => setVisible(!document.hidden);
@@ -83,11 +84,10 @@ export function LiveStudio({ switcher, onFailed }: { switcher?: ReactNode; onFai
       disconnected={disconnected}
       lastReceivedAt={connection.lastReceivedAt}
       paused={!visible || cctvOpen || recordPopupOpen}
-      example={USE_MOCK}
-      switcher={switcher}
-      account={chrome ? <StudioAccount extra={chrome.extra} /> : undefined}
+      topBar={<TopBar overlay className="st-topbar" center={switcher} extra={chrome?.extra} />}
       onFailed={onFailed}
       recordLink={recordLink}
+      openRecord={openRecord}
       deviceActions={(id: DeviceId) => (
         <>
           <DeviceControls deviceId={id} context="home" />

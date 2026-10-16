@@ -126,7 +126,8 @@ describe('RequireAuth', () => {
 
   it('로그아웃하면 로그인 화면으로 간다', async () => {
     renderWithStore(app(), { me: ADMIN, route: '/' });
-    await userEvent.click(screen.getByRole('button', { name: '로그아웃' }));
+    await userEvent.click(screen.getByRole('button', { name: /메뉴$/ }));
+    await userEvent.click(screen.getByRole('menuitem', { name: '로그아웃' }));
     await vi.waitFor(() => expect(where()).toBe('/login'));
   });
 });

@@ -1,6 +1,6 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { KpiDetailContext } from '../../components/charts/KpiDetailContext';
-import type { MutableRefObject, ReactNode } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, MutableRefObject, ReactNode } from 'react';
 import { DEVICE_IDS, TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, DeviceState, DeviceStatus, PlantMetric, Vehicle } from '@ecocycle/shared';
 import {
@@ -17,7 +17,7 @@ import {
   formatVolumeM3,
 } from '../../config/display';
 import type { PinElements } from '../three/Fx';
-import type { RecordLink, StudioData } from '../types';
+import type { RecordLink, RecordOpen, RecordTarget, RecordsListTab, StudioData } from '../types';
 import { SECTOR_LABEL } from '../../config/processDisplay';
 import { VIEWS } from '../world/views';
 import type { ViewPreset } from '../world/views';
@@ -63,22 +63,8 @@ function usePopover(): [boolean, (open: boolean) => void, MutableRefObject<HTMLD
   return [open, setOpen, ref];
 }
 
-// ── 상단 바 ───────────────────────────────────────────────────────────
-
-/** 현지 시각 시계. 1초마다 이 컴포넌트만 다시 그린다 (서버 값이 아니라 지금 시각이다) */
-function Clock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  const text = new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
-  return (
-    <time dateTime={now.toISOString()} aria-label="현재 시각">
-      {text}
-    </time>
-  );
-}
+// ── 카메라 지역 전환 ─────────────────────────────────────────────────
+// 상단 바는 앱 전체에 하나(components/layout/TopBar)이고 3D 홈도 그것을 쓴다. 지역 전환은 카메라 조작이라 바에서 빼 지도 도구 곁에 둔다.
 
 const AREA_BADGE: Record<string, IconName> = { site: 'layers', process: 'robot', inbound: 'scan', unload: 'unload', shipping: 'ship' };
 
@@ -115,7 +101,8 @@ function areaLine(key: string, data: StudioData): ReactNode {
   }
 }
 
-function AreaSwitcher({ data, view, onView, stale }: { data: StudioData; view: string; onView: (preset: ViewPreset) => void; stale: boolean }) {
+/** 카메라 지역 전환: 상단 바가 아니라 지도 도구 곁에 뜬다 (카메라 조작이므로). 펼치면 구역마다 서버 값 한 줄 */
+export function AreaSwitcher({ data, view, onView, stale }: { data: StudioData; view: string; onView: (preset: ViewPreset) => void; stale: boolean }) {
   const [open, setOpen, ref] = usePopover();
   const current = VIEWS.find((p) => p.key === view) ?? VIEWS[1]!;
   return (
@@ -157,188 +144,6 @@ function AreaSwitcher({ data, view, onView, stale }: { data: StudioData; view: s
         </ul>
       )}
     </div>
-  );
-}
-
-interface SearchItem {
-  key: string;
-  label: string;
-  sub: string;
-  icon: IconName;
-}
-
-function searchItems(data: StudioData): SearchItem[] {
-  const devices = DEVICE_IDS.map((id): SearchItem => {
-    const device = data.devices[id];
-    return { key: `dev:${id}`, label: DEVICE_NAMES[id], sub: device ? deviceLine(device).value : '', icon: id.startsWith('tank') ? 'sector' : id === 'robot-1' ? 'robot' : id === 'conveyor-z' ? 'conveyor' : 'press' };
-  });
-  const vehicles = data.vehicles
-    .filter((v) => v.stage !== 'departed')
-    .map((v): SearchItem => ({ key: `veh:${v.id}`, label: v.plate ?? '번호판 인식 중', sub: `${v.companyName ?? '계중대'} · ${VEHICLE_STAGE_TEXT[v.stage]}`, icon: 'truck' }));
-  const bales = data.bales.filter((b) => b.stage === 'created').map((b): SearchItem => ({ key: `bale:${b.id}`, label: `베일 ${shortId(b.id)}`, sub: `${shortId(b.batchId)} · ${BALE_STAGE_TEXT[b.stage]}`, icon: 'bale' }));
-  return [...vehicles, ...devices, ...bales];
-}
-
-/** 검색: 설비 이름, 번호판, 회사, 베일 번호로 찾아 고른다 (고르면 카메라가 그 대상으로 간다) */
-function Search({ data, onSelect }: { data: StudioData; onSelect: (key: string) => void }) {
-  const [query, setQuery] = useState('');
-  const [open, setOpen, ref] = usePopover();
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return searchItems(data)
-      .filter((item) => `${item.label} ${item.sub}`.toLowerCase().includes(q))
-      .slice(0, 6);
-  }, [data, query]);
-  const pick = (item: SearchItem) => {
-    onSelect(item.key);
-    setQuery('');
-    setOpen(false);
-  };
-  return (
-    <div className="st-search" ref={ref}>
-      <Icon name="search" size={16} />
-      <input
-        type="search"
-        value={query}
-        placeholder="설비, 번호판, 회사, 베일 찾기"
-        aria-label="장면에서 찾기"
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && results[0]) pick(results[0]);
-        }}
-      />
-      {open && results.length > 0 && (
-        <ul className="st-glass st-search-list" role="listbox" aria-label="찾은 대상">
-          {results.map((item) => (
-            <li key={item.key}>
-              <button type="button" role="option" aria-selected={false} onClick={() => pick(item)}>
-                <span className="st-area-badge st-badge-soft">
-                  <Icon name={item.icon} size={15} />
-                </span>
-                <span className="st-area-text">
-                  <b>{item.label}</b>
-                  <small>{item.sub}</small>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-export interface TopBarProps {
-  data: StudioData;
-  /** 홈 맨 위 전환(3D | 대시보드). 폰에서도 "더 보기"에 숨기지 않고 상단 바에 바로 둔다 */
-  switcher?: ReactNode;
-  /** 보조 영역(시연 화면의 측정 버튼 등). 폰에서는 "더 보기" 안에 들어간다 */
-  tabs?: ReactNode;
-  disconnected: boolean;
-  lastReceivedAt: string | null;
-  example: boolean;
-  view: string;
-  onView: (preset: ViewPreset) => void;
-  onSelect: (key: string) => void;
-  /** 오른쪽 끝: 알람·CCTV·사용자·메뉴 (앱 틀을 넘겨받았을 때만). 없으면 알람 수만 보여 준다 */
-  account?: ReactNode;
-  /** 폰: 로고·지역 전환·연결만 두고, 검색·탭·계정은 "더 보기" 메뉴 안에 넣는다 */
-  compact?: boolean;
-}
-
-/** 폰 상단 바의 "더 보기": 검색, 보조 영역, 알람·CCTV·사용자·메뉴 */
-function MoreMenu({ children }: { children: ReactNode }) {
-  const [open, setOpen, ref] = usePopover();
-  return (
-    <div className="st-more-menu" ref={ref}>
-      <button type="button" className="st-more-button" aria-haspopup="true" aria-expanded={open} aria-label="더 보기: 검색·탭·계정" onClick={() => setOpen(!open)}>
-        <Icon name="more" size={20} />
-      </button>
-      {open && <div className="st-glass st-more-panel">{children}</div>}
-    </div>
-  );
-}
-
-function Logo() {
-  return (
-    <span className="st-logo" aria-hidden="true">
-      <svg viewBox="0 0 32 32" width="30" height="30">
-        <rect width="32" height="32" rx="9" fill="#2563eb" />
-        <path d="M16 7.5a8.5 8.5 0 1 0 8.2 10.7" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M24.6 9.2v5.4h-5.4" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
-  );
-}
-
-/** 얇은 상단 바 하나: 로고, 검색, (탭), 지역 전환, 실시간 시계·연결, 알람, 사용자 */
-export function TopBar({ data, switcher, tabs, disconnected, lastReceivedAt, example, view, onView, onSelect, account, compact = false }: TopBarProps) {
-  const alarmCount = data.alarms.filter((a) => a.state === 'active').length;
-  const bell = account ?? (
-    <span className="st-bell" aria-label={`지금 울리는 알람 ${alarmCount}건`} role="img">
-      <Icon name="bell" />
-      {alarmCount > 0 && <b>{alarmCount}</b>}
-    </span>
-  );
-  const live = (
-    <span className={`st-live${disconnected ? ' st-live-off' : ''}`} role="status">
-      <i aria-hidden="true" />
-      {disconnected ? (
-        <>
-          {compact ? '끊김' : '연결 끊김'} · {compact ? '' : '마지막 '}
-          <time dateTime={lastReceivedAt ?? undefined}>{compact ? hhmm(lastReceivedAt) : time(lastReceivedAt)}</time>
-        </>
-      ) : (
-        <>
-          {compact ? '' : '실시간 '}
-          <Clock />
-        </>
-      )}
-    </span>
-  );
-  if (compact) {
-    return (
-      <header className="st-glass st-top st-top-compact">
-        <div className="st-brand">
-          <Logo />
-          {example && <span className="st-chip st-chip-example">예시</span>}
-        </div>
-        {switcher && <div className="st-tabs-slot st-switch-slot">{switcher}</div>}
-        <AreaSwitcher data={data} view={view} onView={onView} stale={disconnected} />
-        {live}
-        <MoreMenu>
-          <Search data={data} onSelect={onSelect} />
-          {tabs && <div className="st-tabs-slot">{tabs}</div>}
-          <div className="st-more-account">{bell}</div>
-        </MoreMenu>
-      </header>
-    );
-  }
-  return (
-    <header className="st-glass st-top">
-      <div className="st-brand">
-        <Logo />
-        <strong>EcoCycle</strong>
-        {example && <span className="st-chip st-chip-example">예시 데이터</span>}
-      </div>
-      <Search data={data} onSelect={onSelect} />
-      {(switcher || tabs) && (
-        <div className="st-tabs-slot">
-          {switcher}
-          {tabs}
-        </div>
-      )}
-      <div className="st-top-right">
-        <AreaSwitcher data={data} view={view} onView={onView} stale={disconnected} />
-        {live}
-        {bell}
-      </div>
-    </header>
   );
 }
 
@@ -845,20 +650,34 @@ type TableTab = 'vehicles' | 'sectors' | 'batches' | 'bales';
 
 const newest = <T extends { updatedAt: string }>(list: readonly T[]): T[] => [...list].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
 
-/** 표 한 종류의 내용 (오른쪽 아래 표와 폰의 아래 시트가 같이 쓴다) */
-function TableBody({ tab, data, disconnected, selection, onSelect }: PanelCommon & { tab: TableTab }) {
-  const row = (key: string | null) => ({
-    className: key && key === selection ? 'st-row-on' : undefined,
-    onClick: key ? () => onSelect(key) : undefined,
-    tabIndex: key ? 0 : undefined,
+/**
+ * 표 한 종류의 내용 (오른쪽 아래 표와 폰의 아래 시트가 같이 쓴다).
+ * 줄을 누르면: 그 대상이 지금 3D 장면에 있으면(현장의 차량, 적치 중인 베일, 섹터) 고른다 → 카메라가 다가가고 상세 패널.
+ * 장면에 없으면(출차한 차량, 출하된 베일, 배치) 카메라는 그대로 두고 기록 상세 팝업을 연다(`openRecord`, 없으면 누를 수 없다).
+ */
+function TableBody({ tab, data, disconnected, selection, onSelect, openRecord }: PanelCommon & { tab: TableTab; openRecord?: RecordOpen }) {
+  const activate = (run: () => void) => ({
+    onClick: run,
+    onKeyDown: (e: ReactKeyboardEvent<HTMLTableRowElement>) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        run();
+      }
+    },
+    tabIndex: 0,
   });
+  const row = (key: string | null, record?: RecordTarget) => {
+    if (key) return { className: key === selection ? 'st-row-on' : undefined, ...activate(() => onSelect(key)) };
+    if (record && openRecord) return { 'data-off-scene': true, ...activate(() => openRecord(record)) };
+    return {};
+  };
   return (
     <>
         {tab === 'vehicles' && (
         <table>
           <tbody>
             {newest(data.vehicles).map((v) => (
-              <tr key={v.id} {...row(v.stage === 'departed' ? null : `veh:${v.id}`)}>
+              <tr key={v.id} {...row(v.stage === 'departed' ? null : `veh:${v.id}`, { kind: 'vehicle', id: v.id })}>
                 <td>
                   <b className="st-cell-main">{v.plate ?? '인식 중'}</b>
                   <small className="st-cell-sub">{v.companyName ?? '–'}</small>
@@ -910,7 +729,7 @@ function TableBody({ tab, data, disconnected, selection, onSelect }: PanelCommon
         <table>
           <tbody>
             {newest(data.batches).map((b) => (
-              <tr key={b.id}>
+              <tr key={b.id} {...row(null, { kind: 'batch', id: b.id })}>
                 <td>
                   <b className="st-cell-main">{shortId(b.id)}</b>
                   <small className="st-cell-sub">{mixText(b)}</small>
@@ -928,7 +747,7 @@ function TableBody({ tab, data, disconnected, selection, onSelect }: PanelCommon
         <table>
           <tbody>
             {newest(data.bales).map((b) => (
-              <tr key={b.id} {...row(b.stage === 'created' ? `bale:${b.id}` : null)}>
+              <tr key={b.id} {...row(b.stage === 'created' ? `bale:${b.id}` : null, { kind: 'bale', id: b.id })}>
                 <td>
                   <b className="st-cell-main">베일 {shortId(b.id)}</b>
                   <small className="st-cell-sub">배치 {shortId(b.batchId)}</small>
@@ -946,15 +765,68 @@ function TableBody({ tab, data, disconnected, selection, onSelect }: PanelCommon
   );
 }
 
-export function Tables({ data, disconnected, selection, onSelect, recordLink }: PanelCommon & { recordLink?: RecordLink }) {
+/** 표의 "기록 보기"가 여는 공정 기록 탭 (섹터는 공정 기록이 아니라 링크가 없다) */
+const listTab = (tab: TableTab | SheetTab): RecordsListTab | null => (tab === 'sectors' ? null : tab);
+
+/** 표를 접었는지: 기기마다 기억한다 (화면 표시 설정일 뿐이다) */
+export const TABLE_COLLAPSED_KEY = 'ecocycle.studio.tableCollapsed';
+
+function useRememberedFlag(key: string): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(key) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const set = (next: boolean) => {
+    setOn(next);
+    try {
+      if (next) localStorage.setItem(key, '1');
+      else localStorage.removeItem(key);
+    } catch {
+      // 저장소를 못 써도 접기는 된다
+    }
+  };
+  return [on, set];
+}
+
+/**
+ * 오른쪽 아래(세로 태블릿은 아래) 탭 표: 차량 · 섹터 · 배치 · 베일. 접기 단추로 요약 한 줄까지 접을 수 있고(3D를 덜 가린다),
+ * 접었는지는 기기에 기억한다. 줄을 누르는 규칙은 TableBody.
+ */
+export function Tables({ data, disconnected, selection, onSelect, recordLink, openRecord }: PanelCommon & { recordLink?: RecordLink; openRecord?: RecordOpen }) {
   const [tab, setTab] = useState<TableTab>('vehicles');
+  const [collapsed, setCollapsed] = useRememberedFlag(TABLE_COLLAPSED_KEY);
   const onSite = data.vehicles.filter((v) => v.stage !== 'departed').length;
+  const openBatches = data.batches.filter((b) => b.stage !== 'completed').length;
+  const stacked = data.bales.filter((b) => b.stage === 'created').length;
   const tabs: Array<{ key: TableTab; label: string; count: number }> = [
     { key: 'vehicles', label: '차량', count: onSite },
     { key: 'sectors', label: '섹터', count: TANK_IDS.length },
-    { key: 'batches', label: '배치', count: data.batches.filter((b) => b.stage !== 'completed').length },
-    { key: 'bales', label: '베일', count: data.bales.filter((b) => b.stage === 'created').length },
+    { key: 'batches', label: '배치', count: openBatches },
+    { key: 'bales', label: '베일', count: stacked },
   ];
+  const linkTab = listTab(tab);
+
+  if (collapsed) {
+    return (
+      <section className="st-glass st-table st-table-collapsed" aria-label="공정 기록">
+        <button type="button" className={`st-table-summary${disconnected ? ' st-stale' : ''}`} aria-expanded={false} onClick={() => setCollapsed(false)}>
+          <span className="st-panel-icon" aria-hidden="true">
+            <Icon name="batch" size={15} />
+          </span>
+          <span className="st-table-summary-text">
+            차량 {onSite}대 · 진행 배치 {openBatches} · 적치 베일 {stacked}개
+          </span>
+          <span className="st-table-toggle" aria-hidden="true">
+            <Icon name="chevron" size={16} />
+          </span>
+          <span className="st-sr">공정 기록 표 펼치기</span>
+        </button>
+      </section>
+    );
+  }
   return (
     <section className="st-glass st-table" aria-label="공정 기록">
       <div className="st-table-head">
@@ -968,10 +840,13 @@ export function Tables({ data, disconnected, selection, onSelect, recordLink }: 
             </button>
           ))}
         </div>
-        {recordLink && (tab === 'vehicles' || tab === 'batches') && recordLink({ kind: 'list', tab }, '기록 보기', 'st-link-mini')}
+        {recordLink && linkTab && recordLink({ kind: 'list', tab: linkTab }, '기록 보기', 'st-link-mini')}
+        <button type="button" className="st-table-toggle st-table-collapse" aria-expanded={true} aria-label="공정 기록 표 접기" onClick={() => setCollapsed(true)}>
+          <Icon name="chevron" size={16} />
+        </button>
       </div>
       <div className={`st-table-scroll${disconnected ? ' st-stale' : ''}`} role="tabpanel">
-        <TableBody tab={tab} data={data} disconnected={disconnected} selection={selection} onSelect={onSelect} />
+        <TableBody tab={tab} data={data} disconnected={disconnected} selection={selection} onSelect={onSelect} openRecord={openRecord} />
       </div>
     </section>
   );
@@ -1012,7 +887,7 @@ const SHEET_TABS: Array<{ key: SheetTab; label: string }> = [
  * 폰의 아래 시트: 접힌 상태(기본)에서는 짧은 공정 막대와 요약 한 줄만, 펼치면 탭(배치 · 차량 · 섹터 · 베일)과 내용.
  * 대상을 고르면 펼쳐서 그 상세를 보여 준다 (상세의 닫기 = 고르기 풀기).
  */
-export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActions, recordLink }: DetailProps) {
+export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActions, recordLink, openRecord }: DetailProps & { openRecord?: RecordOpen }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<SheetTab>('batches');
   useEffect(() => {
@@ -1054,9 +929,9 @@ export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActi
             ))}
           </div>
           <div className={`st-sheet-body st-table${disconnected ? ' st-stale' : ''}`} role="tabpanel">
-            {recordLink && (tab === 'vehicles' || tab === 'batches') && <div className="st-list-link">{recordLink({ kind: 'list', tab }, '기록 보기', 'st-link-mini')}</div>}
+            {recordLink && listTab(tab) && <div className="st-list-link">{recordLink({ kind: 'list', tab: listTab(tab)! }, '기록 보기', 'st-link-mini')}</div>}
             {tab === 'batches' && <Detail {...common} selection={null} recordLink={recordLink} bare />}
-            <TableBody tab={tab} {...common} />
+            <TableBody tab={tab} {...common} openRecord={openRecord} />
           </div>
         </>
       )}

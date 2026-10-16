@@ -119,7 +119,7 @@ async function run(browser) {
           ['베일', '베일 상세'],
         ]) {
           await openSheet(tab);
-          const row = page.locator('.st-sheet-body tr[tabindex="0"]').first();
+          const row = page.locator('.st-sheet-body tr[tabindex="0"]:not([data-off-scene])').first();
           if (!(await row.count())) {
             console.log(`- ${w}px 글자 ${zoom * 100}% · ${name}: 지금 고를 수 있는 ${tab}이 없어 건너뜀`);
             continue;
@@ -129,7 +129,7 @@ async function run(browser) {
         }
       } else {
         await check(page, '3D 홈', zoom);
-        await page.locator('.st-table tr[tabindex="0"]').first().click().catch(() => undefined);
+        await page.locator('.st-table tr[tabindex="0"]:not([data-off-scene])').first().click().catch(() => undefined);
         await check(page, '3D 홈 상세', zoom);
       }
       for (const [route, name] of [

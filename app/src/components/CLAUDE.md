@@ -10,15 +10,24 @@ components/
 │                  KpiCard + Sparkline(지표 카드와 작은 추이선), Tabs, DataTable, ToastCard(알림 카드 한 장)
 ├── status/        StatusBadge(색+기호+글자), OfflineNotice, Timestamp, useDisplayStatus(끊기면 모든 상태를 "연결 끊김"으로), tone(색 클래스)
 ├── controls/      DeviceControls, RobotModeControl(로봇 운전 모드 세 칸 + 섹터 칩·집기), CommandButton, ConfirmDialog, SettingForm(update_setting), AckAlarmButton, CommandResultToast, useDeviceCommand
-├── layout/        Sidebar(앱의 유일한 주 메뉴: 폰 아래 탭 바 + "더 보기", md 이상 왼쪽 사이드바·접힘, 강조 `NAV_ACTIVE`), TopBar(로고·시계·알람 수·연결 상태·화질·사용자),
+├── layout/        Sidebar(앱의 유일한 주 메뉴: 폰 아래 탭 바 + "더 보기", md 이상 왼쪽 사이드바·접힘, 강조 `NAV_ACTIVE`), TopBar(앱의 유일한 상단 바, 아래 "상단 바" 절),
 │                  AppShell(슬롯: headerCenter·headerExtra·overlays), TopCards,
-│                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 상단 바·끊김 안내를 숨기고 headerExtra를 넘기며 주 메뉴를 접는다. 3D 홈만 쓴다)
+│                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 틀의 상단 바·끊김 안내를 숨기고 headerExtra를 넘기며 주 메뉴를 접는다. 3D 홈만 쓴다.
+│                  `useHeaderSlot`: 틀의 상단 바 가운데 칸, 화면이 포털로 홈 전환을 넣는다)
 ├── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
 ├── records/       RecordList(기간 고르기 → 서버에서 10줄씩 → 폰 쌓인 줄 / md 이상 표 → 쪽 넘기기), Pagination, range(기간·쪽 번호 계산),
 │                  recordPopup(기록 상세 팝업의 주소·기록 상태, `PopupLink`·`useOpenRecordPopup`: 그리기는 features/records/popup)
 └── device/        기기 페이지 틀: DevicePage(배치: `illustrated`면 위쪽 두 칸, 아니면 한 줄), DeviceHero(이름·큰 상태 칩·지금 하는 일·선택 그림), KeyTile/KeyTiles(최대 4개, 작은 추이선·게이지, `wide`면 폭 전체 격자),
                    NowNext(지금/다음), ActionBar·DeviceActionBar(위험도 낮은 조작 + 알람 확인), DetailsSection("자세히", 처음엔 닫힘), live(연결 상태)
 ```
+
+## 상단 바 (`layout/TopBar`, 2026-10-16 "상단 바 하나로")
+
+- 앱에 상단 바는 하나다. 일반 화면은 `AppShell`이 화면 맨 위에 붙여 그리고(`data-topbar="page"`), 3D 홈은 틀의 바를 넘겨받아 같은 컴포넌트를 `overlay` 모양(떠 있는 성에 낀 판, `data-topbar="overlay"`)으로 3D 위에 그린다. 화면이 따로 상단 바를 만들지 않는다.
+- 순서: 로고 · "예시 데이터"(값이 모의 서버에서 올 때) · 가운데 칸(홈에서만 3D | 대시보드 전환. 대시보드는 `useHeaderSlot` 포털, 3D 홈은 `center`) · 연결·시계 알약(연결되면 지금 시각, 끊기면 "연결 끊김"과 마지막 수신 시각) · 알람 · CCTV(`extra`) · 사용자 메뉴(이름·권한, 설정(화질), 로그아웃).
+- 폰(md 미만): 알람은 아래 탭 바의 "알람" 배지가 맡아 바에서 빼고 CCTV는 사용자 메뉴 안. 로고 글자는 전환이 있으면 xl 미만에서 뺀다(사이드바를 펼친 태블릿에서도 전환이 잘리지 않게). 사용자 이름은 xl부터.
+- 서버 없는 시연 화면은 `live`(연결 상태)와 `example`을 직접 넘긴다. 높이는 56px(`h-14`): 3D 홈 패널 자리(`studio.css`)가 이 높이를 기준으로 한다.
+- 점검: `node app/scripts/topBar.mjs`(세 크기, 결과 `docs/screenshots/top-bar`).
 
 ## 주 메뉴 (`layout/Sidebar`)
 

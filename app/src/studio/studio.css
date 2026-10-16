@@ -63,7 +63,7 @@
   backdrop-filter: blur(18px) saturate(1.4);
 }
 
-.st-root button {
+.st-root button:not(.st-topbar *) {
   font: inherit;
   color: inherit;
   border: 0;
@@ -158,109 +158,47 @@
   color: var(--st-offline);
 }
 
-/* ── 상단 바 (하나뿐) ── */
-.st-top {
+/* ── 상단 바: 앱 전체의 상단 바 하나(components/layout/TopBar, overlay 모양)를 3D 위에 띄운다. 여기서는 자리만 정한다 ── */
+.st-topbar {
   position: absolute;
   top: var(--st-gap);
   left: var(--st-gap);
   right: var(--st-gap);
-  height: 54px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 0 10px 0 12px;
-  border-radius: 18px;
-  z-index: 30;
 }
 
-.st-brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
+/* 시연 화면(/scene-demo)이 바 가운데 칸에 넣는 측정 버튼 */
+.st-topbar .st-aux {
   flex: none;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 9px;
+  background: rgb(30 45 80 / 0.05);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--st-soft);
+  white-space: nowrap;
 }
 
-.st-brand strong {
-  font-size: 15.5px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+.st-topbar .st-aux[aria-pressed='true'] {
+  background: #3a4252;
+  color: #fff;
 }
 
-.st-logo {
-  display: grid;
-}
-
-.st-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 300px;
-  min-width: 0;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 12px;
-  background: rgb(30 45 80 / 0.045);
+.st-topbar .st-fps {
+  flex: none;
+  font-size: 11px;
   color: var(--st-faint);
+  white-space: nowrap;
 }
 
-.st-search input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: var(--st-ink);
-  outline: none;
-}
-
-.st-search input::placeholder {
-  color: var(--st-faint);
-}
-
-.st-search-list,
-.st-area-list {
+/* ── 카메라 지역 전환: 지도 도구 곁에 뜨는 작은 유리 판 ── */
+.st-area-dock {
   position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  min-width: 100%;
-  padding: 6px;
-  list-style: none;
-  z-index: 50;
-  background: rgb(255 255 255 / 0.9);
-}
-
-.st-search-list button,
-.st-area-list button {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 7px 8px;
-  border-radius: 12px;
-  text-align: left;
-}
-
-.st-search-list button:hover,
-.st-area-list button:hover,
-.st-area-list button[aria-selected='true'] {
-  background: rgb(37 99 235 / 0.07);
-}
-
-.st-tabs-slot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.st-top-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
-  min-width: 0;
+  top: 158px;
+  left: var(--st-gap);
+  padding: 2px;
+  border-radius: 15px;
+  z-index: 21;
 }
 
 /* 지역 전환 */
@@ -319,12 +257,6 @@
   white-space: nowrap;
 }
 
-.st-area-list {
-  left: auto;
-  right: 0;
-  width: 300px;
-}
-
 .st-area-list em {
   margin-left: auto;
   font-style: normal;
@@ -358,235 +290,36 @@
   font-style: normal;
 }
 
-/* 실시간 시계·연결 */
-.st-live {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: #e8f6ee;
-  color: var(--st-normal);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.st-live i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 0 3px rgb(31 157 104 / 0.18);
-}
-
-.st-live time {
-  color: var(--st-ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.st-live-off {
-  background: #eceef2;
-  color: var(--st-offline);
-}
-
-.st-live-off i {
-  box-shadow: none;
-}
-
-/* 알람·사용자·메뉴 */
-.st-account {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.st-bell {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  color: var(--st-soft);
-}
-
-a.st-bell:hover {
-  background: rgb(30 45 80 / 0.05);
-}
-
-.st-bell b {
-  position: absolute;
-  top: 5px;
-  right: 4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 99px;
-  background: var(--st-alarm);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 16px;
-  text-align: center;
-}
-
-/* 틀에서 넘겨받은 CCTV 버튼을 상단 바 모양에 맞춘다 */
-.st-extra button,
-.st-extra a {
-  min-height: 0 !important;
-  height: 36px !important;
-  padding: 0 12px !important;
-  border: 0 !important;
-  border-radius: 11px !important;
-  background: rgb(30 45 80 / 0.05) !important;
-  box-shadow: none !important;
-  color: var(--st-soft) !important;
-  font-size: 12.5px !important;
-  font-weight: 500 !important;
-}
-
-.st-pop {
-  position: relative;
-}
-
-.st-pop > button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 42px;
-  padding: 0 8px !important;
-  border-radius: 12px;
-  color: var(--st-soft) !important;
-}
-
-.st-pop > button:hover,
-.st-pop > button[aria-expanded='true'] {
-  background: rgb(30 45 80 / 0.05) !important;
-}
-
-.st-avatar {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--st-blue-soft);
-  color: var(--st-blue);
-  font-weight: 600;
-}
-
-.st-user-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.2;
-}
-
-.st-user-text b {
-  font-weight: 500;
-  color: var(--st-ink);
-  white-space: nowrap;
-}
-
-.st-user-text small {
-  font-size: 11px;
-  color: var(--st-faint);
-  white-space: nowrap;
-}
-
-.st-pop-menu {
+.st-area-list {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
-  min-width: 180px;
+  left: 0;
+  width: 300px;
   padding: 6px;
-  display: flex;
-  flex-direction: column;
+  list-style: none;
   z-index: 50;
   background: rgb(255 255 255 / 0.92);
 }
 
-.st-pop-menu > * {
+.st-area-list button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 12px !important;
-  border-radius: 11px;
-  color: var(--st-ink) !important;
-  text-decoration: none;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 12px;
   text-align: left;
 }
 
-.st-pop-menu > *:hover {
-  background: rgb(37 99 235 / 0.08) !important;
-  color: var(--st-blue) !important;
-}
-
-.st-pop-menu [aria-disabled='true'] {
-  color: var(--st-faint) !important;
-  cursor: not-allowed;
-}
-
-/* 상단 바 안에 들어온 홈 전환(3D | 대시보드)과 시연 화면의 보조 버튼 */
-.st-tabs-slot [role='tablist'] {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border: 0;
-  border-radius: 12px;
-  background: rgb(30 45 80 / 0.05);
-}
-
-.st-tabs-slot [role='tab'] {
-  min-height: 0;
-  white-space: nowrap;
-  flex: none;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 9px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--st-soft);
-  background: none;
-}
-
-.st-tabs-slot [role='tab'][aria-selected='true'] {
-  background: #fff;
-  color: var(--st-blue);
-  box-shadow: 0 1px 4px rgb(30 50 100 / 0.12);
-}
-
-.st-tabs-slot .st-aux {
-  height: 30px;
-  padding: 0 11px;
-  border-radius: 9px;
-  background: rgb(30 45 80 / 0.05);
-  font-weight: 500;
-  color: var(--st-soft);
-  white-space: nowrap;
-}
-
-.st-tabs-slot .st-aux[aria-pressed='true'] {
-  background: #3a4252;
-  color: #fff;
-}
-
-.st-tabs-slot .st-fps {
-  font-size: 11px;
-  color: var(--st-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.st-area-list button:hover,
+.st-area-list button[aria-selected='true'] {
+  background: rgb(37 99 235 / 0.07);
 }
 
 /* ── 연결 끊김 ── */
 .st-offline {
   position: absolute;
-  top: 74px;
+  top: 76px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 40;
@@ -622,7 +355,7 @@ a.st-bell:hover {
 /* ── 지표 카드 (왼쪽 위 세 장) ── */
 .st-kpis {
   position: absolute;
-  top: 74px;
+  top: 76px;
   left: var(--st-gap);
   display: flex;
   gap: var(--st-gap);
@@ -690,7 +423,7 @@ a.st-bell:hover {
 /* ── 지도 도구 (확대·축소·회전·기본 화면) ── */
 .st-tools {
   position: absolute;
-  top: 74px;
+  top: 76px;
   right: calc(var(--st-gap) * 2 + 300px);
   display: flex;
   flex-direction: column;
@@ -726,10 +459,10 @@ a.st-bell:hover {
 /* ── 상세 패널 (오른쪽) ── */
 .st-detail {
   position: absolute;
-  top: 74px;
+  top: 76px;
   right: var(--st-gap);
   width: 300px;
-  max-height: calc(100% - 74px - 214px);
+  max-height: calc(100% - 76px - 214px);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -1235,6 +968,58 @@ button.st-now:hover {
   box-shadow: 0 1px 4px rgb(30 50 100 / 0.12);
 }
 
+/* 표 접기: 머리 줄 오른쪽 끝의 단추, 접으면 요약 한 줄 (기기에 기억, Panels의 Tables) */
+.st-table-toggle {
+  display: grid !important;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--st-soft) !important;
+}
+
+.st-table-collapse:hover {
+  background: rgb(30 45 80 / 0.06) !important;
+}
+
+.st-table-summary .st-table-toggle .st-icon {
+  transform: rotate(180deg);
+}
+
+.st-root .st-table.st-table-collapsed {
+  height: auto;
+  padding: 6px;
+}
+
+.st-table-summary {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 0 0 2px !important;
+  border-radius: 12px;
+  text-align: left;
+}
+
+.st-table-summary-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--st-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 장면에 없는 대상의 줄(누르면 기록 팝업): 장면의 대상과 구별되게 글자를 조금 옅게 */
+.st-table tr[data-off-scene] .st-cell-main {
+  color: var(--st-soft);
+}
+
 .st-table-scroll {
   flex: 1;
   min-height: 0;
@@ -1503,9 +1288,6 @@ button.st-now:hover {
 
 /* ── 좁은 가로(1320px 이하): 패널을 조금 줄인다 ── */
 @container (max-width: 1320px) {
-  .st-search {
-    width: 220px;
-  }
   .st-kpi {
     width: 196px;
   }
@@ -1521,42 +1303,13 @@ button.st-now:hover {
 }
 
 /* ── 세로 태블릿 등 좁은 화면(1000px 미만): 아래에 표와 공정 추적을 쌓는다 ── */
-.st-layout-narrow .st-search {
-  width: 44px;
-  padding: 0;
-  justify-content: center;
-}
-
-.st-layout-narrow .st-search:focus-within {
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  width: auto;
-  padding: 0 12px;
-  background: #fff;
-  z-index: 5;
-}
-
-.st-layout-narrow .st-search input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-}
-
-.st-layout-narrow .st-search:focus-within input {
-  position: static;
-  opacity: 1;
-}
-
-.st-layout-narrow .st-brand strong,
-.st-layout-narrow .st-user-text,
-.st-layout-narrow .st-area-text small,
-.st-layout-narrow .st-chip-example {
+.st-layout-narrow .st-area-text small {
   display: none;
 }
 
-.st-layout-narrow .st-top {
-  gap: 8px;
+.st-layout-narrow .st-area-dock {
+  top: 158px;
+  left: calc(var(--st-gap) * 2 + 42px);
 }
 
 .st-layout-narrow .st-kpis {
@@ -1574,19 +1327,19 @@ button.st-now:hover {
 }
 
 .st-layout-narrow .st-tools {
-  top: 156px;
+  top: 158px;
   right: auto;
   left: var(--st-gap);
 }
 
 .st-layout-narrow .st-detail {
-  top: 156px;
+  top: 158px;
   width: 290px;
-  max-height: calc(100% - 156px - 340px);
+  max-height: calc(100% - 158px - 340px);
 }
 
 .st-layout-narrow .st-offline {
-  top: 156px;
+  top: 158px;
 }
 
 .st-layout-narrow .st-tracker {
@@ -1609,148 +1362,40 @@ button.st-now:hover {
   bottom: 330px;
 }
 
-/* 세로 태블릿: 상단 바의 탭 칸은 줄어들고 옆으로 밀리며, 지역 전환·연결은 늘 보인다 */
-.st-layout-narrow .st-tabs-slot {
-  flex: 1 1 auto;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.st-layout-narrow .st-tabs-slot::-webkit-scrollbar {
-  display: none;
-}
-
-.st-layout-narrow .st-top-right {
-  flex: none;
-}
-
 /* ── 폰(600px 미만): 짧은 상단 바 → 지표 한 줄 → 3D가 화면 대부분 → 아래 시트 ── */
 .st-layout-phone {
   min-height: 0;
   --st-gap: 8px;
 }
 
-.st-top-compact {
-  height: 50px;
-  gap: 6px;
-  padding: 0 6px 0 8px;
-  border-radius: 16px;
+/* 지역 전환: 왼쪽 위, 이름만 (지도 도구는 오른쪽 위) */
+.st-layout-phone .st-area-dock {
+  top: 118px;
+  max-width: calc(100% - 3 * var(--st-gap) - 38px);
 }
 
-.st-top-compact .st-brand {
-  gap: 6px;
-}
-
-.st-top-compact .st-area {
-  position: static;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.st-top-compact .st-area-button {
-  width: 100%;
-  height: 40px;
+.st-layout-phone .st-area-button {
+  height: 38px;
   gap: 7px;
-  padding: 0 6px 0 4px !important;
 }
 
-.st-top-compact .st-area-text {
-  min-width: 0;
+.st-layout-phone .st-area-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
 }
 
-.st-top-compact .st-area-text b {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.st-top-compact .st-area-text small,
-.st-top-compact .st-area-bars {
+.st-layout-phone .st-area-text small {
   display: none;
 }
 
-/* 목록은 상단 바 폭 전체로 (바깥 유리 패널이 흐림 효과를 가지면 fixed가 패널 기준이 되므로 absolute로) */
-.st-top-compact .st-area-list {
-  position: absolute;
-  top: 58px;
-  left: 0;
-  right: 0;
-  width: auto;
-  min-width: 0;
-}
-
-.st-top-compact .st-live {
-  padding: 0 8px;
-  height: 26px;
-  font-size: 11.5px;
-}
-
-/* 홈 전환(3D | 대시보드): 폰에서도 상단 바에 바로 둔다. 자리가 모자라면 지역 전환이 먼저 줄어든다 */
-.st-top-compact .st-switch-slot {
-  flex: none;
-}
-
-.st-top-compact .st-switch-slot [role='tab'] {
-  height: 30px;
-  padding: 0 9px;
-  font-size: 12px;
-}
-
-.st-top-compact .st-chip-example {
-  padding: 2px 6px;
-  font-size: 10px;
-}
-
-.st-more-menu {
-  flex: none;
-}
-
-.st-more-button {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  color: var(--st-soft) !important;
-}
-
-.st-more-button[aria-expanded='true'] {
-  background: rgb(30 45 80 / 0.06) !important;
-}
-
-.st-more-panel {
-  position: absolute;
-  top: 58px;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 16px;
-  z-index: 50;
-}
-
-.st-more-panel .st-search {
-  width: 100%;
-}
-
-.st-more-panel .st-tabs-slot {
-  flex-wrap: wrap;
-}
-
-.st-more-panel .st-tabs-slot .st-fps {
-  white-space: normal;
-}
-
-.st-more-account {
-  display: flex;
-  justify-content: flex-end;
+.st-layout-phone .st-area-list {
+  width: min(300px, calc(100cqw - 2 * var(--st-gap)));
 }
 
 /* 지표: 옆으로 미는 작은 칩 한 줄 */
 .st-layout-phone .st-kpis {
-  top: 66px;
+  top: 72px;
   left: 0;
   right: 0;
   padding: 0 var(--st-gap) 6px;
@@ -1805,7 +1450,7 @@ button.st-now:hover {
 
 /* 지도 도구: 오른쪽 위, 작게 */
 .st-layout-phone .st-tools {
-  top: 112px;
+  top: 118px;
   right: var(--st-gap);
   width: 38px;
   padding: 3px 0;
@@ -1818,7 +1463,7 @@ button.st-now:hover {
 }
 
 .st-layout-phone .st-offline {
-  top: 112px;
+  top: 168px;
   left: var(--st-gap);
   right: calc(var(--st-gap) * 2 + 38px);
   transform: none;
@@ -1984,7 +1629,7 @@ button.st-now:hover {
   background: rgb(255 255 255 / 0.9);
 }
 
-.st-root[data-tier='standard'] :is(.st-top, .st-detail) {
+.st-root[data-tier='standard'] .st-detail {
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   background: rgb(255 255 255 / 0.74);
@@ -1995,6 +1640,13 @@ button.st-now:hover {
   backdrop-filter: none;
   background: rgb(255 255 255 / 0.96);
   box-shadow: 0 6px 18px -10px rgb(30 50 100 / 0.3);
+}
+
+/* 상단 바(앱의 .glass)도 low에서는 흐리지 않는다: 앱의 화질 설정과 상관없이 3D 무대의 단계를 따른다 */
+.st-root[data-tier='low'] .st-topbar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgb(255 255 255 / 0.96);
 }
 
 /* 연결 끊김 알림은 단계와 상관없이 어두운 판 (흰 글씨가 보이게) */
@@ -2176,7 +1828,7 @@ button.st-now:hover {
 /* ── 세로 태블릿: 배치 요약을 한 줄 칩으로 접어 둔다 (누르면 펼침, 고른 대상이 있으면 상세 패널) ── */
 .st-batch-chip {
   position: absolute;
-  top: 156px;
+  top: 158px;
   right: var(--st-gap);
   z-index: 20;
   display: flex;

@@ -82,7 +82,7 @@ describe('패널은 3D 조각을 기다리지 않는다', () => {
   });
 
   describe('3D 장면은 지표가 그려진 뒤에 올린다 (느린 폰에서 장면 만들기가 지표를 늦추지 않게)', () => {
-    const props = { jointSource: fixedSource(), tier: 'low' as const, lastReceivedAt: null, paused: false, example: true, onFailed: () => {} };
+    const props = { jointSource: fixedSource(), tier: 'low' as const, lastReceivedAt: null, paused: false, onFailed: () => {} };
     beforeEach(() => {
       scene.mode = 'render';
       scene.last = null;
@@ -127,7 +127,7 @@ describe('패널은 3D 조각을 기다리지 않는다', () => {
 
     it('지표·상단 바·시트는 store 값으로 바로 보이고, 그 아래에 포스터·돌림표·"3D 장면을 준비하는 중…"이 깔린다', async () => {
       const user = userEvent.setup();
-      render(<StudioView data={demoData(Date.now(), 30)} jointSource={fixedSource()} tier="low" disconnected={false} lastReceivedAt={null} paused={false} example onFailed={() => {}} />);
+      render(<StudioView data={demoData(Date.now(), 30)} jointSource={fixedSource()} tier="low" disconnected={false} lastReceivedAt={null} paused={false} onFailed={() => {}} />);
       const loading = screen.getByRole('status', { name: '3D 장면을 준비하는 중' });
       expect(loading).toHaveTextContent('3D 장면을 준비하는 중…');
       expect(loading.querySelector('.st-spinner')).not.toBeNull();
@@ -161,7 +161,7 @@ describe('포스터는 빈 장면만 담는다', () => {
     expect(EMPTY_DATA.summary).toBeNull();
     expect(scene.last?.jointSource.kind).toBe('fixed');
     expect(container.textContent).toBe('');
-    expect(container.querySelector('.st-top, .st-kpis, .st-pins, .st-sheet, .st-detail, .st-poster')).toBeNull();
+    expect(container.querySelector('[data-topbar], .st-area-dock, .st-kpis, .st-pins, .st-sheet, .st-detail, .st-poster')).toBeNull();
   });
 
   it('포스터를 찍는 스크립트는 그 빈 장면 화면을 찍고, 화면에 글자가 있으면 멈춘다', () => {

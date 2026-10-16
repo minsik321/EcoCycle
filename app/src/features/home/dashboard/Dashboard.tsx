@@ -1,4 +1,5 @@
 import { useContext, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { KpiDetailContext } from '../../../components/charts/KpiDetailContext';
 import { Link } from 'react-router-dom';
 import { TANK_IDS } from '@ecocycle/shared';
@@ -13,6 +14,7 @@ import { useAppSelector } from '../../../store/hooks';
 import { selectConnection, selectDevice, selectIsDisconnected, selectPlantSummary } from '../../../store/selectors';
 import { usePlantTrends } from '../../../store/usePlantTrends';
 import { PageContainer } from '../../../components/layout/PageContainer';
+import { useHeaderSlot } from '../../../components/layout/shellChrome';
 import { PopupLink } from '../../../components/records/recordPopup';
 import { HomeAlarms } from '../HomeAlarms';
 import { currentBatch, recentActivity } from './dashboardData';
@@ -275,11 +277,14 @@ function Recent() {
  * 섹터 4칸, 지금 배치, 6단계 공정 추적, 최근 차량·베일.
  */
 export function Dashboard({ switcher, notice }: { switcher: ReactNode; notice?: string | null }) {
+  const slot = useHeaderSlot();
   return (
     <PageContainer>
       <h1 className="sr-only">홈</h1>
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        {switcher}
+      {/* 전환은 앱 상단 바의 가운데 칸에 (틀 밖에서는 제자리) */}
+      {slot && createPortal(switcher, slot)}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 empty:hidden">
+        {!slot && switcher}
         {notice && (
           <p role="status" className="min-w-0 text-xs text-ink-soft">
             {notice}
