@@ -436,7 +436,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 
 | 메서드와 경로 | 설명 |
 | --- | --- |
-| GET `/process/state` | 공정 흐름 현재 상태: 진행 중인 차량·배치·베일과 최근 목록(표·검색용, 종류별 최근 20건 가정) |
+| GET `/process/state` | 공정 흐름 현재 상태: 진행 중인 차량·배치·베일과 최근 목록(표용, 종류별 최근 20건 가정) |
 | GET `/plant/history?metric=...&from=...&to=...&interval=...` | 요약 값의 이력(지표 카드의 작은 추이선용). 응답은 기기 이력과 같은 `points: [{ts, value}]` |
 | GET `/plant/kpi-history?metric=...&range=today\|7d\|30d&timeZone=Asia/Seoul` | 7단위 KPI 상세(제안안): metric은 기존 세 지표. 오늘은 현지 자정부터 시간별, 7일·30일은 오늘 포함 일별. `{metric, range, from, to, interval, points:[{ts,value,runningMinutes?,stoppedMinutes?}], statistics:{current,average,min,max}, targetBand:{min,max}\|null, updatedAt}`. 생산량은 누적이 아닌 구간 생산 개수, current는 홈 현재값. 통계·목표 범위·가동/정지 분은 서버 집계. 잘못된 metric·range·IANA timeZone은 422. 인증 필요. 목업은 지난 30일을 생성하며 생산량은 야간·휴일 감소, 수분 변동, 정기 정지를 반영한다. |
 
