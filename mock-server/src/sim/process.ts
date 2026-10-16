@@ -1,5 +1,5 @@
 import type { BatchCommand, BatchControlState, BatchEvent, ControlledBatch, BaleDetail } from '@ecocycle/shared';
-import type { Bale, Batch, BatchRecord, CompressorState, MixPart, ProcessState, TankId, TankState, Vehicle, VehicleRecord } from '@ecocycle/shared';
+import type { Bale, BaleRecord, Batch, BatchRecord, CompressorState, MixPart, ProcessState, TankId, TankState, Vehicle, VehicleRecord } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
 import type { CompanyFixture, TruckFixture } from '../fixtures/process';
 import {
@@ -445,6 +445,22 @@ export const liveBatchRecords = (): BatchRecord[] =>
       balesProduced: 0,
       baleIds: [],
     }));
+
+/** 베일 기록 줄 (GET /bales/records): 만든 모든 베일. 단계·출하 시각은 지금 상태, 압력·수분은 생산 당시 값 */
+export const baleRecords = (): BaleRecord[] =>
+  [...baleDetails.keys()].flatMap((id) => {
+    const bale = baleDetail(id);
+    if (!bale) return [];
+    return [{
+      id: bale.id,
+      batchId: bale.batchId,
+      stage: bale.stage,
+      createdAt: bale.stageTimes.created ?? bale.updatedAt,
+      shippedAt: bale.stageTimes.shipped ?? null,
+      pressureMpa: bale.pressureMpa,
+      avgMoisturePercent: bale.avgMoisturePercent,
+    }];
+  });
 
 /** 시작할 때 표가 비어 있지 않게 지나간 예시 기록을 채워 둔다 */
 function seedRecent(): void {

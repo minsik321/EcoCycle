@@ -206,6 +206,8 @@ Oct 13, 2026 · @민식
 | GET `/vehicles/{id}` | 차량 기록 한 건 (목록 한 줄과 같은 모양). 없으면 404 |
 | GET `/batches/records?from=...&to=...&page=1&pageSize=10` | 배치 기록 (시작 시각 기준, 아래 "공정 기록" 모양) |
 | GET `/batches/{id}` | 배치 기록 한 건 (목록 한 줄과 같은 모양). 없으면 404 |
+| GET `/bales/records?from=...&to=...&page=1&pageSize=10` | 베일 기록 (생산 시각 기준, 아래 "공정 기록" 모양) |
+| GET `/bales/{id}` | 베일 한 건 (생산 당시 압력·수분·배합 스냅샷, 5단위 계약). 없으면 404 |
 | GET `/robots/{id}/model` | 로봇 모델 정보: 축 수, 관절 순서, 링크 길이, 각도 범위, 영점 (기종이 정해지면 이 값으로 화면을 맞춘다) |
 | GET `/alarms?state=active` | 알람 목록 |
 | GET `/cameras` | 카메라 목록 |
@@ -247,9 +249,9 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 - 무게는 계중대 값(t): 입차 총중량 `grossT`, 출차 공차 `tareT`, 순중량 `netT = grossT − tareT`(서버가 계산해 저장).
 - `fillBeforePercent`·`fillAfterPercent`는 하역 직전·직후의 섹터 적재율 %. 화면은 두 값과 차이(%p)를 적기만 한다.
 
-##### 공정 기록 (차량·배치)
+##### 공정 기록 (차량·배치·베일)
 
-"공정 기록" 화면의 두 목록은 같은 기록 목록 모양이다. 지금 진행 중인 차량·배치도 목록에 들어 있고(`status`·`result`가 진행 상태를 알려 준다), 끝나면 같은 줄이 바뀐다. 지난 30일 안의 기록을 준다(제안).
+"공정 기록" 화면의 세 목록은 같은 기록 목록 모양이다. 지금 진행 중인 차량·배치와 적치 중인 베일도 목록에 들어 있고(`status`·`result`가 진행 상태를 알려 준다), 끝나면 같은 줄이 바뀐다. 지난 30일 안의 기록을 준다(제안).
 
 차량 기록 `GET /vehicles/records` (기록 시각은 입차 시각 `arrivedAt`):
 
@@ -281,6 +283,21 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 - `result`: `completed`(완료), `skipped`(건너뜀: 압축하지 않고 넘어감), `paused`(일시정지됨: 일시정지된 채 끝남), 진행 중이면 `null`.
 - `actualPressureMpa`는 압축 때 실제로 낸 압력(MPa)이고 압축하지 않았거나 아직 압축 전이면 `null`. `endedAt`은 진행 중이면 `null`. `balesProduced`는 `baleIds`의 길이다.
 - 배치·베일 상세 화면(5단위)이 쓸 `GET /batches/{id}`는 목록 한 줄과 같은 모양을 준다.
+
+베일 기록 `GET /bales/records` (기록 시각은 생산(결속·배출) 시각 `createdAt`):
+
+```json
+{
+  "id": "BL-20261015-0407", "batchId": "batch-0407", "stage": "shipped",
+  "createdAt": "2026-10-15T04:24:10.000Z", "shippedAt": "2026-10-15T04:24:35.000Z",
+  "pressureMpa": 28.3, "avgMoisturePercent": 11.8
+}
+```
+
+- `stage`: `created`(적치: 결속 후 배출되어 쌓여 있음), `shipped`(출하). `shippedAt`은 출하 전에는 `null`.
+- `pressureMpa`·`avgMoisturePercent`는 생산 당시 값(스냅샷)이다. 배합 스냅샷까지 보려면 `GET /bales/{id}`.
+
+차량·배치·베일 한 건은 화면에서 페이지를 옮기지 않고 지금 화면 위의 팝업으로 연다(2026-10-16). 상세 주소(`/records/vehicles/{id}`, `/records/batches/{id}`, `/records/bales/{id}`)는 그대로 쓰고, 그 주소를 바로 열면 공정 기록 화면 위에 팝업을 띄운다. 서버 계약은 바뀌지 않는다.
 
 기기별 상태 형식은 다음과 같으며 `status`가 `normal`, `caution`, `alarm`, `offline` 중 무엇인지는 서버가 기준값으로 정해서 보낸다.
 
@@ -500,7 +517,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 
 ### 5단위 배치·베일 계약 (2026-10-15, 현장 확인 전 가정)
 
-`/records/batches`: 현재·다음 배치 선택, 수동 제어, 사건 RecordList. `/records/batches/{id}`: 과거 상세. `/records/bales/{id}`: 베일 상세.
+`/records/batches`: 현재·다음 배치 선택, 수동 제어, 사건 RecordList(사건을 누르면 그 배치·베일 팝업). `/records/batches/{id}`: 배치 상세 팝업. `/records/bales/{id}`: 베일 상세 팝업.
 - GET `/batches/control`: `{current,next,pressureRange,eventsRevision}`. 각 대상은 `{batch,paused,skipped,progressPercent,currentPressureMpa,baleIds}`. 진행률·압력·현재/다음 선정은 서버가 결정한다. 화면은 2초마다 조회하며 재연결 때 재조회한다.
 - GET `/batches/events/records`: 공통 기간·페이지 계약의 `BatchEvent` 목록. created, mix_changed, pressure_changed, paused, resumed, skipped, bale_produced. 시각·배치 ID·행위자·변경 전후/사유/베일 ID를 저장한다.
 - GET `/bales/{id}`: 베일 ID, 배치 ID, 생성·출하 시각, 상태, 실제 압력, 평균 수분, 배합 스냅샷.
@@ -562,7 +579,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 배치·베일 제어 | 배치당 베일 1개 목업, 모델 1→N. `batch.control`은 관리자만. 투입 전 배합·압축 전 압력 변경, 압축 중 건너뛰기 거부 | `shared/commands.ts`, `mock-server/src/fixtures/accounts.ts`, `mock-server/src/sim/process.ts` |
 | 기록 목록 | 모든 기록 목록은 `from`·`to`·`page`·`pageSize` 쿼리와 `{ items, total, page, pageSize }` 응답, 한 쪽 10줄 | `shared/records.ts`, 모의 서버 `routes/records.ts`, `components/records` |
 | 섹터 하역 기록 | `GET /devices/{id}/unloads/records`, 줄마다 번호판·회사·총중량·공차·순중량(t)·하역 전후 적재율. 섹터 상태에 지금의 주의 기준 `cautionThresholdPercent` | `shared/records.ts`·`devices.ts`, 모의 서버 `sim/unloads.ts`, `features/tank` |
-| 공정 기록 | `GET /vehicles/records`·`GET /batches/records`(기록 목록 모양)와 한 건 조회 `GET /vehicles/{id}`·`GET /batches/{id}`. 차량: 입·출차 시각, 번호판, 회사, 배정 섹터, 총중량·공차·순중량, 상태(인식·하역·출차). 배치: 시작·종료, 배합, 평균 수분, 목표·실제 압력, 결과(완료·건너뜀·일시정지됨), 만든 베일. 지난 30일 | `shared/processRecords.ts`, 모의 서버 `sim/records.ts`, `features/records` |
+| 공정 기록 | `GET /vehicles/records`·`GET /batches/records`·`GET /bales/records`(기록 목록 모양)와 한 건 조회 `GET /vehicles/{id}`·`GET /batches/{id}`·`GET /bales/{id}`. 차량: 입·출차 시각, 번호판, 회사, 배정 섹터, 총중량·공차·순중량, 상태(인식·하역·출차). 배치: 시작·종료, 배합, 평균 수분, 목표·실제 압력, 결과(완료·건너뜀·일시정지됨), 만든 베일. 베일: 생산 시각, 배치, 압력, 평균 수분, 상태(적치·출하). 상세는 팝업(깊이 1 이력). 지난 30일 | `shared/processRecords.ts`, 모의 서버 `sim/records.ts`, `features/records` |
 | 차량·회사·섹터 배정 | 번호판 → 회사 → 배정 섹터는 서버가 정해 보낸다. 모의 서버는 가상의 회사(한빛자원, 동해페이퍼, 새솔리싸이클)와 가상의 번호판을 쓴다 | 모의 서버 예시 데이터 |
 | 배합과 압력 | 배치별 배합비·평균 수분·목표 압력은 서버가 정해 보낸다 | 모의 서버 예시 데이터 |
 | 공정 흐름 형식 | 6절 "공정 흐름"의 `process.*` 메시지와 `GET /process/state` | API 경로와 값 형식 |

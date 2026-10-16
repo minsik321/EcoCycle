@@ -1,5 +1,5 @@
 // 글 줄바꿈 화면 점검: 모의 서버와 앱(vite)을 띄우고 실제 브라우저로 폰·태블릿 화면을 열어
-// (3D 홈 시트·상세, 섹터 목록·페이지, 로봇팔·압축기·컨베이어 페이지와 그 "자세히", 로봇 운전 모드 세 칸, 기록 목록, 공정 기록, 배치·베일, 대시보드·KPI 상세)
+// (3D 홈 시트·상세, 섹터 목록·페이지, 로봇팔·압축기·컨베이어 페이지와 그 "자세히", 로봇 운전 모드 세 칸, 기록 목록, 공정 기록(차량·배치·베일 탭과 상세 팝업), 배치·베일, 대시보드·KPI 상세)
 // 짧은 이름표가 두 줄로 꺾이거나, 낱말이 중간에서 잘리거나, 화면이 옆으로 넘치는 곳을 찾는다.
 //   npm run test:text            (약 2~3분, 서버를 스스로 띄운다)
 // 브라우저: CHROMIUM_PATH, 없으면 이 컴퓨터의 Playwright 브라우저 폴더(ms-playwright/chromium-*)에서 찾는다. 내려받지 않는다.
@@ -180,10 +180,11 @@ async function run(browser) {
           await current(/^자동(?! ·)/).waitFor();
         }
       }
-      // 공정 기록: 차량·배치 탭과 각각의 상세 (첫 줄을 눌러 연다)
-      for (const [tab, label, name] of [
-        ['vehicles', '차량 기록', '공정 기록 차량'],
-        ['batches', '배치 기록', '공정 기록 배치'],
+      // 공정 기록: 차량·배치·베일 탭과 각각의 상세 팝업 (첫 줄을 눌러 연다), 배치 팝업 → 베일 보기 → 배치 보기 (이어 연 팝업)
+      for (const [tab, label, name, title] of [
+        ['vehicles', '차량 기록', '공정 기록 차량', '차량 기록'],
+        ['batches', '배치 기록', '공정 기록 배치', '배치 상세'],
+        ['bales', '베일 기록', '공정 기록 베일', '베일 상세'],
       ]) {
         await go(`/records?tab=${tab}`);
         await page.getByRole('region', { name: label }).waitFor({ timeout: 15_000 });
@@ -191,17 +192,24 @@ async function run(browser) {
         await check(page, name, zoom);
         const first = phone ? page.getByRole('list', { name: label }).getByRole('button').first() : page.getByRole('table', { name: label }).locator('tbody tr').first();
         await first.click();
-        await page.getByText(/^(계중대 무게|만든 베일)/).first().waitFor({ timeout: 15_000 });
+        const dialog = page.getByRole('dialog');
+        await dialog.getByRole('heading', { name: title }).waitFor({ timeout: 15_000 });
+        await dialog.getByText(/^(계중대 무게|만든 베일|사용 압력)/).first().waitFor({ timeout: 15_000 });
         await page.waitForTimeout(800);
-        await check(page, `${name} 상세`, zoom);
+        await check(page, `${name} 상세 팝업`, zoom);
         if (tab === 'batches') {
-          const bale = page.locator('a[href^="/records/bales/"]').first();
+          const bale = dialog.getByRole('button', { name: /^베일 .* 보기$/ }).first();
           if (await bale.count()) {
             await bale.click();
-            await page.getByText('베일 상세', { exact: true }).waitFor();
-            await check(page, '베일 기록 상세', zoom);
+            await dialog.getByRole('heading', { name: '베일 상세' }).waitFor();
+            await dialog.getByText('사용 압력').waitFor({ timeout: 15_000 });
+            await check(page, '베일 상세 팝업 (배치에서 이어 열기)', zoom);
+            await page.keyboard.press('Escape');
+            await dialog.getByRole('heading', { name: '배치 상세' }).waitFor();
           }
         }
+        await page.keyboard.press('Escape');
+        await dialog.waitFor({ state: 'detached' });
       }
       await go('/records/batches');
       await page.getByLabel('A1 (%)', {exact:true}).waitFor();
@@ -220,7 +228,8 @@ async function run(browser) {
       // 대시보드: 3D가 다시 열리면 전환을 누르고, 3D가 실패해 이미 대시보드로 바뀌었으면 그대로 본다
       await go('/');
       await page.locator('.st-root, [aria-label="상태 요약"]').first().waitFor({ timeout: 60_000 });
-      if (await page.locator('.st-root').count()) await page.getByRole('tab', { name: '대시보드' }).click();
+      // 3D 장면을 다시 만드는 동안 메인 스레드가 바빠 실제 클릭이 오래 걸릴 수 있다 (핀처럼 click 이벤트를 바로 보낸다)
+      if (await page.locator('.st-root').count()) await page.getByRole('tab', { name: '대시보드' }).dispatchEvent('click');
       await page.getByRole('region', { name: '상태 요약' }).waitFor();
       await page.waitForTimeout(800);
       await check(page, '대시보드', zoom);

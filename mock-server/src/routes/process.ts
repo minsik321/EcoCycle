@@ -3,7 +3,7 @@ import type { BatchRecord, PlantHistoryResponse, PlantMetric, ProcessState, Vehi
 import { PLANT_METRICS } from '@ecocycle/shared';
 import { sendError } from '../errors';
 import { buildPlantHistory, MAX_HISTORY_POINTS, parseInterval } from '../sim/history';
-import { batchControlState, batchEvents, baleDetail, liveBatchRecords, liveVehicleRecords, processState } from '../sim/process';
+import { baleRecords, batchControlState, batchEvents, baleDetail, liveBatchRecords, liveVehicleRecords, processState } from '../sim/process';
 import { finishedBatchRecords, finishedVehicleRecords } from '../sim/records';
 import { summarize } from '../sim/state';
 import { sendRecordPage } from './records';
@@ -40,6 +40,8 @@ processRouter.get('/batches/records', (req, res) => {
 
 processRouter.get('/batches/control', (_req, res) => res.json(batchControlState()));
 processRouter.get('/batches/events/records', (req, res) => sendRecordPage(req, res, batchEvents(), r => r.at));
+// GET /bales/records?from=...&to=...&page=1&pageSize=10 — 베일 기록 (생산 시각 기준). /bales/:id보다 먼저 둔다
+processRouter.get('/bales/records', (req, res) => sendRecordPage(req, res, baleRecords(), (r) => r.createdAt));
 processRouter.get('/bales/:id', (req, res) => {
   const bale = baleDetail(req.params.id);
   if (!bale) return sendError(res, 404, 'NOT_FOUND', '베일을 찾을 수 없습니다.');

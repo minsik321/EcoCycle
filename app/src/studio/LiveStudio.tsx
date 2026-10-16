@@ -5,7 +5,8 @@ import type { DeviceId } from '@ecocycle/shared';
 import { DeviceControls } from '../components/controls/DeviceControls';
 import { useImmersiveShell } from '../components/layout/shellChrome';
 import { USE_MOCK } from '../config/env';
-import { batchRecordPath, devicePagePath, recordsPath, vehicleRecordPath } from '../config/navigation';
+import { batchBalePath, devicePagePath, recordsPath } from '../config/navigation';
+import { PopupLink } from '../components/records/recordPopup';
 import { useRobotModel } from '../features/robot/useRobot';
 import { demoSource, liveSource } from './robot/jointSource';
 import { useAppSelector } from '../store/hooks';
@@ -18,11 +19,17 @@ import { StudioAccount } from './overlay/Account';
 import { useStudioTier } from './useStudioTier';
 import type { RecordLink, StudioData } from './types';
 
-/** 공정 기록 화면으로 가는 링크 (패널은 주소를 모르고, 앱의 주소 규칙은 config/navigation에 있다) */
+/**
+ * 공정 기록으로 가는 링크 (패널은 주소를 모르고, 앱의 주소 규칙은 config/navigation에 있다).
+ * 목록은 공정 기록 화면으로 가고, 차량·배치 한 건은 3D 홈 위에 기록 상세 팝업을 띄운다(열린 동안 3D 그리기는 멈춘다).
+ */
 const recordLink: RecordLink = (target, label, className) => {
-  const to = target.kind === 'list' ? recordsPath(target.tab) : target.kind === 'vehicle' ? vehicleRecordPath(target.id) : batchRecordPath(target.id);
+  if (target.kind === 'list') return <Link to={recordsPath(target.tab)} className={className}>{label}</Link>;
   return (
-    <><Link to={to} className={className}>{label}</Link>{target.kind === 'batch' && <Link to="/records/batches" className={className}>배치·베일 제어 →</Link>}</>
+    <>
+      <PopupLink target={target} className={className}>{label}</PopupLink>
+      {target.kind === 'batch' && <Link to={batchBalePath} className={className}>배치·베일 제어 →</Link>}
+    </>
   );
 };
 
@@ -42,6 +49,7 @@ export function LiveStudio({ switcher, onFailed }: { switcher?: ReactNode; onFai
   const connection = useAppSelector(selectConnection);
   const disconnected = useAppSelector(selectIsDisconnected);
   const cctvOpen = useAppSelector((state) => state.ui.cctvOpen);
+  const recordPopupOpen = useAppSelector((state) => state.ui.recordPopupOpen);
   // 화질: 직접 고른 값은 그대로, 측정값은 기기 종류 기본값(폰 low·태블릿 standard·데스크톱 high)에서 한 단계까지만
   const qualityMode = useAppSelector((state) => state.ui.qualityMode);
   const qualityAuto = useAppSelector((state) => state.ui.qualityAuto);
@@ -74,7 +82,7 @@ export function LiveStudio({ switcher, onFailed }: { switcher?: ReactNode; onFai
       tier={tier}
       disconnected={disconnected}
       lastReceivedAt={connection.lastReceivedAt}
-      paused={!visible || cctvOpen}
+      paused={!visible || cctvOpen || recordPopupOpen}
       example={USE_MOCK}
       switcher={switcher}
       account={chrome ? <StudioAccount extra={chrome.extra} /> : undefined}

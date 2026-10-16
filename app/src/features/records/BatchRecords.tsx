@@ -1,10 +1,9 @@
-import { useNavigate } from 'react-router-dom';
 import type { BatchRecord, BatchResult } from '@ecocycle/shared';
 import { getRecords } from '../../api';
 import type { Column } from '../../components/common/DataTable';
 import { RecordList } from '../../components/records/RecordList';
+import { useOpenRecordPopup } from '../../components/records/recordPopup';
 import { formatLocalTime, formatPercent, formatPressureMpa } from '../../config/display';
-import { batchRecordPath } from '../../config/navigation';
 import { batchResultText, mixPercentText, shortId } from '../../config/processDisplay';
 
 const pill = 'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap';
@@ -38,10 +37,10 @@ const COLUMNS: readonly Column<BatchRecord>[] = [
 
 /**
  * 공정 기록의 "배치" 탭: 배치 번호, 시작·종료 시각, 배합(섹터 %), 평균 수분, 목표·실제 압력, 결과(완료·건너뜀·일시정지됨), 만든 베일.
- * 값은 모두 서버가 준다(`GET /batches/records`). 줄을 누르면 배치 상세로 간다.
+ * 값은 모두 서버가 준다(`GET /batches/records`). 줄을 누르면 배치 팝업이 뜬다.
  */
 export function BatchRecords() {
-  const navigate = useNavigate();
+  const open = useOpenRecordPopup();
   return (
     <RecordList<BatchRecord>
       label="배치 기록"
@@ -62,7 +61,7 @@ export function BatchRecords() {
       )}
       columns={COLUMNS}
       dense
-      onOpen={(r) => navigate(batchRecordPath(r.id))}
+      onOpen={(r) => open({ kind: 'batch', id: r.id })}
     />
   );
 }

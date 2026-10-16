@@ -13,6 +13,7 @@ import { useAppSelector } from '../../../store/hooks';
 import { selectConnection, selectDevice, selectIsDisconnected, selectPlantSummary } from '../../../store/selectors';
 import { usePlantTrends } from '../../../store/usePlantTrends';
 import { PageContainer } from '../../../components/layout/PageContainer';
+import { PopupLink } from '../../../components/records/recordPopup';
 import { HomeAlarms } from '../HomeAlarms';
 import { currentBatch, recentActivity } from './dashboardData';
 
@@ -181,6 +182,9 @@ function BatchCard() {
             <Row label="목표 압력" value={dash(formatPressureMpa(batch.targetPressureMpa))} />
             <Row label="현재 압력" value={compressor && !disconnected ? formatPressureMpa(compressor.pressureMpa) : '–'} />
           </dl>
+          <PopupLink target={{ kind: 'batch', id: batch.id }} className="-mb-2 inline-flex min-h-12 items-center text-sm font-semibold whitespace-nowrap text-accent-strong">
+            이 배치 상세 →
+          </PopupLink>
         </>
       ) : (
         <p className="text-sm text-ink-soft">진행 중인 배치가 없습니다.</p>
@@ -245,16 +249,19 @@ function Recent() {
       ) : (
         <ul>
           {rows.map((r) => (
-            <li key={r.key} className="flex min-w-0 items-center gap-3 border-b border-line py-2 last:border-b-0">
-              <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper-deep text-xs font-bold text-ink-soft">
-                {r.kind === 'vehicle' ? '차' : '베'}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold whitespace-nowrap text-ink">{r.title}</span>
-                {r.sub && <span className="block truncate text-xs whitespace-nowrap text-ink-soft">{r.sub}</span>}
-              </span>
-              <span className="shrink-0 rounded-full bg-paper-deep px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-ink-soft">{r.stage}</span>
-              <span className="shrink-0 text-right text-xs whitespace-nowrap text-ink-faint tabular-nums">{formatLocalClock(r.at)}</span>
+            <li key={r.key} className="border-b border-line last:border-b-0">
+              {/* 줄을 누르면 그 차량·베일의 기록 팝업 */}
+              <PopupLink target={{ kind: r.kind, id: r.id }} className="flex min-h-12 min-w-0 items-center gap-3 rounded-control py-2 active:bg-paper-deep">
+                <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper-deep text-xs font-bold text-ink-soft">
+                  {r.kind === 'vehicle' ? '차' : '베'}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold whitespace-nowrap text-ink">{r.title}</span>
+                  {r.sub && <span className="block truncate text-xs whitespace-nowrap text-ink-soft">{r.sub}</span>}
+                </span>
+                <span className="shrink-0 rounded-full bg-paper-deep px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-ink-soft">{r.stage}</span>
+                <span className="shrink-0 text-right text-xs whitespace-nowrap text-ink-faint tabular-nums">{formatLocalClock(r.at)}</span>
+              </PopupLink>
             </li>
           ))}
         </ul>

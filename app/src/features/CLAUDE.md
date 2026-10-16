@@ -13,7 +13,7 @@
 | `conveyor/` | `/conveyor` | 기기 페이지 틀(그림 없음): 가동·적재 정도·압축기로 가는 중, 자세히(이력·속도 설정·알람 이력) |
 | `compressor/` | `/compressor` | 기기 페이지 틀(그림 없음): 압력 게이지 칸(지금 vs 목표)·온도·오늘 베일·사이클 단계, 지금 배치(배치·베일 링크), 자세히(이력·설정·알람·점검 이력) |
 | `alarms/` | `/alarms` | 활성·이력 목록, 확인 처리, 누르면 해당 기기 페이지로 |
-| `records/` | `/records`, `/records/vehicles/:id`, `/records/batches/:id` | 공정 기록: 탭 차량·배치(`?tab=`, 둘 다 `RecordList`), 차량 상세, 배치 상세(5단위가 이어서 채움) |
+| `records/` | `/records`, `/records/batches`, 팝업 주소 `/records/{vehicles,batches,bales}/:id` | 공정 기록: 탭 차량·배치·베일(`?tab=`, 모두 `RecordList`), 배치·베일 제어 화면, 차량·배치·베일 상세 팝업 |
 | `settings/` | `/settings` | 화질 모드(고화질/기본/저사양, 자동으로 다시 고르기), 계정, 앱 정보 |
 | `design/` | `/design` | 디자인 토큰과 공용 컴포넌트 미리 보기 (개발용, 로그인 불필요, 값은 모두 예시) |
 | `cctv/` | 오버레이 | 카메라 선택, 발급받은 주소를 `<video>`로 재생 |
@@ -32,7 +32,7 @@
 - 3D 홈의 모양·배치 규칙은 `app/src/studio/CLAUDE.md`. 아래 home/ 규칙은 대시보드의 규칙이다.
 - 홈 주소에 `?demo=1`을 붙이면 서버 관절 값 대신 정해진 시연 동작을 보여 준다(명세의 최후 수단, "시연 동작" 표시).
 - `tank/`: `SectorBin`(납작한 2D 사각 칸 그림 SVG: 아래에서 적재율만큼 차는 평평한 크라프트 채움 + 윗가장자리 짙은 선 + 은은한 파지 무늬, 서버 주의 기준선은 가는 점선과 "주의 N%" 글자, 값이 바뀌면 `transform` 전환, 섹터 목록(`size="sm"`)과 상세(`lg`)가 같은 컴포넌트). 적재율(큰 글자)과 부피 "4.8 / 8.0 m³"는 그림 안, 채움 윗선 바로 위 밝은 빈 곳에 붙고, 거의 차면 칸 위 여백까지 올라가 파지 무늬 위에 놓이지 않는다. 끊기면(`frozen`) 전환을 멈추고 "–"와 마지막 수신 시각. `SectorChips`(수분·등급 작은 칩, 상세는 머리 줄의 상태 칩 앞, 목록은 카드 아래), `TankListPage`(폰 2개씩, 카드: 이름·상태 → 칸 그림 → 칩), `TankPage`(`DevicePage` 틀, 따로 된 주요 수치 칸 없음(추이는 자세히의 이력 그래프), 태블릿·데스크톱은 그림 카드 하나 안에 그림과 그 아래 지금/다음, PC(xl, 1280px 이상)는 "자세히"를 그림 카드 오른쪽에 늘 펼친 채, 접기 버튼 없이(`DetailsSection pinnedWhen={WIDE_QUERY}`, 안은 컨테이너 폭이 좁아 세로로 쌓임), 두 칸은 같은 높이(낮은 쪽이 늘어나고 그림 카드는 그림 칸이 늘어남), 폰은 그림 카드 → 지금/다음(따로 된 카드) → 자세히 → 하역 기록, 맨 아래 `SectorUnloads` = `RecordList`로 `GET /devices/{id}/unloads/records`), `sectorText`(그림 설명, 지금/다음 문장). 화면 글은 "섹터", 코드·주소·ID는 tank 그대로.
-- `records/`(4단위): `RecordsPage`(탭은 주소의 `?tab=vehicles|batches`라 홈의 링크가 탭을 골라 열고 뒤로 가기에도 유지), `VehicleRecords`(입차·출차 시각, 번호판, 회사, 섹터, 총중량·공차·순중량 t, 상태 인식·하역·출차, `GET /vehicles/records`), `BatchRecords`(시작·종료, 배합 섹터 %, 평균 수분, 목표→실제 압력, 결과 완료·건너뜀·일시정지됨·진행 중, 만든 베일, `GET /batches/records`), 줄을 누르면 상세(`VehicleDetailPage` = `GET /vehicles/{id}`, `BatchDetailPage` = `GET /batches/{id}`, 둘 다 `useRecord`·`RecordDetail` 틀). 주소 만들기는 `config/navigation.ts`(`recordsPath`, `vehicleRecordPath`, `batchRecordPath`). 폰은 "더 보기" 안의 메뉴. 홈에서 오는 링크: 대시보드 "전체 보기"(지금 배치 카드 → 배치 탭, 최근 차량·베일 카드 → 차량 탭), 3D 홈 "기록 보기"·"이 차량 기록"·"이 배치 상세"(`studio`의 `RecordLink`, 링크 그리기는 `LiveStudio`가 넘긴다).
+- `records/`(4단위): `RecordsPage`(탭은 주소의 `?tab=vehicles|batches|bales`라 홈의 링크가 탭을 골라 열고 뒤로 가기에도 유지), `VehicleRecords`(입차·출차 시각, 번호판, 회사, 섹터, 총중량·공차·순중량 t, 상태 인식·하역·출차, `GET /vehicles/records`), `BatchRecords`(시작·종료, 배합 섹터 %, 평균 수분, 목표→실제 압력, 결과 완료·건너뜀·일시정지됨·진행 중, 만든 베일, `GET /batches/records`), `BaleRecords`(베일 ID, 생산 시각, 배치, 압력, 평균 수분, 상태 적치·출하, `GET /bales/records`). 줄을 누르면 상세 팝업(아래 "기록 상세 팝업"). 주소 만들기는 `config/navigation.ts`(`recordsPath`, `vehicleRecordPath`, `batchRecordPath`, `baleRecordPath`). 폰은 "더 보기" 안의 메뉴. 홈에서 오는 링크: 대시보드 "전체 보기"(지금 배치 카드 → 배치·베일 화면, 최근 차량·베일 카드 → 차량 탭)와 "이 배치 상세"·최근 차량·베일 줄(팝업), 3D 홈 "기록 보기"·"이 차량 기록"·"이 배치 상세"·"이 베일 상세"(`studio`의 `RecordLink`, 링크 그리기는 `LiveStudio`가 넘긴다).
 추가된 폴더: `history/`(이력 그래프 패널·구간 훅·알람 이력 훅·주요 수치 추이선 `useDeviceTrend`, 섹터·컨베이어·압축기 페이지가 공유), `devices/`(로봇팔·컨베이어·압축기 페이지 화면 테스트만. 옛 공통 틀 `MachinePage`는 2026-10-16 기기 페이지 재설계로 지웠다).
 서버가 제공하지 않아 안내 문구만 둔 항목: 로봇팔 사이클 통계, 압축기 점검 이력, 설정의 현재값 (`docs/questions.md` B18, B21, B22).
 - `robot/`(6단위): 자동·수동·자동 섹터 지정(`auto_pinned`), 지정 목록은 서버 상태와 초안을 구분. `set_mode`의 기존 권한·확인 흐름을 확장한다. 사이클 통계 아래 `PickRecords` = 별도 `RecordList`(`GET /robots/robot-1/picks/records`, 시각·모드·섹터·부피 m³·컨베이어 → 배치). `pickRecordsRevision` 변경 시 같은 기간·쪽을 갱신한다. 재현은 `node app/scripts/robotArm.mjs`, 결과는 `docs/screenshots/robot-arm`.
@@ -122,11 +122,18 @@
 - 화면을 떠날 때 그 화면이 연 구독(관절 값 등)을 해제한다.
 
 
+## 기록 상세 팝업 (2026-10-16, `docs/decisions.md` "기록 상세는 팝업, 이력 깊이 1")
+- 차량·배치·베일 상세는 페이지가 아니라 지금 화면 위의 팝업이다: `features/records/popup/RecordPopupLayer`(라우트 전체를 감싸 화면은 뒤에 깔린 주소로 그리고 그 위에 팝업 하나), `RecordPopup`(`Dialog size="popup"`·베일은 `popupNarrow`, 제목 줄 닫기 버튼), 본문 `VehicleDetail`·`BatchDetail`·`BaleDetail`(`useRecord`·`RecordFrame`·`DetailSection`·`DetailRow`).
+- 여는 쪽은 `components/records/recordPopup`의 `PopupLink`(링크) 또는 `useOpenRecordPopup()`(목록 줄)만 쓴다. 주소를 직접 만들어 `navigate`하지 않는다(뒤 화면 정보가 빠진다).
+- 이어 열기·닫기·뒤로 가기·깊은 링크의 규칙은 `RecordPopupLayer` 머리 주석. 앱이 기억하는 팝업은 지금 것과 바로 전 것 둘뿐이고, 닫기는 어느 방법이든 지금 것 하나만 닫는다. 바로 전 팝업이 있으면 제목 아래에 "닫으면 이전 팝업(…)이 다시 보입니다".
+- 초점: 열면 닫기 버튼, Tab은 팝업 안에서만, 모두 닫으면 처음 누른 곳으로 돌아온다(`Dialog`). 열린 동안 `ui.recordPopupOpen`으로 3D 홈 그리기를 멈춘다.
+- 재현: `node app/scripts/recordPopups.mjs` (390×844·1440×900, 팝업 셋·베일 → 배치 → 베일·뒤로 가기·깊은 링크·대시보드, `docs/screenshots/record-popups`).
+
 ## 5단위 배치·베일
 - `/records/batches` (`BatchBalePage`): 현재 배치 요약, 현재/다음 선택, `BatchControls`, 사건 `RecordList`. `useBatchControl`은 서버 현재 상태를 2초마다 조회하며 명령 결과와 재연결 때 다시 받는다. 초안 입력과 서버 확정값은 분리한다.
-- `/records/bales/:id` (`BaleDetailPage`): 생산 당시 압력·수분·배합 스냅샷, 적치/출하 상태. 기존 배치 상세의 베일 ID로 연결한다.
+- 베일 상세 팝업(`BaleDetail`, 주소 `/records/bales/:id`): 생산 당시 압력·수분·배합 스냅샷, 적치/출하 상태, "배치 보기". 배치 팝업의 "베일 보기"와 현재 배치의 베일 링크로 연다.
 - `batch.control` 권한은 관리자만 주는 가정. 명령은 기존 `useDeviceCommand`·`ConfirmDialog`·`CommandResultToast` 사용. 상태/범위/승인은 서버가 결정한다.
-- 사건 줄을 누르면 변경 전후·수행자·시각·사유 전체를 대화상자로 보여 준다. `eventsRevision` 변경 시 같은 기간·쪽을 새로 조회한다.
+- 사건 줄을 누르면 그 사건의 베일(베일 생산) 또는 배치 팝업을 바로 연다(따로 된 "사건 상세" 없음, 변경·사유·수행자는 목록 줄에 있다). `eventsRevision` 변경 시 같은 기간·쪽을 새로 조회한다.
 - 재현: `node app/scripts/batchBale.mjs` (실제 목업 명령 검증, 두 크기·글자 100/130%, `docs/screenshots/batch-bale`). 전체 글 검사에도 새 화면을 포함한다.
 
 ## 7단위 KPI 상세

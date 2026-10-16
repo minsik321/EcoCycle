@@ -1,10 +1,9 @@
-import { useNavigate } from 'react-router-dom';
 import type { VehicleRecord, VehicleRecordStatus } from '@ecocycle/shared';
 import { getRecords } from '../../api';
 import type { Column } from '../../components/common/DataTable';
 import { RecordList } from '../../components/records/RecordList';
+import { useOpenRecordPopup } from '../../components/records/recordPopup';
 import { formatLocalTime, formatWeightT } from '../../config/display';
-import { vehicleRecordPath } from '../../config/navigation';
 import { SECTOR_LABEL, VEHICLE_RECORD_STATUS_TEXT } from '../../config/processDisplay';
 
 const pill = 'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap';
@@ -31,10 +30,10 @@ const COLUMNS: readonly Column<VehicleRecord>[] = [
 
 /**
  * 공정 기록의 "차량" 탭: 입·출차 시각, 번호판, 회사, 배정 섹터, 총중량·공차·순중량(t), 상태(인식·하역·출차).
- * 값은 모두 서버가 준다(`GET /vehicles/records`). 줄을 누르면 차량 상세로 간다.
+ * 값은 모두 서버가 준다(`GET /vehicles/records`). 줄을 누르면 차량 팝업이 뜬다.
  */
 export function VehicleRecords() {
-  const navigate = useNavigate();
+  const open = useOpenRecordPopup();
   return (
     <RecordList<VehicleRecord>
       label="차량 기록"
@@ -61,7 +60,7 @@ export function VehicleRecords() {
         </span>
       )}
       columns={COLUMNS}
-      onOpen={(r) => navigate(vehicleRecordPath(r.id))}
+      onOpen={(r) => open({ kind: 'vehicle', id: r.id })}
     />
   );
 }

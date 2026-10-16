@@ -13,6 +13,8 @@ export interface UiState {
   /** 홈에서 확대해서 보고 있는 기기 */
   selectedDeviceId: DeviceId | null;
   cctvOpen: boolean;
+  /** 기록 상세 팝업(차량·배치·베일)이 열려 있다. 열린 동안 3D 그리기를 멈춘다 */
+  recordPopupOpen: boolean;
   /** 화질 단계. 저사양 태블릿에서는 low */
   qualityMode: QualityMode;
   /** 이 기기에서 아직 고른 적이 없다. 접속할 때 짧게 프레임을 재서 자동으로 고른다 */
@@ -105,6 +107,7 @@ export function saveHomeMode(mode: HomeMode): void {
 const initialState = (): UiState => ({
   selectedDeviceId: null,
   cctvOpen: false,
+  recordPopupOpen: false,
   qualityMode: loadQualityMode(),
   qualityAuto: loadSavedQuality() === null,
   qualityChosen: loadQualityChosen(),
@@ -120,6 +123,9 @@ const slice = createSlice({
     },
     cctvToggled(state, action: PayloadAction<boolean>) {
       state.cctvOpen = action.payload;
+    },
+    recordPopupToggled(state, action: PayloadAction<boolean>) {
+      state.recordPopupOpen = action.payload;
     },
     /** 사용자가 설정에서 직접 골랐다 */
     qualityModeChanged(state, action: PayloadAction<QualityMode>) {
@@ -144,5 +150,5 @@ const slice = createSlice({
   },
 });
 
-export const { deviceSelected, cctvToggled, qualityModeChanged, qualityProbed, qualityAutoRequested, homeModeChanged } = slice.actions;
+export const { deviceSelected, cctvToggled, recordPopupToggled, qualityModeChanged, qualityProbed, qualityAutoRequested, homeModeChanged } = slice.actions;
 export default slice.reducer;

@@ -61,17 +61,19 @@ export function devicePagePath(id: DeviceId): string {
 }
 
 /** 공정 기록 화면의 탭 (쿼리 `?tab=`) */
-export type RecordsTab = 'vehicles' | 'batches';
-export const RECORDS_TABS: readonly RecordsTab[] = ['vehicles', 'batches'];
+export type RecordsTab = 'vehicles' | 'batches' | 'bales';
+export const RECORDS_TABS: readonly RecordsTab[] = ['vehicles', 'batches', 'bales'];
 
 /** 공정 기록 화면 주소 (홈의 "기록 보기"·"전체 보기"가 탭을 골라 연다) */
 export const recordsPath = (tab: RecordsTab = 'vehicles'): string => `/records?tab=${tab}`;
-/** 차량 한 대의 기록 상세 */
+/** 차량 한 대의 기록 상세 (팝업. 이 주소를 바로 열면 공정 기록 위에 뜬다, components/records/recordPopup) */
 export const vehicleRecordPath = (id: string): string => `/records/vehicles/${encodeURIComponent(id)}`;
 /** 배치·베일 화면 (지금·다음 배치와 수동 제어, 사건 기록) */
 export const batchBalePath = '/records/batches';
-/** 배치 하나의 기록 상세 (베일 상세와 함께 5단위가 채운다) */
+/** 배치 하나의 기록 상세 (팝업) */
 export const batchRecordPath = (id: string): string => `/records/batches/${encodeURIComponent(id)}`;
+/** 베일 하나의 상세 (팝업) */
+export const baleRecordPath = (id: string): string => `/records/bales/${encodeURIComponent(id)}`;
 
 /** 이 주소가 이 메뉴의 화면인가 (메뉴 강조용: 홈은 정확히 "/"만, 나머지는 그 아래 주소 포함) */
 export function isNavActive(item: NavItem, pathname: string): boolean {

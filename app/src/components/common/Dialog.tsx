@@ -12,8 +12,13 @@ export interface DialogProps {
   children: ReactNode;
   /** 하단 버튼 영역 */
   actions?: ReactNode;
-  /** md: 확인 대화상자 크기, xl: 영상처럼 넓은 내용 */
-  size?: 'md' | 'xl' | 'sheet';
+  /**
+   * md: 확인 대화상자 크기, xl: 영상처럼 넓은 내용, sheet: 폰은 아래 시트·640px 이상은 가운데 대화상자.
+   * popup·popupNarrow: 기록 상세 팝업. 폰은 아래 시트(내용이 길면 화면 높이 전체), 640px 이상은 가운데 대화상자(narrow는 좁게)
+   */
+  size?: 'md' | 'xl' | 'sheet' | 'popup' | 'popupNarrow';
+  /** 주면 제목 줄 오른쪽에 닫기 버튼을 둔다 (이름표는 화면 읽기용 이름) */
+  closeLabel?: string;
 }
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -22,7 +27,7 @@ const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select
  * 모달 대화상자. 열리면 `data-autofocus`가 붙은 요소(없으면 첫 버튼)로 초점을 옮기고,
  * Tab이 대화상자 밖으로 나가지 않게 하며, 닫히면 열기 전 위치로 초점을 돌려준다.
  */
-export function Dialog({ open, title, onClose, dismissible = true, children, actions, size = 'md' }: DialogProps) {
+export function Dialog({ open, title, onClose, dismissible = true, children, actions, size = 'md', closeLabel }: DialogProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -59,9 +64,17 @@ export function Dialog({ open, title, onClose, dismissible = true, children, act
     }
   };
 
+  const bottomSheet = size === 'sheet' || size === 'popup' || size === 'popupNarrow';
+  const panelSize =
+    size === 'sheet'
+      ? 'max-w-2xl max-h-[90dvh] overflow-y-auto rounded-t-panel p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-panel sm:p-6'
+      : size === 'popup' || size === 'popupNarrow'
+        ? `${size === 'popup' ? 'sm:max-w-2xl' : 'sm:max-w-lg'} max-h-[100dvh] overflow-y-auto overscroll-contain rounded-t-panel p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-h-[90dvh] sm:rounded-panel sm:p-6`
+        : `${size === 'xl' ? 'max-w-4xl' : 'max-w-md'} rounded-panel p-6`;
+
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex justify-center bg-ink/40 ${size === 'sheet' ? 'items-end sm:items-center sm:p-6' : 'items-center p-4'}`}
+      className={`fixed inset-0 z-50 flex justify-center bg-ink/40 ${bottomSheet ? 'items-end sm:items-center sm:p-6' : 'items-center p-4'}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && dismissible) onClose();
       }}
@@ -73,11 +86,27 @@ export function Dialog({ open, title, onClose, dismissible = true, children, act
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className={`w-full ${size === 'sheet' ? 'max-w-2xl max-h-[90dvh] overflow-y-auto rounded-t-panel p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:rounded-panel sm:p-6' : `${size === 'xl' ? 'max-w-4xl' : 'max-w-md'} rounded-panel p-6`} bg-surface shadow-soft-3 outline-none`}
+        className={`w-full ${panelSize} bg-surface shadow-soft-3 outline-none`}
       >
-        <h2 id={titleId} className="mb-2 text-lg font-bold text-ink">
-          {title}
-        </h2>
+        {closeLabel ? (
+          <div className="mb-2 flex min-w-0 items-center justify-between gap-3">
+            <h2 id={titleId} className="min-w-0 truncate text-lg font-bold text-ink">
+              {title}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={closeLabel}
+              className="-mr-1 inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center rounded-control border border-line px-3 text-sm font-semibold whitespace-nowrap text-ink active:bg-paper-deep"
+            >
+              닫기
+            </button>
+          </div>
+        ) : (
+          <h2 id={titleId} className="mb-2 text-lg font-bold text-ink">
+            {title}
+          </h2>
+        )}
         <div className="text-base text-ink-soft">{children}</div>
         {actions && <div className="mt-5 flex justify-end gap-3">{actions}</div>}
       </div>

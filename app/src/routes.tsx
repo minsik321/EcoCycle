@@ -1,5 +1,3 @@
-import { BatchBalePage } from './features/records/BatchBalePage';
-import { BaleDetailPage } from './features/records/BaleDetailPage';
 import { Suspense, lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
@@ -13,7 +11,7 @@ import { DesignPage } from './features/design/DesignPage';
 import { DevicePreviewPage } from './features/design/DevicePreviewPage';
 import { RecordsPreviewPage } from './features/design/RecordsPreviewPage';
 import { HomePage } from './features/home/HomePage';
-import { BatchDetailPage, RecordsPage, VehicleDetailPage } from './features/records';
+import { BatchBalePage, RecordPopupLayer, RecordsPage } from './features/records';
 import { RobotPage } from './features/robot';
 import { SettingsPage } from './features/settings';
 import { TankListPage, TankPage } from './features/tank';
@@ -35,49 +33,53 @@ function Placeholder({ title }: { title: string }) {
 }
 
 export default function AppRoutes() {
+  // 기록 상세(차량·배치·베일)는 페이지가 아니라 팝업이다: 화면은 팝업 뒤에 깔린 주소로 그리고 그 위에 팝업을 띄운다 (features/records/popup)
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      {/* 서버·로그인 없이 3D 장면만 보여 주는 시연·측정 페이지 (값은 모두 가짜) */}
-      <Route
-        path="/scene-demo"
-        element={
-          <Suspense fallback={null}>
-            <SceneDemoPage />
-          </Suspense>
-        }
-      />
-      {/* 디자인 토큰과 공용 컴포넌트 미리 보기 (개발용, 값은 모두 예시) */}
-      <Route path="/design" element={<DesignPage />} />
-      {/* 기기 페이지 틀 미리 보기 (개발용, 값은 모두 예시). ?offline=1이면 연결 끊김 모습 */}
-      <Route path="/design/device" element={<DevicePreviewPage />} />
-      {/* 기록 목록 미리 보기 (개발용, 값은 모두 예시). ?empty=1 기록 없음, ?offline=1 연결 끊김 */}
-      <Route path="/design/records" element={<RecordsPreviewPage />} />
-      <Route element={<RequireAuth />}>
-        <Route element={<AppShell headerExtra={<CctvButton />} overlays={<CctvOverlay />} />}>
-          {NAV_ITEMS.filter((item) => !IMPLEMENTED.has(item.id)).map((item) => (
-            <Route
-              key={item.id}
-              path={item.path === '/' ? undefined : `${item.path}/*`}
-              index={item.path === '/'}
-              element={item.id === 'home' ? <HomePage /> : <Placeholder title={item.label} />}
-            />
-          ))}
-          <Route path="/tanks" element={<TankListPage />} />
-          <Route path="/tanks/:id" element={<TankPage />} />
-          <Route path="/alarms" element={<AlarmsPage />} />
-          <Route path="/records/batches" element={<BatchBalePage />} />
-          <Route path="/records/bales/:id" element={<BaleDetailPage />} />
-          <Route path="/records" element={<RecordsPage />} />
-          <Route path="/records/vehicles/:id" element={<VehicleDetailPage />} />
-          <Route path="/records/batches/:id" element={<BatchDetailPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/robot" element={<RobotPage />} />
-          <Route path="/conveyor" element={<ConveyorPage />} />
-          <Route path="/compressor" element={<CompressorPage />} />
-          <Route path="*" element={<Placeholder title="찾을 수 없는 화면" />} />
-        </Route>
-      </Route>
-    </Routes>
+    <RecordPopupLayer>
+      {(location) => (
+        <Routes location={location}>
+          <Route path="/login" element={<LoginPage />} />
+          {/* 서버·로그인 없이 3D 장면만 보여 주는 시연·측정 페이지 (값은 모두 가짜) */}
+          <Route
+            path="/scene-demo"
+            element={
+              <Suspense fallback={null}>
+                <SceneDemoPage />
+              </Suspense>
+            }
+          />
+          {/* 디자인 토큰과 공용 컴포넌트 미리 보기 (개발용, 값은 모두 예시) */}
+          <Route path="/design" element={<DesignPage />} />
+          {/* 기기 페이지 틀 미리 보기 (개발용, 값은 모두 예시). ?offline=1이면 연결 끊김 모습 */}
+          <Route path="/design/device" element={<DevicePreviewPage />} />
+          {/* 기록 목록 미리 보기 (개발용, 값은 모두 예시). ?empty=1 기록 없음, ?offline=1 연결 끊김 */}
+          <Route path="/design/records" element={<RecordsPreviewPage />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<AppShell headerExtra={<CctvButton />} overlays={<CctvOverlay />} />}>
+              {NAV_ITEMS.filter((item) => !IMPLEMENTED.has(item.id)).map((item) => (
+                <Route
+                  key={item.id}
+                  path={item.path === '/' ? undefined : `${item.path}/*`}
+                  index={item.path === '/'}
+                  element={item.id === 'home' ? <HomePage /> : <Placeholder title={item.label} />}
+                />
+              ))}
+              <Route path="/tanks" element={<TankListPage />} />
+              <Route path="/tanks/:id" element={<TankPage />} />
+              <Route path="/alarms" element={<AlarmsPage />} />
+              <Route path="/records/batches" element={<BatchBalePage />} />
+              <Route path="/records" element={<RecordsPage />} />
+              {/* 상세 주소는 로그인 전에만 여기 닿는다(로그인 뒤에는 팝업 계층이 공정 기록 위의 팝업으로 바꾼다) */}
+              <Route path="/records/:kind/:id" element={<RecordsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/robot" element={<RobotPage />} />
+              <Route path="/conveyor" element={<ConveyorPage />} />
+              <Route path="/compressor" element={<CompressorPage />} />
+              <Route path="*" element={<Placeholder title="찾을 수 없는 화면" />} />
+            </Route>
+          </Route>
+        </Routes>
+      )}
+    </RecordPopupLayer>
   );
 }

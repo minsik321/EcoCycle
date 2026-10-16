@@ -14,7 +14,8 @@ components/
 │                  AppShell(슬롯: headerCenter·headerExtra·overlays), TopCards,
 │                  shellChrome(`useImmersiveShell`: 화면이 있는 동안 상단 바·끊김 안내를 숨기고 headerExtra를 넘기며 주 메뉴를 접는다. 3D 홈만 쓴다)
 ├── charts/        HistoryChart(받은 점만 그리는 표시 전용), ticks(날짜 눈금)
-├── records/       RecordList(기간 고르기 → 서버에서 10줄씩 → 폰 쌓인 줄 / md 이상 표 → 쪽 넘기기), Pagination, range(기간·쪽 번호 계산)
+├── records/       RecordList(기간 고르기 → 서버에서 10줄씩 → 폰 쌓인 줄 / md 이상 표 → 쪽 넘기기), Pagination, range(기간·쪽 번호 계산),
+│                  recordPopup(기록 상세 팝업의 주소·기록 상태, `PopupLink`·`useOpenRecordPopup`: 그리기는 features/records/popup)
 └── device/        기기 페이지 틀: DevicePage(배치: `illustrated`면 위쪽 두 칸, 아니면 한 줄), DeviceHero(이름·큰 상태 칩·지금 하는 일·선택 그림), KeyTile/KeyTiles(최대 4개, 작은 추이선·게이지, `wide`면 폭 전체 격자),
                    NowNext(지금/다음), ActionBar·DeviceActionBar(위험도 낮은 조작 + 알람 확인), DetailsSection("자세히", 처음엔 닫힘), live(연결 상태)
 ```
@@ -75,4 +76,4 @@ components/
 - 터치 대상 최소 48dp, 호버 의존 금지.
 - 컴포넌트는 props와 선택자로만 데이터를 받는다. API를 직접 호출하지 않고, 명령은 `api/commands`를 쓰는 훅을 통해 보낸다.
 - 차트는 Recharts로 통일한다. `HistoryChart`는 받은 점만 그리는 표시 전용이고, 구간 이동·요청은 `features`의 `useHistoryWindow`가 맡는다(규칙은 `features/CLAUDE.md`의 이력 그래프 절). 홈 3D 장면과 같은 화면에서는 차트 애니메이션을 끈다.
-- `KpiHistoryChart`는 KPI 서버 응답의 구간별 막대·수분 선/목표 밴드·가동/정지 막대를 그리는 표시 전용이다(`/design`에서 세 종류 미리 보기). `Dialog size="sheet"`는 폰 하단 시트·큰 화면 중앙 대화상자이며, KPI 카드의 선택적 `onClick`은 접근 가능한 전체 카드 버튼을 제공한다.
+- `KpiHistoryChart`는 KPI 서버 응답의 구간별 막대·수분 선/목표 밴드·가동/정지 막대를 그리는 표시 전용이다(`/design`에서 세 종류 미리 보기). `Dialog size="sheet"`는 폰 하단 시트·큰 화면 중앙 대화상자이며(`popup`·`popupNarrow`는 기록 상세 팝업: 폰은 화면 높이 전체까지, `closeLabel`을 주면 제목 줄에 닫기 버튼), KPI 카드의 선택적 `onClick`은 접근 가능한 전체 카드 버튼을 제공한다.

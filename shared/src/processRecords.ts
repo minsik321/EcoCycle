@@ -1,11 +1,12 @@
 import type { IsoTimestamp } from './common';
 import type { TankId } from './ids';
-import type { MixPart, StageTimes, VehicleStage } from './process';
+import type { BaleStage, MixPart, StageTimes, VehicleStage } from './process';
 
 /*
- * 공정 기록 (명세 6절 "공정 기록(차량·배치)"): "공정 기록" 화면의 차량·배치 목록과 한 건 조회.
+ * 공정 기록 (명세 6절 "공정 기록(차량·배치·베일)"): "공정 기록" 화면의 차량·배치·베일 목록과 한 건 조회.
  *   GET /vehicles/records, GET /vehicles/{id}  → VehicleRecord
  *   GET /batches/records,  GET /batches/{id}   → BatchRecord
+ *   GET /bales/records → BaleRecord, GET /bales/{id} → BaleDetail (process.ts)
  * 목록은 기록 목록 모양(`RecordPage<T>`, records.ts)이고 지금 진행 중인 차량·배치도 들어 있다. 끝나면 같은 줄이 바뀐다.
  * ⚠ 프론트 제안 형식이다 (서버 담당 확인 전, `docs/questions.md` B31).
  */
@@ -55,4 +56,17 @@ export interface BatchRecord {
   /** `baleIds.length` */
   balesProduced: number;
   baleIds: string[];
+}
+
+/** 베일 기록 한 줄. 기록 시각은 생산(결속·배출) 시각 `createdAt`. 압력·수분은 생산 당시 값(스냅샷) */
+export interface BaleRecord {
+  id: string;
+  batchId: string;
+  /** created(적치) · shipped(출하). 서버가 정한다 */
+  stage: BaleStage;
+  createdAt: IsoTimestamp;
+  /** 출하 전에는 null */
+  shippedAt: IsoTimestamp | null;
+  pressureMpa: number;
+  avgMoisturePercent: number;
 }

@@ -20,7 +20,7 @@ export interface StudioData {
  * 패널이 공정 기록 화면(앱의 다른 화면)으로 보내는 링크의 대상. 스튜디오는 화면(features)을 import하지 않으므로
  * 링크 그리기는 앱 쪽(LiveStudio)이 넘겨 준다. 없으면(시연 화면) 링크를 그리지 않는다.
  */
-export type RecordLinkTarget = { kind: 'list'; tab: 'vehicles' | 'batches' } | { kind: 'vehicle'; id: string } | { kind: 'batch'; id: string };
+export type RecordLinkTarget = { kind: 'list'; tab: 'vehicles' | 'batches' } | { kind: 'vehicle'; id: string } | { kind: 'batch'; id: string } | { kind: 'bale'; id: string };
 /** 링크 하나를 그린다. `className`은 패널이 정하는 모양(`st-link` 큰 버튼, `st-link-mini` 작은 글자 링크) */
 export type RecordLink = (target: RecordLinkTarget, label: string, className: string) => ReactNode;
 

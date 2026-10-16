@@ -21,6 +21,8 @@ export function currentBatch(batches: readonly Batch[]): Batch | undefined {
 export interface ActivityRow {
   key: string;
   kind: 'vehicle' | 'bale';
+  /** 차량·베일 ID (누르면 그 기록 팝업) */
+  id: string;
   /** 번호판 또는 베일 번호 */
   title: string;
   /** 회사 이름 등 (없으면 null) */
@@ -36,6 +38,7 @@ export function recentActivity(vehicles: readonly Vehicle[], bales: readonly Bal
     ...vehicles.map((v) => ({
       key: `veh:${v.id}`,
       kind: 'vehicle' as const,
+      id: v.id,
       title: v.plate ?? '번호판 인식 전',
       sub: v.companyName,
       stage: VEHICLE_STAGE_TEXT[v.stage],
@@ -44,6 +47,7 @@ export function recentActivity(vehicles: readonly Vehicle[], bales: readonly Bal
     ...bales.map((b) => ({
       key: `bale:${b.id}`,
       kind: 'bale' as const,
+      id: b.id,
       title: `베일 ${shortId(b.id)}`,
       sub: null,
       stage: BALE_STAGE_TEXT[b.stage],

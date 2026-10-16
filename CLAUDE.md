@@ -95,6 +95,7 @@ npm run test:text           # 실제 브라우저로 폰·태블릿 화면의 �
 npm run measure:load        # 3D 홈 첫 화면 시간: 프로덕션 빌드, 폰 390×844 + 4G + CPU 4배 느림으로 로그인 → 지표·3D 첫 장 (약 10~20분, 로컬 Chromium 필요)
 npm run poster              # 3D 홈 준비 화면의 포스터(빈 장면)를 다시 찍는다 (약 1분, 로컬 Chromium 필요)
 node app/scripts/layoutPages.mjs   # 페이지 폭·간격: 네 크기에서 섹터 목록·공정 기록·대시보드 스크린샷과 같은 폭 점검 (약 2분, 로컬 Chromium 필요)
+node app/scripts/recordPopups.mjs  # 기록 상세 팝업: 베일 기록 API, 폰·데스크톱에서 팝업 셋·이어 열기·뒤로 가기·깊은 링크 점검과 스크린샷 (약 2분, 로컬 Chromium 필요)
 npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```
 

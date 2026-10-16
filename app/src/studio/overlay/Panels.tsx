@@ -665,7 +665,12 @@ export function Detail({ data, disconnected, selection, onSelect, deviceActions,
                 ['출하', time(bale.stageTimes.shipped)],
               ]}
             />
-            {recordLink && <div className="st-actions">{recordLink({ kind: 'batch', id: bale.batchId }, '이 배치 상세', 'st-link')}</div>}
+            {recordLink && (
+              <div className="st-actions">
+                {recordLink({ kind: 'bale', id: bale.id }, '이 베일 상세', 'st-link')}
+                {recordLink({ kind: 'batch', id: bale.batchId }, '이 배치 상세', 'st-link')}
+              </div>
+            )}
           </div>
         ) : (
           <p className="st-muted">이 베일의 기록이 목록에서 지나갔습니다.</p>

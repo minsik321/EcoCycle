@@ -113,7 +113,7 @@ studio/
 └── loading.test.tsx    조각 나누기(패널에 three 없음), 3D 전 패널·준비 화면, 장면 올리는 때, 미리 받기(정적 파일만), 포스터(빈 장면)
 ```
 
-- 공정 기록 링크(2026-10-15): 차량·배치 탭의 "기록 보기"(표 머리, 폰은 시트 위쪽), 고른 차량의 "이 차량 기록", 고른 베일 상세·지금 배치 요약의 "이 배치 상세". 스튜디오는 앱의 주소를 모르므로 `StudioView`의 `recordLink` 속성으로 받는다(`LiveStudio`가 `<Link>`를 그려 넘기고 `/scene-demo`는 넘기지 않아 링크가 없다).
+- 공정 기록 링크(2026-10-15): 차량·배치 탭의 "기록 보기"(표 머리, 폰은 시트 위쪽), 고른 차량의 "이 차량 기록", 고른 베일 상세의 "이 베일 상세"·"이 배치 상세", 지금 배치 요약의 "이 배치 상세". 스튜디오는 앱의 주소를 모르므로 `StudioView`의 `recordLink` 속성으로 받는다(`LiveStudio`가 그려 넘기고 `/scene-demo`는 넘기지 않아 링크가 없다). 한 건 링크는 3D 홈 위에 기록 상세 팝업을 띄우고(`components/records/recordPopup`의 `PopupLink`), 팝업이 열린 동안 `ui.recordPopupOpen`으로 그리기를 멈춘다(고정 규칙 5와 같은 방식).
 - 홈의 전환 "3D | 대시보드"(`HomeSwitch`)와 lazy import는 `features/home`에 있다. 전환은 상단 바의 `switcher` 자리에 들어가고 폰에서도 "더 보기"에 숨기지 않는다(자리가 모자라면 지역 전환이 아이콘만 남도록 먼저 줄어든다). `tabs`는 시연 화면의 측정 버튼 같은 보조 영역이다.
 - 대시보드와 함께 쓰는 것: 공정 문구·6단계 계산(`config/processDisplay.ts`, `overlay/text.ts`가 다시 내보낸다), 지표 추이선(`store/usePlantTrends.ts`).
 - 앱 코드에서 가져다 쓰는 것: `config/robotModel`·`robotCycle`(로봇 기본 모델, 집는 각도·시연 주기), `config/display`(값 형식·기기 이름·상태 문구),
