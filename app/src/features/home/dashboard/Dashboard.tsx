@@ -12,10 +12,11 @@ import { BATCH_STAGE_TEXT, SECTOR_LABEL, cycleSteps, mixText } from '../../../co
 import { useAppSelector } from '../../../store/hooks';
 import { selectConnection, selectDevice, selectIsDisconnected, selectPlantSummary } from '../../../store/selectors';
 import { usePlantTrends } from '../../../store/usePlantTrends';
+import { PageContainer } from '../../../components/layout/PageContainer';
 import { HomeAlarms } from '../HomeAlarms';
 import { currentBatch, recentActivity } from './dashboardData';
 
-// 대시보드 홈: 3D 없이 빠르게 읽는 홈 화면. 폰 1단 → 태블릿 2단 → 데스크톱 3단.
+// 대시보드 홈: 3D 없이 빠르게 읽는 홈 화면. 폰 1단 → 태블릿 2단 → 데스크톱 3단. 상태 요약은 늘 폭 전체 띠.
 // 값은 모두 store(서버 값)에서 온다. 연결이 끊기면 숫자는 "–"이고 마지막 수신 시각을 함께 적는다.
 // three.js를 import하지 않는다(이 화면을 보는 동안 3D 묶음을 내려받지 않는다).
 
@@ -61,7 +62,7 @@ function StatusSummary() {
   const connection =
     status === 'online' ? { text: '실시간', dot: 'bg-status-normal' } : status === 'connecting' ? { text: '연결 중', dot: 'bg-status-caution' } : { text: '연결 끊김', dot: 'bg-status-offline' };
   return (
-    <section aria-label="상태 요약" className="min-w-0 rounded-card border border-line bg-surface px-4 py-3 shadow-soft-1 xl:col-span-3">
+    <section aria-label="상태 요약" className="min-w-0 rounded-card border border-line bg-surface px-4 py-3 shadow-soft-1">
       <dl className="grid grid-cols-3 gap-3">
         <div className="min-w-0">
           <dt className="text-xs whitespace-nowrap text-ink-soft">시스템</dt>
@@ -98,9 +99,9 @@ function Kpis() {
   const note = disconnected ? `연결 끊김 · 마지막 수신 ${formatLocalClock(lastReceivedAt)}` : '최근 24시간';
   return (
     <>
-      <KpiCard onClick={() => openKpi('balesToday')} glass={false} label="오늘 생산 베일" value={live ? integer.format(live.balesToday) : null} unit="개" trend={live ? trends.balesToday : undefined} note={note} />
-      <KpiCard onClick={() => openKpi('averageMoisturePercent')} glass={false} label="평균 수분" value={live ? oneDecimal.format(live.averageMoisturePercent) : null} unit="%" trend={live ? trends.averageMoisturePercent : undefined} note={note} />
-      <KpiCard onClick={() => openKpi('compressorUptimePercent')} glass={false} label="압축기 가동률" value={live ? oneDecimal.format(live.compressorUptimePercent) : null} unit="%" trend={live ? trends.compressorUptimePercent : undefined} note={note} />
+      <KpiCard onClick={() => openKpi('balesToday')} glass={false} className="flex-wrap" label="오늘 생산 베일" value={live ? integer.format(live.balesToday) : null} unit="개" trend={live ? trends.balesToday : undefined} note={note} />
+      <KpiCard onClick={() => openKpi('averageMoisturePercent')} glass={false} className="flex-wrap" label="평균 수분" value={live ? oneDecimal.format(live.averageMoisturePercent) : null} unit="%" trend={live ? trends.averageMoisturePercent : undefined} note={note} />
+      <KpiCard onClick={() => openKpi('compressorUptimePercent')} glass={false} className="flex-wrap" label="압축기 가동률" value={live ? oneDecimal.format(live.compressorUptimePercent) : null} unit="%" trend={live ? trends.compressorUptimePercent : undefined} note={note} />
     </>
   );
 }
@@ -139,7 +140,7 @@ function SectorTile({ id }: { id: TankId }) {
 function Sectors() {
   return (
     <Panel title="섹터" className="md:col-span-2" aside={<span className="text-xs whitespace-nowrap text-ink-faint">누르면 섹터 페이지</span>}>
-      <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2">
         {TANK_IDS.map((id) => (
           <SectorTile key={id} id={id} />
         ))}
@@ -162,7 +163,7 @@ function BatchCard() {
       aside={
         <span className="flex shrink-0 items-center gap-2">
           {batch && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-accent-strong">{disconnected ? '연결 끊김' : BATCH_STAGE_TEXT[batch.stage]}</span>}
-          <><SeeAll to="/records/batches" label="배치·베일" /><SeeAll to={recordsPath('batches')} label="배치 기록 전체 보기" /></>
+          <SeeAll to="/records/batches" label="배치·베일 전체 보기" />
         </span>
       }
     >
@@ -198,10 +199,10 @@ function Tracker() {
   return (
     <Panel
       title="공정 추적"
-      className="md:col-span-2"
+      className="@container md:col-span-2 xl:col-span-1"
       aside={<span className="truncate text-xs font-semibold whitespace-nowrap text-ink-soft">{disconnected ? '연결 끊김' : current ? `지금 ${current.label}` : '대기'}</span>}
     >
-      <ol className="grid grid-cols-1 gap-1 sm:grid-cols-6 sm:gap-2">
+      <ol className="grid grid-cols-1 gap-1 @lg:grid-cols-6 @lg:gap-2">
         {steps.map((s, i) => {
           const active = !disconnected && s.active;
           const done = !disconnected && i < currentIndex && !s.active;
@@ -209,7 +210,7 @@ function Tracker() {
             <li
               key={s.key}
               aria-current={i === currentIndex ? 'step' : undefined}
-              className={`flex min-w-0 items-center gap-3 rounded-control px-2 py-1.5 sm:flex-col sm:items-center sm:gap-1 sm:px-1 sm:text-center ${active ? 'bg-accent-soft' : ''}`}
+              className={`flex min-w-0 items-center gap-3 rounded-control px-2 py-1.5 @lg:flex-col @lg:items-center @lg:gap-1 @lg:px-1 @lg:text-center ${active ? 'bg-accent-soft' : ''}`}
             >
               <span
                 aria-hidden="true"
@@ -219,9 +220,9 @@ function Tracker() {
               >
                 {i + 1}
               </span>
-              <span className="min-w-0 flex-1 sm:flex-none">
+              <span className="min-w-0 flex-1 @lg:flex-none">
                 <span className={`block truncate text-sm font-semibold whitespace-nowrap ${active ? 'text-accent-strong' : 'text-ink'}`}>{s.label}</span>
-                <span className="block truncate text-xs whitespace-nowrap text-ink-soft sm:hidden">{s.detail ?? '–'}</span>
+                <span className="block truncate text-xs whitespace-nowrap text-ink-soft @lg:hidden">{s.detail ?? '–'}</span>
               </span>
               <span className="shrink-0 text-xs whitespace-nowrap text-ink-faint tabular-nums">
                 {active ? '진행 중' : s.at ? formatLocalClock(s.at) : '–'}
@@ -238,7 +239,7 @@ function Recent() {
   const { vehicles, bales } = useAppSelector((state) => state.process);
   const rows = recentActivity(vehicles, bales, 5);
   return (
-    <Panel title="최근 차량·베일" aside={<SeeAll to={recordsPath('vehicles')} label="차량 기록 전체 보기" />}>
+    <Panel title="최근 차량·베일" className="xl:col-span-2" aside={<SeeAll to={recordsPath('vehicles')} label="차량 기록 전체 보기" />}>
       {rows.length === 0 ? (
         <p className="text-sm text-ink-soft">아직 기록이 없습니다.</p>
       ) : (
@@ -268,7 +269,7 @@ function Recent() {
  */
 export function Dashboard({ switcher, notice }: { switcher: ReactNode; notice?: string | null }) {
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] min-w-0 flex-col gap-3">
+    <PageContainer>
       <h1 className="sr-only">홈</h1>
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         {switcher}
@@ -279,14 +280,19 @@ export function Dashboard({ switcher, notice }: { switcher: ReactNode; notice?: 
         )}
       </div>
       <HomeAlarms />
-      <div className="grid min-w-0 grid-flow-row-dense grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <StatusSummary />
+      {/* 상태 요약은 어느 크기에서나 내용 높이만큼의 띠(폭 전체), 지표 3장은 태블릿부터 한 줄 */}
+      <StatusSummary />
+      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
         <Kpis />
+      </div>
+      {/* 아래 카드: 태블릿 섹터(폭 전체) → 지금 배치 | 최근 차량·베일 → 공정 추적(폭 전체),
+          데스크톱 섹터(2칸, 2×2) | 지금 배치, 공정 추적(1칸, 세로 단계) | 최근 차량·베일(2칸). 같은 줄 카드의 내용 높이가 비슷해 빈 곳이 크지 않다 */}
+      <div className="grid min-w-0 grid-flow-row-dense grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
         <Sectors />
         <BatchCard />
         <Tracker />
         <Recent />
       </div>
-    </div>
+    </PageContainer>
   );
 }

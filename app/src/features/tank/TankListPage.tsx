@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { TankState } from '@ecocycle/shared';
+import { PageContainer } from '../../components/layout/PageContainer';
 import { StatusBadge } from '../../components/status/StatusBadge';
 import { useDeviceLive } from '../../components/device/live';
 import { DEVICE_NAMES } from '../../config/display';
@@ -15,14 +16,14 @@ export function TankListPage() {
   const tanks = useAppSelector(selectTanks);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
+    <PageContainer>
       <h1 className="text-xl font-bold text-ink">섹터</h1>
       {tanks.length === 0 ? (
         <p role="status" className="text-ink-soft">
           섹터 상태를 불러오는 중…
         </p>
       ) : (
-        <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">
+        <ul className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
           {tanks.map((tank) => (
             <li key={tank.id} className="min-w-0">
               <SectorCard tank={tank} />
@@ -30,7 +31,7 @@ export function TankListPage() {
           ))}
         </ul>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

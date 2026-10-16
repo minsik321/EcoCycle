@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { PAGE_CONTAINER } from '../layout/PageContainer';
 
 export interface DevicePageProps {
   /** 1. 맨 위: DeviceHero. 그림이 있으면(`illustrated`) 태블릿·데스크톱에서 왼쪽 칸에 놓인다 */
@@ -42,7 +43,7 @@ export function DevicePage({ hero, illustrated = false, tiles, now, actions, det
     // 조작 줄은 자세히 아래, 기록은 아래 폭 전체.
     // 행에 걸치는(row-span) 칸을 두지 않는다: 걸치면 둘째 행이 필요 이상 커져 기록 위에 빈 곳이 생긴다. 기록은 자동 배치라 조작 줄이 없으면 바로 둘째 행에 온다
     return (
-      <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-3 md:min-h-0 md:gap-4 xl:grid xl:grid-cols-2 xl:content-start xl:items-stretch xl:gap-6">
+      <div className={`${PAGE_CONTAINER} min-h-full md:min-h-0 xl:grid xl:grid-cols-2 xl:content-start xl:items-stretch xl:gap-6`}>
         <div className="flex flex-col gap-3 md:gap-0 md:overflow-hidden md:rounded-panel md:border md:border-line md:bg-surface md:shadow-soft-1 md:*:rounded-none md:*:border-0 md:*:bg-transparent md:*:shadow-none md:[&>*+*]:border-t md:[&>*+*]:border-line xl:col-start-1 xl:row-start-1 xl:*:first:flex-1">
           {hero}
           {tiles}
@@ -56,7 +57,7 @@ export function DevicePage({ hero, illustrated = false, tiles, now, actions, det
   }
   // 그림 없음: 조작 줄은 폰에서 맨 끝(화면 아래에 붙음), 넓은 화면에서는 order로 지금/다음 바로 아래
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-3 md:min-h-0 md:gap-4 xl:gap-6">
+    <div className={`${PAGE_CONTAINER} min-h-full md:min-h-0 xl:gap-6`}>
       {hero}
       {tiles}
       {now}

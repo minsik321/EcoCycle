@@ -94,6 +94,7 @@ npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403�
 npm run test:text           # 실제 브라우저로 폰·태블릿 화면의 글 줄바꿈·가로 넘침 점검 (글자 100%·130%, 약 15~25분, 서버를 스스로 띄움, 로컬 Chromium 필요)
 npm run measure:load        # 3D 홈 첫 화면 시간: 프로덕션 빌드, 폰 390×844 + 4G + CPU 4배 느림으로 로그인 → 지표·3D 첫 장 (약 10~20분, 로컬 Chromium 필요)
 npm run poster              # 3D 홈 준비 화면의 포스터(빈 장면)를 다시 찍는다 (약 1분, 로컬 Chromium 필요)
+node app/scripts/layoutPages.mjs   # 페이지 폭·간격: 네 크기에서 섹터 목록·공정 기록·대시보드 스크린샷과 같은 폭 점검 (약 2분, 로컬 Chromium 필요)
 npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```
 

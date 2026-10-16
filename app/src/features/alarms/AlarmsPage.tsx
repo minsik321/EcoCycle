@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PageContainer } from '../../components/layout/PageContainer';
 import { Link } from 'react-router-dom';
 import type { Alarm } from '@ecocycle/shared';
 import { Button } from '../../components/common/Button';
@@ -45,7 +46,7 @@ export function AlarmsPage() {
   const history = useAlarmHistory();
 
   return (
-    <div className="flex flex-col gap-4">
+    <PageContainer>
       <h1 className="text-xl font-bold">알람</h1>
       <div role="group" aria-label="보기" className="flex gap-2">
         <Button variant={tab === 'open' ? 'primary' : 'secondary'} aria-pressed={tab === 'open'} onClick={() => setTab('open')}>
@@ -87,6 +88,6 @@ export function AlarmsPage() {
           )}
         </Card>
       )}
-    </div>
+    </PageContainer>
   );
 }

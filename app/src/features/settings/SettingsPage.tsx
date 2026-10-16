@@ -1,4 +1,5 @@
 import { Card } from '../../components/common/Card';
+import { PageContainer } from '../../components/layout/PageContainer';
 import { Button } from '../../components/common/Button';
 import { Timestamp } from '../../components/status/Timestamp';
 import { API_BASE, APP_VERSION, USE_MOCK } from '../../config/env';
@@ -19,7 +20,7 @@ export function SettingsPage() {
   const connection = useAppSelector(selectConnection);
 
   return (
-    <div className="flex flex-col gap-4">
+    <PageContainer>
       <h1 className="text-xl font-bold">설정</h1>
 
       <Card title="계정" aria-label="계정">
@@ -106,6 +107,6 @@ export function SettingsPage() {
           </dd>
         </dl>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

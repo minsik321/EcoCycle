@@ -155,13 +155,16 @@ describe('대시보드 홈', () => {
     expect(within(card).getByText('22.5 MPa')).toBeInTheDocument();
   });
 
-  it('"전체 보기": 최근 차량·베일 카드는 차량 기록, 지금 배치 카드는 배치 기록으로 연다', () => {
+  it('"전체 보기": 최근 차량·베일 카드는 차량 기록, 지금 배치 카드는 배치·베일 화면 하나로 연다', () => {
     page();
     const recent = screen.getByRole('region', { name: '최근 차량·베일' });
     expect(within(recent).getByRole('link', { name: '차량 기록 전체 보기' })).toHaveAttribute('href', '/records?tab=vehicles');
     const current = screen.getByRole('region', { name: '지금 배치' });
-    expect(within(current).getByRole('link', { name: '배치 기록 전체 보기' })).toHaveAttribute('href', '/records?tab=batches');
-    expect(within(current).getByRole('link', { name: '배치 기록 전체 보기' })).toHaveTextContent('전체 보기');
+    const links = within(current).getAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAccessibleName('배치·베일 전체 보기');
+    expect(links[0]).toHaveAttribute('href', '/records/batches');
+    expect(links[0]).toHaveTextContent('전체 보기');
   });
 
   it('6단계 공정 추적: 순서대로, 지금 단계를 표시한다', () => {

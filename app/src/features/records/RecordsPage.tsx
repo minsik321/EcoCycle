@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { PageContainer } from '../../components/layout/PageContainer';
 import { useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/common/Card';
 import { Tabs } from '../../components/common/Tabs';
@@ -24,7 +25,7 @@ export function RecordsPage() {
   const requested = params.get('tab');
   const tab: RecordsTab = isTab(requested) ? requested : 'vehicles';
   return (
-    <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-3">
+    <PageContainer>
       <h1 className="text-xl font-bold">공정 기록</h1>
       <Link to="/records/batches" className="inline-flex min-h-12 items-center text-accent-strong font-semibold">배치·베일 · 현재 배치 제어 →</Link>
       <Card aria-label="공정 기록">
@@ -32,6 +33,6 @@ export function RecordsPage() {
           {tab === 'vehicles' ? <VehicleRecords /> : <BatchRecords />}
         </Tabs>
       </Card>
-    </div>
+    </PageContainer>
   );
 }
