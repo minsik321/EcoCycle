@@ -107,9 +107,17 @@ function WarmUp({ onReady }: { onReady?: () => void }) {
   return null;
 }
 
+// 임시 진단 스위치(폰에서만 검게 나오는 로봇팔 원인 찾기): 주소에 ?noao=1 (주변 차폐 끔), ?noshadow=1 (실시간 그림자 끔). 원인을 찾으면 지운다.
+const DEBUG_FLAGS = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search);
+const NO_AO = DEBUG_FLAGS.has('noao');
+const NO_SHADOW = DEBUG_FLAGS.has('noshadow');
+
 /** 단계에 맞는 후처리 묶음. low는 쓰지 않는다 */
 function Post({ profile, frozen }: { profile: StudioProfile; frozen: boolean }) {
   const effects: ReactElement[] = [];
+  if (NO_AO) {
+    // 진단용: 주변 차폐 없이
+  } else
   // 주변 차폐는 첫 스튜디오 시안의 세기: 형태마다 분명하고 부드러운 그늘
   if (profile.ao === 'n8ao') effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.6} quality="high" color="#4c566b" />);
   else effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.5} quality="low" halfRes color="#4c566b" />);
@@ -128,7 +136,7 @@ function Post({ profile, frozen }: { profile: StudioProfile; frozen: boolean }) 
 }
 
 function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, selection, onSelect, pins, routeKeys, rig, inset, balerStatus, grades, onReady }: StageProps) {
-  const profile = STUDIO_PROFILES[tier];
+  const profile = NO_SHADOW ? { ...STUDIO_PROFILES[tier], shadowMap: 0 as const } : STUDIO_PROFILES[tier];
   const motion = useMemo(() => new Motion(), []);
   const baked = profile.shadowMap === 0;
 
