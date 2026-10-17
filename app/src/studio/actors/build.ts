@@ -164,6 +164,7 @@ export function buildTruck(variant: number): TruckModel {
 export interface ForkliftModel {
   root: Group;
   carriage: Group;
+  jaws: Group[];
   wheels: Group[];
   beacon: Group;
 }
@@ -216,18 +217,28 @@ export function buildForklift(): ForkliftModel {
     wheels.push(w);
   }
 
-  // 포크 받침 (위아래로 움직인다)
+  // 베일 클램프: 바닥 포크 없이 양옆의 판으로 잡는다.
   const carriage = new Group();
   const c = new Kit('metal');
   c.box(C.dark, [0.05, 0.42, 0.66], [0.6, 0, 0], { r: 0.02, mat: 'clay' });
   c.box(C.dark, [0.05, 0.05, 0.7], [0.6, 0.42, 0], { r: 0.02, mat: 'clay' });
-  for (const dz of [-0.2, 0.2]) {
-    c.box(C.steel, [0.78, 0.04, 0.1], [0.98, -0.045, dz], { r: 0.015 });
-    c.box(C.steel, [0.05, 0.36, 0.1], [0.615, -0.045, dz], { r: 0.015 });
+  for (const y of [0.14, 0.4]) {
+    c.box(C.steel, [0.06, 0.055, 0.83], [0.6, y, 0], { r: 0.01 });
+    c.cyl(C.steelLight, 0.025, 0.7, [0.64, y + 0.025, 0], { axis: 'z', seg: 10 });
   }
-  carriage.add(c.build('forklift-forks'));
+  carriage.add(c.build('forklift-clamp-carriage'));
+  const jaws = [-1, 1].map((side) => {
+    const jaw = new Kit('metal');
+    jaw.box(C.steel, [0.76, 0.4, 0.025], [0.99, 0.1, side * 0.0025], { r: 0.008 });
+    jaw.box(C.rubber, [0.7, 0.34, 0.005], [1.0, 0.13, -side * 0.0125], { r: 0.002, mat: 'clay' });
+    jaw.box(C.yellow, [0.65, 0.055, 0.005], [1.0, 0.4, side * 0.0125], { r: 0.002 });
+    const group = jaw.build('forklift-clamp-jaw');
+    group.position.z = side * 0.415;
+    carriage.add(group);
+    return group;
+  });
   root.add(carriage);
-  return { root, carriage, wheels, beacon };
+  return { root, carriage, jaws, wheels, beacon };
 }
 
 export interface WorkerModel {

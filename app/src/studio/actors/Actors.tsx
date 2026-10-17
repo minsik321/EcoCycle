@@ -132,6 +132,9 @@ export function Forklifts({ director, onSelect, blobs = false }: ActorProps) {
       model.root.position.set(sim.x, GROUND_Y, sim.z);
       model.root.rotation.y = sim.heading;
       model.carriage.position.y = sim.fork + 0.02;
+      model.jaws.forEach((jaw, side) => {
+        jaw.position.z = (side === 0 ? -1 : 1) * (0.415 - sim.clamp * 0.025);
+      });
       for (const w of model.wheels) w.rotation.z = -sim.wheel;
       model.beacon.visible = (sim.legs.length > 0 || sim.speed > 0.05) && Math.sin(director.t * 9) > 0;
     });

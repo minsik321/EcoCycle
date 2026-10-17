@@ -214,6 +214,81 @@ describe('출하 마당: 생산 속도를 지게차가 따라간다', () => {
   });
 });
 
+describe('화면을 떠났다가 돌아온 출하 마당', () => {
+  it('클램프를 닫고 운반하며 적치 후 열고 출하 후 빈 집게로 돌아온다', () => {
+    const d = new Director();
+    const bales = steadyFeed(40, 25)(0);
+    d.sync({ devices: {}, vehicles: [], batches: [], bales }, T0);
+    let closing = false;
+    let opening = false;
+    let carried = false;
+    let requestedShip = false;
+    for (let i = 0; i < 120 / DT; i += 1) {
+      d.step(DT);
+      for (const f of d.forklifts) {
+        if (f.clamp > 0 && f.clamp < 1) {
+          closing ||= d.yard.stats.stored === 0;
+          opening ||= d.yard.stats.stored > 0;
+        }
+        if (f.carrying) {
+          carried = true;
+          expect(f.clamp).toBe(1);
+        }
+      }
+      if (!requestedShip && d.yard.stats.stored > 0 && d.forklifts.every((f) => f.clamp === 0)) {
+        requestedShip = true;
+        d.sync({ devices: {}, vehicles: [], batches: [], bales: bales.map((b) => ({ ...b, stage: 'shipped' })) }, T0 + i * DT * 1000);
+      }
+    }
+    expect(closing && opening && carried && requestedShip).toBe(true);
+    expect(d.yard.stats.shipped).toBe(1);
+    expect(d.forklifts.every((f) => !f.away && !f.carrying && f.clamp === 0)).toBe(true);
+  });
+
+  it.each(['new-scene', 'paused-with-sync', 'paused-without-sync'] as const)('%s: 밀린 베일을 반영하고 재개해도 겹치지 않는다', (mode) => {
+    const d = new Director();
+    const feed = steadyFeed(20, 1e9, 80);
+    const sync = (t: number, ship = false) => {
+      const bales = feed(t).map((b) => ship ? { ...b, stage: 'shipped' as const } : b);
+      d.sync({ devices: {}, vehicles: [], batches: [], bales }, T0 + t * 1000);
+    };
+    const check = () => {
+      const a = d.yard.audit(d.trucks);
+      expect(a.baleOnBale + a.forkOnBale + a.forkOnFork + a.forkOnTruck).toBe(0);
+      // 복귀 직후에는 운반 중인 아래 칸 위로 오래된 베일이 먼저 배치될 수 있다.
+      // 겹침 검사와 별개로 아래에서 이 일시적인 공중 적치를 기록한다.
+      expect(a.slotErrors.filter((error) => !error.includes('공중에 있다'))).toEqual([]);
+      expect(a.slotsUsed).toBeLessThanOrEqual(YARD_CAPACITY);
+    };
+    if (mode !== 'new-scene') {
+      sync(0);
+      for (let i = 0; i < 100; i += 1) d.step(DT);
+    }
+    // 10분 동안 프레임이 멈춘 사이 서버 데이터만 진행한 경우도 확인한다.
+    if (mode === 'paused-with-sync') {
+      for (let t = 5; t <= 600; t += 1) {
+        sync(t);
+        check();
+      }
+    }
+    sync(600);
+    check();
+    expect(d.yard.audit().slotErrors).toEqual(mode === 'paused-without-sync' ? ['칸 8의 베일이 공중에 있다'] : []);
+    expect(d.yard.audit().active + d.yard.audit().waiting).toBe(31);
+    // 복귀 첫 프레임의 큰 delta와 이후 적치·출하 동작을 모두 검사한다.
+    d.step(600);
+    check();
+    for (let i = 0; i < 600 / DT; i += 1) {
+      if (i === 60 / DT) sync(660, true);
+      d.step(DT);
+      check();
+    }
+    expect(d.yard.stats.shipped).toBeGreaterThan(0);
+    expect(d.yard.audit().active + d.yard.audit().waiting).toBe(0);
+    expect(d.yard.audit().slotErrors).toEqual([]);
+  });
+});
+
 describe('지게차 한 대 설정', () => {
   it('지게차 한 대로도 시연 원본(52초에 하나)을 따라가고, 겹침이 없다', async () => {
     vi.resetModules();

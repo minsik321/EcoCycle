@@ -5,7 +5,7 @@ import { Kit } from '../three/kit';
 import type { Footprint } from '../three/kit';
 import { YARD_FLOW } from '../../config/yard';
 import { APRON, BALE, BALER, BAY, BAY_Z, CONVEYOR, GATE, HALL, OFFICE, PARKING, ROAD, SCALE, SITE, YARD } from './layout';
-import { bush, car, cone, lamp, pallet, tree } from './props';
+import { bale, bush, car, cone, lamp, pallet, tree } from './props';
 
 // 스튜디오 월드의 고정물. 전부 코드로 조립하고 재질별 메시 몇 개로 합친다.
 // 본관 벽은 방향별로 따로 만들어, 카메라 쪽을 향한 벽은 숨긴다 (안이 들여다보이는 "인형의 집" 방식).
@@ -310,7 +310,10 @@ function baler(k: Kit): void {
 }
 
 function yardProps(k: Kit): void {
-  // 마당의 베일은 움직이는 베일(지게차가 쌓는 것)뿐이다: 미리 쌓아 둔 소품 더미는 서버 값과 어긋나고 지게차 자리와 겹쳐 뺐다
+  // 운반 대상을 보여 주는 고정 소품 3개. 실제 적치 칸·재고 수량에는 포함하지 않는다.
+  // 두 지게차 대기 자리 사이의 본관 서쪽 가장자리에 두어 진입·회전 통로를 비운다.
+  k.box(C.concrete, [0.86, 0.04, 3.12], [-10.5, -0.012, -3.8], { r: 0.015 });
+  for (const z of [-4.9, -3.8, -2.7]) bale(k, -10.5, 0.03, z, -Math.PI / 2);
   pallet(k, 2.9, -4.7, 0);
   pallet(k, 2.9, -4.7, 0, 0.13);
   pallet(k, 3.75, -4.75, 0.1);
@@ -432,7 +435,8 @@ function utilities(k: Kit): void {
   for (const [x, z, rot] of [
     [4.95, -7.05, 0],
     [12.9, -7.05, 0],
-    [-5.6, -7.1, 0],
+    // 서쪽 녹지에서 지게차 대기 공간(-Z)을 향하도록 돌린다.
+    [-11.4, -3.3, Math.PI],
   ] as const) lamp(k, x, z, rot);
 
   // 녹지 띠의 나무와 덤불 (숲도 맨땅도 아니게: 띠마다 몇 그루, 크기는 첫 스튜디오 시안처럼 풍성하게)

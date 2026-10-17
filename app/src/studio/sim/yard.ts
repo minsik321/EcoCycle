@@ -40,6 +40,7 @@ type Leg =
   | { kind: 'drive'; to: P2; reverse: boolean }
   | { kind: 'turn'; heading: number }
   | { kind: 'fork'; height: number }
+  | { kind: 'clamp'; closed: boolean }
   | { kind: 'call'; fn: () => void }
   | { kind: 'lane'; take: boolean }
   | { kind: 'wait'; sec: number };
@@ -53,6 +54,8 @@ export interface ForkliftSim extends Mover {
   /** 1부터 */
   id: number;
   fork: number;
+  /** 0: 클램프 열림, 1: 베일 양옆을 잡음 */
+  clamp: number;
   carrying: BaleSim | null;
   legs: Leg[];
   task: Task | null;
@@ -203,7 +206,7 @@ export class Yard {
     for (let i = 0; i < BALE_POOL; i += 1) this.bales.push({ active: false, id: '', state: 'gone', x: 0, y: 0, z: 0, rot: 0, slot: -1, t: 0, seq: 0, ship: false, owner: 0 });
     for (let i = 0; i < YARD_FLOW.forkliftCount; i += 1) {
       const home = YARD.homes[i]!;
-      this.forklifts.push({ ...mover(home[0], home[1], FACE_PLUS_Z), id: i + 1, fork: LOW_FORK, carrying: null, legs: [], task: null, idleT: 0, away: false, home, col: -1, target: -1, blockedT: 0 });
+      this.forklifts.push({ ...mover(home[0], home[1], FACE_PLUS_Z), id: i + 1, fork: LOW_FORK, clamp: 0, carrying: null, legs: [], task: null, idleT: 0, away: false, home, col: -1, target: -1, blockedT: 0 });
     }
   }
 
@@ -511,6 +514,7 @@ export class Yard {
     const legs: Leg[] = [];
     this.route(f, legs, cur, CHUTE[0], CHUTE[1], true, { afterExit: [{ kind: 'fork', height: BALE_REST[1] }] });
     legs.push(
+      { kind: 'clamp', closed: true },
       {
         kind: 'call',
         fn: () => {
@@ -530,6 +534,7 @@ export class Yard {
         f.carrying = null;
       },
     });
+    legs.push({ kind: 'clamp', closed: false });
     bale.owner = f.id;
     f.target = slotCol(target);
     this.begin(f, { kind: 'store', bale }, legs);
@@ -545,6 +550,7 @@ export class Yard {
     const legs: Leg[] = [];
     this.route(f, legs, cur, sx, YARD.pocketZ, true, { beforeEnter: [{ kind: 'fork', height: sy + 0.03 }], enterCol: col });
     legs.push(
+      { kind: 'clamp', closed: true },
       {
         kind: 'call',
         fn: () => {
@@ -594,6 +600,7 @@ export class Yard {
         fn: () => {
           f.away = false;
           f.fork = LOW_FORK;
+          f.clamp = 0;
           f.heading = 0;
           f.x = YARD.exitX;
           f.z = YARD.laneZ;
@@ -698,6 +705,13 @@ export class Yard {
         leg.sec -= dt;
         done = leg.sec <= 0;
         break;
+      case 'clamp': {
+        const target = leg.closed ? 1 : 0;
+        f.clamp += Math.max(-dt * 4, Math.min(dt * 4, target - f.clamp));
+        done = Math.abs(target - f.clamp) < 1e-3;
+        if (done) f.clamp = target;
+        break;
+      }
       case 'fork': {
         const d = leg.height - f.fork;
         f.fork += Math.max(-YARD_FLOW.liftMps * dt, Math.min(YARD_FLOW.liftMps * dt, d));
@@ -801,17 +815,19 @@ export class Yard {
         setBox(c, b.x, b.z, b.rot, -BALE.d / 2, BALE.d / 2, BALE.w / 2);
         if (boxesOverlap(a, c)) out.forkOnBale += 1;
       }
-      // 포크와 베일: 맡은 베일이 아닌 베일과는 높이가 겹칠 때 겹치면 안 된다
-      setBox(a, f.x, f.z, f.heading, BODY_FRONT, FORK_TIP, 0.3);
+      // 양쪽 클램프 판과 베일: 실제 판의 높이와 폭으로 검사한다.
       for (const b of live) {
         if (b === f.carrying || b.owner === f.id) continue;
         // 포크가 가리키는 바로 앞의 베일(같은 열의 아래 단)은 지금 일하는 대상이라 거른다
         const lat = Math.abs(-(b.x - f.x) * -Math.sin(f.heading) + (b.z - f.z) * Math.cos(f.heading));
         if (lat < 0.4 && (b.x - f.x) * Math.cos(f.heading) - (b.z - f.z) * Math.sin(f.heading) > 0) continue;
-        // 포크가 베일 밑에 들어가 있거나 위로 지나가면 겹친 것이 아니다 (포크 윗면 = fork, 베일 바닥 = y + 0.03)
-        if (f.fork <= b.y + 0.05 || f.fork - 0.05 >= b.y + 0.03 + BALE.h - 0.02) continue;
+        if (f.fork + 0.52 <= b.y + 0.03 || f.fork + 0.12 >= b.y + 0.03 + BALE.h) continue;
         setBox(c, b.x, b.z, b.rot, -BALE.d / 2, BALE.d / 2, BALE.w / 2);
-        if (boxesOverlap(a, c)) out.forkOnBale += 1;
+        for (const side of [-1, 1]) {
+          const offset = side * (0.415 - f.clamp * 0.025);
+          setBox(a, f.x + Math.sin(f.heading) * offset, f.z + Math.cos(f.heading) * offset, f.heading, 0.61, 1.37, 0.015);
+          if (boxesOverlap(a, c)) out.forkOnBale += 1;
+        }
       }
     }
     for (let i = 0; i < this.forklifts.length; i += 1) {
@@ -842,7 +858,7 @@ export class Yard {
       if (b.active) k += (b.x * 1.1 + b.y * 3.7 + b.z * 2.3 + b.rot) * (i + 11);
     });
     this.forklifts.forEach((f, i) => {
-      k += (f.x * 1.9 + f.z * 3.3 + f.heading * 5.1 + f.fork * 7.3) * (i + 1);
+      k += (f.x * 1.9 + f.z * 3.3 + f.heading * 5.1 + f.fork * 7.3 + f.clamp * 2.7) * (i + 1);
     });
     return k;
   }
