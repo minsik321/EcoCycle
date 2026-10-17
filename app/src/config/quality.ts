@@ -21,11 +21,12 @@ export const PROBE_WARMUP_MS = 300;
 
 /**
  * 측정한 초당 프레임 수로 화질 단계를 고른다. 측정하지 못했으면(null) 기본 단계.
- * 처리 코어가 적은 기기는 측정이 잘 나와도 고화질로 올리지 않는다(오래 돌리면 발열로 느려진다).
+ * 처리 코어가 2개 이하인 기기는 측정이 잘 나와도 고화질로 올리지 않는다(오래 돌리면 발열로 느려진다).
+ * 아이폰 같은 기기는 코어 수를 적게 알려 줄 수 있어 4개 이하로 막으면 고화질에 닿지 못했다(2026-10-17).
  */
 export function tierFromProbe(fps: number | null, cpuCores?: number): QualityTier {
   if (fps === null) return 'standard';
   if (fps < PROBE_FPS_FOR_STANDARD) return 'low';
   if (fps < PROBE_FPS_FOR_HIGH) return 'standard';
-  return cpuCores !== undefined && cpuCores <= 4 ? 'standard' : 'high';
+  return cpuCores !== undefined && cpuCores <= 2 ? 'standard' : 'high';
 }

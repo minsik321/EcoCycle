@@ -46,10 +46,10 @@ describe('SettingsPage: 계정', () => {
 });
 
 describe('SettingsPage: 화질 모드', () => {
-  it('기본이 선택되어 있고 저사양으로 바꿀 수 있다', async () => {
+  it('고화질이 선택되어 있고 저사양으로 바꿀 수 있다', async () => {
     const { store } = renderWithStore(<SettingsPage />);
     const group = screen.getByRole('radiogroup', { name: '화질 모드' });
-    expect(within(group).getByRole('radio', { name: /기본/ })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: /고화질/ })).toBeChecked();
 
     await userEvent.click(within(group).getByRole('radio', { name: /저사양/ }));
     expect(within(group).getByRole('radio', { name: /저사양/ })).toBeChecked();
@@ -78,13 +78,13 @@ describe('SettingsPage: 화질 모드', () => {
     const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('blocked');
     });
-    expect(loadQualityMode()).toBe('standard');
+    expect(loadQualityMode()).toBe('high');
     spy.mockRestore();
   });
 
   it('알 수 없는 저장 값은 기본값으로 본다', () => {
     localStorage.setItem('ecocycle.qualityMode', 'ultra');
-    expect(loadQualityMode()).toBe('standard');
+    expect(loadQualityMode()).toBe('high');
   });
 });
 

@@ -56,7 +56,7 @@ function loadSavedQuality(): QualityMode | null {
   }
 }
 
-export const loadQualityMode = (): QualityMode => loadSavedQuality() ?? 'standard';
+export const loadQualityMode = (): QualityMode => loadSavedQuality() ?? 'high';
 
 /** null이면 기억한 값을 지운다 (다음에 열 때 다시 자동으로 고른다) */
 export function saveQualityMode(mode: QualityMode | null): void {

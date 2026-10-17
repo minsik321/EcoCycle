@@ -14,8 +14,9 @@ describe('자동 선택 (tierFromProbe)', () => {
     expect(tierFromProbe(null)).toBe('standard');
   });
 
-  it('처리 코어가 적은 기기는 잘 나와도 고화질로 올리지 않는다', () => {
-    expect(tierFromProbe(60, 4)).toBe('standard');
+  it('처리 코어가 2개 이하인 기기는 잘 나와도 고화질로 올리지 않는다', () => {
+    expect(tierFromProbe(60, 2)).toBe('standard');
+    expect(tierFromProbe(60, 4)).toBe('high');
     expect(tierFromProbe(60, undefined)).toBe('high');
   });
 });
@@ -23,7 +24,7 @@ describe('자동 선택 (tierFromProbe)', () => {
 describe('화질 단계 기억', () => {
   it('고른 적이 없으면 자동이고, 측정 결과가 들어오면 그 값을 기억한다', () => {
     const store = createAppStore();
-    expect(store.getState().ui).toMatchObject({ qualityMode: 'standard', qualityAuto: true });
+    expect(store.getState().ui).toMatchObject({ qualityMode: 'high', qualityAuto: true });
     store.dispatch(qualityProbed('high'));
     expect(store.getState().ui).toMatchObject({ qualityMode: 'high', qualityAuto: false });
     expect(localStorage.getItem('ecocycle.qualityMode')).toBe('high');
