@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { KpiDetailContext } from '../../components/charts/KpiDetailContext';
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MutableRefObject, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MutableRefObject, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 import { DEVICE_IDS, TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, DeviceState, DeviceStatus, PlantMetric, Vehicle } from '@ecocycle/shared';
 import {
@@ -852,6 +852,110 @@ function useDragToggle(setOpen: (open: boolean) => void, touchAction: CSSPropert
   };
 }
 
+/** 접힌 시트의 요약 줄이 차지하는 높이(줄 32px + 간격 8px): 펼친 시트의 접힌 높이를 구할 때 더한다 */
+const SHEET_SUMMARY_PX = 40;
+/** 손가락을 떼었을 때 이 속도(px/ms)보다 빠르면 높이와 상관없이 던진 방향으로 열거나 닫는다 */
+const SHEET_FLING = 0.5;
+/** 끌어서 열림·닫힘이 바뀌는 비율: 접힌 높이와 펼친 높이 사이의 이만큼 넘게 끌면 바뀐다 */
+const SHEET_SNAP = 0.35;
+/** 놓은 뒤 열림·닫힘 자리로 찾아가는 시간(ms). studio.css의 .st-sheet-settling과 같아야 한다 */
+const SHEET_SETTLE_MS = 200;
+
+/**
+ * 폰의 아래 시트를 손가락을 따라 끌어 올리고 내린다. 끄는 동안 시트의 높이가 손가락 움직임과 같이 변하고(접힌 높이 ~ 펼친 높이),
+ * 놓으면 더 가까운 쪽(또는 던진 방향)으로 찾아가 열림·닫힘이 된다. 누르기는 그대로 여닫는다(끌었을 때만 뒤따르는 클릭을 막는다).
+ * 끄는 동안에는 펼친 내용을 그려 두어 올라오는 만큼 보이게 한다(`height`가 null이 아닌 동안).
+ * 마우스는 손잡이가 작아 첫 움직임에 벗어나므로 시작하면 창 전체에서 움직임을 받는다(터치는 시작한 곳이 계속 받는다).
+ */
+function useSheetDrag(sheet: RefObject<HTMLElement | null>, open: boolean, setOpen: (open: boolean) => void) {
+  const [height, setHeight] = useState<number | null>(null);
+  const [settling, setSettling] = useState(false);
+  const dragged = useRef(false);
+  const stop = useRef<(() => void) | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(
+    () => () => {
+      stop.current?.();
+      clearTimeout(timer.current);
+    },
+    [],
+  );
+  return {
+    height,
+    settling,
+    grip: {
+      style: { touchAction: 'none' } as CSSProperties,
+      onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
+        const el = sheet.current;
+        const parent = el?.offsetParent as HTMLElement | null;
+        if (!el || !parent) return;
+        stop.current?.();
+        clearTimeout(timer.current);
+        setSettling(false);
+        dragged.current = false;
+        const style = getComputedStyle(el);
+        const pad = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+        const startH = el.offsetHeight;
+        const minH = open ? pad + e.currentTarget.offsetHeight + SHEET_SUMMARY_PX : startH;
+        const maxH = Math.max(minH, parent.clientHeight * 0.6);
+        const id = e.pointerId;
+        const startY = e.clientY;
+        let current = startH;
+        // 던지는 속도는 마지막 100ms의 움직임으로 잰다(끝의 흔들림 한 번이 던지기로 읽히지 않게)
+        let trail = [{ t: e.timeStamp, y: e.clientY }];
+        const move = (ev: PointerEvent) => {
+          if (ev.pointerId !== id) return;
+          const dy = ev.clientY - startY;
+          if (!dragged.current && Math.abs(dy) < 6) return;
+          dragged.current = true;
+          trail = [...trail.filter((p) => ev.timeStamp - p.t <= 100), { t: ev.timeStamp, y: ev.clientY }];
+          current = Math.min(maxH, Math.max(minH, startH - dy));
+          setHeight(current);
+        };
+        const end = (ev: PointerEvent) => {
+          if (ev.pointerId !== id) return;
+          stop.current?.();
+          if (!dragged.current) return;
+          const first = trail[0]!;
+          const lastPoint = trail[trail.length - 1]!;
+          const span = lastPoint.t - first.t;
+          const velocity = span >= 16 && ev.timeStamp - lastPoint.t <= 100 ? (lastPoint.y - first.y) / span : 0;
+          // 펼친 내용의 자연스러운 높이(최대 60%)를 재서 펼침 자리로 쓴다
+          const before = el.style.height;
+          el.style.height = 'auto';
+          const natural = Math.min(maxH, Math.max(minH, el.offsetHeight));
+          el.style.height = before;
+          // 시작한 상태에서 범위의 35% 넘게 끌면 바뀐다(열려 있던 것은 35% 넘게 내려야 닫힌다)
+          const edge = (natural - minH) * SHEET_SNAP;
+          const goOpen = Math.abs(velocity) > SHEET_FLING ? velocity < 0 : open ? current > natural - edge : current > minH + edge;
+          setSettling(true);
+          setHeight(goOpen ? natural : minH);
+          timer.current = setTimeout(() => {
+            setOpen(goOpen);
+            setHeight(null);
+            setSettling(false);
+          }, SHEET_SETTLE_MS);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', end);
+        window.addEventListener('pointercancel', end);
+        stop.current = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', end);
+          window.removeEventListener('pointercancel', end);
+          stop.current = null;
+        };
+      },
+      onClickCapture: (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+        if (!dragged.current) return;
+        dragged.current = false;
+        e.preventDefault();
+        e.stopPropagation();
+      },
+    },
+  };
+}
+
 /**
  * 오른쪽 아래(세로 태블릿은 아래) 탭 표: 차량 · 섹터 · 배치 · 베일. 접기 단추로 요약 한 줄까지 접을 수 있고(3D를 덜 가린다),
  * 접었는지는 기기에 기억한다. 줄을 누르는 규칙은 TableBody.
@@ -953,8 +1057,11 @@ const SHEET_TABS: Array<{ key: SheetTab; label: string }> = [
 export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActions, recordLink, openRecord }: DetailProps & { openRecord?: RecordOpen }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<SheetTab>('batches');
-  // 손잡이·공정 막대·접힌 요약 줄을 끌어서 여닫는다 (펼친 안쪽 내용은 따로 스크롤된다)
-  const drag = useDragToggle(setOpen);
+  // 손잡이·공정 막대·접힌 요약 줄을 손가락을 따라 끌어 올리고 내린다 (펼친 안쪽 내용은 따로 스크롤된다)
+  const sheetRef = useRef<HTMLElement>(null);
+  const { height: dragHeight, settling, grip } = useSheetDrag(sheetRef, open, setOpen);
+  // 끄는 동안(놓은 뒤 찾아가는 동안 포함)에는 펼친 내용을 그려 올라오는 만큼 보이게 한다
+  const showBody = open || dragHeight !== null;
   useEffect(() => {
     if (selection) setOpen(true);
   }, [selection]);
@@ -970,20 +1077,25 @@ export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActi
   const summary = `${batch ? `${shortId(batch.id)} ${BATCH_STAGE_TEXT[batch.stage]}` : '배치 대기'} · 차량 ${onSite}대 · 적치 베일 ${stacked}개`;
   const common = { data, disconnected, selection, onSelect };
   return (
-    <section className={`st-glass st-sheet${open ? ' st-sheet-open' : ''}`} aria-label="공정 정보">
-      <div className="st-sheet-grip" {...drag}>
+    <section
+      ref={sheetRef}
+      className={`st-glass st-sheet${showBody ? ' st-sheet-open' : ''}${settling ? ' st-sheet-settling' : ''}`}
+      style={dragHeight !== null ? { height: dragHeight, overflow: 'hidden' } : undefined}
+      aria-label="공정 정보"
+    >
+      <div className="st-sheet-grip" {...grip}>
         <button type="button" className="st-sheet-handle" aria-expanded={open} aria-label={open ? '공정 정보 접기' : '공정 정보 펼치기'} onClick={() => setOpen(!open)}>
           <i aria-hidden="true" />
         </button>
         <TrackerBar data={data} disconnected={disconnected} />
-        {!open && (
+        {!showBody && (
           <button type="button" className={`st-sheet-summary${disconnected ? ' st-stale' : ''}`} onClick={() => setOpen(true)}>
             {summary}
             <Icon name="chevron" size={16} />
           </button>
         )}
       </div>
-      {!open ? null : selection ? (
+      {!showBody ? null : selection ? (
         <div className="st-sheet-body">
           <Detail {...common} deviceActions={deviceActions} recordLink={recordLink} bare />
         </div>

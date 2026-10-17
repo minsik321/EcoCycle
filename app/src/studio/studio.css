@@ -1539,6 +1539,11 @@ button.st-now:hover {
   max-height: 60%;
 }
 
+/* 끌어 놓은 뒤 열림·닫힘 자리로 찾아가는 짧은 전환 (SHEET_SETTLE_MS와 같은 시간) */
+.st-sheet.st-sheet-settling {
+  transition: height 0.2s ease-out;
+}
+
 /* 손잡이·공정 막대·접힌 요약을 한 덩어리로: 끌어서 여닫는 자리 (스크롤되는 안쪽 내용은 밖) */
 .st-sheet-grip {
   display: flex;
