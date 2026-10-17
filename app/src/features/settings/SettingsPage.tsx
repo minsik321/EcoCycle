@@ -61,7 +61,7 @@ export function SettingsPage() {
           {QUALITY_TIERS.map((tier) => (
             <label
               key={tier}
-              className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-control border p-3 ${quality === tier ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}
+              className={`flex min-h-12 cursor-pointer items-start whitespace-normal gap-3 rounded-control border p-3 ${quality === tier ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}
             >
               <input
                 type="radio"
