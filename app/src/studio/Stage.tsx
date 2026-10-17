@@ -112,7 +112,7 @@ function WarmUp({ onReady }: { onReady?: () => void }) {
 const TOUCH_DEVICE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
 // 임시 진단 스위치(기본 화질에서만 로봇팔이 검게 나오는 원인 찾기). 원인을 찾으면 지운다.
-//   ?dpr=1.5|2 화면 배율 상한 · ?fps=0|30 프레임 상한(0은 없음) · ?bloom=1 빛 번짐 켬 · ?tilt=1 얕은 심도 켬
+//   ?dpr=1.5|2 화면 배율 상한 · ?fps=0|30 프레임 상한(0은 없음) · ?bloom=1 빛 번짐 켬 · ?tilt=1 얕은 심도 켬 · ?noshadow=1 실시간 그림자 끔
 const DEBUG = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search);
 function withDebug(base: StudioProfile): StudioProfile {
   const dpr = Number(DEBUG.get('dpr'));
@@ -123,6 +123,7 @@ function withDebug(base: StudioProfile): StudioProfile {
     ...(fps !== null && Number.isFinite(Number(fps)) ? { maxFps: Number(fps) } : {}),
     ...(DEBUG.has('bloom') ? { bloom: true } : {}),
     ...(DEBUG.has('tilt') ? { tiltShift: true } : {}),
+    ...(DEBUG.has('noshadow') ? { shadowMap: 0 as const } : {}),
   };
 }
 

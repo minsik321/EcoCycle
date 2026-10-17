@@ -18,6 +18,8 @@ export const PROBE_FPS_FOR_STANDARD = 28;
 /** 측정 시간(ms)과 시작 전 버리는 시간(ms) */
 export const PROBE_MEASURE_MS = 1200;
 export const PROBE_WARMUP_MS = 300;
+/** 앱이 뜨는 동안의 프레임 저하를 피하려고 측정을 시작하기 전에 기다리는 시간(ms) */
+export const PROBE_START_DELAY_MS = 1500;
 
 /**
  * 측정한 초당 프레임 수로 화질 단계를 고른다. 측정하지 못했으면(null) 기본 단계.
