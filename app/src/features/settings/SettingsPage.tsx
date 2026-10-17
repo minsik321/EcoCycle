@@ -69,11 +69,11 @@ export function SettingsPage() {
                 value={tier}
                 checked={quality === tier}
                 onChange={() => dispatch(qualityModeChanged(tier))}
-                className="mt-1 h-5 w-5 accent-accent"
+                className="mt-1 h-5 w-5 shrink-0 accent-accent"
               />
-              <span className="flex flex-col">
+              <span className="flex min-w-0 flex-1 flex-col">
                 <span className="font-semibold text-ink">{QUALITY_TEXT[tier].label}</span>
-                <span className="text-sm text-ink-soft">{QUALITY_TEXT[tier].help}</span>
+                <span className="break-words text-sm text-ink-soft">{QUALITY_TEXT[tier].help}</span>
               </span>
             </label>
           ))}
