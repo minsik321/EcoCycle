@@ -107,33 +107,17 @@ function WarmUp({ onReady }: { onReady?: () => void }) {
   return null;
 }
 
-// 손가락이 주된 입력인 기기(폰·태블릿)에서는 N8AO(주변 차폐)를 쓰지 않는다: 아이폰에서 로봇팔이 통째로 검게 나왔다
-// (2026-10-17 실기기 확인: 주변 차폐를 끄면 정상). 그림자 지도와 나머지 후처리는 그대로 쓴다.
+// 손가락이 주된 입력인 기기(폰·태블릿)에서는 후처리 묶음(EffectComposer)을 쓰지 않는다. 아이폰에서 standard·high일 때
+// 로봇팔이 검게 나왔다: 주변 차폐(N8AO)를 끄면 대부분 사라졌지만 둥근 표면의 검은 얼룩이 남았고, 실시간 그림자를 꺼도 남았다.
+// 후처리가 없는 low만 정상이라 후처리 묶음이 원인이다(2026-10-17 실기기 확인). 그림자 지도·화면 배율·프레임 상한은 단계 그대로 쓰고,
+// 톤 매핑은 low처럼 렌더러가, 끊김 회색은 캔버스 필터가 한다. 빛 번짐·얕은 심도·색 보정은 터치 기기에서 빠진다.
 const TOUCH_DEVICE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-
-// 임시 진단 스위치(기본 화질에서만 로봇팔이 검게 나오는 원인 찾기). 원인을 찾으면 지운다.
-//   ?dpr=1.5|2 화면 배율 상한 · ?fps=0|30 프레임 상한(0은 없음) · ?bloom=1 빛 번짐 켬 · ?tilt=1 얕은 심도 켬 · ?noshadow=1 실시간 그림자 끔
-const DEBUG = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search);
-function withDebug(base: StudioProfile): StudioProfile {
-  const dpr = Number(DEBUG.get('dpr'));
-  const fps = DEBUG.get('fps');
-  return {
-    ...base,
-    ...(dpr > 0 ? { maxDpr: dpr } : {}),
-    ...(fps !== null && Number.isFinite(Number(fps)) ? { maxFps: Number(fps) } : {}),
-    ...(DEBUG.has('bloom') ? { bloom: true } : {}),
-    ...(DEBUG.has('tilt') ? { tiltShift: true } : {}),
-    ...(DEBUG.has('noshadow') ? { shadowMap: 0 as const } : {}),
-  };
-}
 
 /** 단계에 맞는 후처리 묶음. low는 쓰지 않는다 */
 function Post({ profile, frozen }: { profile: StudioProfile; frozen: boolean }) {
   const effects: ReactElement[] = [];
   // 주변 차폐는 첫 스튜디오 시안의 세기: 형태마다 분명하고 부드러운 그늘
-  if (TOUCH_DEVICE) {
-    // 터치 기기는 주변 차폐 없이 (위 설명)
-  } else if (profile.ao === 'n8ao') effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.6} quality="high" color="#4c566b" />);
+  if (profile.ao === 'n8ao') effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.6} quality="high" color="#4c566b" />);
   else effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.5} quality="low" halfRes color="#4c566b" />);
   if (profile.bloom) effects.push(<Bloom key="bloom" mipmapBlur luminanceThreshold={1.05} luminanceSmoothing={0.2} intensity={0.5} radius={0.7} />);
   if (profile.tiltShift) effects.push(<TiltShift2 key="tilt" blur={0.022} taper={0.7} />);
@@ -150,7 +134,7 @@ function Post({ profile, frozen }: { profile: StudioProfile; frozen: boolean }) 
 }
 
 function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, selection, onSelect, pins, routeKeys, rig, inset, balerStatus, grades, onReady }: StageProps) {
-  const profile = useMemo(() => withDebug(STUDIO_PROFILES[tier]), [tier]);
+  const profile = useMemo(() => (TOUCH_DEVICE ? { ...STUDIO_PROFILES[tier], post: false } : STUDIO_PROFILES[tier]), [tier]);
   const motion = useMemo(() => new Motion(), []);
   const baked = profile.shadowMap === 0;
 
@@ -172,7 +156,8 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
       }}
       camera={{ fov: 20, near: 2, far: 420, position: [60, 60, -60] }}
       onPointerMissed={() => onSelect(null)}
-      style={{ touchAction: 'none' }}
+      // 후처리가 없으면(low, 터치 기기) 연결 끊김의 회색 화면을 캔버스 필터로 낸다
+      style={{ touchAction: 'none', filter: !profile.post && frozen ? 'grayscale(0.92) brightness(0.98)' : undefined }}
     >
       <MotionContext.Provider value={motion}>
         <color attach="background" args={[C.bg]} />

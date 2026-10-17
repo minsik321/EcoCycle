@@ -1693,10 +1693,6 @@ button.st-now:hover {
   background: rgb(44 50 62 / 0.92);
 }
 
-/* low는 후처리가 없으므로 연결 끊김의 회색 화면을 캔버스 필터로 낸다 */
-.st-root[data-tier='low'][data-frozen] .st-canvas canvas {
-  filter: grayscale(0.92) brightness(0.98);
-}
 
 /* 셰이더를 미리 컴파일하는 동안 덮는 포스터 */
 .st-poster {
