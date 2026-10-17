@@ -1,7 +1,7 @@
 import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Bale, Batch, DeviceState, PlantSummary, Vehicle } from '@ecocycle/shared';
 import * as api from '../../api';
 import { alarmReceived, connectionChanged, plantReceived, processSynced } from '../../store';
@@ -95,7 +95,9 @@ function page() {
 
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem('ecocycle.homeMode', 'dashboard');
+  // 새 로그인은 모바일에서 대시보드로 시작한다.
+  vi.stubGlobal('innerWidth', 390);
+  vi.stubGlobal('innerHeight', 844);
   vi.restoreAllMocks();
   vi.spyOn(support, 'supportsWebGL').mockReturnValue(true);
   vi.mocked(api.getPlantHistory).mockImplementation(async ({ metric }) => ({
@@ -106,6 +108,8 @@ beforeEach(() => {
     points: [1, 3, 2, 4].map((value, i) => ({ ts: at(i), value })),
   }));
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('대시보드 홈', () => {
   it('3D 묶음을 불러오지 않는다', () => {
