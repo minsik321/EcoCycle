@@ -13,8 +13,8 @@ export const QUALITY_TEXT: Record<QualityTier, { label: string; help: string }> 
 };
 
 /** 자동 선택 기준: 짧은 측정에서 나온 초당 프레임 수가 이 값 이상이면 그 단계를 고른다 */
-export const PROBE_FPS_FOR_HIGH = 50;
-export const PROBE_FPS_FOR_STANDARD = 28;
+export const PROBE_FPS_FOR_HIGH = 25;
+export const PROBE_FPS_FOR_STANDARD = 15;
 /** 측정 시간(ms)과 시작 전 버리는 시간(ms) */
 export const PROBE_MEASURE_MS = 1200;
 export const PROBE_WARMUP_MS = 300;
