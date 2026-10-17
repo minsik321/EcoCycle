@@ -1,5 +1,5 @@
 import type { BatchCommand, BatchControlState, BatchEvent, ControlledBatch, BaleDetail } from '@ecocycle/shared';
-import type { Bale, BaleRecord, Batch, BatchRecord, CompressorState, MixPart, ProcessState, TankId, TankState, Vehicle, VehicleRecord } from '@ecocycle/shared';
+import type { Bale, BaleRecord, Batch, BatchRecord, CompressorState, MixPart, ProcessState, RobotMode, TankId, TankState, Vehicle, VehicleRecord } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
 import type { CompanyFixture, TruckFixture } from '../fixtures/process';
 import {
@@ -435,14 +435,14 @@ export function mixingBatchId(): string | null {
 }
 
 /** 진행 중 집기가 끝나면 원래 배치에만 반영한다. 일시정지 중에도 이미 집은 양은 보존한다. */
-export function notePlaced(sectorId: TankId, batchId: string | null, volumeM3: number): string | null {
+export function notePlaced(sectorId: TankId, batchId: string | null, volumeM3: number, mode: RobotMode = 'auto'): string | null {
   const batch = batches.find(b => b.id === batchId && b.stage === 'mixing');
   if (!batch) return null;
   countFor(batch).set(sectorId, (countFor(batch).get(sectorId) ?? 0) + 1);
   const volumes = volumesFor(batch);
   volumes.set(sectorId, (volumes.get(sectorId) ?? 0) + volumeM3);
-  // 지정이 걸린 적 있는 배치는 실제 배합·수분·목표 압력을 다시 계산해 보낸다
-  if (batch.actualMix) {
+  // 수동 투입도 실제 배합을 시작한다. 이전 자동 투입량과 이후 투입량을 모두 포함한다.
+  if (mode === 'manual' || batch.actualMix !== null) {
     recomputeActual(batch);
     batch.updatedAt = iso(Date.now());
     sendBatch(batch);

@@ -1,4 +1,5 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { restoreSkipped, restoreUserSession } from '../../store';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -33,14 +34,23 @@ export function SessionCheck() {
 }
 
 /**
- * 로그인해야 볼 수 있는 화면을 감싼다. 로그인되어 있지 않으면 /login으로 보내고, 로그인하면 원래 가려던 화면으로 돌려보낸다.
+ * 로그인해야 볼 수 있는 화면을 감싼다. 새로 로그인하거나 앱 시작 시 세션을 복원하면 홈에서 시작한다.
  * 이것은 화면 보호일 뿐이고 데이터 접근은 서버가 토큰으로 막는다.
  */
 export function RequireAuth() {
   const status = useAppSelector((state) => state.auth.status);
-  const location = useLocation();
+  const navigate = useNavigate();
+  const [restoring, setRestoring] = useState(status === 'unknown');
+
+  useEffect(() => {
+    if (restoring && status === 'loggedIn') {
+      navigate('/', { replace: true });
+      setRestoring(false);
+    }
+  }, [navigate, restoring, status]);
 
   if (status === 'unknown') return <SessionCheck />;
-  if (status === 'loggedOut') return <Navigate to="/login" replace state={{ from: location }} />;
+  if (status === 'loggedOut') return <Navigate to="/login" replace />;
+  if (restoring) return <SessionCheck />;
   return <Outlet />;
 }

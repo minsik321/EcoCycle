@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { clearLoginError, loginUser } from '../../store';
@@ -25,7 +25,6 @@ function useCountdown(seconds: number | null): number {
 
 export function LoginPage() {
   const dispatch = useAppDispatch();
-  const location = useLocation();
   const { status, loginPending, loginError, sessionExpired } = useAppSelector((state) => state.auth);
 
   const [id, setId] = useState('');
@@ -48,8 +47,7 @@ export function LoginPage() {
 
   if (status === 'unknown') return <SessionCheck />;
   if (status === 'loggedIn') {
-    const from = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
-    return <Navigate to={from?.pathname ? `${from.pathname}${from.search ?? ''}` : '/'} replace />;
+    return <Navigate to="/" replace />;
   }
 
   const onSubmit = (event: FormEvent) => {

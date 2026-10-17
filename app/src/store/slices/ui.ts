@@ -3,6 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import type { DeviceId } from '@ecocycle/shared';
 import { QUALITY_TIERS } from '../../config/quality';
 import type { QualityTier } from '../../config/quality';
+import { loginUser, restoreUserSession } from './auth';
 
 /** 화질 단계(high/standard/low). 값의 뜻은 config/quality.ts */
 export type QualityMode = QualityTier;
@@ -73,7 +74,7 @@ const HOME_MODE_KEY = 'ecocycle.homeMode';
 const OLD_HOME_TAB_KEY = 'ecocycle.homeTab';
 const OLD_HOME_VIEW_KEY = 'ecocycle.homeView';
 
-/** 고른 적이 없을 때의 홈: 폰(짧은 변 600px 미만)은 대시보드, 그 밖은 3D (2026-10-17 사용자 요청) */
+/** 새 로그인 때의 홈: 폰(짧은 변 600px 미만)은 대시보드, 그 밖은 3D */
 function defaultHomeMode(): HomeMode {
   return typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 600 ? 'dashboard' : '3d';
 }
@@ -169,6 +170,15 @@ const slice = createSlice({
     homeModeChanged(state, action: PayloadAction<HomeMode>) {
       state.homeMode = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(loginUser.fulfilled, (state) => {
+        state.homeMode = defaultHomeMode();
+      })
+      .addCase(restoreUserSession.fulfilled, (state, action) => {
+        if (action.payload.kind === 'restored') state.homeMode = defaultHomeMode();
+      });
   },
 });
 

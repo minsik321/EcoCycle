@@ -152,7 +152,7 @@ function place(tankId: TankId): void {
   r.heldSectorId = null;
   // 빈 섹터라 아무것도 못 집었으면 벨트에 올라가는 덩어리도 없다
   if (pickedVolume > 0) {
-    const batchId = notePlaced(tankId, cycleBatchId, pickedVolume);
+    const batchId = notePlaced(tankId, cycleBatchId, pickedVolume, cycleMode);
     addToConveyor(6);
     recordPick({
       mode: cycleMode,

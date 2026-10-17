@@ -50,7 +50,7 @@ export interface BatchRecord {
   endedAt: IsoTimestamp | null;
   /** 계획 배합 */
   mix: MixPart[];
-  /** 실제 배합 (섹터 지정이 걸린 적 없는 배치는 null, `Batch.actualMix`와 같다) */
+  /** 실제 배합 (섹터 지정·수동 투입이 없는 배치는 null, `Batch.actualMix`와 같다) */
   actualMix: MixPart[] | null;
   /** 섹터 지정 시작·변경·해제 기록 */
   pinChanges: BatchPinChange[];

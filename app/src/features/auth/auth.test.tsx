@@ -48,6 +48,42 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+describe('새 세션의 시작 화면', () => {
+  it.each([
+    [390, 844, 'dashboard', '3d'],
+    [844, 390, 'dashboard', '3d'],
+    [820, 1180, '3d', 'dashboard'],
+    [1440, 900, '3d', 'dashboard'],
+  ])('%s×%s 기기는 이전 선택 대신 %s에서 시작한다', async (width, height, expected, saved) => {
+    vi.stubGlobal('innerWidth', width);
+    vi.stubGlobal('innerHeight', height);
+    localStorage.setItem('ecocycle.homeMode', saved);
+    vi.mocked(api.login).mockResolvedValue({ accessToken: 'a', expiresIn: 900, user: ADMIN });
+    const { store } = renderWithStore(app(), { me: null, route: '/alarms?previous=1' });
+    await userEvent.type(screen.getByLabelText('아이디'), 'admin');
+    await userEvent.type(screen.getByLabelText('비밀번호'), '1234');
+    await userEvent.click(screen.getByRole('button', { name: '로그인' }));
+    await vi.waitFor(() => expect(where()).toBe('/'));
+    expect(store.getState().ui.homeMode).toBe(expected);
+  });
+
+  it.each([
+    [390, 844, 'dashboard', '3d'],
+    [820, 1180, '3d', 'dashboard'],
+    [1440, 900, '3d', 'dashboard'],
+  ])('자동 로그인도 %s×%s 기기의 기본 홈 %s에서 시작한다', async (width, height, expected, saved) => {
+    vi.stubGlobal('innerWidth', width);
+    vi.stubGlobal('innerHeight', height);
+    localStorage.setItem('ecocycle.homeMode', saved);
+    vi.mocked(api.restoreSession).mockResolvedValue({ kind: 'restored', me: ADMIN });
+    const { store } = renderWithStore(app(), { me: 'unknown', route: '/alarms' });
+    await act(async () => { await store.dispatch(restoreUserSession()); });
+    await vi.waitFor(() => expect(where()).toBe('/'));
+    expect(store.getState().ui.homeMode).toBe(expected);
+  });
 });
 
 describe('loginErrorMessage', () => {
@@ -97,7 +133,7 @@ describe('RequireAuth', () => {
     // 다시 시도: 이번에는 되살아난다
     vi.mocked(api.restoreSession).mockResolvedValue({ kind: 'restored', me: ADMIN });
     await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
-    await vi.waitFor(() => expect(screen.getByRole('main')).toHaveTextContent('알람 내용'));
+    await vi.waitFor(() => expect(screen.getByRole('main')).toHaveTextContent('홈 내용'));
     expect(api.restoreSession).toHaveBeenCalledTimes(2);
   });
 
@@ -179,13 +215,13 @@ describe('LoginPage', () => {
     expect(api.login).toHaveBeenCalledWith('admin', '1234', true);
   });
 
-  it('보호된 화면에서 튕겨 왔다면 로그인 후 그 화면으로 돌아간다', async () => {
+  it('이전 화면에서 로그인으로 이동했어도 로그인 후 홈에서 시작한다', async () => {
     vi.mocked(api.login).mockResolvedValue({ accessToken: 'a', refreshToken: 'r', expiresIn: 900, user: ADMIN });
     renderWithStore(app(), { me: null, route: '/alarms' });
     expect(where()).toBe('/login');
     await type('admin', '1234');
     await userEvent.click(screen.getByRole('button', { name: '로그인' }));
-    await vi.waitFor(() => expect(where()).toBe('/alarms'));
+    await vi.waitFor(() => expect(where()).toBe('/'));
   });
 
   it('틀린 비밀번호: 안내하고, 비밀번호는 지우고 아이디는 남기고, 비밀번호로 초점을 옮긴다', async () => {
