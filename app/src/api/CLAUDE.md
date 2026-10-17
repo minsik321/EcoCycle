@@ -16,7 +16,7 @@ api/
 ├── push.ts         registerPush, unregisterPush
 ├── records.ts      getRecords<T>(경로, { from, to, page, pageSize }) — 모든 기록 목록이 함께 쓴다 (응답 RecordPage<T>)
 ├── processRecords.ts getVehicleRecord, getBatchRecord — 공정 기록 한 건 (404는 ApiError.status). 목록은 getRecords로
-├── commands.ts     sendCommand(Idempotency-Key 생성), getCommand
+├── commands.ts     sendCommand(Idempotency-Key 생성, 권한 없으면 보내지 않음), getCommand
 └── index.ts        재수출
 ```
 
@@ -39,5 +39,6 @@ api/
 - 명령 전송:
   - 요청마다 새 `Idempotency-Key`(UUID). 같은 버튼 재시도는 같은 키를 재사용한다.
   - 202 `accepted`는 완료가 아니다. 결과는 WebSocket `command.result`로 받고, 일정 시간 안에 못 받으면 `GET /commands/{id}`로 조회한다.
-  - 위험도 높은 명령(`set_mode`, `pick_from`, `update_setting`)은 `confirm: true` 없이 보내지 않는다. 재인증(비밀번호·PIN) 방식은 서버와 확정 전이므로 끼워 넣을 자리만 둔다.
+  - 위험도 높은 명령(`COMMAND_RULES`의 `requiresConfirm`)은 `confirm: true` 없이 보내지 않는다. 재인증(비밀번호·PIN) 방식은 서버와 확정 전이므로 끼워 넣을 자리만 둔다.
+  - 권한: `sendCommand(deviceId, command, { permissions })` — `/me`의 권한에 필요 권한(`COMMAND_RULES`)이 없으면 요청을 보내지 않고 `ApiError(403, PERMISSION_MISSING)`를 던진다. api는 store를 모르므로 thunk(`sendDeviceCommand`)가 넘긴다. 차단은 여전히 서버가 한다(명세 6절 "권한 표").
 - 화면은 이 함수들을 store의 thunk나 작은 훅(`useDeviceHistory` 등)을 통해 쓴다. 이력 그래프처럼 화면에서만 쓰는 조회 결과는 store에 넣지 않아도 된다.

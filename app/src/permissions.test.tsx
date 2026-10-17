@@ -1,6 +1,6 @@
-// 권한별 화면 분기 점검 (G-32).
-// 권한 표는 모의 서버의 가정(docs/decisions.md: admin 5개 전부, operator 2개, viewer 없음)을 기준으로 한다.
-// 이 파일이 "누가 어느 화면에서 무엇을 보고 누를 수 있는가"의 한 장짜리 기준표다. 권한 종류가 확정되어 바뀌면 이 표부터 고친다.
+// 권한별 화면 분기 점검: 역할 이름(role === ...)으로 분기하지 않는지, 연결이 끊기면 어느 역할이든 조작이 막히는지 등.
+// 줄별 "누가 무엇을 할 수 있는가"의 기준표는 src/test/permissionMatrix.ts 하나이고 permissionMatrix.test.tsx가 그 표 전체를 돈다.
+// 아래 MATRIX는 화면 묶음 다섯 개의 요약이다(같은 모의 서버 계정에서 계산되므로 기준표와 어긋나면 둘 다 깨진다).
 // 화면의 표시·비활성은 편의일 뿐이고 실제 차단은 서버가 한다.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';

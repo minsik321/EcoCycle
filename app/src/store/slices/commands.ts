@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
-import type { Command, CommandStatus, CommandType, DeviceId } from '@ecocycle/shared';
+import type { Command, CommandStatus, CommandType, DeviceId, Me } from '@ecocycle/shared';
 import * as api from '../../api';
 import {
   COMMAND_POLL_GIVE_UP_MS,
@@ -130,7 +130,7 @@ interface SendArgs {
   idempotencyKey?: string;
 }
 
-type ThunkConfig = { state: { commands: CommandsState } };
+type ThunkConfig = { state: { commands: CommandsState; auth: { me: Me | null } } };
 
 /**
  * 명령을 보내고 결과를 추적한다.
@@ -145,7 +145,9 @@ export const sendDeviceCommand = createAsyncThunk<string, SendArgs, ThunkConfig>
 
     let commandId: string;
     try {
-      const { accepted } = await api.sendCommand(deviceId, command, { idempotencyKey: key });
+      // 권한(/me)이 없으면 api가 요청을 보내지 않고 403으로 거부한다 (로그인 전이면 권한이 없다)
+      const permissions = getState().auth.me?.permissions ?? [];
+      const { accepted } = await api.sendCommand(deviceId, command, { idempotencyKey: key, permissions });
       commandId = accepted.commandId;
     } catch (error) {
       const httpStatus = error instanceof api.ApiError ? error.status : 0;

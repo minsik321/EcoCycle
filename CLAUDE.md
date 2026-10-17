@@ -15,7 +15,7 @@ React 웹으로 만들고 Capacitor로 안드로이드 앱을 빌드한다. 서�
 ```
 EcoCycle/
 ├── CLAUDE.md              ← 이 파일: 전체 규칙과 흐름
-├── docs/                  기준 문서, 결정 기록, 확인 상태
+├── docs/                  기준 문서(명세), 결정 기록, 확인 질문
 ├── shared/                API 계약 타입 (app과 mock-server가 함께 import)
 ├── mock-server/           서버 준비 전 가짜 센서·관절 값을 흘리는 개발용 서버
 └── app/                   React + Vite 웹앱, Capacitor 안드로이드 빌드
@@ -90,7 +90,7 @@ npm run dev                 # mock-server + app 동시 실행
 npm run dev:app             # app만 (VITE_API_BASE로 실서버 지정)
 npm run mock -- --scenario=disconnect   # 시나리오 지정해 모의 서버 실행
 npm run typecheck && npm run test       # 타입 검사 + 단위·화면 테스트 (서버 불필요, 약 1분)
-npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 403·로봇 수동 집기→놓기 순서(409)와 섹터 지정 실제 배합·자동 로그인(쿠키·교체·재사용 감지·유예) 점검 + 실제 Chromium으로 새로고침 뒤 로그인 유지 (약 2분, 서버·앱을 스스로 띄움, 로컬 Chromium 필요, 없으면 INTEGRATION_SKIP_BROWSER=1, 브라우저 점검 반복은 INTEGRATION_BROWSER_RUNS=5)
+npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 매트릭스(명령 403·조회 200·비로그인 401)·로봇 수동 집기→놓기 순서(409)와 섹터 지정 실제 배합·자동 로그인(쿠키·교체·재사용 감지·유예) 점검 + 실제 Chromium으로 새로고침 뒤 로그인 유지 (약 2분, 서버·앱을 스스로 띄움, 로컬 Chromium 필요, 없으면 INTEGRATION_SKIP_BROWSER=1, 브라우저 점검 반복은 INTEGRATION_BROWSER_RUNS=5, Windows가 기본 포트 4099를 예약해 두었으면 INTEGRATION_PORT=4399)
 npm run test:text           # 실제 브라우저로 폰·태블릿 화면의 글 줄바꿈·가로 넘침 점검 (글자 100%·130%, 약 15~25분, 서버를 스스로 띄움, 로컬 Chromium 필요)
 npm run measure:load        # 3D 홈 첫 화면 시간: 프로덕션 빌드, 폰 390×844 + 4G + CPU 4배 느림으로 로그인 → 지표·3D 첫 장 (약 10~20분, 로컬 Chromium 필요)
 npm run poster              # 3D 홈 준비 화면의 포스터(빈 장면)를 다시 찍는다 (약 1분, 로컬 Chromium 필요)

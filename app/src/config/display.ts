@@ -218,7 +218,7 @@ export const HISTORY_EMPTY_TEXT = '이 구간에는 기록된 값이 없습니�
 export const PERMISSION_TEXT: Record<Permission, string> = {
   'batch.control': '배치 수동 제어',
   'robot.control': '시작·일시정지·재개·정지',
-  'robot.manual': '모드 전환·자동 섹터 지정·수동 집기',
+  'robot.manual': '모드 전환·섹터 지정·수동 집기·놓기',
   'settings.write': '설정값 변경',
   'alarm.ack': '알람 확인 처리',
 };
