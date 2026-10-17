@@ -21,5 +21,5 @@ export function useDeviceClass(): DeviceClass {
  */
 export function useStudioTier(probed: QualityTier | null, chosen: QualityTier | null): { tier: QualityTier; device: DeviceClass } {
   const device = useDeviceClass();
-  return { tier: studioTier(device, probed, chosen), device };
+  return { tier: studioTier(probed, chosen), device };
 }

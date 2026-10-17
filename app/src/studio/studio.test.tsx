@@ -522,19 +522,17 @@ describe('화질 단계: 휴대폰 먼저 (고정 규칙 6)', () => {
     expect(deviceClass(hints(1440, 900))).toBe('desktop');
   });
 
-  it('기본은 폰 low · 태블릿 standard · 데스크톱 high이고, 측정값은 한 단계까지만 반영한다', () => {
-    expect(studioTier('phone', null, null)).toBe('low');
-    expect(studioTier('tablet', null, null)).toBe('standard');
-    expect(studioTier('desktop', null, null)).toBe('high');
-    expect(studioTier('phone', 'high', null)).toBe('standard');
-    expect(studioTier('desktop', 'low', null)).toBe('standard');
-    expect(studioTier('tablet', 'low', null)).toBe('low');
-    expect(studioTier('tablet', 'standard', null)).toBe('standard');
+  it('기본은 모든 기기에서 high이고, 측정값이 낮으면 그 단계로 내린다', () => {
+    expect(studioTier(null, null)).toBe('high');
+    expect(studioTier('high', null)).toBe('high');
+    expect(studioTier('standard', null)).toBe('standard');
+    expect(studioTier('low', null)).toBe('low');
   });
 
   it('사용자가 직접 고른 단계는 그대로 따른다', () => {
-    expect(studioTier('phone', null, 'high')).toBe('high');
-    expect(studioTier('desktop', 'high', 'low')).toBe('low');
+    expect(studioTier(null, 'low')).toBe('low');
+    expect(studioTier('high', 'low')).toBe('low');
+    expect(studioTier('low', 'high')).toBe('high');
   });
 
   it('low는 후처리·실시간 그림자·패널 흐림 없이, standard·low는 초당 30으로 묶는다', () => {

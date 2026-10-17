@@ -1,9 +1,8 @@
-import { QUALITY_TIERS } from '../config/quality';
 import type { QualityTier } from '../config/quality';
 
 // 스튜디오의 화질 단계 (studio/CLAUDE.md 고정 규칙 6). 앱 전체의 단계 이름(high/standard/low)을 그대로 쓰고,
 // 단계마다 스튜디오가 무엇을 그릴지는 여기서만 정한다.
-// 휴대폰 먼저: 기본 단계는 기기 종류로 고른다 (폰 low, 태블릿 standard, 데스크톱 high). 접속 때 프레임 측정이 한 단계까지 조정한다.
+// 기본 단계는 모든 기기에서 high이고, 접속 때 프레임 측정 결과가 낮으면 그 단계로 내린다 (2026-10-17 사용자 요청).
 
 export interface StudioProfile {
   /** 화면 배율 상한 */
@@ -55,22 +54,17 @@ export function deviceClass({ width, height, coarse, gpu }: DeviceHints): Device
   return 'desktop';
 }
 
-export const DEVICE_DEFAULT_TIER: Record<DeviceClass, QualityTier> = { phone: 'low', tablet: 'standard', desktop: 'high' };
-
-const rank = (tier: QualityTier): number => QUALITY_TIERS.length - 1 - QUALITY_TIERS.indexOf(tier); // low 0, standard 1, high 2
-const fromRank = (r: number): QualityTier => QUALITY_TIERS[QUALITY_TIERS.length - 1 - Math.max(0, Math.min(2, r))]!;
+/** 기기 종류와 상관없이 모두 고화질에서 시작하고, 측정 결과가 낮으면 그 단계로 내린다 */
+export const DEFAULT_STUDIO_TIER: QualityTier = 'high';
 
 /**
  * 스튜디오가 쓸 단계.
  * - 사용자가 직접 고른 값이 있으면 그대로
- * - 측정값이 있으면 기기 종류 기본값에서 그쪽으로 한 단계까지만 움직인다
- * - 아무것도 없으면 기기 종류 기본값
+ * - 측정값이 있으면 그 단계 (측정은 단계를 내리는 쪽으로만 쓰인다: 기본이 이미 가장 높다)
+ * - 아무것도 없으면 high
  */
-export function studioTier(device: DeviceClass, probed: QualityTier | null, chosen: QualityTier | null): QualityTier {
-  if (chosen) return chosen;
-  const base = rank(DEVICE_DEFAULT_TIER[device]);
-  if (!probed) return fromRank(base);
-  return fromRank(base + Math.sign(rank(probed) - base));
+export function studioTier(probed: QualityTier | null, chosen: QualityTier | null): QualityTier {
+  return chosen ?? probed ?? DEFAULT_STUDIO_TIER;
 }
 
 /** 지금 기기의 단서 (브라우저에서만). 그래픽 칩 이름은 한 번만 읽는다 */
