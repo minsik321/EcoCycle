@@ -1,0 +1,1 @@
+PASS: API 3 metrics × 3 ranges, validation 422/auth 401, timezone; 72 browser text checks (360/390/820px, 100/130%); both homes, focus restore, retry, disconnect.

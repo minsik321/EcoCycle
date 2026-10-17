@@ -1,0 +1,259 @@
+import type { CompressorCycleStage, DeviceId, DeviceStatus, DeviceType, Gripper, Permission, Phase, RobotMode, RobotStatus, Role } from '@ecocycle/shared';
+
+// 표시용 문구·기호·형식. 상태 색은 styles/index.css의 토큰(--color-status-*)을 쓴다.
+// 상태 판정(status)은 서버가 하고 화면은 표시만 한다. 색만으로 구분하지 않도록 기호와 글자를 함께 쓴다.
+
+export const STATUS_TEXT: Record<DeviceStatus, string> = {
+  normal: '정상',
+  caution: '주의',
+  alarm: '알람',
+  offline: '연결 끊김',
+};
+
+export const STATUS_SYMBOL: Record<DeviceStatus, string> = {
+  normal: '✓',
+  caution: '▲',
+  alarm: '✕',
+  offline: '–',
+};
+
+export const ROBOT_STATUS_TEXT: Record<RobotStatus, string> = {
+  idle: '대기',
+  running: '작동 중',
+  paused: '일시정지',
+  stopped: '정지',
+  error: '오류',
+  offline: '연결 끊김',
+};
+
+/** 로봇 상태를 기기 상태 색으로 옮긴다 (정지·오류·연결 끊김은 눈에 띄게) */
+export const ROBOT_STATUS_TONE: Record<RobotStatus, DeviceStatus> = {
+  idle: 'normal',
+  running: 'normal',
+  paused: 'caution',
+  stopped: 'caution',
+  error: 'alarm',
+  offline: 'offline',
+};
+
+export const ROBOT_MODE_TEXT: Record<RobotMode, string> = {
+  auto: '자동',
+  manual: '수동',
+  auto_pinned: '자동 · 섹터 지정',
+};
+
+/** 좁은 칸(기기 페이지 주요 수치)에 쓰는 짧은 모드 이름 */
+export const ROBOT_MODE_SHORT_TEXT: Record<RobotMode, string> = {
+  auto: '자동',
+  manual: '수동',
+  auto_pinned: '섹터 지정',
+};
+
+/** 로봇 모드 전환의 세 칸 순서 (자동 | 자동 · 섹터 지정 | 수동) */
+export const ROBOT_MODE_ORDER: readonly RobotMode[] = ['auto', 'auto_pinned', 'manual'];
+
+/** 모드마다 하는 일 한 줄 (모드 전환 아래 안내) */
+export const ROBOT_MODE_HELP: Record<RobotMode, string> = {
+  auto: '배합 중인 배치의 배합비를 따라 서버가 집을 섹터를 고릅니다.',
+  auto_pinned: '고른 섹터만 차례로 돌며 자동으로 집습니다.',
+  manual: '섹터를 골라 "집기"로 집어 든 뒤 "컨베이어에 놓기"로 놓습니다.',
+};
+
+export const gripperText = (gripper: Gripper): string => (gripper.holding ? '잡고 있음' : gripper.closed ? '닫힘' : '열림');
+
+/** 압축기 사이클 단계 (서버 `cycleStage`) */
+export const COMPRESSOR_CYCLE_TEXT: Record<CompressorCycleStage, string> = {
+  idle: '대기',
+  filling: '투입',
+  pressing: '압축',
+  ejecting: '결속·배출',
+};
+
+/**
+ * 압축기 원형 게이지의 눈금 범위(MPa). 그림의 눈금일 뿐 판정 기준이 아니다(판정은 서버 status).
+ * ⚠ 설비 최대 압력은 확인 전이라 목표 압력 범위(목업 27~30 MPa)가 오른쪽 끝 근처에 오도록 잡은 가정이다.
+ */
+export const PRESSURE_GAUGE_MPA = { min: 0, max: 35 } as const;
+
+// 권한 종류는 대표님과 확정 전이다 (docs/questions.md A4). 표시 이름만 둔다. 화면 분기에는 쓰지 않는다.
+export const ROLE_TEXT: Record<Role, string> = {
+  admin: '관리자',
+  operator: '작업자',
+  viewer: '열람자',
+};
+
+export const DEVICE_NAMES: Record<DeviceId, string> = {
+  'tank-a1': '섹터 A1',
+  'tank-a2': '섹터 A2',
+  'tank-b1': '섹터 B1',
+  'tank-b2': '섹터 B2',
+  'robot-1': '로봇팔',
+  'conveyor-z': '컨베이어 Section Z',
+  'compressor-1': '압축기',
+};
+
+/**
+ * 홈 하단 단계 바: 집기, 이동, 놓기, 압축.
+ * 압축은 서버의 로봇 `phase`(idle/pick/move/place)에 없어서 연결할 값이 아직 정해지지 않았다.
+ * 압축기 `running`으로 대신할지 서버에 확인한다 (docs/questions.md).
+ */
+export const PHASE_STEPS: ReadonlyArray<{ key: string; label: string; phase: Phase | null }> = [
+  { key: 'pick', label: '집기', phase: 'pick' },
+  { key: 'move', label: '이동', phase: 'move' },
+  { key: 'place', label: '놓기', phase: 'place' },
+  { key: 'compress', label: '압축', phase: null },
+];
+
+// 값 표시 형식: 단위는 %, m³, MPa, °C, 도. 무게(t)는 차량·하역 기록에만 쓴다 (명세 6절 "공통 규칙").
+const oneDecimal = new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const integer = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 });
+
+export const formatPercent = (value: number): string => `${oneDecimal.format(value)}%`;
+export const formatVolumeM3 = (value: number): string => `${oneDecimal.format(value)} m³`;
+const pickVolume = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 3 });
+export const formatPickVolumeM3 = (value: number): string => `${pickVolume.format(value)} m³`;
+export const formatPressureMpa = (value: number): string => `${oneDecimal.format(value)} MPa`;
+export const formatTemperatureC = (value: number): string => `${oneDecimal.format(value)} °C`;
+export const formatAngleDeg = (value: number): string => `${oneDecimal.format(value)}°`;
+export const formatLoadPercent = (value: number): string => `${integer.format(value)}%`;
+export const formatCount = (value: number): string => integer.format(value);
+const twoDecimals = new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** 계중대 무게 (차량·하역 기록에만). 계중대 눈금이 10 kg라 소수 둘째 자리까지 */
+export const formatWeightT = (value: number): string => `${twoDecimals.format(value)} t`;
+
+/**
+ * 하역 전후 적재율: "42% → 55%"와 "+13%p". 서버가 준 두 값을 정수로 적고 그 차이를 붙일 뿐이다.
+ * 차이는 반올림한 두 값의 차라서 화면에 적힌 숫자와 맞는다.
+ */
+export function formatFillChange(beforePercent: number, afterPercent: number): { range: string; delta: string } {
+  const before = Math.round(beforePercent);
+  const after = Math.round(afterPercent);
+  const diff = after - before;
+  return { range: `${before}% → ${after}%`, delta: `${diff > 0 ? '+' : diff < 0 ? '−' : '±'}${Math.abs(diff)}%p` };
+}
+
+/** 섹터 등급 표시 (등급 종류는 가정, docs/questions.md A8) */
+export const formatGrade = (grade: string): string => `${grade}등급`;
+
+/** ISO 8601 UTC 문자열을 현지 시각으로 (표시할 때만 변환한다). 잘못된 값이면 "-" */
+export function formatLocalTime(iso: string | null | undefined, withSeconds = true): string {
+  if (!iso) return '-';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(withSeconds ? { second: '2-digit' } : {}),
+    hour12: false,
+  }).format(date);
+}
+
+/**
+ * 짧은 칸에 넣는 시각: 오늘이면 시:분(:초)만, 다른 날이면 월.일 시:분. 표·목록의 좁은 칸에서 두 줄로 꺾이지 않게 쓴다.
+ * now는 테스트용
+ */
+export function formatLocalClock(iso: string | null | undefined, withSeconds = false, now: Date = new Date()): string {
+  if (!iso) return '-';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '-';
+  const sameDay = date.toDateString() === now.toDateString();
+  if (!sameDay) return formatLocalTime(iso, false);
+  return new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', ...(withSeconds ? { second: '2-digit' } : {}), hour12: false }).format(date);
+}
+
+// --- 이력 그래프 (기기 페이지) ---
+// 센서값을 그때그때 보는 용도라 상세할 필요가 없다. 한 번에 한 구간만 요청하고, 구간마다 점이 수백 개 이하로 유지된다.
+
+export type HistoryUnitKey = 'day' | 'week' | 'month';
+
+export interface HistoryUnit {
+  label: string;
+  /** 구간 길이(ms) */
+  spanMs: number;
+  /** 서버에 요청할 간격 */
+  interval: string;
+  /** 구간 안의 점 수(참고) */
+  points: number;
+  /** x축 눈금 형식: 시각 또는 날짜 */
+  tick: 'time' | 'date';
+}
+
+export const HISTORY_UNIT_ORDER: readonly HistoryUnitKey[] = ['day', 'week', 'month'];
+
+export const HISTORY_UNITS: Record<HistoryUnitKey, HistoryUnit> = {
+  day: { label: '일', spanMs: 24 * 3_600_000, interval: '10m', points: 144, tick: 'time' },
+  week: { label: '주', spanMs: 7 * 24 * 3_600_000, interval: '1h', points: 168, tick: 'date' },
+  month: { label: '월', spanMs: 30 * 24 * 3_600_000, interval: '6h', points: 120, tick: 'date' },
+};
+
+export interface HistoryMetric {
+  /** 서버 `metric` 값. 이름은 서버와 확정 전이다 (docs/questions.md B12). */
+  key: string;
+  label: string;
+  unit: string;
+  /** y축 범위. 퍼센트는 0~100으로 고정하고 나머지는 자동 */
+  domain: readonly [number, number] | 'auto';
+}
+
+export const HISTORY_METRICS: Record<DeviceType, readonly HistoryMetric[]> = {
+  tank: [
+    { key: 'level', label: '적재율', unit: '%', domain: [0, 100] },
+    { key: 'moisture', label: '수분', unit: '%', domain: [0, 100] },
+    { key: 'volume', label: '부피', unit: 'm³', domain: 'auto' },
+  ],
+  robot: [],
+  conveyor: [{ key: 'load', label: '적재 정도', unit: '%', domain: [0, 100] }],
+  compressor: [
+    { key: 'pressure', label: '압력', unit: 'MPa', domain: 'auto' },
+    { key: 'temperature', label: '온도', unit: '°C', domain: 'auto' },
+  ],
+};
+
+/** 점이 하나도 없는 구간에 보여 줄 안내 */
+export const HISTORY_EMPTY_TEXT = '이 구간에는 기록된 값이 없습니다.';
+
+/** 권한을 사용자가 읽을 수 있는 말로. 권한 종류는 대표님과 확정 전이다 (docs/questions.md A4). */
+export const PERMISSION_TEXT: Record<Permission, string> = {
+  'batch.control': '배치 수동 제어',
+  'robot.control': '시작·일시정지·재개·정지',
+  'robot.manual': '모드 전환·섹터 지정·수동 집기·놓기',
+  'settings.write': '설정값 변경',
+  'alarm.ack': '알람 확인 처리',
+};
+
+// --- 기록 목록 (components/records/RecordList) ---
+// 모든 기록 화면(차량·하역·로봇 집기 등)이 같은 기간 고르기와 쪽 넘기기를 쓴다. 요청·응답 모양은 shared/records.ts.
+
+export type RecordRangeKey = 'today' | 'yesterday' | 'last7d' | 'custom';
+
+export const RECORD_RANGES: ReadonlyArray<{ key: RecordRangeKey; label: string }> = [
+  { key: 'today', label: '오늘' },
+  { key: 'yesterday', label: '어제' },
+  { key: 'last7d', label: '최근 7일' },
+  { key: 'custom', label: '직접 선택' },
+];
+
+/** 기록 목록별 검색 상자의 안내 글. 서버가 찾는 값과 같아야 한다 (명세 6절 "기록 목록"의 검색 대상 표) */
+export const RECORD_SEARCH_HINT = {
+  vehicles: '번호판, 회사 검색',
+  batches: '배치 ID, 섹터 검색',
+  bales: '베일 ID, 배치 ID 검색',
+  unloads: '번호판, 회사 검색',
+  picks: '섹터, 배치 ID 검색',
+  batchEvents: '배치·베일 ID, 사건 종류, 수행자 검색',
+  alarms: '기기 이름, 알람 내용 검색',
+} as const;
+
+export const RECORD_LIST = {
+  /** 처음 열 때의 기간 */
+  defaultRange: 'today' as RecordRangeKey,
+  /** 직접 선택에서 한 번에 고를 수 있는 최대 일수 (서버 부담을 막는 표시용 제한, 가정) */
+  maxCustomDays: 92,
+  /** 쪽 번호를 몇 개까지 보여 주나 (폰에서는 가운데 3개만) */
+  pageWindow: 5,
+  emptyText: '이 기간에 기록이 없습니다',
+  /** 검색어가 있는데 결과가 없을 때 (기간과 검색어를 아래에 함께 적는다) */
+  emptySearchText: '검색 결과가 없습니다',
+} as const;

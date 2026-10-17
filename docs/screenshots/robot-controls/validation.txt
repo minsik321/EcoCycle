@@ -1,0 +1,1 @@
+PASS: 390×844, 1440×900; robot page auto / auto·pinned / manual (empty, holding, placed), inline apply, batch planned vs actual mix with pin badge, pin events, pick records two steps, 3D home robot panel controls.

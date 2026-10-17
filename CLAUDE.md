@@ -15,7 +15,7 @@ React 웹으로 만들고 Capacitor로 안드로이드 앱을 빌드한다. 서�
 ```
 EcoCycle/
 ├── CLAUDE.md              ← 이 파일: 전체 규칙과 흐름
-├── docs/                  기준 문서, 결정 기록, 확인 상태
+├── docs/                  기준 문서(명세), 결정 기록, 확인 질문
 ├── shared/                API 계약 타입 (app과 mock-server가 함께 import)
 ├── mock-server/           서버 준비 전 가짜 센서·관절 값을 흘리는 개발용 서버
 └── app/                   React + Vite 웹앱, Capacitor 안드로이드 빌드
@@ -25,11 +25,13 @@ EcoCycle/
         ├── store/         앱 상태(Redux Toolkit) — 저빈도 값만
         ├── config/        로봇 모델·장면 배치·화질 모드·환경값 (가정에 의존하는 값)
         ├── components/    공용 UI, 재사용 조작 컴포넌트
-        ├── features/      화면 단위: 로그인, 홈, 기기 페이지, 알람, 설정, CCTV
-        └── scene/         홈 3D 장면 (react-three-fiber)
+        ├── features/      화면 단위: 로그인, 홈, 기기 페이지, 알람, 공정 기록, 설정, CCTV
+        └── studio/        3D 홈 (react-three-fiber): 홈의 유일한 3D 장면 (자체 규칙, 3D를 고를 때만 불러옴)
 ```
 
 각 폴더의 `CLAUDE.md`에 그 폴더의 책임과 규칙이 있다. 폴더 안에서 작업할 때는 그 파일을 먼저 읽는다.
+
+**`app/src/studio/`는 예외 구역이다.** 이 파일과 `features`·명세의 시각·배치·세부 성능 규칙(카메라 조작 제한 포함)을 따르지 않고 `app/src/studio/CLAUDE.md`의 고정 규칙 여섯 가지만 따른다. 권한·위험 조작·비상정지·연결 끊김·값 규칙(공통 규칙 1~6, 8, 9)과 화질 3단계(7번)는 스튜디오에도 그대로 적용되며, 스튜디오는 휴대폰 → 태블릿 → 데스크톱 순으로 맞춘다.
 
 ## 데이터 흐름
 
@@ -43,7 +45,7 @@ EcoCycle/
         ▼                         ▼            ▼
               app/src/store (Redux)      jointBuffer (store 밖, 보간)
                     │                          │
-          features/ (2D 화면)  ◄──────────►  scene/ (3D 홈, RobotArm)
+          features/ (2D 화면)  ◄──(lazy)──►  studio/ (3D 홈, 로봇팔)
                     │
    조작: components/controls → api 명령(POST + Idempotency-Key) → 202 accepted
          → WebSocket command.result (못 받으면 GET /commands/{id}) → 결과를 홈에서도 표시
@@ -52,12 +54,12 @@ EcoCycle/
 ## 전체 공통 규칙 (모든 폴더에 적용)
 
 1. **권한은 서버가 판단한다.** 프론트는 `GET /me`의 `permissions`로 버튼 표시·비활성만 정한다. 비활성 버튼은 편의 기능일 뿐 차단 수단이 아니다.
-2. **위험 조작은 기기 페이지에서만.** 홈·확대 화면은 시작/일시정지/재개/정지/알람 확인만. `set_mode`, `pick_from`, `update_setting`은 기기 페이지 + 확인 단계(`confirm: true`)를 거친다.
+2. **위험 조작은 기기 페이지에서만.** 홈·확대 화면은 시작/일시정지/재개/정지/알람 확인만. `set_mode`, `pick_from`, `place_on_conveyor`, `update_setting`은 기기 페이지 + 확인 단계(`confirm: true`)를 거친다. 예외 하나: 3D 홈의 로봇 상세 패널은 기기 페이지와 같은 운전 모드 조작(`RobotModeControl`, 같은 확인 단계)을 둔다(`docs/decisions.md` 2026-10-16 "수동 집기·놓기 두 단계"). 권한이 없으면 그리지 않는다.
 3. **비상정지는 앱의 일이 아니다.** 물리 버튼과 현장 안전 인터록이 담당한다. 앱에 "비상정지"를 안전 수단처럼 보이게 만들지 않는다.
 4. **연결 끊김을 숨기지 않는다.** 15초간 메시지가 없으면 "연결 끊김"과 마지막 수신 시각을 표시하고 로봇팔을 멈춘다. 마지막 값을 정상처럼 계속 보여 주지 않는다. 복구되면 REST로 현재 상태를 다시 받는다.
-5. **값 규칙:** 시각은 ISO 8601 UTC 문자열(표시할 때만 현지 시각), 단위는 %·m³·MPa·°C·도. **무게는 쓰지 않는다**(부피·용량만). 상태 판정(`status`)은 서버가 하고 화면은 표시만 한다.
+5. **값 규칙:** 시각은 ISO 8601 UTC 문자열(표시할 때만 현지 시각), 단위는 %·m³·MPa·°C·도. **무게는 차량·하역 기록에만**(계중대 순중량 t, 총중량·공차·순중량 셋 다 저장), 섹터는 적재율·부피, 로봇 집기는 부피 또는 횟수(명세 6절 "공통 규칙", `docs/decisions.md` 2026-10-15). 상태 판정(`status`)은 서버가 하고 화면은 표시만 한다.
 6. **기기 ID는 고정:** `tank-a1`, `tank-a2`, `tank-b1`, `tank-b2`, `robot-1`, `conveyor-z`, `compressor-1`.
-7. **가볍게 만든다.** 화려한 연출보다 실제 저사양 태블릿에서 끊김 없이 도는 것이 우선이다(성능 원칙은 `app/src/scene/CLAUDE.md`).
+7. **화질은 3단계(high/standard/low)로 나눈다.** `low`는 저사양 태블릿의 안전판으로, 끊김 없이 도는 것이 그 티어의 유일한 기준이다. `standard`·`high`에서는 시각 품질도 1차 목표이지만, 상위 티어의 연출이 `low`의 무끊김 기준을 깨면 안 된다. 티어는 접속 시 짧은 FPS 프로브로 자동 선택하고 설정에서 바꿀 수 있다. 단계별 그리기는 `app/src/studio/CLAUDE.md`의 "성능" 절, 완화 이유는 `docs/decisions.md`(2026-10-13 "홈 3D 재설계").
 8. **가정에 의존하는 값은 설정으로 분리한다.** 권한 종류, 기준값, 조작 목록, 로봇 링크 길이·축 등은 코드에 박지 않고 `app/src/config`에 둔다.
 9. **API 형식이 바뀌면 순서는 명세 → `shared/` 타입 → mock-server → app.** 타입 오류가 나는 곳이 고칠 곳이다.
 
@@ -69,16 +71,16 @@ EcoCycle/
 | --- | --- | --- |
 | 0. 준비 | docs, shared | 가정 표와 프로토타입 전달, 피드백 수집 |
 | 1. 핵심 기능 | shared → mock-server → api, realtime, store → features, components | 권한별 화면 분기와 연결 끊김 표시 동작 |
-| 2. 3D 홈 시안 | scene, config, features/home | 실제 태블릿 30fps 안정, 30분 이상 끊김·발열 없음 |
+| 2. 3D 홈 시안 | studio, config, features/home | 실제 태블릿 30fps 안정, 30분 이상 끊김·발열 없음 |
 | 3. 실서버 연동 | api, realtime, config(env, robotModel) | 실제 값으로 로봇팔 구동, 끊기면 정지·표시 |
 | 4. 장시간·현장 테스트 | realtime, app(빌드·배포) | 하루 이상 구동해도 느려짐·멈춤 없음 |
-| 5. 확장 | scene, features | 2단계에서 여유 확인된 경우만 |
+| 5. 확장 | studio, features | 2단계에서 여유 확인된 경우만 |
 
-**현재 단계: 0 → 1 시작 전.** 단계가 바뀌면 이 줄과 `docs/decisions.md`를 갱신한다.
+**현재 단계: 2 (3D 홈 시안), 범위가 "살아있는 3D 월드"로 확장되어 재작업 중(2026-10-13, 사용자 요청). 실제 태블릿 측정(초당 30프레임·30분)은 재작업 완료 후로 미룬다.** 단계가 바뀌면 이 줄과 `docs/decisions.md`를 갱신한다.
 
 로봇팔 동기화 후퇴 순서: ① 관절 값 실시간 → ② 단계+진행률 → ③ 정해진 동작 반복(최후).
 
-## 명령어 (1단계에서 만들 예정)
+## 명령어
 
 npm workspaces로 `shared`, `mock-server`, `app`을 묶는다.
 
@@ -87,15 +89,51 @@ npm install                 # 루트에서 한 번
 npm run dev                 # mock-server + app 동시 실행
 npm run dev:app             # app만 (VITE_API_BASE로 실서버 지정)
 npm run mock -- --scenario=disconnect   # 시나리오 지정해 모의 서버 실행
-npm run typecheck && npm run test
-npm run build:android       # app 빌드 → cap sync android
+npm run typecheck && npm run test       # 타입 검사 + 단위·화면 테스트 (서버 불필요, 약 1분)
+npm run test:integration    # 실제 모의 서버로 연결 끊김·권한 매트릭스(명령 403·조회 200·비로그인 401)·로봇 수동 집기→놓기 순서(409)와 섹터 지정 실제 배합·자동 로그인(쿠키·교체·재사용 감지·유예) 점검 + 실제 Chromium으로 새로고침 뒤 로그인 유지 (약 2분, 서버·앱을 스스로 띄움, 로컬 Chromium 필요, 없으면 INTEGRATION_SKIP_BROWSER=1, 브라우저 점검 반복은 INTEGRATION_BROWSER_RUNS=5, Windows가 기본 포트 4099를 예약해 두었으면 INTEGRATION_PORT=4399)
+npm run test:text           # 실제 브라우저로 폰·태블릿 화면의 글 줄바꿈·가로 넘침 점검 (글자 100%·130%, 약 15~25분, 서버를 스스로 띄움, 로컬 Chromium 필요)
+npm run measure:load        # 3D 홈 첫 화면 시간: 프로덕션 빌드, 폰 390×844 + 4G + CPU 4배 느림으로 로그인 → 지표·3D 첫 장 (약 10~20분, 로컬 Chromium 필요)
+npm run poster              # 3D 홈 준비 화면의 포스터(빈 장면)를 다시 찍는다 (약 1분, 로컬 Chromium 필요)
+node app/scripts/uiPolish.mjs      # UI 다듬기(섹터 PC 1:2 칸, 배치·베일 틀 폭, KPI 상세 높이 고정, 3D 지역 전환 간격, 팝업 X 닫기, 알람 이력 5건·거른 알람 화면, 모의 계정 1234): 세 크기 스크린샷과 점검 (약 3분, 로컬 Chromium 필요)
+node app/scripts/recordSearch.mjs   # 기록·알람 검색: 390×844·1440×900에서 공정 기록 세 탭·섹터 하역 기록·알람 이력의 기간 + 검색, 결과 없음, 번호판 공백 무시, X 점검과 스크린샷 (약 3분, 로컬 Chromium 필요)
+node app/scripts/layoutPages.mjs   # 페이지 폭·간격: 네 크기에서 섹터 목록·공정 기록·대시보드 스크린샷과 같은 폭 점검 (약 2분, 로컬 Chromium 필요)
+node app/scripts/topBar.mjs        # 상단 바 하나·3D 홈 표: 세 크기(390·820·1440)에서 3D 홈과 일반 화면의 바, 사용자 메뉴, 대시보드, 태블릿·PC 표 접기(기억), 장면에 없는 대상 → 팝업, 베일 "기록 보기" 점검과 스크린샷 (약 5분, 로컬 Chromium 필요)
+node app/scripts/floatingBar.mjs   # 떠 있는 상단 바·사이드바 폭: 세 크기(1440·820·390)에서 3D 홈·대시보드·공정 기록의 바 자리·모양·내용 간격·사이드바 폭이 같은지, 접기 기억, 나란히 놓은 비교 (약 3분, 로컬 Chromium 필요)
+node app/scripts/robotControls.mjs # 로봇팔 7단위: 390×844·1440×900에서 로봇팔 페이지 세 모드·수동 놓기 대기·적용 자리, 섹터 지정 중인 배치의 계획 vs 실제 배합, 사건 기록, 집기 기록 두 단계, 3D 홈 로봇 패널 조작 (약 5분, 로컬 Chromium 필요, 결과 docs/screenshots/robot-controls)
+node app/scripts/yardSoak.mjs      # 출하 마당 장시간: /scene-demo?yardprobe=1을 월드 시계 10분(YARD_SOAK_MIN로 조절) 돌리며 5초마다 베일·지게차 겹침과 칸 정합을 보고, 끝나면 1440×900·390×844 스크린샷 (약 12분, 로컬 Chromium 필요, 결과 docs/screenshots/studio/yard)
+node app/scripts/recordPopups.mjs  # 기록 상세 팝업: 베일 기록 API, 폰·데스크톱에서 팝업 셋·이어 열기·뒤로 가기·깊은 링크 점검과 스크린샷 (약 2분, 로컬 Chromium 필요)
+npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```
 
+`build:android`(app 빌드 → `cap sync android`)는 Capacitor를 붙이는 안드로이드 빌드 단계에서 만든다. 아직 없다.
 스크립트를 추가·변경하면 이 표도 함께 고친다.
+
+## 배포
+
+자세한 이유와 주의점은 `docs/decisions.md`의 "배포 방식" 항목.
+
+| 대상 | 프로토타입 (지금) | 이후 |
+| --- | --- | --- |
+| 프론트 (`app`) | Vercel — 정적 파일 배포, 웹 브라우저로 접속 | Capacitor APK (직접 설치 또는 Firebase App Distribution), Vercel은 웹 버전으로 유지 |
+| 목서버 (`mock-server`) | Render — Node로 REST + WebSocket 실행 | 실서버 준비되면 내림 |
+| 실서버 | 없음 | 서버 담당이 배포, 프론트는 주소만 교체 |
+
+```bash
+# Vercel: 루트 디렉터리는 저장소 루트. 설치·빌드·출력·되돌리기는 루트 vercel.json (npm ci → npm run build → app/dist)
+#   환경 변수: VITE_USE_MOCK=true(값이 모의 서버에서 오는 동안 "예시 데이터" 표시, 실서버로 바꾸면 false), VITE_API_BASE=https://<render주소>/api/v1, VITE_WS_BASE=wss://<render주소>/ws/v1/stream
+# Render: 루트 디렉터리는 저장소 루트. Build npm ci --include=dev, Start npm run start -w @ecocycle/mock-server, Health Check /healthz
+#   환경 변수: CORS_ORIGINS=https://<vercel주소> (쿠키 때문에 정확한 출처만, * 불가),
+#             REFRESH_COOKIE_SAMESITE=none (Vercel과 Render는 다른 사이트라 자동 로그인 쿠키에 SameSite=None 필요), PORT는 넣지 않음
+# APK 단계(예정): build:android → app 빌드 → cap sync android → Android Studio/Gradle로 APK
+```
+
+- `VITE_*` 값은 빌드할 때 들어간다. 서버 주소를 바꾸면 Vercel 재배포, APK 재빌드가 필요하다.
+- 배포 값은 플랫폼 환경변수에만 넣는다. `.env`는 Git에 없어 배포되지 않고, 서버는 이미 설정된 환경변수를 `.env`로 덮어쓰지 않는다.
+- 단계별 설정과 확인 순서는 `docs/deployment.md`.
 
 ## 작업 방식
 
 - 사용자와는 한국어로 소통한다. 코드 식별자는 영어, 주석·문서는 한국어.
 - 작은 단위로 나눠 진행하고, 필요 이상의 추상화를 만들지 않는다.
 - 명세의 "확인 필요" 항목(서버 담당, 권한 종류, 로봇 기종 등)을 임의로 확정하지 않는다. 가정으로 진행하고 `docs/dashboard-spec.md`의 프로토타입 가정 표에 맞춘다.
-- 하지 않는 것: 서버 기능(로그인 검증, FCM 발송, 영상 변환) 구현, 로봇 AI 학습, 토큰을 URL에 넣기, 투명·발광·유리 재질, 카메라 자유 회전·핀치 확대.
+- 하지 않는 것: 서버 기능(로그인 검증, FCM 발송, 영상 변환) 구현, 로봇 AI 학습, 토큰을 URL에 넣기, 범위를 벗어난 카메라 조작(부지 밖 이동, ±35도를 넘는 회전, 자유 회전·핀치 확대처럼 끝없이 돌리거나 파고들 수 있는 조작).

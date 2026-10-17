@@ -1,0 +1,165 @@
+@import "tailwindcss";
+/* 글꼴은 Pretendard 하나만 쓴다. 필요한 글자 묶음만 내려받는 동적 서브셋 파일을 styles/fonts에 넣어 두어 오프라인(APK)에서도 동작한다 (OFL 라이선스). */
+@import "./fonts/pretendard/pretendard.css";
+
+/*
+ * 디자인 토큰 — 색·모서리·그림자·글꼴은 여기 한 곳에서만 정한다.
+ * 화면 코드는 이 토큰으로 만든 Tailwind 클래스(bg-paper, text-ink, rounded-card, shadow-soft-2 …)와
+ * 공용 컴포넌트(components/)를 쓰고, 임의의 색·그림자 값을 직접 적지 않는다.
+ *
+ * 글자 크기: 본문 text-base(16px), 보조 text-sm, 주석 text-xs, 화면 제목 text-xl, 지표 숫자 text-3xl.
+ * 간격: Tailwind 기본 4px 단위. 패널 안쪽 p-4, 패널 사이 gap-3, 화면 가장자리 p-4.
+ */
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Noto Sans KR", "Malgun Gothic", sans-serif;
+
+  /* 바탕: 따뜻한 미색. 강조색은 파랑 하나만 쓴다. */
+  --color-paper: #f6f4ef;
+  --color-paper-deep: #ece8df;
+  --color-surface: #ffffff;
+  --color-line: #e4dfd4;
+  --color-ink: #1f2430;
+  --color-ink-soft: #586173;
+  --color-ink-faint: #8a92a1;
+
+  --color-accent: #2563eb;
+  --color-accent-strong: #1d4ed8;
+  --color-accent-soft: #e6eefe;
+
+  /* 장면과 맞춘 보조색: 파지(크라프트), 로봇·지게차(안전 노랑) */
+  --color-kraft: #c9a26b;
+  --color-kraft-soft: #f3e9d8;
+  --color-kraft-deep: #a37a45;
+  --color-kraft-light: #e0c393;
+  --color-safety: #f5b301;
+
+  /* 섹터 그림(features/tank/SectorBin)의 콘크리트 벽: 윗면 → 안쪽 면 → 그늘진 면 순으로 어둡다 */
+  --color-concrete-top: #efede8;
+  --color-concrete: #d8d4cb;
+  --color-concrete-shade: #bfbab0;
+  --color-concrete-edge: #9f998e;
+
+  /* 상태 색: 앱 전체에서 normal / caution / alarm / offline 네 가지만 쓴다.
+     뜻이 있는 색이라 강조색과 섞어 쓰지 않는다. 색만으로 구분하지 않도록 화면에서는 기호·글자를 함께 쓴다. */
+  --color-status-normal: #2e7d32;
+  --color-status-caution: #b26a00;
+  --color-status-alarm: #c62828;
+  --color-status-offline: #616161;
+  --color-status-normal-soft: #e7f4e8;
+  --color-status-caution-soft: #fdf1dc;
+  --color-status-alarm-soft: #fde8e8;
+  --color-status-offline-soft: #eeeeee;
+
+  /* 모서리 */
+  --radius-control: 0.75rem;
+  --radius-card: 1.125rem;
+  --radius-panel: 1.5rem;
+
+  /* 부드러운 그림자 3단계: 1 카드, 2 떠 있는 패널, 3 대화상자·알림 */
+  --shadow-soft-1: 0 1px 2px rgb(31 36 48 / 0.04), 0 4px 12px rgb(31 36 48 / 0.05);
+  --shadow-soft-2: 0 2px 4px rgb(31 36 48 / 0.05), 0 12px 28px rgb(31 36 48 / 0.1);
+  --shadow-soft-3: 0 4px 8px rgb(31 36 48 / 0.06), 0 24px 56px rgb(31 36 48 / 0.18);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  -webkit-font-smoothing: antialiased;
+  /* 숫자가 바뀔 때 폭이 흔들리지 않게 */
+  font-variant-numeric: tabular-nums;
+  /* 터치 기기: 더블탭 확대·당겨서 새로고침으로 화면이 튀지 않게 */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+/*
+ * 글 줄바꿈 (앱 전체, 3D 홈 포함 — 2026-10-14 폰의 펼친 상세에서 글이 꺾이던 것).
+ * - 한국어는 낱말(띄어쓰기) 단위로만 줄을 바꾼다. 두 글자 낱말이 한 글자씩 갈라지지 않는다.
+ * - 그래도 칸보다 긴 한 덩어리(긴 번호·주소)는 칸 밖으로 넘치지 않게 그때만 끊는다.
+ *   anywhere가 아니라 break-word: anywhere는 상자의 최소 폭 계산까지 바꿔 표 칸·flex 항목이 한 글자 폭까지 줄어들고
+ *   글이 세로로 쌓인다(로봇팔 관절 표의 "-58.6°"가 두 줄로 갈라졌다). break-word는 넘칠 때만 끊고 상자를 줄이지 않는다.
+ * - 이름표·탭·표 머리·버튼·상태 글은 한 줄. 넘치면 말줄임(…)이고 세로로 쌓지 않는다.
+ *   글자 크기를 키운 기기(안드로이드 "글자 크기" 설정)에서도 같은 규칙으로 버틴다.
+ */
+html {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+:where(dt, th, legend, label, button, [role='tab'], [role='status'] > *, summary) {
+  white-space: nowrap;
+}
+
+/* 이름 · 값 한 줄: 같은 기준선, 이름은 줄지 않고 값은 넘치면 말줄임 */
+.kv-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.kv-row > :first-child {
+  flex: none;
+  white-space: nowrap;
+}
+
+.kv-row > :last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 유리 패널. 화질 단계(html의 data-quality)에 따라 달라진다.
+ *   high      모든 패널이 블러 유리
+ *   standard  주요 패널(.glass)만 블러, 보조 패널(.glass-minor)은 단색
+ *   low       블러 없음 — 흰 단색 + 그림자 (저사양 태블릿에서도 읽기 쉬워야 한다)
+ * backdrop-filter를 지원하지 않는 브라우저도 단색으로 떨어진다.
+ */
+/* 컴포넌트 층에 둔다: 유틸리티 클래스(상태 띠 색 등)가 이 규칙을 덮을 수 있어야 한다 */
+@layer components {
+  .glass,
+  .glass-minor {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    box-shadow: var(--shadow-soft-2);
+  }
+
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root[data-quality="high"] .glass,
+    :root[data-quality="high"] .glass-minor,
+    :root[data-quality="standard"] .glass {
+      background: rgb(255 255 255 / 0.68);
+      border-color: rgb(255 255 255 / 0.7);
+      -webkit-backdrop-filter: blur(18px) saturate(1.5);
+      backdrop-filter: blur(18px) saturate(1.5);
+    }
+  }
+}
+
+/* 연결이 끊기면 기기 그림(components/device/DeviceHero)의 CSS 움직임을 그 자리에서 멈춘다.
+   마지막 값을 정상처럼 움직이며 보여 주지 않기 위한 것이다. 캔버스로 그리는 그림은 스스로 멈춘다. */
+[data-frozen="true"],
+[data-frozen="true"] * {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

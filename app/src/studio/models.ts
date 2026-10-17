@@ -1,0 +1,133 @@
+import { Box3, Color, Float32BufferAttribute, Group, Vector3 } from 'three';
+import type { BufferGeometry, Mesh, MeshStandardMaterial, Texture } from 'three';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MAT } from './three/kit';
+import { MODELS, MODEL_BASE } from './modelList';
+import type { ModelEntry, ModelKey } from './modelList';
+
+export { MODELS } from './modelList';
+export type { ModelEntry, ModelKey } from './modelList';
+
+// 스튜디오가 쓰는 모델 파일(glTF/GLB) 목록과 불러오기.
+//  - 파일은 app/public/models 아래에 둔다. Meshopt 압축은 늘 읽는다(디코더가 작아 스튜디오 묶음에 들어 있다).
+//    Draco 압축 모델은 목록에 draco: true로 적으며, 그런 모델을 처음 불러올 때만 DRACOLoader와 디코더(glTF용 한 벌)를 내려받는다.
+//  - 모델마다 라이선스·출처·삼각형 수를 적는다. 목록에 없는 파일은 쓰지 않는다.
+//  - 파일을 못 받으면 코드로 만든 모형(절차적 모형)을 그대로 쓴다. 모델이 없어도 화면은 완성되어 있어야 한다.
+//
+// 지금 쓰는 팩은 Kenney "Car Kit" 하나뿐이고(CC0), 주차된 승용차에만 쓴다.
+// 트럭(적재함이 들림)·지게차(포크가 오르내림)·작업자(팔다리가 움직임)·나무·소품은 코드로 만든 모형이다:
+// CC0 팩 하나로 이 전부를 갖추면서 움직이는 마디까지 나뉜 것을 찾지 못했다 (studio/CLAUDE.md "모델").
+
+let loader: GLTFLoader | null = null;
+let dracoReady: Promise<void> | null = null;
+
+function gltfLoader(): GLTFLoader {
+  if (loader) return loader;
+  loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  return loader;
+}
+
+/** Draco 모델을 처음 불러올 때만 DRACOLoader를 붙인다 (그 전에는 디코더를 내려받지 않는다) */
+function withDraco(gltf: GLTFLoader): Promise<void> {
+  dracoReady ??= import('three/addons/loaders/DRACOLoader.js').then(({ DRACOLoader }) => {
+    gltf.setDRACOLoader(new DRACOLoader());
+  });
+  return dracoReady;
+}
+
+const cache = new Map<ModelKey, Promise<Group>>();
+
+/** 모델 하나를 불러와 배율·방향·원점을 맞춘 그룹으로 돌려준다 (한 번만 받고, 쓸 때는 clone 한다) */
+export function loadModel(key: ModelKey): Promise<Group> {
+  let pending = cache.get(key);
+  if (!pending) {
+    const entry: ModelEntry = MODELS[key];
+    const gltf = gltfLoader();
+    pending = (entry.draco ? withDraco(gltf) : Promise.resolve())
+      .then(() => gltf.loadAsync(MODEL_BASE + entry.file))
+      .then((gltf) => {
+        const inner = gltf.scene;
+        inner.scale.setScalar(entry.scale);
+        inner.rotation.set(entry.rotation[0], entry.rotation[1], entry.rotation[2]);
+        const holder = new Group();
+        holder.add(inner);
+        holder.updateMatrixWorld(true);
+        // 바닥 중심이 원점이 되게 한다
+        const box = new Box3().setFromObject(holder);
+        const center = box.getCenter(new Vector3());
+        inner.position.set(-center.x + entry.pivot[0], -box.min.y + entry.pivot[1], -center.z + entry.pivot[2]);
+        holder.name = key;
+        return holder;
+      });
+    cache.set(key, pending);
+    pending.catch(() => cache.delete(key));
+  }
+  return pending;
+}
+
+// ── 색 맞추기 ─────────────────────────────────────────────────────────
+
+function pixels(texture: Texture): { data: Uint8ClampedArray; width: number; height: number } | null {
+  const image = texture.image as CanvasImageSource & { width: number; height: number };
+  if (!image || !image.width) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = image.width;
+  canvas.height = image.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(image, 0, 0);
+  return { data: ctx.getImageData(0, 0, canvas.width, canvas.height).data, width: canvas.width, height: canvas.height };
+}
+
+const hsl = { h: 0, s: 0, l: 0 };
+const paintHsl = { h: 0, s: 0, l: 0 };
+const sample = new Color();
+const paintColor = new Color();
+
+/**
+ * 팩의 모델은 색 지도(텍스처) 한 장으로 칠해져 있고 원색이 강하다. 스튜디오의 재질·색과 어울리도록
+ * 텍스처 색을 꼭짓점 색으로 옮기고, 채도가 높은 부분(차체)만 고른 색으로 바꾼다. 유리·바퀴 같은 무채색은 그대로 둔다.
+ * 그 뒤에는 스튜디오의 공용 재질(장난감 플라스틱)을 쓴다.
+ */
+export function repaint(model: Group, paint: string): Group {
+  const copy = model.clone(true);
+  paintColor.set(paint).getHSL(paintHsl);
+  copy.traverse((object) => {
+    const mesh = object as Mesh;
+    if (!mesh.isMesh) return;
+    const material = mesh.material as MeshStandardMaterial;
+    const map = material.map;
+    const source = mesh.geometry as BufferGeometry;
+    const uv = source.getAttribute('uv');
+    const image = map ? pixels(map) : null;
+    const geometry = source.clone();
+    const count = geometry.getAttribute('position').count;
+    const colors = new Float32Array(count * 3);
+    for (let i = 0; i < count; i += 1) {
+      if (image && uv && map) {
+        // 텍스처 변환(KHR_texture_transform)과 반복을 반영해 해당 픽셀을 읽는다
+        const u = uv.getX(i) * map.repeat.x + map.offset.x;
+        const v = uv.getY(i) * map.repeat.y + map.offset.y;
+        const px = Math.min(image.width - 1, Math.max(0, Math.floor((u - Math.floor(u)) * image.width)));
+        const py = Math.min(image.height - 1, Math.max(0, Math.floor((v - Math.floor(v)) * image.height)));
+        const at = (py * image.width + px) * 4;
+        sample.setRGB(image.data[at]! / 255, image.data[at + 1]! / 255, image.data[at + 2]! / 255, 'srgb');
+      } else {
+        sample.copy(material.color);
+      }
+      sample.getHSL(hsl);
+      if (hsl.s > 0.3 && hsl.l > 0.18) sample.setHSL(paintHsl.h, paintHsl.s, Math.min(0.92, paintHsl.l * (0.55 + hsl.l * 0.9)));
+      colors[i * 3] = sample.r;
+      colors[i * 3 + 1] = sample.g;
+      colors[i * 3 + 2] = sample.b;
+    }
+    geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
+    mesh.geometry = geometry;
+    mesh.material = MAT.gloss;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+  });
+  return copy;
+}
