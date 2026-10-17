@@ -690,6 +690,17 @@
   border-top: 1px solid var(--st-line);
 }
 
+/* 좁은 기기 패널에서도 기본 조작 네 개를 한 줄에 놓는다. */
+.st-actions .device-controls-buttons {
+  gap: 6px;
+}
+
+.st-actions .device-controls-buttons button {
+  padding-inline: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 /* 표 머리·폰 시트의 작은 "기록 보기" 링크: 탭 줄 오른쪽 끝, 한 줄 */
 .st-link-mini {
   display: inline-flex;

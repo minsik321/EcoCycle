@@ -55,7 +55,7 @@ export function DeviceControls({ deviceId, context, className = '' }: DeviceCont
           {groupReason}
         </p>
       )}
-      <div className="flex flex-wrap items-start gap-3">
+      <div className="device-controls-buttons flex flex-wrap items-start gap-3">
         {types.map((type) => {
           const allowed = canUse(permissions, type);
           const base = { disabledByGroup: !!groupReason, allowed };
