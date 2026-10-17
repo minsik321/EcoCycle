@@ -17,6 +17,11 @@ app.use(cors({ origin: config.corsOrigins, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());
 
+// 배포 플랫폼(Render)의 상태 확인용. 로그인 없이 200, 시나리오 지연을 받지 않도록 지연보다 앞에 둔다.
+app.get('/healthz', (_req, res) => {
+  res.json({ ok: true, scenario: config.scenario });
+});
+
 // slow-network 시나리오에서만 응답이 늦어진다
 app.use((_req, _res, next) => {
   const delay = restDelayMs();
@@ -25,8 +30,8 @@ app.use((_req, _res, next) => {
 });
 
 // 기본 주소: /api/v1
-app.use('/api/v1', authRouter);
-app.use('/api/v1', queryRouter);
+app.use(config.apiBasePath, authRouter);
+app.use(config.apiBasePath, queryRouter);
 
 // 명세에 없는 경로. 오류 상태는 명세 표(401/403/409/422/429/503)만 쓰므로 503으로 응답한다.
 app.use((_req, res) => sendError(res, 503, 'NOT_IMPLEMENTED', '아직 구현되지 않았거나 없는 경로입니다.'));
@@ -36,7 +41,7 @@ attachStream(server);
 startSim();
 startScenario();
 
-server.listen(config.port, () => {
-  console.log(`[mock-server] http://localhost:${config.port}/api/v1  시나리오: ${config.scenario}`);
+server.listen(config.port, config.host, () => {
+  console.log(`[mock-server] ${config.host}:${config.port}${config.apiBasePath}  WS: ${config.wsPath}  시나리오: ${config.scenario}`);
   console.log(`  허용 출처: ${config.corsOrigins.join(', ')}  리프레시 쿠키 SameSite=${config.refreshCookieSameSite}`);
 });

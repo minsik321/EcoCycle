@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import type { CookieOptions, NextFunction, Request, Response } from 'express';
-import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH, REFRESH_TOKEN_DELIVERIES } from '@ecocycle/shared';
+import { REFRESH_COOKIE_NAME, REFRESH_TOKEN_DELIVERIES } from '@ecocycle/shared';
 import type {
   LoginRequest,
   LoginResponse,
@@ -108,7 +108,7 @@ function cookieOptions(): CookieOptions {
     httpOnly: true,
     secure: true,
     sameSite,
-    path: REFRESH_COOKIE_PATH,
+    path: config.refreshCookiePath,
     ...(sameSite === 'none' ? { partitioned: true } : {}),
   };
 }

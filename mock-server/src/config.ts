@@ -1,3 +1,13 @@
+import { loadEnvFile } from 'node:process';
+import { fileURLToPath } from 'node:url';
+
+// 실행 디렉터리와 무관하게 서버 전용 .env를 읽는다. 배포 환경변수가 우선한다.
+try {
+  loadEnvFile(fileURLToPath(new URL('../.env', import.meta.url)));
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+}
+
 export const SCENARIOS = [
   'normal',
   'tank-alarm',
@@ -38,7 +48,21 @@ function parseGraceSec(value: string | undefined): number {
   process.exit(1);
 }
 
+function parsePath(name: string, fallback: string): string {
+  const value = (process.env[name] ?? fallback).trim().replace(/\/+$/, '') || '/';
+  if (!/^\/(?:[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*)?$/.test(value)) {
+    throw new Error(`${name}은 /로 시작하는 경로여야 합니다: ${value}`);
+  }
+  return value;
+}
+
+const apiBasePath = parsePath('API_BASE_PATH', '/api/v1');
+
 export const config = {
+  host: process.env.HOST ?? '0.0.0.0',
+  apiBasePath,
+  wsPath: parsePath('WS_PATH', '/ws/v1/stream'),
+  refreshCookiePath: `${apiBasePath === '/' ? '' : apiBasePath}/auth`,
   port: Number(process.env.PORT ?? 4000),
   /** 쉼표로 구분한 허용 출처(쿠키를 보내는 출처). 비어 있으면 로컬 Vite 개발 주소. 배포 시 Vercel 주소를 넣는다. */
   corsOrigins: (process.env.CORS_ORIGINS ?? '')

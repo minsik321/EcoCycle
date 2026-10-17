@@ -7,8 +7,8 @@ import { streamGate } from './scenarios/gate';
 import { onMessage } from './sim/bus';
 import { processState } from './sim/process';
 import { listDevices, summarize } from './sim/state';
+import { config } from './config';
 
-const STREAM_PATH = '/ws/v1/stream';
 const HEARTBEAT_MS = 5000;
 const TOPICS: readonly string[] = ['plant', 'devices', 'alarms', 'process', 'robot-1.joints'];
 
@@ -101,7 +101,7 @@ export function attachStream(server: Server): void {
   // 연결 전에 티켓을 확인한다. 1회용이라 쓰고 나면 다시 못 쓴다.
   server.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url ?? '', 'http://localhost');
-    const granted = url.pathname === STREAM_PATH ? consumeWsTicket(url.searchParams.get('ticket') ?? '') : undefined;
+    const granted = url.pathname === config.wsPath ? consumeWsTicket(url.searchParams.get('ticket') ?? '') : undefined;
     if (!granted) {
       socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
       socket.destroy();

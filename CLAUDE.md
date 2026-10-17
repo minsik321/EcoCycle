@@ -119,16 +119,17 @@ npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 | 실서버 | 없음 | 서버 담당이 배포, 프론트는 주소만 교체 |
 
 ```bash
-# Vercel: 프로젝트 루트 폴더 app, 빌드 npm run build, 출력 dist
+# Vercel: 루트 디렉터리는 저장소 루트. 설치·빌드·출력·되돌리기는 루트 vercel.json (npm ci → npm run build → app/dist)
 #   환경 변수: VITE_USE_MOCK=true(값이 모의 서버에서 오는 동안 "예시 데이터" 표시, 실서버로 바꾸면 false), VITE_API_BASE=https://<render주소>/api/v1, VITE_WS_BASE=wss://<render주소>/ws/v1/stream
-# Render: 루트에서 npm install 후 mock-server 빌드·실행 (shared 함께 설치)
+# Render: 루트 디렉터리는 저장소 루트. Build npm ci --include=dev, Start npm run start -w @ecocycle/mock-server, Health Check /healthz
 #   환경 변수: CORS_ORIGINS=https://<vercel주소> (쿠키 때문에 정확한 출처만, * 불가),
-#             REFRESH_COOKIE_SAMESITE=none (Vercel과 Render는 다른 사이트라 자동 로그인 쿠키에 SameSite=None 필요)
+#             REFRESH_COOKIE_SAMESITE=none (Vercel과 Render는 다른 사이트라 자동 로그인 쿠키에 SameSite=None 필요), PORT는 넣지 않음
 # APK 단계(예정): build:android → app 빌드 → cap sync android → Android Studio/Gradle로 APK
 ```
 
 - `VITE_*` 값은 빌드할 때 들어간다. 서버 주소를 바꾸면 Vercel 재배포, APK 재빌드가 필요하다.
-- 정확한 빌드·실행 명령은 배포 설정을 만들 때 이 절에 채워 넣는다.
+- 배포 값은 플랫폼 환경변수에만 넣는다. `.env`는 Git에 없어 배포되지 않고, 서버는 이미 설정된 환경변수를 `.env`로 덮어쓰지 않는다.
+- 단계별 설정과 확인 순서는 `docs/deployment.md`.
 
 ## 작업 방식
 
