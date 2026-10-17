@@ -1539,6 +1539,14 @@ button.st-now:hover {
   max-height: 60%;
 }
 
+/* 손잡이·공정 막대·접힌 요약을 한 덩어리로: 끌어서 여닫는 자리 (스크롤되는 안쪽 내용은 밖) */
+.st-sheet-grip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: grab;
+}
+
 .st-sheet-handle {
   align-self: center;
   display: grid;

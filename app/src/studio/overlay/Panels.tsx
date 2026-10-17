@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { KpiDetailContext } from '../../components/charts/KpiDetailContext';
-import type { KeyboardEvent as ReactKeyboardEvent, MutableRefObject, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MutableRefObject, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { DEVICE_IDS, TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, DeviceState, DeviceStatus, PlantMetric, Vehicle } from '@ecocycle/shared';
 import {
@@ -802,6 +802,56 @@ function useRememberedFlag(key: string): [boolean, (on: boolean) => void] {
   return [on, set];
 }
 
+/** 끌어서 여닫을 때 손가락(마우스)이 이만큼(px) 움직이면 끌기로 본다 */
+const DRAG_TOGGLE_PX = 24;
+
+/**
+ * 아래 시트·표를 끌어서 여닫는다: 위로 끌면 펼치고 아래로 끌면 접는다. 누르기(탭)는 그대로 열고 닫는다.
+ * 끌었을 때는 뒤따라오는 클릭을 막아 두 번 바뀌지 않게 한다. 반환값을 끌 수 있는 자리(손잡이·머리 줄)에 펼쳐 쓴다.
+ * 포인터 캡처는 쓰지 않는다(안쪽 단추의 클릭이 깨진다). `touchAction`은 끌기 자리의 브라우저 기본 동작(스크롤·확대)을 막는 값이다.
+ */
+function useDragToggle(setOpen: (open: boolean) => void, touchAction: CSSProperties['touchAction'] = 'none') {
+  const dragged = useRef(false);
+  const stop = useRef<(() => void) | null>(null);
+  // 끌기가 시작되면 창 전체에서 움직임을 받는다: 손잡이가 작아 마우스는 첫 움직임에 자리를 벗어난다(터치는 시작한 곳이 계속 받는다)
+  useEffect(() => () => stop.current?.(), []);
+  return {
+    style: { touchAction } as CSSProperties,
+    onPointerDown: (e: ReactPointerEvent) => {
+      stop.current?.();
+      dragged.current = false;
+      const id = e.pointerId;
+      const startY = e.clientY;
+      const move = (ev: PointerEvent) => {
+        if (ev.pointerId !== id) return;
+        const dy = ev.clientY - startY;
+        if (Math.abs(dy) < DRAG_TOGGLE_PX) return;
+        dragged.current = true;
+        stop.current?.();
+        setOpen(dy < 0);
+      };
+      const end = (ev: PointerEvent) => {
+        if (ev.pointerId === id) stop.current?.();
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', end);
+      window.addEventListener('pointercancel', end);
+      stop.current = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', end);
+        window.removeEventListener('pointercancel', end);
+        stop.current = null;
+      };
+    },
+    onClickCapture: (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+      if (!dragged.current) return;
+      dragged.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+  };
+}
+
 /**
  * 오른쪽 아래(세로 태블릿은 아래) 탭 표: 차량 · 섹터 · 배치 · 베일. 접기 단추로 요약 한 줄까지 접을 수 있고(3D를 덜 가린다),
  * 접었는지는 기기에 기억한다. 줄을 누르는 규칙은 TableBody.
@@ -809,6 +859,8 @@ function useRememberedFlag(key: string): [boolean, (on: boolean) => void] {
 export function Tables({ data, disconnected, selection, onSelect, recordLink, openRecord }: PanelCommon & { recordLink?: RecordLink; openRecord?: RecordOpen }) {
   const [tab, setTab] = useState<TableTab>('vehicles');
   const [collapsed, setCollapsed] = useRememberedFlag(TABLE_COLLAPSED_KEY);
+  // 머리 줄(접힌 때는 한 줄 전체)을 끌어서 여닫는다. 가로 끌기는 탭 줄에 남긴다
+  const drag = useDragToggle((open) => setCollapsed(!open), 'pan-x');
   const onSite = data.vehicles.filter((v) => v.stage !== 'departed').length;
   const openBatches = data.batches.filter((b) => b.stage !== 'completed').length;
   const stacked = data.bales.filter((b) => b.stage === 'created').length;
@@ -822,7 +874,7 @@ export function Tables({ data, disconnected, selection, onSelect, recordLink, op
 
   if (collapsed) {
     return (
-      <section className="st-glass st-table st-table-collapsed" aria-label="공정 기록">
+      <section className="st-glass st-table st-table-collapsed" aria-label="공정 기록" {...drag}>
         <button type="button" className={`st-table-summary${disconnected ? ' st-stale' : ''}`} aria-expanded={false} onClick={() => setCollapsed(false)}>
           <span className="st-panel-icon" aria-hidden="true">
             <Icon name="batch" size={15} />
@@ -840,7 +892,7 @@ export function Tables({ data, disconnected, selection, onSelect, recordLink, op
   }
   return (
     <section className="st-glass st-table" aria-label="공정 기록">
-      <div className="st-table-head">
+      <div className="st-table-head" {...drag}>
         <span className="st-panel-icon" aria-hidden="true">
           <Icon name="batch" size={15} />
         </span>
@@ -901,6 +953,8 @@ const SHEET_TABS: Array<{ key: SheetTab; label: string }> = [
 export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActions, recordLink, openRecord }: DetailProps & { openRecord?: RecordOpen }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<SheetTab>('batches');
+  // 손잡이·공정 막대·접힌 요약 줄을 끌어서 여닫는다 (펼친 안쪽 내용은 따로 스크롤된다)
+  const drag = useDragToggle(setOpen);
   useEffect(() => {
     if (selection) setOpen(true);
   }, [selection]);
@@ -917,16 +971,19 @@ export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActi
   const common = { data, disconnected, selection, onSelect };
   return (
     <section className={`st-glass st-sheet${open ? ' st-sheet-open' : ''}`} aria-label="공정 정보">
-      <button type="button" className="st-sheet-handle" aria-expanded={open} aria-label={open ? '공정 정보 접기' : '공정 정보 펼치기'} onClick={() => setOpen(!open)}>
-        <i aria-hidden="true" />
-      </button>
-      <TrackerBar data={data} disconnected={disconnected} />
-      {!open ? (
-        <button type="button" className={`st-sheet-summary${disconnected ? ' st-stale' : ''}`} onClick={() => setOpen(true)}>
-          {summary}
-          <Icon name="chevron" size={16} />
+      <div className="st-sheet-grip" {...drag}>
+        <button type="button" className="st-sheet-handle" aria-expanded={open} aria-label={open ? '공정 정보 접기' : '공정 정보 펼치기'} onClick={() => setOpen(!open)}>
+          <i aria-hidden="true" />
         </button>
-      ) : selection ? (
+        <TrackerBar data={data} disconnected={disconnected} />
+        {!open && (
+          <button type="button" className={`st-sheet-summary${disconnected ? ' st-stale' : ''}`} onClick={() => setOpen(true)}>
+            {summary}
+            <Icon name="chevron" size={16} />
+          </button>
+        )}
+      </div>
+      {!open ? null : selection ? (
         <div className="st-sheet-body">
           <Detail {...common} deviceActions={deviceActions} recordLink={recordLink} bare />
         </div>
