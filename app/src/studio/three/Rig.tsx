@@ -47,6 +47,8 @@ const MAX_DIST = 150;
 const MIN_POL = 24;
 const MAX_POL = 74;
 const GLIDE = 2.3;
+/** 손가락·마우스로 끄는 동안의 따라오는 속도: 느슨하면 손이 움직인 만큼 화면이 따라오지 않고 미끄러진다 */
+const DRAG_GLIDE = 22;
 /** 대상을 볼 때의 천정각 */
 const FOCUS_POLAR = 52;
 
@@ -112,6 +114,7 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
     goal.current.pol = FOCUS_POLAR;
   }, [focusKey]);
 
+  const touching = useRef(false);
   useEffect(() => {
     const el = gl.domElement;
     const pointers = new Map<number, { x: number; y: number }>();
@@ -122,6 +125,7 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
 
     const down = (e: PointerEvent) => {
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      touching.current = true;
       rotating = e.button === 2 || e.shiftKey || e.ctrlKey;
       el.setPointerCapture(e.pointerId);
       if (pointers.size === 2) {
@@ -159,6 +163,7 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
     };
     const up = (e: PointerEvent) => {
       pointers.delete(e.pointerId);
+      touching.current = pointers.size > 0;
       pinch = 0;
     };
     const wheel = (e: WheelEvent) => {
@@ -198,7 +203,7 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
       g.y = anchor.current.y;
       g.z = anchor.current.z;
     }
-    const k = 1 - Math.exp(-Math.min(delta, 0.1) * GLIDE);
+    const k = 1 - Math.exp(-Math.min(delta, 0.1) * (touching.current ? DRAG_GLIDE : GLIDE));
     c.x += (g.x - c.x) * k;
     c.y += (g.y - c.y) * k;
     c.z += (g.z - c.z) * k;

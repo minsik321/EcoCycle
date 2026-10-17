@@ -73,17 +73,23 @@ const HOME_MODE_KEY = 'ecocycle.homeMode';
 const OLD_HOME_TAB_KEY = 'ecocycle.homeTab';
 const OLD_HOME_VIEW_KEY = 'ecocycle.homeView';
 
+/** 고른 적이 없을 때의 홈: 폰(짧은 변 600px 미만)은 대시보드, 그 밖은 3D (2026-10-17 사용자 요청) */
+function defaultHomeMode(): HomeMode {
+  return typeof window !== 'undefined' && Math.min(window.innerWidth, window.innerHeight) < 600 ? 'dashboard' : '3d';
+}
+
 /**
  * 기억한 홈 모드. 새 키가 없으면 옛 키를 옮긴다: 2D 카드(homeView = cards)를 골랐던 기기는 대시보드,
  * 그 밖(3D를 골랐거나 기본·스튜디오 탭만 남은 기기)은 3D. 옮긴 뒤 옛 키는 지운다.
  */
 export function loadHomeMode(): HomeMode {
+  const fallback = defaultHomeMode();
   try {
     const saved = localStorage.getItem(HOME_MODE_KEY);
     if (saved === '3d' || saved === 'dashboard') return saved;
     const oldView = localStorage.getItem(OLD_HOME_VIEW_KEY);
     const hadOld = oldView !== null || localStorage.getItem(OLD_HOME_TAB_KEY) !== null;
-    const mode: HomeMode = oldView === 'cards' ? 'dashboard' : '3d';
+    const mode: HomeMode = oldView === 'cards' ? 'dashboard' : fallback;
     if (hadOld) {
       localStorage.setItem(HOME_MODE_KEY, mode);
       localStorage.removeItem(OLD_HOME_VIEW_KEY);
@@ -91,7 +97,7 @@ export function loadHomeMode(): HomeMode {
     }
     return mode;
   } catch {
-    return '3d';
+    return fallback;
   }
 }
 
@@ -104,15 +110,31 @@ export function saveHomeMode(mode: HomeMode): void {
 }
 
 // 로그아웃으로 초기화될 때도 기억해 둔 화질 모드를 그대로 쓰도록 함수로 만든다
-const initialState = (): UiState => ({
-  selectedDeviceId: null,
-  cctvOpen: false,
-  recordPopupOpen: false,
-  qualityMode: loadQualityMode(),
-  qualityAuto: loadSavedQuality() === null,
-  qualityChosen: loadQualityChosen(),
-  homeMode: loadHomeMode(),
-});
+// 2026-10-17 화질 규칙이 바뀌었다(기본 high). 예전 규칙으로 잰 자동 값은 한 번 버려 새로 잰다. 직접 고른 값은 둔다.
+const QUALITY_RULE_KEY = 'ecocycle.qualityRule';
+const QUALITY_RULE = '2';
+function dropStaleAutoQuality(): void {
+  try {
+    if (localStorage.getItem(QUALITY_RULE_KEY) === QUALITY_RULE) return;
+    localStorage.setItem(QUALITY_RULE_KEY, QUALITY_RULE);
+    if (localStorage.getItem(QUALITY_CHOSEN_KEY) !== '1') localStorage.removeItem(QUALITY_KEY);
+  } catch {
+    // 저장소를 못 써도 앱은 동작한다
+  }
+}
+
+const initialState = (): UiState => {
+  dropStaleAutoQuality();
+  return {
+    selectedDeviceId: null,
+    cctvOpen: false,
+    recordPopupOpen: false,
+    qualityMode: loadQualityMode(),
+    qualityAuto: loadSavedQuality() === null,
+    qualityChosen: loadQualityChosen(),
+    homeMode: loadHomeMode(),
+  };
+};
 
 const slice = createSlice({
   name: 'ui',

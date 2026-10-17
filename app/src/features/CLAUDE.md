@@ -25,7 +25,7 @@
 
 위 표의 화면은 모두 2D로 구현했고, 2단계에서 홈에 3D 장면(`app/src/studio`)을 얹었다. 처음 만든 3D 장면(`scene/`, 홈의 "기본" 탭)은 2026-10-14에 삭제했다(`docs/decisions.md`).
 
-- `home/HomePage.tsx`, `home/HomeSwitch.tsx`: 맨 위 전환 하나 "3D | 대시보드". 고른 쪽은 기기에 기억하고(`ui.homeMode`, `ecocycle.homeMode`, 기본 3D) 옛 키(`homeTab`·`homeView`)는 처음 읽을 때 옮긴다. 3D는 `app/src/studio`를 lazy로 불러와 홈 화면 전체를 쓰고(패널이 먼저, 3D 장면은 그 아래에 나중에), 전환은 앱 상단 바(`components/layout/TopBar`)의 가운데 칸에 들어간다(3D는 3D 위에 뜬 같은 바, 대시보드는 틀의 바에 `useHeaderSlot` 포털, 폰에서도 바로 보임). 그래픽(WebGL)을 못 쓰거나 3D에서 오류가 나면 기억한 값은 두고 대시보드로 보여 주며 짧게 알린다("3D"는 누를 수 없게).
+- `home/HomePage.tsx`, `home/HomeSwitch.tsx`: 맨 위 전환 하나 "3D | 대시보드". 고른 쪽은 기기에 기억하고(`ui.homeMode`, `ecocycle.homeMode`, 고른 적이 없으면 폰은 대시보드·그 밖은 3D) 옛 키(`homeTab`·`homeView`)는 처음 읽을 때 옮긴다. 3D는 `app/src/studio`를 lazy로 불러와 홈 화면 전체를 쓰고(패널이 먼저, 3D 장면은 그 아래에 나중에), 전환은 앱 상단 바(`components/layout/TopBar`)의 가운데 칸에 들어간다(3D는 3D 위에 뜬 같은 바, 대시보드는 틀의 바에 `useHeaderSlot` 포털, 폰에서도 바로 보임). 그래픽(WebGL)을 못 쓰거나 3D에서 오류가 나면 기억한 값은 두고 대시보드로 보여 주며 짧게 알린다("3D"는 누를 수 없게).
 - `home/useStudioPrefetch.ts`: 앱 틀(`App.tsx`)이 쓴다. 홈을 3D로 기억한 기기면 로그인 화면에서 한가할 때 3D 파일(정적 파일만)을 미리 받는다(`studio/preload.ts`). 로그인 전에는 API·WebSocket을 부르지 않는다.
 - `home/dashboard/`: 대시보드 홈(`Dashboard.tsx`, 값 고르기 `dashboardData.ts`). three.js를 import하지 않는다. 공정 문구·6단계 계산은 3D 홈과 함께 쓰는 `config/processDisplay.ts`, 추이선은 `store/usePlantTrends.ts`. `features/home`은 `studio`를 정적으로 import하지 않는다(예외: three를 import하지 않는 `studio/three/stats`와 `studio/preload`).
 - `home/SceneDemoPage.tsx`: 서버·로그인 없이 3D 홈만 보여 주는 시연·프레임 측정 화면(`/scene-demo`). 값은 예시이고 화면에 그렇게 표시한다. 이 주소를 열 때만 불러온다(lazy).

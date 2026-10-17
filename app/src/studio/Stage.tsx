@@ -107,19 +107,17 @@ function WarmUp({ onReady }: { onReady?: () => void }) {
   return null;
 }
 
-// 임시 진단 스위치(폰에서만 검게 나오는 로봇팔 원인 찾기): 주소에 ?noao=1 (주변 차폐 끔), ?noshadow=1 (실시간 그림자 끔). 원인을 찾으면 지운다.
-const DEBUG_FLAGS = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search);
-const NO_AO = DEBUG_FLAGS.has('noao');
-const NO_SHADOW = DEBUG_FLAGS.has('noshadow');
+// 손가락이 주된 입력인 기기(폰·태블릿)에서는 N8AO(주변 차폐)를 쓰지 않는다: 아이폰에서 로봇팔이 통째로 검게 나왔다
+// (2026-10-17 실기기 확인: 주변 차폐를 끄면 정상). 그림자 지도와 나머지 후처리는 그대로 쓴다.
+const TOUCH_DEVICE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
 /** 단계에 맞는 후처리 묶음. low는 쓰지 않는다 */
 function Post({ profile, frozen }: { profile: StudioProfile; frozen: boolean }) {
   const effects: ReactElement[] = [];
-  if (NO_AO) {
-    // 진단용: 주변 차폐 없이
-  } else
   // 주변 차폐는 첫 스튜디오 시안의 세기: 형태마다 분명하고 부드러운 그늘
-  if (profile.ao === 'n8ao') effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.6} quality="high" color="#4c566b" />);
+  if (TOUCH_DEVICE) {
+    // 터치 기기는 주변 차폐 없이 (위 설명)
+  } else if (profile.ao === 'n8ao') effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.6} quality="high" color="#4c566b" />);
   else effects.push(<N8AO key="ao" aoRadius={1.5} distanceFalloff={1.1} intensity={2.5} quality="low" halfRes color="#4c566b" />);
   if (profile.bloom) effects.push(<Bloom key="bloom" mipmapBlur luminanceThreshold={1.05} luminanceSmoothing={0.2} intensity={0.5} radius={0.7} />);
   if (profile.tiltShift) effects.push(<TiltShift2 key="tilt" blur={0.022} taper={0.7} />);
@@ -136,7 +134,7 @@ function Post({ profile, frozen }: { profile: StudioProfile; frozen: boolean }) 
 }
 
 function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, selection, onSelect, pins, routeKeys, rig, inset, balerStatus, grades, onReady }: StageProps) {
-  const profile = NO_SHADOW ? { ...STUDIO_PROFILES[tier], shadowMap: 0 as const } : STUDIO_PROFILES[tier];
+  const profile = STUDIO_PROFILES[tier];
   const motion = useMemo(() => new Motion(), []);
   const baked = profile.shadowMap === 0;
 
