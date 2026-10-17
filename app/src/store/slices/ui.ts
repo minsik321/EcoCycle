@@ -112,7 +112,7 @@ export function saveHomeMode(mode: HomeMode): void {
 // 로그아웃으로 초기화될 때도 기억해 둔 화질 모드를 그대로 쓰도록 함수로 만든다
 // 2026-10-17 화질 규칙이 바뀌었다(기본 high). 예전 규칙으로 잰 자동 값은 한 번 버려 새로 잰다. 직접 고른 값은 둔다.
 const QUALITY_RULE_KEY = 'ecocycle.qualityRule';
-const QUALITY_RULE = '2';
+const QUALITY_RULE = '3';
 function dropStaleAutoQuality(): void {
   try {
     if (localStorage.getItem(QUALITY_RULE_KEY) === QUALITY_RULE) return;

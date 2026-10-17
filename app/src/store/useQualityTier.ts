@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { tierFromProbe } from '../config/quality';
+import { PROBE_START_DELAY_MS, tierFromProbe } from '../config/quality';
 import { useAppDispatch, useAppSelector } from './hooks';
 import { measureFps } from './qualityProbe';
 import { qualityProbed } from './slices/ui';
@@ -21,12 +21,21 @@ export function useQualityTier(): void {
   useEffect(() => {
     if (!auto) return;
     let cancelled = false;
-    void measureFps().then((fps) => {
-      if (cancelled || fps === null) return;
-      dispatch(qualityProbed(tierFromProbe(fps, navigator.hardwareConcurrency)));
-    });
+    // 앱이 막 뜨는 동안(내려받기·화면 만들기)에는 프레임이 일시적으로 떨어져 한 번 잰 값이 실제보다 낮게 나온다.
+    // 한가해진 뒤 두 번 재서 높은 쪽을 쓴다. 한 번의 나쁜 측정이 기기에 저장되어 계속 저사양으로 시작하는 것을 막는다.
+    const timer = setTimeout(() => {
+      void (async () => {
+        const first = await measureFps();
+        const second = cancelled ? null : await measureFps();
+        if (cancelled) return;
+        const samples = [first, second].filter((fps): fps is number => fps !== null);
+        if (samples.length === 0) return;
+        dispatch(qualityProbed(tierFromProbe(Math.max(...samples), navigator.hardwareConcurrency)));
+      })();
+    }, PROBE_START_DELAY_MS);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [auto, dispatch]);
 }
