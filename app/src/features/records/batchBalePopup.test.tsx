@@ -138,7 +138,7 @@ describe('섹터 지정 중인 배치: 계획 배합과 실제 배합', () => {
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText('A1 55% · B1 45%')).toBeInTheDocument();
     expect(within(dialog).getByText('계획 배합')).toBeInTheDocument();
-    expect(within(dialog).getByText('섹터 지정 반영')).toBeInTheDocument();
+    expect(within(dialog).getByText('실제 배합 반영')).toBeInTheDocument();
     expect(within(dialog).getByText('지정 B1')).toBeInTheDocument();
     expect(within(dialog).getByText('지정 해제')).toBeInTheDocument();
     expect(within(dialog).getAllByText(/관리자\(모의\)/)).toHaveLength(2);

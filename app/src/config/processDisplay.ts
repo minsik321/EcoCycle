@@ -46,7 +46,7 @@ export const partsText = (parts: readonly MixPart[]): string => parts.map((m) =>
 export const sectorsText = (ids: readonly TankId[]): string => ids.map((id) => SECTOR_LABEL[id]).join(' · ');
 
 /**
- * 실제 배합 줄: 서버가 준 `actualMix`를 적는다(화면이 계산하지 않는다). 섹터 지정이 걸린 적 없는 배치(null)는 null,
+ * 실제 배합 줄: 서버가 준 `actualMix`를 적는다(화면이 계산하지 않는다). 섹터 지정·수동 투입이 없는 배치(null)는 null,
  * 아직 놓은 것이 없으면 안내 글.
  */
 export const actualMixText = (batch: Pick<Batch, 'actualMix'>): string | null =>
