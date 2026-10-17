@@ -111,6 +111,21 @@ function WarmUp({ onReady }: { onReady?: () => void }) {
 // (2026-10-17 실기기 확인: 주변 차폐를 끄면 정상). 그림자 지도와 나머지 후처리는 그대로 쓴다.
 const TOUCH_DEVICE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
+// 임시 진단 스위치(기본 화질에서만 로봇팔이 검게 나오는 원인 찾기). 원인을 찾으면 지운다.
+//   ?dpr=1.5|2 화면 배율 상한 · ?fps=0|30 프레임 상한(0은 없음) · ?bloom=1 빛 번짐 켬 · ?tilt=1 얕은 심도 켬
+const DEBUG = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search);
+function withDebug(base: StudioProfile): StudioProfile {
+  const dpr = Number(DEBUG.get('dpr'));
+  const fps = DEBUG.get('fps');
+  return {
+    ...base,
+    ...(dpr > 0 ? { maxDpr: dpr } : {}),
+    ...(fps !== null && Number.isFinite(Number(fps)) ? { maxFps: Number(fps) } : {}),
+    ...(DEBUG.has('bloom') ? { bloom: true } : {}),
+    ...(DEBUG.has('tilt') ? { tiltShift: true } : {}),
+  };
+}
+
 /** 단계에 맞는 후처리 묶음. low는 쓰지 않는다 */
 function Post({ profile, frozen }: { profile: StudioProfile; frozen: boolean }) {
   const effects: ReactElement[] = [];
@@ -134,7 +149,7 @@ function Post({ profile, frozen }: { profile: StudioProfile; frozen: boolean }) 
 }
 
 function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, selection, onSelect, pins, routeKeys, rig, inset, balerStatus, grades, onReady }: StageProps) {
-  const profile = STUDIO_PROFILES[tier];
+  const profile = useMemo(() => withDebug(STUDIO_PROFILES[tier]), [tier]);
   const motion = useMemo(() => new Motion(), []);
   const baked = profile.shadowMap === 0;
 
