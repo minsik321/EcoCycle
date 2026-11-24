@@ -12,11 +12,14 @@ import { findChromium, start } from './browserKit.mjs';
 const root = path.resolve(import.meta.dirname, '../..');
 const out = path.join(root, 'docs/screenshots/top-bar');
 fs.mkdirSync(out, { recursive: true });
-const api = 'http://localhost:14019/api/v1';
-const origin = 'http://localhost:15219';
+// 포트는 환경값으로 바꿀 수 있다 (다른 점검과 함께 돌 때): TOPBAR_API_PORT, TOPBAR_APP_PORT
+const API_PORT = process.env.TOPBAR_API_PORT ?? '14019';
+const APP_PORT = process.env.TOPBAR_APP_PORT ?? '15219';
+const api = `http://localhost:${API_PORT}/api/v1`;
+const origin = `http://localhost:${APP_PORT}`;
 const COLLAPSED_KEY = 'ecocycle.studio.tableCollapsed';
-const mock = start('mock', ['run', 'start', '-w', '@ecocycle/mock-server'], root, { PORT: '14019', CORS_ORIGINS: origin }, '[mock-server]');
-const app = start('app', ['run', 'dev', '-w', '@ecocycle/app', '--', '--port', '15219', '--strictPort'], root, { VITE_API_BASE: api, VITE_WS_BASE: 'ws://localhost:14019/ws/v1/stream', VITE_USE_MOCK: 'true' }, 'Local:');
+const mock = start('mock', ['run', 'start', '-w', '@ecocycle/mock-server'], root, { PORT: API_PORT, CORS_ORIGINS: origin }, '[mock-server]');
+const app = start('app', ['run', 'dev', '-w', '@ecocycle/app', '--', '--port', APP_PORT, '--strictPort'], root, { VITE_API_BASE: api, VITE_WS_BASE: `ws://localhost:${API_PORT}/ws/v1/stream`, VITE_USE_MOCK: 'true' }, 'Local:');
 
 let browser;
 try {
@@ -45,7 +48,8 @@ try {
     await page.waitForURL((u) => u.pathname === '/');
     const shot = async (name) => {
       await page.waitForTimeout(500);
-      await page.screenshot({ path: path.join(out, `${size}-${name}.png`) });
+      // 소프트웨어 그래픽(SwiftShader)에서 3D 장면이 큰 화면은 한 장 그리는 데 오래 걸린다 (현장 사진 기준 장면, 2026-11-25)
+      await page.screenshot({ path: path.join(out, `${size}-${name}.png`), timeout: 150_000 });
       console.log(`✓ ${size} ${name}`);
     };
     // 앱 안에서 주소를 바꾼다 (새로 불러오면 로그인이 풀린다: 토큰은 메모리에만 있다)
@@ -60,7 +64,8 @@ try {
     const home3d = async () => {
       // 로그인하면 폰은 대시보드에서 시작하므로(기기별 시작 홈) 3D로 바꾼다
       const tab3d = bar.getByRole('tab', { name: '3D' });
-      await tab3d.waitFor();
+      // 3D 장면을 다시 만드는 동안(소프트웨어 그래픽) 화면이 한동안 바쁘다
+      await tab3d.waitFor({ timeout: 120_000 });
       if ((await tab3d.getAttribute('aria-selected')) !== 'true') await tab3d.click();
       await page.waitForSelector('.st-root', { timeout: 30_000 });
       await page.waitForFunction(() => !document.querySelector('.st-poster'), null, { timeout: 90_000 }).catch(() => undefined);

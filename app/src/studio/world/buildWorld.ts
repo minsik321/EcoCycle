@@ -375,9 +375,9 @@ function forestTree(k: Kit, x: number, y: number, z: number, s: number, v: numbe
     [x, y, z],
     v * 1.7,
     () => {
-      k.cyl(C.trunk, [0.08, 0.11], 0.7, [0, 0, 0], { seg: 6 });
-      k.ball(a, 0.78, [0, 1.25, 0], { scale: [1, 0.9, 1], seg: 8 });
-      k.ball(b, 0.52, [0.36, 1.72, 0.14], { seg: 7 });
+      k.cyl(C.trunk, [0.08, 0.11], 0.7, [0, 0, 0], { seg: 5 });
+      k.ball(a, 0.78, [0, 1.25, 0], { scale: [1, 0.9, 1], seg: 7 });
+      k.ball(b, 0.52, [0.36, 1.72, 0.14], { seg: 6 });
     },
     s,
   );
@@ -386,7 +386,7 @@ function forestTree(k: Kit, x: number, y: number, z: number, s: number, v: numbe
 function forest(k: Kit): void {
   const rnd = random(4021);
   const avoid = [BALE_AREAS.nw, ...HOUSE_POLYS];
-  const step = 1.6;
+  const step = 1.8;
   let n = 0;
   const xs = FOREST.map((p) => p[0]);
   const zs = FOREST.map((p) => p[1]);

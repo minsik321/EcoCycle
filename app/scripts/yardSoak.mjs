@@ -67,8 +67,9 @@ try {
   for (const shot of SHOTS) {
     await page.setViewportSize({ width: shot.width, height: shot.height });
     await page.waitForTimeout(1500);
-    await page.locator('.st-area-button').click({ timeout: 10_000 });
-    await page.getByRole('option', { name: /베일 적치/ }).click({ timeout: 10_000 });
+    // (소프트웨어 그래픽에서 장면이 무거워 클릭이 "안정될 때까지" 기다리다 멈추는 일이 있어 요소의 click()을 직접 부른다)
+    await page.locator('.st-area-button').evaluate((el) => el.click());
+    await page.getByRole('option', { name: /베일 적치/ }).first().evaluate((el) => el.click());
     await page.waitForTimeout(5000);
     await page.screenshot({ path: path.join(outDir, `yard-after-${MINUTES}min-${shot.name}.png`) });
   }

@@ -154,7 +154,7 @@ export class Kit {
 
   /** 공(scale로 눌러 타원체로). center는 중심 */
   ball(hex: string, radius: number, center: Vec3, o: PartOptions = {}): this {
-    this.add(new SphereGeometry(radius, o.seg ?? 16, Math.max(8, Math.round((o.seg ?? 16) * 0.7))), hex, center, 0, o);
+    this.add(new SphereGeometry(radius, o.seg ?? 16, Math.max(5, Math.round((o.seg ?? 16) * 0.7))), hex, center, 0, o);
     return this;
   }
 
