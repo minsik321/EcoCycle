@@ -56,6 +56,8 @@ export const C = {
   /** 압축기 건물의 파란 지붕 (사진의 파란 지붕): 본동, 옆동·골판 줄 */
   roofBlue: '#4f8fe0',
   roofBlueDeep: '#2f6fc4',
+  /** 사무실 지붕: 사진처럼 짙은 회색 */
+  roofOffice: '#8e98a7',
   skin: '#f0c4a0',
   /** 작업자 조끼도 안전 노랑 */
   vest: '#ffc31f',

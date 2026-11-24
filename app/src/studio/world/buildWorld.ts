@@ -229,7 +229,7 @@ function office(k: Kit): void {
   k.at([OFFICE.center[0], 0, OFFICE.center[1]], SITE_ROT_Y, () => {
     k.box(C.concreteDark, [w + 0.5, 0.08, d + 0.5], [0, 0, 0], { r: 0.03 });
     k.box(C.wall, [w, height, d], [0, 0.08, 0], { r: 0.14, seg: 4 });
-    k.box(C.roof, [w + 0.24, 0.16, d + 0.24], [0, height + 0.04, 0], { r: 0.07, seg: 3 });
+    k.box(C.roofOffice, [w + 0.24, 0.16, d + 0.24], [0, height + 0.04, 0], { r: 0.07, seg: 3 });
     edgeX(k, -w / 2 - 0.12, w / 2 + 0.12, height + 0.17, d / 2 + 0.12);
     edgeZ(k, -d / 2 - 0.12, d / 2 + 0.12, height + 0.17, -w / 2 - 0.12);
     edgeY(k, -w / 2 - 0.01, d / 2 + 0.01, 0.08, height + 0.1);

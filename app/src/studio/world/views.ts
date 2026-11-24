@@ -37,7 +37,7 @@ export const TOP_VIEW: ViewPreset = { key: 'top', label: '위에서 보기', hin
 
 /** 구역(mid). 첫 번째가 기본 화면이다 */
 export const AREAS: readonly ViewPreset[] = [
-  { key: 'process', label: '섹터·로봇', hint: '섹터 A·C 더미, 로봇팔', tier: 'mid', at: [222, 352], height: 0.4, distance: 44, azimuth: 26, polar: 50 },
+  { key: 'process', label: '섹터·로봇', hint: '섹터 A·C 더미, 로봇팔', tier: 'mid', at: [210, 372], height: 0.4, distance: 44, azimuth: 26, polar: 50 },
   { key: 'inbound', label: '입구·계근대', hint: '입차, 계근, 번호판 인식, 출차', tier: 'mid', at: [462, 272], height: 0, distance: 42, azimuth: 30, polar: 50 },
   { key: 'baler', label: '압축기·레일', hint: '경사 레일, 압축기 건물, 배출구', tier: 'mid', at: [160, 440], height: 0.6, distance: 40, azimuth: 18, polar: 50 },
   { key: 'bales', label: '베일 적치', hint: '남동 적치, 지게차, 상차(예시)', tier: 'mid', at: [338, 378], height: 0.2, distance: 50, azimuth: 30, polar: 50 },
