@@ -1,0 +1,38 @@
+{
+  "defaultBranch": "main",
+  "unitIdPattern": "^[A-Z][0-9]+[a-z]?$",
+  "verify": [
+    {
+      "paths": ["shared/**", "mock-server/**", "app/**", "package.json", "package-lock.json", "vercel.json"],
+      "cwd": ".",
+      "commands": ["npm run typecheck", "npm run test", "npm run build"]
+    },
+    {
+      "paths": ["shared/**", "mock-server/**", "app/src/api/**", "app/src/realtime/**", "app/src/store/**", "app/src/integration/**", "app/scripts/integration.mjs", "app/scripts/authReload.mjs"],
+      "cwd": ".",
+      "commands": ["npm run test:integration"],
+      "alone": true
+    }
+  ],
+  "review": [
+    "CLAUDE.md#전체 공통 규칙 1~9 (권한은 서버, 위험 조작은 기기 페이지만, 비상정지 금지, 연결 끊김 표시, 값 규칙, 기기 ID 고정, 화질 3단계, 가정값은 app/src/config)",
+    "작업한 폴더의 CLAUDE.md 규칙을 따랐는가 (app/src/studio/는 그 폴더의 고정 규칙 여섯 가지 + 공통 규칙 1~6·8·9·7)",
+    "API 형식 변경은 명세 → shared → mock-server → app 순서이고 docs/dashboard-spec.md와 1:1인가",
+    "명세 6절 권한 표와 app/src/test/permissionMatrix.ts가 줄·✓✗까지 같은가",
+    "docs/ 는 메인 AI와 사용자만 수정 — 작업 단위가 docs/를 고쳤으면 되돌리고 PR 본문에 필요한 수정을 적게 한다",
+    "카메라 조작 범위(부지 밖 이동, ±35도 초과 회전, 자유 회전·핀치 확대 금지), 토큰을 URL에 넣지 않음",
+    "UI 변경은 해당 점검 스크립트(app/scripts/*.mjs, CLAUDE.md 명령어 표)를 돌리고 스크린샷을 PR에 첨부; 스크립트를 추가·변경했으면 CLAUDE.md 명령어 표 수정 필요를 PR에 적는다"
+  ],
+  "prompt": {
+    "language": "en",
+    "extra": [
+      "Read CLAUDE.md and the CLAUDE.md of every folder you touch before editing. docs/dashboard-spec.md is the single source of truth; if the implementation must differ from it, stop and report instead of changing code.",
+      "Do not edit docs/. Put needed doc/decision changes in the PR body under '문서 수정 필요'.",
+      "Commit titles: <type>(<area>): <Korean summary>, e.g. fix(robot): 수동 투입을 배치 배합에 반영. Code identifiers in English, comments in Korean.",
+      "No GitHub Actions CI: run the local verify commands and paste totals in the PR body. Browser checks (test:integration, app/scripts/*.mjs) need local Chromium; run them alone, not in parallel. If Windows reserves port 4099 use INTEGRATION_PORT=4399.",
+      "Do not decide open questions (docs/questions.md); proceed with the prototype assumptions in docs/dashboard-spec.md."
+    ]
+  },
+  "parallel": { "maxPhases": 3 },
+  "models": { "audit": "opus", "design": "opus", "simple": "sonnet", "review": "codex" }
+}

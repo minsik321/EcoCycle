@@ -22,3 +22,9 @@ app/scripts/.loadtime/
 
 # 로컬 개발 서버 로그
 dev-server.*.log
+
+# Claude·오케스트레이션 (기기 전용)
+.claude/settings.local.json
+.claude/workflow.local.json
+.claude/scheduled_tasks.lock
+.wf-loop/
