@@ -23,7 +23,7 @@ interface ExampleRecord {
 }
 
 const COMPANIES = ['한빛자원', '동해페이퍼', '새솔리싸이클'];
-const SECTORS = ['A1', 'A2', 'B1', 'B2'];
+const SECTORS = ['A', 'C'];
 
 /** 최근 7일에 흩어진 예시 기록 (같은 값이 나오도록 고정된 규칙으로 만든다) */
 function exampleRecords(now: number): ExampleRecord[] {
@@ -32,7 +32,7 @@ function exampleRecords(now: number): ExampleRecord[] {
     ts: new Date(now - (i * 4.3 + 0.2) * 60 * 60 * 1000).toISOString(),
     plate: `${12 + (i % 7)}가 ${String(3456 + i * 37).slice(-4)}`,
     company: COMPANIES[i % COMPANIES.length]!,
-    sector: SECTORS[(i * 3) % SECTORS.length]!,
+    sector: SECTORS[i % SECTORS.length]!,
     netT: Math.round((6.2 + ((i * 7) % 23) / 10) * 10) / 10,
   }));
 }

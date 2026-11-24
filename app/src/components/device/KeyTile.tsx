@@ -10,7 +10,7 @@ export interface KeyTileProps {
   sub?: string;
   /** 최근 24시간 추이(오래된 것부터). 숫자가 아닌 값(모드 등)에는 넣지 않는다 */
   trend?: readonly number[];
-  /** 글로 된 값(예: "A2 집기", "결속·배출")은 'text': 숫자보다 작게 적어 반 칸에서 꺾이지 않게 한다 */
+  /** 글로 된 값(예: "C 집기", "결속·배출")은 'text': 숫자보다 작게 적어 반 칸에서 꺾이지 않게 한다 */
   kind?: 'number' | 'text';
   /** 작은 게이지: 지금 값과 목표 눈금의 위치(0~1). 값이 목표와 같은 숫자를 다시 그리지 않고 막대로만 보여 준다 */
   gauge?: { fraction: number; target?: number | null };

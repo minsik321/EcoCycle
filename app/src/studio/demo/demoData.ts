@@ -11,15 +11,15 @@ const iso = (ms: number) => new Date(ms).toISOString();
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 const COMPANIES: Array<{ name: string; sectorId: TankId; plate: string }> = [
-  { name: '예시자원', sectorId: 'tank-a2', plate: '12가 3456' },
-  { name: '예시페이퍼', sectorId: 'tank-b1', plate: '34다 7781' },
-  { name: '예시리싸이클', sectorId: 'tank-a1', plate: '56마 2098' },
-  { name: '예시환경', sectorId: 'tank-b2', plate: '78사 5127' },
+  { name: '예시자원', sectorId: 'sector-a', plate: '12가 3456' },
+  { name: '예시페이퍼', sectorId: 'sector-c', plate: '34다 7781' },
+  { name: '예시리싸이클', sectorId: 'sector-a', plate: '56마 2098' },
+  { name: '예시환경', sectorId: 'sector-c', plate: '78사 5127' },
 ];
 const MIXES: Array<[TankId, number, TankId, number]> = [
-  ['tank-a1', 40, 'tank-b1', 60],
-  ['tank-a2', 50, 'tank-b2', 50],
-  ['tank-b1', 30, 'tank-a2', 70],
+  ['sector-a', 40, 'sector-c', 60],
+  ['sector-a', 50, 'sector-c', 50],
+  ['sector-c', 30, 'sector-a', 70],
 ];
 
 const VEHICLE_EVERY = 40;
@@ -138,17 +138,15 @@ export function demoData(startMs: number, tSec: number): StudioData {
       fillPercent: fill,
       volumeM3: round1(fill * 0.08),
       capacityM3: 8,
-      moisturePercent: round1(11 + (id.charCodeAt(6) % 4) * 0.5),
+      moisturePercent: round1(11 + (id.charCodeAt(7) % 4) * 0.5),
       cautionThresholdPercent: 80,
       updatedAt: iso(now),
     };
   };
   const pose = demoPose(tSec);
   const devices: Partial<Record<DeviceId, DeviceState>> = {
-    'tank-a1': tank('tank-a1', 'A1', 62, 37),
-    'tank-a2': tank('tank-a2', 'A2', 48, 53),
-    'tank-b1': tank('tank-b1', 'B1', 40, 61),
-    'tank-b2': tank('tank-b2', 'B2', 66, 43),
+    'sector-a': tank('sector-a', 'A', 62, 37),
+    'sector-c': tank('sector-c', 'C', 48, 53),
     'robot-1': { id: 'robot-1', type: 'robot', status: 'running', mode: 'auto', pinnedSectors: [], pickRecordsRevision: 0, phase: pose.phase, targetTankId: pose.targetTankId, heldSectorId: pose.gripper.holding ? pose.targetTankId : null, gripper: pose.gripper, updatedAt: iso(now) },
     'conveyor-z': { id: 'conveyor-z', type: 'conveyor', status: 'normal', running: true, loadPercent: 50, itemsToBaler: 2, updatedAt: iso(now) },
     'compressor-1': {

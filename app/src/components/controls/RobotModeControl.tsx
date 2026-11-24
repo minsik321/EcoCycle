@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
-import { TANK_IDS } from '@ecocycle/shared';
+import { PINNED_SECTORS_MAX, PINNED_SECTORS_MIN, TANK_IDS, isValidPinnedSectors } from '@ecocycle/shared';
 import type { Command, CommandType, DeviceStatus, RobotMode, RobotState, TankId } from '@ecocycle/shared';
 import { CONTROL_TEXT, canUse, controlsFor } from '../../config/controls';
 import { DEVICE_NAMES, ROBOT_MODE_HELP, ROBOT_MODE_ORDER, ROBOT_MODE_TEXT, formatLocalClock } from '../../config/display';
@@ -47,7 +47,7 @@ export interface RobotModeControlProps {
  * - 칸을 고르는 것은 초안이다. 서버가 확정한 모드에는 "지금" 표시가 붙고, 명령은 "적용"을 눌러 확인 단계를 거쳐야 나간다.
  *   "적용"은 줄 하나를 차지하지 않는다: 태블릿·데스크톱은 세 칸 오른쪽, 폰(과 패널)은 섹터 칩 줄의 마지막 칩(지정 모드), 그 밖에는 안내 글 오른쪽.
  *   바꾼 것이 없으면 비활성.
- * - 수동: 한 사이클을 두 번 나눠 조작한다. "집기"(고른 섹터에서 집어 듦) → "컨베이어에 놓기". 사이의 상태("A1에서 집음 · 놓기 대기")를 보여 주고,
+ * - 수동: 한 사이클을 두 번 나눠 조작한다. "집기"(고른 섹터에서 집어 듦) → "컨베이어에 놓기". 사이의 상태("A에서 집음 · 놓기 대기")를 보여 주고,
  *   들고 있는 동안 "집기"는, 들고 있지 않은 동안 "컨베이어에 놓기"는 비활성이다. 순서는 서버가 다시 검사한다(409).
  * - 위험 조작이라 모두 확인 단계(confirm: true)를 거친다. 권한·연결로 막는 것은 표시일 뿐이고 차단은 서버가 한다.
  * - 기기 페이지는 로봇 조작 권한이 하나도 없으면(열람자) 그리지 않고, 3D 홈 패널은 이 조작들(robot.manual)의 권한이 없으면 그리지 않는다.
@@ -162,7 +162,7 @@ function ModeEditor({ robot, blocked, inline, canMode, canPick, canPlace }: Mode
   const groupId = useId();
   const segments = useRef<Array<HTMLButtonElement | null>>([]);
 
-  // 섹터 칩은 서버 순서(A1·A2·B1·B2)로 보낸다
+  // 섹터 칩은 서버 순서(A·C)로 보낸다
   const orderedPins = useMemo(() => TANK_IDS.filter((id) => pins.includes(id)), [pins]);
 
   useEffect(() => {
@@ -201,7 +201,7 @@ function ModeEditor({ robot, blocked, inline, canMode, canPick, canPlace }: Mode
 
   // 같은 모드(지정 모드는 같은 섹터)면 적용할 것이 없다
   const unchanged = draft === robot.mode && (draft !== 'auto_pinned' || sameSet(orderedPins, robot.pinnedSectors));
-  const noPins = draft === 'auto_pinned' && orderedPins.length === 0;
+  const noPins = draft === 'auto_pinned' && !isValidPinnedSectors(orderedPins);
   const applyReason = modeReason ?? (noPins ? '섹터를 1개 이상 고르세요' : unchanged ? '바꾼 것이 없습니다' : null);
   const applyDisabled = modeDisabled || modePending || unchanged || noPins;
   const applyReasonId = `${groupId}-apply-reason`;
@@ -283,8 +283,12 @@ function ModeEditor({ robot, blocked, inline, canMode, canPick, canPlace }: Mode
 
       {draft === 'auto_pinned' && (
         <fieldset className="flex flex-col gap-2" disabled={modeDisabled || modePending}>
-          <legend className="mb-2 text-sm font-semibold text-ink">집을 섹터 (여러 개)</legend>
-          <div className={`grid gap-2 ${applyPlace === 'chips' ? 'grid-cols-5' : 'grid-cols-4'}`}>
+          <legend className="mb-2 text-sm font-semibold text-ink">집을 섹터 ({PINNED_SECTORS_MIN}~{PINNED_SECTORS_MAX}곳)</legend>
+          {/* 섹터 칩 수(+ 적용 칩)만큼 같은 폭 칸 */}
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${TANK_IDS.length + (applyPlace === 'chips' ? 1 : 0)}, minmax(0, 1fr))` }}
+          >
             {TANK_IDS.map((id) => {
               const on = pins.includes(id);
               const applied = robot.mode === 'auto_pinned' && robot.pinnedSectors.includes(id);

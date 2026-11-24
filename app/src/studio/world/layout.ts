@@ -25,10 +25,8 @@ function tip(baseDeg: number): [number, number, number] {
 
 /** 로봇이 각 섹터에서 집는 자리 (공구 끝) */
 export const PICK: Record<TankId, [number, number, number]> = {
-  'tank-a1': tip(TANK_BASE_DEG['tank-a1']),
-  'tank-a2': tip(TANK_BASE_DEG['tank-a2']),
-  'tank-b1': tip(TANK_BASE_DEG['tank-b1']),
-  'tank-b2': tip(TANK_BASE_DEG['tank-b2']),
+  'sector-a': tip(TANK_BASE_DEG['sector-a']),
+  'sector-c': tip(TANK_BASE_DEG['sector-c']),
 };
 /** 로봇이 컨베이어에 놓는 자리 */
 export const PLACE = tip(DEMO_CYCLE.conveyorBaseDeg);
@@ -40,11 +38,10 @@ export const HALL = { minX: -10, maxX: 4.7, minZ: -4, maxZ: 4, wallH: 3.3, wallT
 /** 섹터 칸: 로봇 쪽 낮은 벽(minX)에서 트럭 쪽 입구(maxX)까지. 칸막이는 Z 방향으로 1.7 간격 */
 export const BAY = { minX: 1.0, maxX: 4.5, width: 1.7, dividerH: 1.9, backH: 0.9, pileMaxH: 1.45 } as const;
 
+// 임시 맞춤(S2c): 섹터 2곳을 예전 4칸 중 바깥 두 칸 자리에 둔다. 실제 부지 배치(노천 더미)는 S2d에서 다시 만든다
 export const BAY_Z: Record<TankId, readonly [number, number]> = {
-  'tank-a1': [1.7, 3.4],
-  'tank-a2': [0, 1.7],
-  'tank-b1': [-1.7, 0],
-  'tank-b2': [-3.4, -1.7],
+  'sector-a': [1.7, 3.4],
+  'sector-c': [-3.4, -1.7],
 };
 
 export const bayCenterZ = (id: TankId): number => (BAY_Z[id][0] + BAY_Z[id][1]) / 2;

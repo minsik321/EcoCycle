@@ -146,8 +146,8 @@ export class Director {
   readonly lumps: LumpSim[] = [];
   readonly workers: WorkerSim[] = [];
   /** 섹터별 화면에 그릴 적재율 (서버 값으로 부드럽게 따라간다) */
-  readonly fill: Record<TankId, number> = { 'tank-a1': 0, 'tank-a2': 0, 'tank-b1': 0, 'tank-b2': 0 };
-  private readonly fillTarget: Record<TankId, number> = { 'tank-a1': 0, 'tank-a2': 0, 'tank-b1': 0, 'tank-b2': 0 };
+  readonly fill: Record<TankId, number> = { 'sector-a': 0, 'sector-c': 0 };
+  private readonly fillTarget: Record<TankId, number> = { 'sector-a': 0, 'sector-c': 0 };
   private fillSeen = false;
   beltOffset = 0;
   /** 램 위치 0(뒤)~1(끝까지 밂) */

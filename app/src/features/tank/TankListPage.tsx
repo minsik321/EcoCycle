@@ -11,7 +11,7 @@ import { SectorBin } from './SectorBin';
 import { SectorChips } from './SectorChips';
 import { binLabel } from './sectorText';
 
-/** 섹터 4개를 칸 그림(안에 적재율·부피)으로 한눈에 보고, 누르면 그 섹터의 기기 페이지로 간다. 폰은 한 줄에 2개. */
+/** 섹터 2곳을 노천 더미 그림(안에 적재율·부피)으로 한눈에 보고, 누르면 그 섹터의 기기 페이지로 간다. 어느 크기에서나 한 줄에 2개. */
 export function TankListPage() {
   const tanks = useAppSelector(selectTanks);
 
@@ -23,7 +23,7 @@ export function TankListPage() {
           섹터 상태를 불러오는 중…
         </p>
       ) : (
-        <ul className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-3 md:gap-4">
           {tanks.map((tank) => (
             <li key={tank.id} className="min-w-0">
               <SectorCard tank={tank} />
@@ -39,7 +39,7 @@ function SectorCard({ tank }: { tank: TankState }) {
   const { disconnected, lastReceivedAt } = useDeviceLive();
   const name = DEVICE_NAMES[tank.id];
 
-  // 상세와 같은 모양: 위에 이름·상태, 칸 그림 안에 적재율·부피, 아래에 수분·등급 칩
+  // 상세와 같은 모양: 위에 이름·상태, 더미 그림 안에 적재율·부피, 아래에 수분·등급 칩
   return (
     <Link
       to={devicePagePath(tank.id)}

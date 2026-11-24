@@ -131,7 +131,7 @@ export function DesignPage() {
             </GlassPanel>
           </div>
           <div className="mt-3 flex max-w-md flex-col gap-2">
-            <ToastCard tone="alarm" role="status" title="섹터 A1" onDismiss={() => {}}>
+            <ToastCard tone="alarm" role="status" title="섹터 A" onDismiss={() => {}}>
               적재율 95% 초과
             </ToastCard>
             <ToastCard tone="normal" title="압축기 · 시작">
@@ -156,7 +156,7 @@ export function DesignPage() {
         <Card title="글자">
           <p className="text-3xl font-bold">28.7 MPa · 지표 숫자</p>
           <p className="text-xl font-bold">화면 제목 — 스마트 폐지 처리 대시보드</p>
-          <p className="text-base">본문 — 한빛자원 차량이 섹터 A1에 하역 중입니다.</p>
+          <p className="text-base">본문 — 한빛자원 차량이 섹터 A에 하역 중입니다.</p>
           <p className="text-sm text-ink-soft">보조 — 마지막 수신 14:23:11</p>
           <p className="text-xs text-ink-faint">주석 — 실제로 할 수 있는 조작은 서버가 다시 확인합니다.</p>
         </Card>

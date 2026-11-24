@@ -7,7 +7,7 @@ import type { CompressorState, TankId, TankState } from '@ecocycle/shared';
 import { KpiCard } from '../../../components/common/KpiCard';
 import { StatusBadge } from '../../../components/status/StatusBadge';
 import { BAR_CLASS } from '../../../components/status/tone';
-import { formatLocalClock, formatPercent, formatPressureMpa } from '../../../config/display';
+import { formatLocalClock, formatPercent, formatPressureMpa, formatVolumeM3 } from '../../../config/display';
 import { devicePagePath, recordsPath } from '../../../config/navigation';
 import { BATCH_STAGE_TEXT, SECTOR_LABEL, actualMixText, cycleSteps, mixText, sectorsText } from '../../../config/processDisplay';
 import { useAppSelector } from '../../../store/hooks';
@@ -132,18 +132,21 @@ function SectorTile({ id }: { id: TankId }) {
       <div role="meter" aria-label={`섹터 ${SECTOR_LABEL[id]} 적재율`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level)} className="h-2 w-full overflow-hidden rounded-full bg-paper-deep">
         <div className={`h-full ${BAR_CLASS[status]}`} style={{ width: `${level}%` }} />
       </div>
-      <div className="flex min-w-0 items-baseline justify-between gap-2 tabular-nums">
-        <span className={`text-xl leading-none font-bold whitespace-nowrap ${live ? 'text-ink' : 'text-ink-faint'}`}>{live ? formatPercent(live.fillPercent) : '–'}</span>
-        <span className="truncate text-xs whitespace-nowrap text-ink-soft">수분 {live ? formatPercent(live.moisturePercent) : '–'}</span>
-      </div>
+      <span className={`text-2xl leading-none font-bold whitespace-nowrap tabular-nums ${live ? 'text-ink' : 'text-ink-faint'}`}>{live ? formatPercent(live.fillPercent) : '–'}</span>
+      {/* 섹터가 두 곳이라 칸이 넓다: 부피·수분·주의 기준을 이름·값 줄로 (옆 "지금 배치" 카드와 높이가 비슷하다) */}
+      <dl className="mt-auto">
+        <Row label="부피" value={live ? `${live.volumeM3.toFixed(1)} / ${formatVolumeM3(live.capacityM3)}` : '–'} />
+        <Row label="수분" value={live ? formatPercent(live.moisturePercent) : '–'} />
+        <Row label="주의 기준" value={live ? `${Math.round(live.cautionThresholdPercent)}%` : '–'} />
+      </dl>
     </Link>
   );
 }
 
 function Sectors() {
   return (
-    <Panel title="섹터" className="md:col-span-2" aside={<span className="text-xs whitespace-nowrap text-ink-faint">누르면 섹터 페이지</span>}>
-      <div className="grid grid-cols-2 gap-2">
+    <Panel title="섹터" className="flex flex-col md:col-span-2" aside={<span className="text-xs whitespace-nowrap text-ink-faint">누르면 섹터 페이지</span>}>
+      <div className="grid flex-1 grid-cols-2 gap-2">
         {TANK_IDS.map((id) => (
           <SectorTile key={id} id={id} />
         ))}
@@ -276,7 +279,7 @@ function Recent() {
 
 /**
  * 대시보드 홈. 맨 위에 전환(3D | 대시보드)과 짧은 안내(3D를 못 쓸 때), 그 아래 열린 알람, 상태 요약, 지표 3장,
- * 섹터 4칸, 지금 배치, 6단계 공정 추적, 최근 차량·베일.
+ * 섹터 2곳, 지금 배치, 6단계 공정 추적, 최근 차량·베일.
  */
 export function Dashboard({ switcher, notice }: { switcher: ReactNode; notice?: string | null }) {
   const slot = useHeaderSlot();
@@ -300,7 +303,7 @@ export function Dashboard({ switcher, notice }: { switcher: ReactNode; notice?: 
         <Kpis />
       </div>
       {/* 아래 카드: 태블릿 섹터(폭 전체) → 지금 배치 | 최근 차량·베일 → 공정 추적(폭 전체),
-          데스크톱 섹터(2칸, 2×2) | 지금 배치, 공정 추적(1칸, 세로 단계) | 최근 차량·베일(2칸). 같은 줄 카드의 내용 높이가 비슷해 빈 곳이 크지 않다 */}
+          데스크톱 섹터(2칸, 섹터 2곳 나란히) | 지금 배치, 공정 추적(1칸, 세로 단계) | 최근 차량·베일(2칸). 같은 줄 카드의 내용 높이가 비슷해 빈 곳이 크지 않다 */}
       <div className="grid min-w-0 grid-flow-row-dense grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
         <Sectors />
         <BatchCard />
