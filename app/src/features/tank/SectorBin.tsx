@@ -18,9 +18,12 @@ const VIEW = { w: X0 + W + WALL + 34, h: Y0 + H + WALL + 10 }; // 오른쪽에 �
 const FLOOR = Y0 + H;
 const EASE = '1.2s ease-in-out';
 
-// 100% 더미의 옆모습: 바닥 양 끝에서 완만하게 올라 가운데 꼭대기가 평평한 둔덕
-const MOUND = `M${X0} ${FLOOR} C${X0 + W * 0.3} ${FLOOR} ${X0 + W * 0.3} ${Y0} ${X0 + W / 2} ${Y0} C${X0 + W * 0.7} ${Y0} ${X0 + W * 0.7} ${FLOOR} ${X0 + W} ${FLOOR} Z`;
-const MOUND_TOP = `M${X0} ${FLOOR} C${X0 + W * 0.3} ${FLOOR} ${X0 + W * 0.3} ${Y0} ${X0 + W / 2} ${Y0} C${X0 + W * 0.7} ${Y0} ${X0 + W * 0.7} ${FLOOR} ${X0 + W} ${FLOOR}`;
+// 100% 더미의 옆모습: 바닥 양 끝에서 올라 위가 넓고 둥근 둔덕 (덜 차도 낮고 넓은 더미로 보이게 윗부분을 넓게)
+const MOUND_TOP =
+  `M${X0} ${FLOOR} C${X0 + W * 0.1} ${FLOOR} ${X0 + W * 0.14} ${Y0 + H * 0.12} ${X0 + W * 0.3} ${Y0 + H * 0.03}` +
+  ` Q${X0 + W / 2} ${Y0 - H * 0.05} ${X0 + W * 0.7} ${Y0 + H * 0.03}` +
+  ` C${X0 + W * 0.86} ${Y0 + H * 0.12} ${X0 + W * 0.9} ${FLOOR} ${X0 + W} ${FLOOR}`;
+const MOUND = `${MOUND_TOP} Z`;
 
 // 글자 크기별: 숫자 두 줄 높이(rem)보다 조금 큰 그림 위 여백. 100%로 차도 글자가 이 여백 안에 들어간다
 const SIZE = {
@@ -113,7 +116,7 @@ export function SectorBin({
           )}
 
           {/* 콘크리트 바닥 (칸막이·벽은 없다) */}
-          <rect x={X0 - 8} y={FLOOR} width={W + 16} height={WALL} rx={2} fill="var(--color-concrete-edge)" />
+          <rect x={X0 - 8} y={FLOOR} width={W + 16} height={WALL / 2} rx={1} fill="var(--color-concrete-shade)" />
 
           {/* 주의선: 가는 점선 (채움 위에 그어 늘 보인다), 오른쪽 바깥에 "주의"와 기준값 */}
           {caution !== null && (

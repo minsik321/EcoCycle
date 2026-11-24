@@ -37,6 +37,10 @@ try {
     await page.getByLabel('비밀번호').fill('1234');
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     await page.waitForURL((u) => u.pathname === '/');
+    // 로그인하면 태블릿·PC는 3D 홈에서 시작하므로 대시보드로 바꿔 둔다 (홈 주소가 대시보드를 그리게)
+    const dashboardTab = page.getByRole('tab', { name: '대시보드' });
+    await dashboardTab.waitFor();
+    if ((await dashboardTab.getAttribute('aria-selected')) !== 'true') await dashboardTab.click();
     const widths = {};
     for (const [name, route] of PAGES) {
       await page.evaluate((r) => {

@@ -72,7 +72,10 @@ try {
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     await page.waitForURL((u) => u.pathname === '/');
 
-    // 4. 3D 홈 지역 전환
+    // 4. 3D 홈 지역 전환 (로그인하면 폰은 대시보드에서 시작하므로 3D로 바꾼다)
+    const homeTab = page.getByRole('tab', { name: '3D' });
+    await homeTab.waitFor();
+    if ((await homeTab.getAttribute('aria-selected')) !== 'true') await homeTab.click();
     await page.locator('.st-area-dock').waitFor();
     await page.waitForTimeout(2500);
     await shot('4-3d-home');
