@@ -22,22 +22,9 @@ export interface ModelEntry {
   draco?: boolean;
 }
 
-const KENNEY = {
-  licence: 'CC0 1.0 (Kenney, www.kenney.nl)',
-  source: 'https://kenney.nl/assets/car-kit',
-  note: 'Car Kit 3.1의 GLB를 gltf-transform meshopt로 압축(텍스처 포함). 색은 불러올 때 스튜디오 색으로 바꾼다.',
-  scale: 0.54,
-  rotation: [0, Math.PI / 2, 0],
-  pivot: [0, 0, 0],
-} as const;
-
-export const MODELS = {
-  'car-sedan': { ...KENNEY, file: 'kenney-car-kit/sedan.glb', triangles: 2032 },
-  'car-suv': { ...KENNEY, file: 'kenney-car-kit/suv.glb', triangles: 2474 },
-  'car-hatchback': { ...KENNEY, file: 'kenney-car-kit/hatchback-sports.glb', triangles: 2088 },
-  'car-van': { ...KENNEY, file: 'kenney-car-kit/van.glb', triangles: 2082 },
-  'car-suv-luxury': { ...KENNEY, file: 'kenney-car-kit/suv-luxury.glb', triangles: 2086 },
-  'car-sedan-sports': { ...KENNEY, file: 'kenney-car-kit/sedan-sports.glb', triangles: 2088 },
-} as const satisfies Record<string, ModelEntry>;
-
-export type ModelKey = keyof typeof MODELS;
+/**
+ * 지금 장면이 쓰는 모델 파일은 없다: 실제 부지 배치(2026-11-24)에서 주차 차량(Kenney Car Kit)을 없앴고,
+ * 트럭·지게차·작업자·나무·소품·건물은 모두 코드로 만든 모형이다. 모델을 다시 쓰게 되면 여기에 적고 불러오기를 붙인다(studio/CLAUDE.md "모델").
+ * 미리 받기(preload.ts)는 이 목록의 파일만 받으므로, 비어 있는 동안에는 모델 파일을 받지 않는다.
+ */
+export const MODELS: Readonly<Record<string, ModelEntry>> = {};

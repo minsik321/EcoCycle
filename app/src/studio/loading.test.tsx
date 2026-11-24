@@ -93,7 +93,8 @@ describe('패널은 3D 조각을 기다리지 않는다', () => {
       const { rerender } = render(<StudioView {...props} data={EMPTY_DATA} disconnected={false} />);
       await act(() => new Promise((r) => setTimeout(r, 50)));
       expect(screen.queryByTestId('scene')).toBeNull();
-      expect(document.head.querySelector(`link[rel="prefetch"][href="${MODEL_BASE + MODELS['car-van'].file}"]`)).not.toBeNull();
+      // 파일은 받기 시작했다 (포스터 한 장은 늘 받는다)
+      expect(document.head.querySelector(`link[rel="prefetch"][href="${POSTER.wide}"], link[rel="prefetch"][href="${POSTER.tall}"]`)).not.toBeNull();
       rerender(<StudioView {...props} data={demoData(Date.now(), 30)} disconnected={false} />);
       // 같은 그리기에서는 아직 없다: 지표가 먼저 나간다
       expect(screen.queryByTestId('scene')).toBeNull();
@@ -206,9 +207,12 @@ describe('3D 홈 미리 받기 (정적 파일만)', () => {
     expect(connectionAllowsPrefetch({ effectiveType: '4g', saveData: true })).toBe(false);
   });
 
-  it('받는 것은 이 앱의 공개 정적 파일뿐이다: 빌드가 적은 3D 조각, 모델, 화면 방향에 맞는 포스터 한 장', () => {
+  it('받는 것은 이 앱의 공개 정적 파일뿐이다: 빌드가 적은 3D 조각, 목록에 있는 모델(지금은 없음), 화면 방향에 맞는 포스터 한 장', () => {
     const urls = studioPrefetchUrls();
     expect(urls).toEqual(expect.arrayContaining(['/assets/studio-a.css', '/assets/studio-b.js', '/assets/StudioScene-c.js', ...Object.values(MODELS).map((m) => MODEL_BASE + m.file)]));
+    // 장면이 쓰지 않는 모델 파일은 받지 않는다 (주차 차량을 없애 모델 목록이 비었다)
+    expect(Object.keys(MODELS)).toHaveLength(0);
+    expect(urls.filter((u) => u.startsWith(MODEL_BASE))).toEqual([]);
     expect(urls.filter((u) => u.startsWith('/studio/'))).toHaveLength(1);
     for (const url of urls) {
       expect(url).toMatch(/^\/(assets|models|studio)\//);
@@ -223,7 +227,7 @@ describe('3D 홈 미리 받기 (정적 파일만)', () => {
     expect(rel('/assets/StudioScene-c.js')?.rel).toBe('modulepreload');
     expect(rel('/assets/StudioScene-c.js')?.getAttribute('crossorigin')).toBe('');
     expect(rel('/assets/studio-a.css')?.rel).toBe('prefetch');
-    expect(rel(MODEL_BASE + MODELS['car-van'].file)?.rel).toBe('prefetch');
+    expect(rel(POSTER.wide)?.rel ?? rel(POSTER.tall)?.rel).toBe('prefetch');
     expect(document.head.querySelectorAll('script')).toHaveLength(0);
   });
 
