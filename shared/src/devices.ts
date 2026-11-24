@@ -2,12 +2,12 @@ import type { DeviceStatus, IsoTimestamp } from './common';
 import type { CompressorId, ConveyorId, DeviceId, RobotId, TankId } from './ids';
 import type { Phase, RobotMode, RobotStatus } from './robot';
 
-export type TankSection = 'A1' | 'A2' | 'B1' | 'B2';
+export type TankSection = 'A' | 'C';
 
 /** 섹터(탱크)의 등급. ⚠ 등급 종류는 가정이다 (`docs/questions.md` A8). */
 export type SectorGrade = 'A' | 'C';
 
-/** GET /devices/tank-a1/state — 무게는 쓰지 않고 부피·용량만 쓴다. */
+/** GET /devices/sector-a/state — 무게는 쓰지 않고 부피·용량만 쓴다. */
 export interface TankState {
   id: TankId;
   type: 'tank';
