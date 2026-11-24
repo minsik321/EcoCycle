@@ -1,11 +1,15 @@
 import type { BatchCommand, BatchControlState, BatchEvent, ControlledBatch, BaleDetail } from '@ecocycle/shared';
 import type { Bale, BaleRecord, Batch, BatchRecord, CompressorState, MixPart, ProcessState, RobotMode, TankId, TankState, Vehicle, VehicleRecord } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
-import type { CompanyFixture, TruckFixture } from '../fixtures/process';
+import type { BuyerFixture, CompanyFixture, OutboundTruckFixture, TruckFixture } from '../fixtures/process';
 import {
   BATCH_TIMING_SEC,
+  BUYERS,
   COMPANIES,
   MIX_RATIOS,
+  OUTBOUND_EVERY_INBOUND,
+  OUTBOUND_HISTORY,
+  OUTBOUND_TIMING_SEC,
   PICKS_PER_BATCH,
   PRESSURE_PER_MOISTURE_MPA,
   RECENT_LIMIT,
@@ -14,11 +18,12 @@ import {
 } from '../fixtures/process';
 import { publish } from './bus';
 import { addToTank, excludedTanks } from './plant';
+import type { MeasuredWeight } from './records';
 import { finishedBatchRecords, addBatchRecord, addVehicleRecord, baleIdOf, seedRecords, toVehicleRecord } from './records';
 import { devices, press, production } from './state';
-import { addUnloadRecord, fillGainPercent, weighTruck } from './unloads';
+import { addUnloadRecord, fillGainPercent, weighEmpty, weighLoaded, weighTruck } from './unloads';
 
-// 공정 흐름 시뮬레이터: 차량(입고·인식·하역·출차), 배치(계획·배합·압축), 베일(배출·출하).
+// 공정 흐름 시뮬레이터: 차량(입고: 인식·하역·출차 계근·출차, 상차: 인식·상차·출차 계근·출차), 배치(계획·배합·압축), 베일(배출·적치·상차 차량에 실려 출하).
 // 실서버에서는 서버가 정하는 값(회사·배정 섹터·배합비·목표 압력)을 fixtures의 예시로 흉내 낸다.
 // stage가 바뀔 때마다 대상 전체 상태를 보낸다 (명세 6절 "공정 흐름").
 
@@ -37,13 +42,12 @@ const compressor = () => devices['compressor-1'] as CompressorState;
 
 interface VehicleRun {
   vehicle: Vehicle;
-  company: CompanyFixture;
-  truck: TruckFixture;
-  /** 계중대 무게 (입차 때 총중량, 출차 때 공차를 잰 것으로 친다) */
-  weight: { grossT: number; tareT: number; netT: number };
-  /** 하역 직전·직후 섹터 적재율 % */
-  fillBefore: number | null;
-  fillAfter: number | null;
+  /** 입고 차량: 회사·트럭, 입차 때 정한 무게(공차는 출차 계근 때 잰 것으로 친다), 하역 직전·직후 섹터 적재율 % */
+  inbound: { company: CompanyFixture; truck: TruckFixture; weight: { grossT: number; tareT: number; netT: number }; fillBefore: number | null; fillAfter: number | null } | null;
+  /** 상차 차량: 회사·트럭, 마지막으로 베일을 실은(또는 상차를 시작한) 시각(ms) */
+  outbound: { buyer: BuyerFixture; truck: OutboundTruckFixture; lastLoadAt: number } | null;
+  /** 지금까지 잰 무게 (기록에 그대로 나간다) */
+  measured: MeasuredWeight;
   /** 지금 단계에 들어선 시각(ms) */
   stageAt: number;
 }
@@ -232,7 +236,6 @@ export function setRobotPin(sectors: TankId[] | null, actor: string): void {
   } else return;
   sendBatch(batch);
 }
-const pendingShip: { bale: Bale; at: number }[] = [];
 
 function remember<T extends { id: string }>(list: T[], item: T): void {
   const index = list.findIndex((x) => x.id === item.id);
@@ -259,6 +262,20 @@ function sendBale(bale: Bale): void {
 }
 
 // ── 차량 ──────────────────────────────────────────────────────────────
+// 입고: arrived → identified → unloading → unloaded → weighing_out(출차 계근) → departed
+// 상차: arrived → identified → loading(적치 베일을 하나씩 실음) → loaded → weighing_out → departed
+// 하역·상차가 끝나도 바로 출차하지 않는다. 출차 계근은 계근대가 비어 있을 때 시작해 VEHICLE_TIMING_SEC.weighOut(24초) 걸린다.
+
+/** 입고 차량 몇 대가 더 들어오면 상차 차량이 오나 (3~4대마다 한 대). 처음에는 입고 한 대 뒤에 바로 온다 */
+let inboundSinceOutbound = OUTBOUND_EVERY_INBOUND[0] - 1;
+let outboundAfter = OUTBOUND_EVERY_INBOUND[0];
+
+const rollOutboundAfter = () =>
+  OUTBOUND_EVERY_INBOUND[0] + Math.floor(Math.random() * (OUTBOUND_EVERY_INBOUND[1] - OUTBOUND_EVERY_INBOUND[0] + 1));
+
+/** 계근대 위에 차량이 있다 (도착·인식 또는 출차 계근 중) */
+const scaleBusy = (except?: VehicleRun) =>
+  activeRuns.some((r) => r !== except && (r.vehicle.stage === 'arrived' || r.vehicle.stage === 'identified' || r.vehicle.stage === 'weighing_out'));
 
 function setVehicleStage(run: VehicleRun, stage: Vehicle['stage'], now: number): void {
   const v = run.vehicle;
@@ -267,53 +284,129 @@ function setVehicleStage(run: VehicleRun, stage: Vehicle['stage'], now: number):
   v.updatedAt = iso(now);
   run.stageAt = now;
   if (stage === 'identified') {
-    v.plate = run.truck.plate;
-    v.companyName = run.company.name;
-    v.sectorId = run.company.sectorId;
+    v.plate = run.inbound?.truck.plate ?? run.outbound?.truck.plate ?? null;
+    v.companyName = run.inbound?.company.name ?? run.outbound?.buyer.name ?? null;
+    v.sectorId = run.inbound?.company.sectorId ?? null;
   }
-  if (stage === 'unloading') run.fillBefore = tank(run.company.sectorId).fillPercent;
-  if (stage === 'unloaded') run.fillAfter = tank(run.company.sectorId).fillPercent;
-  // 출차 계량(공차)까지 마치면 하역 기록 한 줄이 생긴다
+  if (run.inbound && stage === 'unloading') run.inbound.fillBefore = tank(run.inbound.company.sectorId).fillPercent;
+  if (run.inbound && stage === 'unloaded') run.inbound.fillAfter = tank(run.inbound.company.sectorId).fillPercent;
+  if (run.outbound && stage === 'loading') run.outbound.lastLoadAt = now;
+  // 출차 계근을 마치면 나중 값과 순중량이 생기고 기록이 남는다 (입고는 하역 기록 한 줄도)
   if (stage === 'departed') {
-    recordUnload(run);
-    addVehicleRecord(toVehicleRecord(v, run.weight));
+    if (run.inbound) {
+      run.measured = { ...run.inbound.weight };
+      recordUnload(run, run.inbound);
+    } else if (run.measured.tareT !== null) {
+      run.measured = weighLoaded(run.measured.tareT, v.baleIds.length);
+    }
+    addVehicleRecord(toVehicleRecord(v, run.measured));
   }
   sendVehicle(v);
 }
 
-/** 계중대가 비어 있고 받을 섹터가 있으면 차량 한 대를 들인다 (섹터 하나에 차량 한 대씩) */
-function spawnVehicle(now: number): void {
-  if (now - lastSpawnAt < VEHICLE_TIMING_SEC.spawnGap * 1000) return;
-  if (activeRuns.length >= 2) return;
-  if (activeRuns.some((r) => r.vehicle.stage === 'arrived' || r.vehicle.stage === 'identified')) return;
-  const busy = new Set(activeRuns.map((r) => r.company.sectorId));
+function newVehicle(kind: Vehicle['kind'], now: number): Vehicle {
+  vehicleSeq += 1;
+  lastSpawnAt = now;
+  return {
+    id: `veh-${siteDate(now)}-${pad(vehicleSeq, 3)}`,
+    kind,
+    stage: 'arrived',
+    plate: null,
+    companyName: null,
+    sectorId: null,
+    baleIds: [],
+    stageTimes: { arrived: iso(now) },
+    updatedAt: iso(now),
+  };
+}
+
+/** 받을 섹터가 있으면 입고 차량 한 대를 들인다 (섹터 하나에 차량 한 대씩) */
+function spawnInbound(now: number): void {
+  const inboundRuns = activeRuns.filter((r) => r.inbound);
+  if (inboundRuns.length >= TANK_IDS.length) return;
+  const busy = new Set(inboundRuns.map((r) => r.inbound?.company.sectorId));
   const candidates = COMPANIES.filter((c) => !busy.has(c.sectorId) && tank(c.sectorId).fillPercent < 60);
   if (candidates.length === 0) return;
   const lowest = Math.min(...candidates.map((c) => tank(c.sectorId).fillPercent));
   const company = pick(candidates.filter((c) => tank(c.sectorId).fillPercent === lowest));
-
   const truck = pick(company.trucks);
-  vehicleSeq += 1;
-  lastSpawnAt = now;
+  const weight = weighTruck(truck);
   const run: VehicleRun = {
-    vehicle: {
-      id: `veh-${siteDate(now)}-${pad(vehicleSeq, 3)}`,
-      stage: 'arrived',
-      plate: null,
-      companyName: null,
-      sectorId: null,
-      stageTimes: { arrived: iso(now) },
-      updatedAt: iso(now),
-    },
-    company,
-    truck,
-    weight: weighTruck(truck),
-    fillBefore: null,
-    fillAfter: null,
+    vehicle: newVehicle('inbound', now),
+    inbound: { company, truck, weight, fillBefore: null, fillAfter: null },
+    outbound: null,
+    measured: { grossT: weight.grossT, tareT: null, netT: null },
     stageAt: now,
   };
+  inboundSinceOutbound += 1;
   activeRuns.push(run);
   sendVehicle(run.vehicle);
+}
+
+/** 상차 차량 한 대를 들인다: 들어올 때 공차를 잰다 */
+function spawnOutbound(now: number): void {
+  const buyer = pick(BUYERS);
+  const truck = pick(buyer.trucks);
+  const run: VehicleRun = {
+    vehicle: newVehicle('outbound', now),
+    inbound: null,
+    outbound: { buyer, truck, lastLoadAt: now },
+    measured: { grossT: null, tareT: weighEmpty(truck), netT: null },
+    stageAt: now,
+  };
+  inboundSinceOutbound = 0;
+  outboundAfter = rollOutboundAfter();
+  activeRuns.push(run);
+  sendVehicle(run.vehicle);
+}
+
+/** 계근대가 비어 있으면 차량 한 대를 들인다. 입고 3~4대마다 상차 한 대(상차 차량은 한 번에 한 대) */
+function spawnVehicle(now: number): void {
+  if (now - lastSpawnAt < VEHICLE_TIMING_SEC.spawnGap * 1000) return;
+  if (scaleBusy()) return;
+  if (inboundSinceOutbound >= outboundAfter && !activeRuns.some((r) => r.outbound)) spawnOutbound(now);
+  else spawnInbound(now);
+}
+
+/** 적치 중(created)인 베일, 오래된 것부터 */
+function yardBales(): BaleDetail[] {
+  return [...baleDetails.values()]
+    .filter((b) => b.stage === 'created')
+    .sort((a, b) => (a.stageTimes.created ?? a.updatedAt).localeCompare(b.stageTimes.created ?? b.updatedAt));
+}
+
+/** 적치 베일 하나를 상차 차량에 싣는다: 베일은 shipped + vehicleId, 차량 baleIds에 더한다 */
+function shipBale(detail: BaleDetail, vehicle: Vehicle, now: number): void {
+  const bale: Bale = {
+    id: detail.id,
+    batchId: detail.batchId,
+    stage: 'shipped',
+    vehicleId: vehicle.id,
+    stageTimes: { ...detail.stageTimes, shipped: iso(now) },
+    updatedAt: iso(now),
+  };
+  vehicle.baleIds.push(bale.id);
+  vehicle.updatedAt = iso(now);
+  sendBale(bale);
+  sendVehicle(vehicle);
+}
+
+/**
+ * 상차 중 1초: 싣는 간격(OUTBOUND_TIMING_SEC.loadEach)이 지났고 적치 베일이 있으면 하나 싣는다.
+ * 다 실었거나, 실을 베일이 없어 마지막으로 실은 때(또는 상차 시작)부터 maxWait초가 지나면 실은 만큼(0개도)으로 상차 완료.
+ */
+function tickLoading(run: VehicleRun, outbound: NonNullable<VehicleRun['outbound']>, now: number): void {
+  const v = run.vehicle;
+  if (v.baleIds.length < outbound.truck.maxBales && (now - outbound.lastLoadAt) / 1000 >= OUTBOUND_TIMING_SEC.loadEach) {
+    const next = yardBales()[0];
+    if (next) {
+      shipBale(next, v, now);
+      outbound.lastLoadAt = now;
+    }
+  }
+  const full = v.baleIds.length >= outbound.truck.maxBales;
+  const waitedTooLong = (now - outbound.lastLoadAt) / 1000 >= OUTBOUND_TIMING_SEC.maxWait;
+  if (full || waitedTooLong) setVehicleStage(run, 'loaded', now);
 }
 
 function tickVehicles(now: number): void {
@@ -324,15 +417,25 @@ function tickVehicles(now: number): void {
         if (waitedSec >= VEHICLE_TIMING_SEC.identify) setVehicleStage(run, 'identified', now);
         break;
       case 'identified':
-        if (waitedSec >= VEHICLE_TIMING_SEC.toSector) setVehicleStage(run, 'unloading', now);
+        if (run.inbound && waitedSec >= VEHICLE_TIMING_SEC.toSector) setVehicleStage(run, 'unloading', now);
+        if (run.outbound && waitedSec >= OUTBOUND_TIMING_SEC.toBay) setVehicleStage(run, 'loading', now);
         break;
       case 'unloading':
+        if (!run.inbound) break;
         // 쏟는 동안 섹터 더미가 조금씩 자란다
-        addToTank(run.company.sectorId, fillGainPercent(run.weight.netT) / VEHICLE_TIMING_SEC.unload);
+        addToTank(run.inbound.company.sectorId, fillGainPercent(run.inbound.weight.netT) / VEHICLE_TIMING_SEC.unload);
         if (waitedSec >= VEHICLE_TIMING_SEC.unload) setVehicleStage(run, 'unloaded', now);
         break;
+      case 'loading':
+        if (run.outbound) tickLoading(run, run.outbound, now);
+        break;
       case 'unloaded':
-        if (waitedSec >= VEHICLE_TIMING_SEC.leave) setVehicleStage(run, 'departed', now);
+      case 'loaded':
+        // 바로 출차하지 않는다: 계근대가 비면 돌아가 다시 잰다
+        if (waitedSec >= VEHICLE_TIMING_SEC.afterWork && !scaleBusy(run)) setVehicleStage(run, 'weighing_out', now);
+        break;
+      case 'weighing_out':
+        if (waitedSec >= VEHICLE_TIMING_SEC.weighOut) setVehicleStage(run, 'departed', now);
         break;
       case 'departed':
         break;
@@ -342,18 +445,20 @@ function tickVehicles(now: number): void {
   spawnVehicle(now);
 }
 
-function recordUnload(run: VehicleRun): void {
+/** 하역 기록은 입고 차량만, 출차 계근을 마칠 때 한 줄 */
+function recordUnload(run: VehicleRun, inbound: NonNullable<VehicleRun['inbound']>): void {
   const v = run.vehicle;
+  const sectorId = inbound.company.sectorId;
   addUnloadRecord({
     id: v.id.replace(/^veh-/, 'unl-'),
     vehicleId: v.id,
-    sectorId: run.company.sectorId,
-    plate: run.truck.plate,
-    companyName: run.company.name,
+    sectorId,
+    plate: inbound.truck.plate,
+    companyName: inbound.company.name,
     unloadedAt: v.stageTimes.unloaded ?? v.updatedAt,
-    ...run.weight,
-    fillBeforePercent: run.fillBefore ?? tank(run.company.sectorId).fillPercent,
-    fillAfterPercent: run.fillAfter ?? tank(run.company.sectorId).fillPercent,
+    ...inbound.weight,
+    fillBeforePercent: inbound.fillBefore ?? tank(sectorId).fillPercent,
+    fillAfterPercent: inbound.fillAfter ?? tank(sectorId).fillPercent,
   });
 }
 
@@ -481,6 +586,7 @@ function tickBatches(now: number): void {
         id: baleIdOf(compressing.id, now),
         batchId: compressing.id,
         stage: 'created',
+        vehicleId: null,
         stageTimes: { created: iso(now) },
         updatedAt: iso(now),
       };
@@ -502,8 +608,8 @@ function tickBatches(now: number): void {
       baleDetails.set(bale.id, { ...structuredClone(bale), pressureMpa: round1(compressor().pressureMpa), avgMoisturePercent: compressing.avgMoisturePercent, mix: pressedMix(compressing) });
       event(compressing.id, 'bale_produced', '자동 공정', `${bale.id} 생산`, bale.id);
       production.balesToday += 1;
+      // 적치(created)된 채 기다리다가 상차 차량이 실을 때 shipped가 된다 (tickLoading)
       sendBale(bale);
-      pendingShip.push({ bale, at: now + BATCH_TIMING_SEC.ship * 1000 });
     }
   }
 
@@ -521,14 +627,6 @@ function tickBatches(now: number): void {
   } else {
     planBatch(now);
   }
-
-  while (pendingShip[0] && pendingShip[0].at <= now) {
-    const { bale } = pendingShip.shift() as { bale: Bale };
-    bale.stage = 'shipped';
-    bale.stageTimes.shipped = iso(now);
-    bale.updatedAt = iso(now);
-    sendBale(bale);
-  }
 }
 
 /** 1초마다 */
@@ -544,7 +642,7 @@ export function processState(): ProcessState {
 }
 
 /** 지금 진행 중인 차량의 공정 기록 줄 (끝난 차량은 sim/records가 보관한다) */
-export const liveVehicleRecords = (): VehicleRecord[] => activeRuns.map((run) => toVehicleRecord(run.vehicle, run.weight));
+export const liveVehicleRecords = (): VehicleRecord[] => activeRuns.map((run) => toVehicleRecord(run.vehicle, run.measured));
 
 /** 지금 진행 중인 배치의 공정 기록 줄 (끝난 배치는 sim/records가 보관한다). 아직 압축하지 않아 실제 압력·베일은 없다 */
 export const liveBatchRecords = (): BatchRecord[] =>
@@ -574,6 +672,7 @@ export const baleRecords = (): BaleRecord[] =>
       id: bale.id,
       batchId: bale.batchId,
       stage: bale.stage,
+      vehicleId: bale.vehicleId,
       createdAt: bale.stageTimes.created ?? bale.updatedAt,
       shippedAt: bale.stageTimes.shipped ?? null,
       pressureMpa: bale.pressureMpa,
@@ -581,9 +680,11 @@ export const baleRecords = (): BaleRecord[] =>
     }];
   });
 
-/** 시작할 때 표가 비어 있지 않게 지나간 예시 기록을 채워 둔다 */
+/** 시작할 때 표가 비어 있지 않게 지나간 예시 기록을 채워 둔다 (입고 차량 4대와 배치 4개. 베일을 싣는 상차 차량은 seedOutbound가 정한다) */
 function seedRecent(): void {
   const now = Date.now();
+  const weighOutAt = 31_000 + VEHICLE_TIMING_SEC.afterWork * 1000;
+  const departAt = weighOutAt + VEHICLE_TIMING_SEC.weighOut * 1000;
   for (let i = 4; i >= 1; i -= 1) {
     const at = now - i * 9 * 60_000;
     const company = COMPANIES[(i * 2) % COMPANIES.length] as CompanyFixture;
@@ -604,18 +705,21 @@ function seedRecent(): void {
     });
     const vehicle: Vehicle = {
       id: vehicleId,
+      kind: 'inbound',
       stage: 'departed',
       plate: truck.plate,
       companyName: company.name,
       sectorId: company.sectorId,
+      baleIds: [],
       stageTimes: {
         arrived: iso(at),
         identified: iso(at + 6_000),
         unloading: iso(at + 22_000),
         unloaded: iso(at + 31_000),
-        departed: iso(at + 45_000),
+        weighing_out: iso(at + weighOutAt),
+        departed: iso(at + departAt),
       },
-      updatedAt: iso(at + 45_000),
+      updatedAt: iso(at + departAt),
     };
     vehicles.push(vehicle);
     addVehicleRecord(toVehicleRecord(vehicle, weight));
@@ -656,13 +760,80 @@ function seedRecent(): void {
       baleIds: [baleIdOf(batch.id, done)],
     });
     bales.push({
-      id: `BL-${siteDate(done)}-${seq}`,
-      batchId: `batch-${seq}`,
-      stage: 'shipped',
-      stageTimes: { created: iso(done), shipped: iso(done + 25_000) },
-      updatedAt: iso(done + 25_000),
+      id: baleIdOf(batch.id, done),
+      batchId: batch.id,
+      stage: 'created',
+      vehicleId: null,
+      stageTimes: { created: iso(done) },
+      updatedAt: iso(done),
     });
   }
+}
+
+/**
+ * 지난 베일을 상차 차량에 나눠 싣는다: 생산 순서대로 2~4개씩 한 대(OUTBOUND_HISTORY), 마지막 베일이 나온 뒤 5~40분에 들어와
+ * 입고 차량과 같은 단계(계근 → 상차 → 출차 계근 → 출차)를 거친다. 지금에 가까워 출차하지 못했을 베일은 적치(created)로 남긴다.
+ * 실은 베일은 shipped + 그 차량의 vehicleId, 차량 기록의 baleIds와 같다.
+ */
+function seedOutbound(): void {
+  const now = Date.now();
+  const list = [...baleDetails.values()].sort((a, b) => (a.stageTimes.created ?? a.updatedAt).localeCompare(b.stageTimes.created ?? b.updatedAt));
+  const [minBales, maxBales] = OUTBOUND_HISTORY.balesPerVehicle;
+  const [minAfter, maxAfter] = OUTBOUND_HISTORY.arriveAfterMin;
+  const seqByDay = new Map<string, number>();
+  let freeAt = 0;
+  let index = 0;
+  while (index < list.length) {
+    const count = minBales + Math.floor(Math.random() * (maxBales - minBales + 1));
+    const group = list.slice(index, index + count);
+    if (group.length < count) break;
+    const lastCreated = Date.parse(group[group.length - 1]?.stageTimes.created ?? '');
+    const arrivedAt = Math.max(lastCreated + (minAfter + Math.random() * (maxAfter - minAfter)) * 60_000, freeAt + 60_000);
+    const identifiedAt = arrivedAt + VEHICLE_TIMING_SEC.identify * 1000;
+    const loadingAt = identifiedAt + OUTBOUND_TIMING_SEC.toBay * 1000;
+    const loadedAt = loadingAt + count * OUTBOUND_TIMING_SEC.loadEach * 1000;
+    const weighingAt = loadedAt + VEHICLE_TIMING_SEC.afterWork * 1000;
+    const departedAt = weighingAt + VEHICLE_TIMING_SEC.weighOut * 1000;
+    if (departedAt > now - 60_000) break;
+
+    const date = siteDate(arrivedAt);
+    const seq = (seqByDay.get(date) ?? 0) + 1;
+    seqByDay.set(date, seq);
+    // 그 수를 실을 수 있는 차량만 고른다
+    const buyer = pick(BUYERS.filter((b) => b.trucks.some((t) => t.maxBales >= count)));
+    const truck = pick(buyer.trucks.filter((t) => t.maxBales >= count));
+    const vehicle: Vehicle = {
+      id: `veh-${date}-s${pad(seq, 3)}`,
+      kind: 'outbound',
+      stage: 'departed',
+      plate: truck.plate,
+      companyName: buyer.name,
+      sectorId: null,
+      baleIds: group.map((b) => b.id),
+      stageTimes: {
+        arrived: iso(arrivedAt),
+        identified: iso(identifiedAt),
+        loading: iso(loadingAt),
+        loaded: iso(loadedAt),
+        weighing_out: iso(weighingAt),
+        departed: iso(departedAt),
+      },
+      updatedAt: iso(departedAt),
+    };
+    group.forEach((detail, k) => {
+      const shippedAt = iso(loadingAt + (k + 1) * OUTBOUND_TIMING_SEC.loadEach * 1000);
+      const shipped = { stage: 'shipped' as const, vehicleId: vehicle.id, stageTimes: { ...detail.stageTimes, shipped: shippedAt }, updatedAt: shippedAt };
+      baleDetails.set(detail.id, { ...detail, ...shipped });
+      const live = bales.find((b) => b.id === detail.id);
+      if (live) Object.assign(live, structuredClone(shipped));
+    });
+    addVehicleRecord(toVehicleRecord(vehicle, weighLoaded(weighEmpty(truck), count)));
+    if (departedAt > now - 60 * 60_000) vehicles.push(vehicle);
+    freeAt = departedAt;
+    index += count;
+  }
+  vehicles.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+  while (vehicles.length > RECENT_LIMIT) vehicles.shift();
 }
 
 seedRecent();
@@ -673,9 +844,10 @@ for (const record of finishedBatchRecords()) {
   event(record.id, 'created', '자동 공정', mixLabel(record.mix), undefined, record.startedAt);
   for (const id of record.baleIds) {
     const at = record.endedAt ?? record.startedAt;
-    baleDetails.set(id, { id, batchId: record.id, stage: 'shipped', stageTimes: { created: at, shipped: iso(Date.parse(at)+25000) }, updatedAt: at, pressureMpa: record.actualPressureMpa ?? record.targetPressureMpa, avgMoisturePercent: record.avgMoisturePercent, mix: structuredClone(record.mix) });
+    baleDetails.set(id, { id, batchId: record.id, stage: 'created', vehicleId: null, stageTimes: { created: at }, updatedAt: at, pressureMpa: record.actualPressureMpa ?? record.targetPressureMpa, avgMoisturePercent: record.avgMoisturePercent, mix: structuredClone(record.mix) });
     event(record.id, 'bale_produced', '자동 공정', `${id} 생산`, id, at);
   }
   if (record.result === 'skipped') event(record.id, 'skipped', '관리자(모의)', '배합 품질 재점검', undefined, record.endedAt ?? record.startedAt);
   if (record.result === 'paused') event(record.id, 'paused', '관리자(모의)', '자동 공정', undefined, record.endedAt ?? record.startedAt);
 }
+seedOutbound();

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { BatchRecord, PlantHistoryResponse, PlantMetric, ProcessState, VehicleRecord } from '@ecocycle/shared';
-import { BATCH_EVENT_TYPE_TEXT, PLANT_METRICS, sectorSearchTerms } from '@ecocycle/shared';
+import { BATCH_EVENT_TYPE_TEXT, PLANT_METRICS, sectorSearchTerms, vehicleSearchTerms } from '@ecocycle/shared';
 import { sendError } from '../errors';
 import { buildPlantHistory, MAX_HISTORY_POINTS, parseInterval } from '../sim/history';
 import { baleRecords, batchControlState, batchEvents, baleDetail, liveBatchRecords, liveVehicleRecords, processState } from '../sim/process';
@@ -21,9 +21,9 @@ processRouter.get('/process/state', (_req, res) => {
 const allVehicles = (): VehicleRecord[] => [...finishedVehicleRecords(), ...liveVehicleRecords()];
 const allBatches = (): BatchRecord[] => [...finishedBatchRecords(), ...liveBatchRecords()];
 
-// GET /vehicles/records?from=...&to=...&page=1&pageSize=10 — 차량 기록 (입차 시각 기준)
+// GET /vehicles/records?from=...&to=...&page=1&pageSize=10 — 차량 기록 (입차 시각 기준, 검색: 번호판·회사·종류 이름)
 processRouter.get('/vehicles/records', (req, res) => {
-  sendRecordPage(req, res, allVehicles(), (r) => r.arrivedAt, (r) => [r.plate, r.companyName]);
+  sendRecordPage(req, res, allVehicles(), (r) => r.arrivedAt, vehicleSearchTerms);
 });
 
 // GET /vehicles/{id} — 차량 기록 한 건
