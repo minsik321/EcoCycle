@@ -85,8 +85,11 @@ Nov 24, 2026 · @민식 · 현재 구현(모의 서버 + 앱) 기준으로 정�
 - 지표: 오늘 생산 베일, 평균 수분, 압축기 가동률(작은 추이선). 누르면 KPI 상세 팝업(오늘·7일·30일, 서버 집계).
 - 6단계 공정 추적은 서버 `stageTimes`를 표시만 한다. 차량·배치·베일을 하나의 사이클로 묶는 값은 서버에 없으므로 "출차하지 않은 가장 최근 차량, 진행 중인 배치, 가장 최근 베일"을 나란히 보여 준다.
 - 장면은 실제 부지 배치를 따른다(위성사진 기준, 위가 북쪽): 동쪽 도로에서 사무실 옆을 지나 계근대 아래쪽 입구로 들어온다. 사무실 바로 아래 계근대, 가운데는 빈 콘크리트 마당, 로봇팔(지금 포크레인 자리) 양옆에 노천 섹터 두 곳(로봇에서 레일을 볼 때 오른쪽 A·북서, 왼쪽 C·남동), 로봇에서 남서쪽으로 내려가 압축기 건물 안으로 올라가는 경사 레일(컨베이어 Section Z), 건물 남동쪽 모서리의 베일 배출구, 베일 적치 구역 두 곳(북서 ㄱ자·남동 ㄴ자), 북서쪽 숲. 섹터 더미 높이는 서버 적재율을 따른다.
-- 차량 흐름(연출): 입고 차량은 입구 → 계근대(번호판 인식 단계까지 대기) → 배정 섹터 더미 앞(하역 단계에서만 적재함을 든다, 출차 단계까지 대기) → 계근대에서 다시 계근 → 같은 입구로 출차. 상차 차량은 서버 값이 없어 "예시"로만 움직인다: 입구 → 계근 → 남동 적치 구역 옆 상차 자리 → 지게차가 북서 재고에서 베일을 실음 → 다시 계근 → 같은 입구로 출차. 번호판·회사·무게는 보여 주지 않는다.
-- 베일(연출): 배출구에서 나온 서버 베일(`created`)은 지게차가 남동 구역에 쌓고, 칸이 차면 압축기가 기다리는 연출을 한다. 북서 구역은 고정 재고("예시")이고 출하 때 지게차가 북서에서 꺼내 상차 차량에 싣는다. 서버 베일이 `shipped`가 되면 지게차가 그 베일을 남동에서 북서 재고로 옮긴다(허공에서 사라지지 않게, 실려 나가는 모습은 북서 재고가 맡는다).
+- 지형: 마당과 계근대 단(사무실 앞)은 동쪽 도로보다 높고 도로 쪽은 옹벽이다. 차는 입구 경사로 한 곳으로만 드나든다(차단봉 없음). 계근대는 마당 쪽에서만 오르내린다: 앞으로 들어가 후진으로 나오거나 후진으로 들어가 앞으로 나온다.
+- 차량 흐름(서버 `stage`를 따르는 연출): 입고 차량(덤프트럭)은 입구 → 계근대(`arrived`, 번호판 인식 장면, `identified`까지 대기) → 배정 섹터 더미 앞(`unloading`에서만 적재함을 든다) → `weighing_out`에 계근대로 돌아가 다시 계근(번호판 인식 장면) → `departed`에 같은 입구로 출차. 상차 차량(윙바디)은 입구 → 계근 → 남동 적치 구역 곁 상차 자리(`loading`: 지게차가 북서 구역에서 베일을 하나씩 실음) → `weighing_out` 계근 → 출차.
+- 3D 홈의 표·시트 "차량" 탭은 회사 안에 있는 차량(`departed`가 아닌 입고·상차 차량)만 보여 주고, 그 수는 장면의 트럭 대수와 같다. 출차한 차량은 "기록 보기"(공정 기록).
+- 압축기는 길쭉한 가로형이고, 새 베일이 앞 베일을 밀어내 배출구 뒤 금속 받침대 위에 한 줄로 놓인다(배출 롤러 없음). 배출구 옆(마당 쪽)에 작은 베일 저울: 지게차가 베일 2개를 위아래로 겹쳐 한 번에 잰다(무게 숫자는 서버 값이 없어 보여 주지 않는다).
+- 베일(서버 `stage`를 따르는 연출): 새 베일(`created`)은 저울을 거쳐 남동 구역에 열 맞춰 점점 쌓이고, 남동 칸이 차면 지게차가 오래된 줄부터 북서 구역으로 옮긴다. 북서는 적치 재고이고 상차는 북서에서 하나씩 꺼내 싣는다. 서버 베일이 `shipped`가 되면 북서 쪽에서 빠진다. 베일은 무작위로 돌리지 않고 같은 방향·간격의 블록(3~5단)으로 쌓는다. 장면 모습의 기준은 사용자가 준 현장 사진(입구·계근대·진입로·내부·도로에서 본 모습, 2026-11-25)이다.
 - 트럭·지게차·작업자의 경로·속도는 화면 연출이고 센서 값이 아니다. 움직임은 받은 `stage`까지만 간다.
 
 ### 기기 페이지
@@ -331,7 +334,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
   "grossT": 18.42, "tareT": 9.86, "netT": 8.56, "fillBeforePercent": 42.0, "fillAfterPercent": 55.1 }
 
 // 차량 (GET /vehicles/{id}도 같은 모양)
-{ "id": "veh-20261015-034", "status": "departed",
+{ "id": "veh-20261015-034", "kind": "inbound", "status": "departed",
   "plate": "12가 3456", "companyName": "한빛자원", "sectorId": "sector-a",
   "arrivedAt": "...", "departedAt": "...", "grossT": 18.42, "tareT": 9.86, "netT": 8.56,
   "stageTimes": { "arrived": "...", "identified": "...", "unloading": "...", "unloaded": "...", "departed": "..." } }
@@ -353,7 +356,8 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 ```
 
 - 하역: 무게는 계중대 값(t), `netT = grossT − tareT`(서버 계산). `fillBeforePercent`·`fillAfterPercent`는 하역 직전·직후 섹터 적재율, 화면은 두 값과 차이(%p)만 적는다.
-- 차량 `status`: `identified`(계중대 도착·번호판 인식), `unloading`(하역 중·하역 완료), `departed`(출차). 번호판·회사·배정 섹터는 인식 전 `null`. `grossT`는 처음부터, `tareT`·`netT`·`departedAt`은 출차 계량 뒤에야 있다(그 전 `null`).
+- 차량 `kind`: `inbound`(입고, 파지를 내림) 또는 `outbound`(상차, 베일을 싣고 나감) ⚠ B41. 차량 `status`: `identified`(계중대 도착·번호판 인식), `unloading`(하역 중·하역 완료), `loading`(상차 중·상차 완료), `weighing_out`(출차 계근 중), `departed`(출차). 번호판·회사는 인식 전 `null`, 배정 섹터는 입고만(상차는 늘 `null`).
+- 무게: 입고는 들어올 때 `grossT`, 출차 계근 뒤 `tareT`·`netT`. 상차는 들어올 때 `tareT`, 출차 계근 뒤 `grossT`·`netT`. 둘 다 `netT = grossT − tareT`(서버 계산), 출차 계근 전에는 나중 값과 `netT`·`departedAt`이 `null`. 상차 차량은 실은 베일 `baleIds`(상차 전 빈 배열)를 함께 준다.
 - 배치 `result`: `completed`(완료), `skipped`(건너뜀: 압축하지 않고 넘어감), `paused`(일시정지된 채 끝남), 진행 중이면 `null`. `actualPressureMpa`는 압축 때 낸 압력(압축 전·건너뜀은 `null`), `endedAt`은 진행 중이면 `null`, `balesProduced = baleIds.length`. `actualMix`·`pinChanges`는 아래 "로봇팔 7단위".
 - 베일 `stage`: `created`(적치), `shipped`(출하, 그 전 `shippedAt` `null`). 압력·수분은 생산 당시 스냅샷. `GET /bales/{id}`는 여기에 `stageTimes`, `updatedAt`, 생산 당시 배합 `mix`(실제 배합이 있으면 실제 배합)를 더한 `BaleDetail`.
 - 집기: `pickedAt`은 놓기 완료 시각(기록 시각), `grabbedAt`은 집은 시각, `grabbedBy`·`placedBy`는 수동으로 조작한 사람(자동은 `null`), `mode`는 사이클 시작 당시 모드, `batchId`는 사이클 시작 때의 배합 중 배치(없으면 `null`, 도중에 건너뛴 배치를 다른 배치로 돌리지 않는다).
@@ -515,9 +519,11 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 3. 공정 흐름 메시지에는 무게가 없다(무게는 차량·하역 기록).
 
 ```json
-// process.vehicle — stage: arrived(계중대 도착) → identified → unloading → unloaded → departed
+// process.vehicle — kind: inbound | outbound
+//   inbound:  arrived(계중대 도착) → identified → unloading → unloaded → weighing_out(출차 계근) → departed
+//   outbound: arrived → identified → loading → loaded → weighing_out → departed  (상차 차량은 baleIds를 함께 준다)
 { "type": "process.vehicle", "vehicle": {
-    "id": "veh-20261013-031", "stage": "identified",
+    "id": "veh-20261013-031", "kind": "inbound", "stage": "identified",
     "plate": "12가 3456", "companyName": "한빛자원", "sectorId": "sector-a",
     "stageTimes": { "arrived": "...", "identified": "..." }, "updatedAt": "..." } }
 
@@ -537,10 +543,12 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 { "vehicles": [ ... ], "batches": [ ... ], "bales": [ ... ], "updatedAt": "..." }
 ```
 
-- `plate`·`companyName`·`sectorId`는 `arrived`에서는 `null`, `identified`부터 채워진다. `sectorId`는 섹터 기기 ID.
+- `plate`·`companyName`·`sectorId`는 `arrived`에서는 `null`, `identified`부터 채워진다. `sectorId`는 섹터 기기 ID(상차 차량은 늘 `null`).
+- 하역·상차가 끝나도 바로 출차하지 않는다: `unloaded`·`loaded` → `weighing_out`(계근대에서 다시 계근) → `departed`.
+- 베일 `shipped`는 상차 차량에 실린 때이고, 그 베일에 `vehicleId`(실은 상차 차량)가 붙는다. 상차 차량의 `baleIds`와 같은 관계다.
 - `targetPressureMpa`는 서버가 이 배치에 정한 목표 압력, 실제 압력은 압축기 상태의 `pressureMpa`.
 - 로봇이 어느 섹터에서 집는지는 `robot.joints`·로봇 상태의 `targetTankId`를 따른다. 화면이 배합비로 집는 순서를 계산하지 않는다.
-- 사건 이름과의 대응: `vehicle.arrived`/`identified` → 차량 `arrived`/`identified`, `unload.started`/`completed` → `unloading`/`unloaded`(출차 `departed`), `batch.planned` → `planned`(배합 시작 `mixing`), `compress.started`/`completed` → `compressing`/`completed`, `bale.created`/`shipped` → 베일 `created`/`shipped`.
+- 사건 이름과의 대응: `vehicle.arrived`/`identified` → 차량 `arrived`/`identified`, `unload.started`/`completed` → `unloading`/`unloaded`, `load.started`/`completed` → `loading`/`loaded`, `weigh.out` → `weighing_out`(출차 `departed`), `batch.planned` → `planned`(배합 시작 `mixing`), `compress.started`/`completed` → `compressing`/`completed`, `bale.created`/`shipped` → 베일 `created`/`shipped`.
 - 값이 모의 서버나 시연 원본에서 오는 동안 화면에 "예시 데이터"를 표시한다.
 
 ## 확인 상태와 프로토타입 가정
@@ -560,7 +568,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 수동 조작 | 시작·일시정지·재개·정지, 알람 확인, 설정 변경, 로봇 모드 전환(섹터 지정 포함), 수동 집기·놓기(두 단계), 배치 배합·압력·일시정지·재개·건너뛰기 | `shared/commands.ts`, `config/controls.ts` |
 | 로봇 기종 | 범용 6축, 링크 길이·축은 설정값, 각도 단위 도 | `config/robotModel.ts`, 구조가 크게 다르면 `studio/actors/Robot` |
 | 이상 기준 | 적재율 80% 이상이 주의, 서버가 `status`로 판정 | 서버 설정(화면은 `status`와 `cautionThresholdPercent`만 표시) |
-| 장면 구성 | 실제 부지(태화리싸이클링 위성사진, 위가 북쪽) 배치: 동쪽 도로·입구, 사무실과 그 아래 계근대, 가운데 콘크리트 마당, 노천 섹터 2곳, 로봇팔(지금 포크레인 자리), 남서쪽 압축기 건물로 올라가는 경사 레일(Section Z), 압축기 1개, 베일 적치 구역 2곳(남동 = 서버 베일, 북서 = 고정 재고 "예시"), 북서쪽 숲 | `studio/world/layout.ts` |
+| 장면 구성 | 실제 부지(태화리싸이클링 위성사진, 위가 북쪽) 배치: 동쪽 도로·입구, 사무실과 그 아래 계근대, 가운데 콘크리트 마당, 노천 섹터 2곳, 로봇팔(지금 포크레인 자리), 남서쪽 압축기 건물로 올라가는 경사 레일(Section Z), 압축기 1개, 베일 적치 구역 2곳(남동 = 새 베일, 북서 = 적치 재고·상차), 옹벽 위 계근대 단, 북서쪽 숲 | `studio/world/layout.ts` |
 | 태블릿·화질 | 기종 제한 없음, 화질 3단계 자동 선택, `low`가 저사양 안전판 | `studio/quality.ts`, `config/quality.ts` |
 | 접속 | 현장 밖 포함, 로그인으로 보호 | 서버 보안 설정, VPN 병행 여부 |
 | 자동 로그인 | 웹 HttpOnly 쿠키, 안드로이드 보안 저장소. 자동 로그인 14일, 아니면 브라우저·앱을 닫을 때까지. 재사용 유예 30초 | `shared/auth.ts`, `app/src/api/tokens.ts`, 모의 서버 `auth.ts` |
@@ -573,8 +581,8 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 배합과 압력 | 배치별 배합비·평균 수분·목표 압력은 서버가 정한다 | 모의 서버 `sim/process.ts` |
 | 배치·베일 | 배치당 베일 1개(모델 1→N), `batch.control` 관리자만, 투입 전 배합·압축 전 압력만 변경, 압축 중 건너뛰기 거부 | `shared/commands.ts`, 모의 서버 `fixtures/accounts.ts`·`sim/process.ts` |
 | 로봇 운전 모드 | 섹터 지정의 실제 배합, 수동 집기·놓기 두 단계(6절 "로봇팔 7단위") | `shared/process.ts`·`devices.ts`·`robot.ts`, 모의 서버 `sim/robot.ts`·`sim/commands.ts` |
-| 베일 적치 연출 | 남동 적치 구역의 고정 칸에 서버 베일을 쌓고(칸이 차면 압축기 대기), 북서 구역은 고정 재고("예시"). 출하된 서버 베일은 북서로 옮겨지고, 상차는 지게차가 북서에서 꺼내 싣는 연출. 연출 속도(트럭 4.0 m/s, 지게차 5.6 m/s, 상차 차량 5분마다)도 가정 | `config/yard.ts` |
-| 상차(출하) 차량 | 서버 값이 없어 3D 홈에서만 "예시"로 움직인다: 입구 → 계근 → 남동 적치 구역 옆 상차 → 계근 → 출차 | `studio/sim/director.ts` (명세에 넣으면 6절 공정 흐름부터) |
+| 베일 적치 연출 | 남동 적치 구역에 서버 베일을 점점 쌓고(칸이 차면 오래된 줄부터 북서로 옮김, 그래도 차면 압축기 대기), 상차는 지게차가 북서에서 하나씩 꺼내 싣는 연출. 베일 저울은 무게 숫자 없이 모양만. 연출 속도(트럭 4.0 m/s, 지게차 5.6 m/s, 상차 차량 5분마다)도 가정 | `config/yard.ts` |
+| 상차(출하) 차량 | 서버가 입고 차량과 같은 공정 흐름으로 준다(`kind: outbound`, 계근 두 번, 실은 베일). 모의 서버는 가상의 회사·번호판으로 주기적으로 만든다 ⚠ B41 | `shared/process.ts`·`processRecords.ts`, 모의 서버 `sim/process.ts` |
 
 ## 위험과 대응
 
