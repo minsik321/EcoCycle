@@ -120,7 +120,7 @@ export const RECENT_LIMIT = 20;
 export const UNLOAD_HISTORY = { seedDays: 30, perSectorPerDay: [6, 14] as [number, number], workHours: [7, 18] as [number, number], keepDays: 40 };
 
 /** 상차 기록 채우기: 상차 차량 한 대에 싣는 베일 수 범위, 마지막 베일 생산 뒤 상차 차량이 오기까지 분 범위 */
-export const OUTBOUND_HISTORY = { balesPerVehicle: [2, 4] as [number, number], arriveAfterMin: [5, 40] as [number, number] };
+export const OUTBOUND_HISTORY = { balesPerVehicle: [1, 3] as [number, number], arriveAfterMin: [5, 40] as [number, number] };
 
 /** 배치 기록: 시작할 때 채워 둘 지난 날 수, 하루 배치 수 범위, 작업 시간(현장 시각), 건너뜀·일시정지됨 비율, 기억할 날 수 (차량 기록도 같은 기간을 기억한다) */
 export const BATCH_HISTORY = {
