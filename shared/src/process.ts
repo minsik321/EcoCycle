@@ -9,15 +9,47 @@ import type { TankId } from './ids';
  * 실시간 메시지에는 무게 필드가 없다. 계중대 무게는 하역 기록(`UnloadRecord`, records.ts)으로 따로 받는다.
  */
 
-/** arrived(계중대 도착) → identified(번호판 인식) → unloading(하역 중) → unloaded(하역 완료) → departed(출차) */
-export const VEHICLE_STAGES = ['arrived', 'identified', 'unloading', 'unloaded', 'departed'] as const;
+/**
+ * 차량 종류 ⚠ B41: inbound(입고, 파지를 내림) · outbound(상차, 베일을 싣고 나감)
+ */
+export const VEHICLE_KINDS = ['inbound', 'outbound'] as const;
+export type VehicleKind = (typeof VEHICLE_KINDS)[number];
+
+/**
+ * 차량 단계 (모든 종류의 합집합, 순서대로):
+ *   inbound:  arrived(계중대 도착) → identified(번호판 인식) → unloading(하역 중) → unloaded(하역 완료) → weighing_out(출차 계근) → departed(출차)
+ *   outbound: arrived → identified → loading(상차 중) → loaded(상차 완료) → weighing_out → departed
+ * 하역·상차가 끝나도 바로 출차하지 않는다(unloaded·loaded → weighing_out → departed).
+ */
+export const VEHICLE_STAGES = ['arrived', 'identified', 'unloading', 'unloaded', 'loading', 'loaded', 'weighing_out', 'departed'] as const;
 export type VehicleStage = (typeof VEHICLE_STAGES)[number];
+
+/** 종류별 단계 순서 */
+export const VEHICLE_STAGES_BY_KIND: Record<VehicleKind, readonly VehicleStage[]> = {
+  inbound: ['arrived', 'identified', 'unloading', 'unloaded', 'weighing_out', 'departed'],
+  outbound: ['arrived', 'identified', 'loading', 'loaded', 'weighing_out', 'departed'],
+};
+
+/**
+ * 사건 이름 → 차량 단계 (명세 6절 "공정 흐름": `load.started`/`completed` → `loading`/`loaded`, `weigh.out` → `weighing_out`).
+ * 출차(`departed`)에는 따로 된 사건 이름이 없다.
+ */
+export const VEHICLE_EVENT_STAGES = {
+  'vehicle.arrived': 'arrived',
+  'vehicle.identified': 'identified',
+  'unload.started': 'unloading',
+  'unload.completed': 'unloaded',
+  'load.started': 'loading',
+  'load.completed': 'loaded',
+  'weigh.out': 'weighing_out',
+} as const satisfies Record<string, VehicleStage>;
+export type VehicleEventName = keyof typeof VEHICLE_EVENT_STAGES;
 
 /** planned(배합 계획) → mixing(배합 중) → compressing(압축 중) → completed(완료) */
 export const BATCH_STAGES = ['planned', 'mixing', 'compressing', 'completed'] as const;
 export type BatchStage = (typeof BATCH_STAGES)[number];
 
-/** created(결속 후 배출) → shipped(출하) */
+/** created(결속 후 배출, 적치) → shipped(출하: 상차 차량에 실림) */
 export const BALE_STAGES = ['created', 'shipped'] as const;
 export type BaleStage = (typeof BALE_STAGES)[number];
 
@@ -26,12 +58,15 @@ export type StageTimes<S extends string> = Partial<Record<S, IsoTimestamp>>;
 
 export interface Vehicle {
   id: string;
+  kind: VehicleKind;
   stage: VehicleStage;
   /** 번호판·회사·배정 섹터는 `arrived`에서는 null이고 `identified`부터 채워진다 */
   plate: string | null;
   companyName: string | null;
-  /** 배정 섹터. 섹터와 탱크는 같은 대상이라 탱크 기기 ID를 그대로 쓴다 */
+  /** 배정 섹터(입고만). 섹터와 탱크는 같은 대상이라 탱크 기기 ID를 그대로 쓴다. 상차 차량은 늘 null */
   sectorId: TankId | null;
+  /** 실은 베일 ID (상차 차량, 상차 전 빈 배열). 입고 차량은 늘 빈 배열 */
+  baleIds: string[];
   stageTimes: StageTimes<VehicleStage>;
   updatedAt: IsoTimestamp;
 }
@@ -85,6 +120,8 @@ export interface Bale {
   id: string;
   batchId: string;
   stage: BaleStage;
+  /** 실은 상차 차량 ID. `shipped`(상차 차량에 실린 때)부터 있고 그 전에는 null. 그 차량의 `baleIds`에 이 베일이 있다 */
+  vehicleId: string | null;
   stageTimes: StageTimes<BaleStage>;
   updatedAt: IsoTimestamp;
 }
