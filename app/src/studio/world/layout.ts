@@ -10,7 +10,8 @@ import type { V3 } from './views';
 // 카메라 지역(views.ts)은 three 없이 패널도 읽으므로 따로 두고 여기서 다시 내보낸다
 export * from './views';
 
-// 3D 홈(스튜디오) 월드의 배치. 실제 부지의 위성사진(613×616px, 위가 북쪽)을 따른다 (docs/decisions.md 2026-11-24 "실제 부지 배치와 섹터 2곳").
+// 3D 홈(스튜디오) 월드의 배치. 실제 부지의 위성사진(613×616px, 위가 북쪽)과 현장 사진 6장을 따른다
+// (docs/decisions.md 2026-11-24 "실제 부지 배치와 섹터 2곳", 2026-11-25 "현장 사진 기준 3D 다듬기").
 // 좌표: Y가 위, 로봇 받침대가 원점. 방향(heading)은 three의 rotation.y와 같다: 0이면 +X, 앞 방향은 (cos h, −sin h).
 //
 // ── 사진 → 월드 변환 (하나뿐이다: sitePx) ─────────────────────────────
@@ -18,20 +19,24 @@ export * from './views';
 //  - 기준점 1: 로봇 자리(지금의 포크레인 자리, 사진 빨간 원) (200, 385)px → 월드 원점.
 //  - 기준점 2: 레일이 압축기 건물로 들어가는 곳(사진 파란 선 끝) (152, 428)px.
 //    로봇 → 기준점 2의 방향(남서)이 레일 쪽 base 각도 θc = DEMO_CYCLE.conveyorBaseDeg(150°)의 3D 방향 (cos θc, −sin θc)에 오도록 돌린다.
-//    그래서 사진은 월드에서 약 −71.9°(위에서 볼 때 시계 방향 71.9°) 돌아가 놓인다: 사진의 북쪽은 월드 방향 18.1°다.
-//  - 배율: 1px = 0.08 (월드 단위). 트럭(2.9)·지게차·베일(0.95)·로봇 배율(1.6)은 예전 그대로 두고, 로봇이 집는 자리(반지름 2.61)가
-//    사진의 두 파지 더미 안쪽에 오도록 정했다. 사진의 베일 한 개(약 12px)가 장면의 베일(0.95)과 비슷하다.
+//  - 배율: 1px = 0.072 (월드 단위). 위성사진에서 잰 값(같은 정합 변환):
+//    베일 줄 간격 13.3 × 13.8px(자기상관), 화물차 62.5px, 계근대 66.9px. 배율 0.072에서 베일(0.90 × 0.95, 틈 0.06)의 간격이 13.3 × 14.0px다.
+//    장면의 트럭 모형은 베일에 비해 짧아서 배율 하나로는 함께 맞지 않는다: 트럭은 모형을 1.4배(4.06 × 1.62 = 56 × 22.5px, 계근대 안)로,
+//    지게차는 큰 베일을 드니 1.15배로 키웠다. 로봇 배율(1.6)은 그대로다(집는 반지름 2.61 = 36px).
 //  - 뒤집지 않는다: 사진 (x, y) → (X, Z)는 위에서 내려다본 화면(+X 오른쪽, −Z 위)과 같은 손잡이라 회전만 하면 된다.
 //    섹터 A(사진 북서 갈색 더미)는 레일을 볼 때 오른쪽(θc − 90°), C(남동 흰 더미)는 왼쪽(θc + 90°)이다 (config/robotCycle).
-// 부지 요소(사무실·계근대·입구·도로·숲·베일 적치 구역 둘·압축기 건물·배출구·레일·섹터 더미·경로)는 모두 사진 좌표로 적고 sitePx로 옮긴다.
-// 로봇이 집는 자리·놓는 자리만은 서버 관절 값(base 각도, 모의 서버와 같은 down 자세)에서 나온다.
+// 부지 요소는 모두 사진 좌표로 적고 sitePx로 옮긴다. 로봇이 집는 자리·놓는 자리만은 서버 관절 값(base 각도, 모의 서버와 같은 down 자세)에서 나온다.
+//
+// ── 높이 ──────────────────────────────────────────────────────────────
+// 마당과 계근대 단(사무실 앞)은 높이 0이다. 동쪽 도로는 그보다 낮고(북쪽이 가장 낮다) 남쪽으로 오른다. 도로 쪽은 블록 옹벽 + 쇠 난간이고,
+// 차는 입구 경사로 한 곳으로만 드나든다(옛 차단봉 자리, 차단봉 없음). 높이는 groundY가 정한다(트럭·작업자가 밟는 높이).
 
 const DEG = Math.PI / 180;
 
 /** 사진 크기(px) */
 export const PHOTO = { width: 613, height: 616 } as const;
 /** 사진 1px의 월드 길이 */
-export const SITE_SCALE = 0.08;
+export const SITE_SCALE = 0.072;
 /** 변환의 기준점 (사진 px): 로봇 자리, 레일이 건물로 들어가는 곳 */
 export const SITE_ANCHORS = { robot: [200, 385] as P2, railEntry: [152, 428] as P2 } as const;
 
@@ -75,6 +80,17 @@ export const SITE_ROT_Y = SITE_ROTATION;
 
 const pts = (list: ReadonlyArray<readonly [number, number]>): P2[] => list.map(([x, y]) => sitePx(x, y));
 
+/** 점이 다각형 안에 있는가 (바닥 x, z 또는 사진 px) */
+export function inside(p: P2, poly: readonly P2[]): boolean {
+  let hit = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+    const a = poly[i]!;
+    const b = poly[j]!;
+    if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0]) hit = !hit;
+  }
+  return hit;
+}
+
 // ── 로봇과 집는·놓는 자리 ─────────────────────────────────────────────
 
 export const ROBOT = { scale: 1.6, pedestalH: 0.8, pedestalR: 0.62 } as const;
@@ -96,7 +112,42 @@ export const PLACE = tip(DEMO_CYCLE.conveyorBaseDeg);
 
 export { SECTOR_LABEL } from '../../config/processDisplay';
 
-// ── 부지 (사진 테두리) ────────────────────────────────────────────────
+// ── 레일 좌표계 ───────────────────────────────────────────────────────
+
+/**
+ * 레일 좌표계: 로봇이 원점, +u는 레일 방향(로봇 → 건물, 3D 방향 θc), +w는 섹터 C 쪽(θc + 90°, 사진 남동).
+ * 사진의 파란 지붕 건물은 벽이 레일과 직각·평행이라 이 좌표계의 상자로 적는다(값은 사진 px를 이 축에 잰 것).
+ * 섹터 더미 둘은 이 좌표계에서 w를 뒤집은 거울 대칭이다(A: −w, C: +w).
+ */
+const RAIL_H = DEMO_CYCLE.conveyorBaseDeg * DEG;
+export const RAIL_FRAME = { heading: RAIL_H, u: [Math.cos(RAIL_H), -Math.sin(RAIL_H)] as P2, w: [Math.cos(RAIL_H + Math.PI / 2), -Math.sin(RAIL_H + Math.PI / 2)] as P2 };
+// 레일 좌표계로 조립할 때(Kit.at(원점, RAIL_H)) 로컬 x는 u, 로컬 z는 −w다 (rotation.y는 로컬 +z를 θc − 90° 쪽으로 돌린다).
+
+/** 레일 좌표계(u, w, 사진 px 단위) → 월드 */
+export function railPx(u: number, w: number): P2 {
+  const su = u * SITE_SCALE;
+  const sw = w * SITE_SCALE;
+  return [RAIL_FRAME.u[0] * su + RAIL_FRAME.w[0] * sw, RAIL_FRAME.u[1] * su + RAIL_FRAME.w[1] * sw];
+}
+
+/** 레일 좌표계(월드 단위) → 월드 */
+export function railAt(u: number, w: number): P2 {
+  return [RAIL_FRAME.u[0] * u + RAIL_FRAME.w[0] * w, RAIL_FRAME.u[1] * u + RAIL_FRAME.w[1] * w];
+}
+
+/** 사진 위의 레일 방향(로봇 → 레일 끝, 단위 벡터) */
+const PU: P2 = (() => {
+  const dx = SITE_ANCHORS.railEntry[0] - SITE_ANCHORS.robot[0];
+  const dy = SITE_ANCHORS.railEntry[1] - SITE_ANCHORS.robot[1];
+  const len = Math.hypot(dx, dy);
+  return [dx / len, dy / len];
+})();
+/** 레일 좌표계(u, w, 사진 px) → 사진 px */
+export function railToPhoto(u: number, w: number): P2 {
+  return [SITE_ANCHORS.robot[0] + u * PU[0] + w * PU[1], SITE_ANCHORS.robot[1] + u * PU[1] - w * PU[0]];
+}
+
+// ── 부지 (사진 테두리)와 지형 ─────────────────────────────────────────
 
 /** 사진 네 모서리(부지 판)의 월드 좌표 */
 export const SITE_CORNERS: readonly P2[] = pts([
@@ -131,12 +182,121 @@ export const ROAD_PX: readonly P2[] = [
   [300, 616],
   [250, 660],
 ];
-export const ROAD = { line: pts(ROAD_PX), width: 2.8, lane: 0.68 } as const;
+export const ROAD = { line: pts(ROAD_PX), width: 2.6, lane: 0.62 } as const;
+
+/** 도로 높이(사진 y px → 월드 높이): 북쪽이 가장 낮고 남쪽으로 오른다 (approach.png: 사무실 북동에서 남쪽이 오르막) */
+const ROAD_RISE: ReadonlyArray<readonly [number, number]> = [
+  [-120, -1.9],
+  [0, -1.7],
+  [150, -1.15],
+  [306, -0.48],
+  [460, -0.2],
+  [700, -0.05],
+];
+export function roadY(py: number): number {
+  const list = ROAD_RISE;
+  if (py <= list[0]![0]) return list[0]![1];
+  for (let i = 1; i < list.length; i += 1) {
+    const [y1, h1] = list[i]!;
+    const [y0, h0] = list[i - 1]!;
+    if (py <= y1) return h0 + ((py - y0) / (y1 - y0)) * (h1 - h0);
+  }
+  return list[list.length - 1]![1];
+}
+
+/**
+ * 마당·계근대 단의 윤곽(높이 0, 사진 px). 동쪽은 블록 옹벽(사무실·계근대 단 둘레와 경사로 남쪽), 남동은 회색 철판 울타리 선이다.
+ * 이 밖(도로·도로 동쪽)은 도로 높이를 따른다
+ */
+export const PLATEAU_PX: readonly P2[] = [
+  [-60, -60],
+  [494, -60],
+  [498, 40],
+  [508, 120],
+  [513, 200],
+  [514, 276],
+  [490, 281],
+  [486, 283],
+  [484, 330],
+  [503, 334],
+  [470, 384],
+  [452, 410],
+  [420, 446],
+  [300, 548],
+  [272, 560],
+  [240, 600],
+  [200, 680],
+  [-60, 680],
+];
+export const PLATEAU = pts(PLATEAU_PX);
+/** 동쪽 블록 옹벽(위에 쇠 난간): 사무실·계근대 단 둘레, 경사로 남쪽 (사진 px) */
+export const WALL_PX: ReadonlyArray<readonly P2[]> = [
+  [
+    [494, -60],
+    [498, 40],
+    [508, 120],
+    [513, 200],
+    [514, 276],
+    [490, 281],
+    [486, 283],
+  ],
+  [
+    [484, 330],
+    [503, 334],
+    [470, 384],
+  ],
+];
+/** 입구 경사로(사진 px): 도로 서쪽 가장자리에서 마당으로 오른다. 차가 드나드는 유일한 곳 */
+export const RAMP_PX: readonly P2[] = [
+  [486, 283],
+  [512, 287],
+  [509, 331],
+  [484, 330],
+];
+export const RAMP = pts(RAMP_PX);
+/** 남동 회색 철판 울타리(사진 px, 울타리 안쪽에 높은 녹색 그물망) */
+export const FENCE_PX: readonly P2[] = [
+  [470, 384],
+  [452, 410],
+  [420, 446],
+  [300, 548],
+  [272, 560],
+];
+/** 높은 녹색 그물망: 북쪽(숲 경계), 남쪽(철판 울타리 안쪽과 건물까지) */
+export const NET_PX: ReadonlyArray<readonly P2[]> = [
+  [
+    [252, 4],
+    [330, 8],
+    [420, 26],
+    [494, 38],
+  ],
+  [
+    [466, 380],
+    [446, 406],
+    [414, 441],
+    [296, 541],
+    [240, 566],
+    [196, 583],
+  ],
+];
+
+/** 바닥 높이 (트럭·작업자가 밟는 곳): 마당·단은 0, 경사로는 도로까지 기울고, 그 밖은 도로 높이 */
+export function groundY(x: number, z: number): number {
+  const [px, py] = worldToPx(x, z);
+  if (inside([px, py], PLATEAU_PX)) return 0;
+  const road = roadY(py);
+  if (inside([px, py], RAMP_PX)) {
+    // 경사로: 마당 가장자리(서쪽 x 485)에서 도로 가장자리(동쪽 x 511)까지
+    const t = Math.min(1, Math.max(0, (px - 485) / 26));
+    return road * t;
+  }
+  return road;
+}
 
 /** 북서쪽 숲의 테두리 (사진 px). 나무는 이 안에서 베일 적치 구역과 떨어진 곳에만 심는다 */
 export const FOREST: readonly P2[] = pts([
-  [-40, -40],
-  [258, -40],
+  [-60, -60],
+  [258, -60],
   [252, 0],
   [240, 60],
   [222, 110],
@@ -145,76 +305,65 @@ export const FOREST: readonly P2[] = pts([
   [128, 262],
   [108, 292],
   [60, 302],
-  [-40, 318],
+  [-60, 318],
 ]);
 
-// ── 건물: 사무실, 계근대, 입구 ────────────────────────────────────────
+// ── 건물: 사무실, 계근대 ──────────────────────────────────────────────
 
-/** 사무실("태화리싸이클링" 자리): 사진 축에 맞춘 상자 (415~500, 100~210)px */
-export const OFFICE = { center: sitePx(457.5, 155), w: 85 * SITE_SCALE, d: 110 * SITE_SCALE, height: 2.3 } as const;
-/** 사무실 옆에 세워 둔 트레일러 (소품) */
-export const TRAILER = { center: sitePx(384, 132), heading: siteHeading(0, 1), length: 75 * SITE_SCALE } as const;
+/** 사무실("태화리싸이클링" 자리): 짙은 회색 골판 2층, 사진 축에 맞춘 상자 (415~500, 100~210)px */
+export const OFFICE = { center: sitePx(457.5, 155), w: 85 * SITE_SCALE, d: 110 * SITE_SCALE, height: 4.6 } as const;
+/** 사무실 서쪽에 세워 둔 트레일러 (소품): 위성사진에서 잰 대형 화물차(운전석 앞 (392, 81) → 적재함 뒤 (378, 171)px, 91px) */
+export const TRAILER = { center: sitePx(385, 126), heading: siteHeading(14, -90), length: 91 * SITE_SCALE } as const;
+/** 사무실 남서 모서리 곁의 흰 창고 (사진 px 446~462, 212~226) */
+export const SHED = { center: sitePx(454, 219), w: 16 * SITE_SCALE, d: 14 * SITE_SCALE } as const;
 
-/** 계근대(검은 사각형, 420~493 × 233~261px): 가로로 길다. 트럭은 그 위에 서서 무게를 잰다 */
+/**
+ * 계근대(노란 테두리 철판, 사진 420~493 × 233~261px, 위성사진 실측 66.9px): 가로로 길고 동쪽 끝이 옹벽이다.
+ * 차는 마당 쪽(서쪽)에서만 오르내린다: 입차 계근은 후진으로 올라 앞으로 나가고(서쪽을 봄), 출차 계근은 앞으로 올라 후진으로 내려온다(동쪽을 봄)
+ */
 export const SCALE = {
   center: sitePx(456.5, 247),
   /** 긴 쪽 방향(사진 동 → 서) */
   heading: siteHeading(-1, 0),
-  length: 73 * SITE_SCALE,
+  length: 67 * SITE_SCALE,
   width: 28 * SITE_SCALE,
   /** 트럭이 서는 자리 */
-  stop: sitePx(454, 247),
+  stop: sitePx(456, 247),
 } as const;
+/** 번호판 인식 카메라 기둥: 계근대 서남 끝(사진 415, 266px), 계근대를 본다 */
+export const PLATE_CAMERA = { at: sitePx(415, 266), heading: siteHeading(1, -0.45) } as const;
 
-/** 입구: 계근대 아래, 계근대와 남동 베일 구역 사이(도로 쪽 부지 끝). 기둥 둘 */
-export const GATE = { north: sitePx(518, 256), south: sitePx(508, 346) } as const;
-
-// ── 압축기 건물·레일 (레일 좌표계) ────────────────────────────────────
-
-/**
- * 레일 좌표계: 로봇이 원점, +u는 레일 방향(로봇 → 건물, 3D 방향 θc), +w는 섹터 C 쪽(θc + 90°, 사진 남동).
- * 사진의 파란 지붕 건물은 벽이 레일과 직각·평행이라 이 좌표계의 상자 둘로 적는다(값은 사진 px를 이 축에 잰 것).
- */
-const RAIL_H = DEMO_CYCLE.conveyorBaseDeg * DEG;
-export const RAIL_FRAME = { heading: RAIL_H, u: [Math.cos(RAIL_H), -Math.sin(RAIL_H)] as P2, w: [Math.cos(RAIL_H + Math.PI / 2), -Math.sin(RAIL_H + Math.PI / 2)] as P2 };
-// 레일 좌표계로 조립할 때(Kit.at(원점, RAIL_H)) 로컬 x는 u, 로컬 z는 −w다 (rotation.y는 로컬 +z를 θc − 90° 쪽으로 돌린다).
-
-/** 레일 좌표계(u, w, 사진 px 단위) → 월드 */
-export function railPx(u: number, w: number): P2 {
-  const su = u * SITE_SCALE;
-  const sw = w * SITE_SCALE;
-  return [RAIL_FRAME.u[0] * su + RAIL_FRAME.w[0] * sw, RAIL_FRAME.u[1] * su + RAIL_FRAME.w[1] * sw];
-}
+// ── 압축기 건물·레일 ──────────────────────────────────────────────────
 
 /**
- * 압축기 건물(파란 지붕). 본동: u 62~150, w −60~66 (압축기·배출구), 옆동: u 33~150, w −140~−60 (사진 북서쪽의 짙은 지붕).
- * 레일은 본동의 북동 벽(u 62)으로 들어가고, 베일은 남동 벽(w 66)의 북동 끝(사진 남동 모서리 165~190, 480~500px)으로 나온다.
+ * 압축기 건물(회색 벽 + 파란 지붕의 긴 공장). 본동: u 62~150, w −60~66 (압축기·배출구), 옆동: u 33~150, w −140~−60 (사진 북서쪽의 짙은 지붕).
+ * 레일은 본동의 북동 벽(u 62)으로 들어가고, 베일은 남동 벽(w 66)의 북동 끝(u 80)으로 나온다.
  */
 export const BALER_HOUSE = {
-  main: { u0: 62, u1: 150, w0: -60, w1: 66, wallH: 3.1 },
-  annex: { u0: 33, u1: 150, w0: -140, w1: -60, wallH: 2.7 },
+  main: { u0: 62, u1: 150, w0: -60, w1: 66, wallH: 3.4 },
+  annex: { u0: 33, u1: 150, w0: -140, w1: -60, wallH: 3.0 },
 } as const;
+/** 지붕 위 파란 물탱크 (레일 좌표 px) */
+export const WATER_TANK = { u: 128, w: -30 } as const;
 
 /**
- * 압축기(레일 좌표계로 조립한 로컬 좌표: x = u, z = −w, 월드 단위). 압축실은 레일 끝 아래(w 0 근처),
- * 램은 +z(−w)에서 −z(+w, 배출구 쪽)로 밀고, 결속부를 지나 롤러를 타고 남동 벽 밖(배출구)으로 나온다.
+ * 압축기: 길쭉한 가로형 (레일 좌표계로 조립한 로컬 좌표: x = u, z = −w, 월드 단위).
+ * 뒤쪽(+z, w −45px)에 유압 실린더, 레일 끝 아래(z 0 근처)에 투입구·압축실, 앞쪽(−z)으로 긴 압출 통로와 결속부가 이어져
+ * 남동 벽(w 66) 배출구에 닿는다. 롤러 없이 새 베일이 앞 베일을 밀어낸다.
  */
 export const BALER = {
   x: 80 * SITE_SCALE,
-  halfX: 0.85,
-  minZ: -0.9,
-  maxZ: 0.9,
-  height: 1.0,
-  /** 결속부가 끝나는 곳, 배출 롤러가 끝나는 곳 (건물 남동 벽 w 66px = z −5.28 밖) */
-  strapZ: -1.5,
-  chuteEndZ: -6.6,
-  chuteY: 0.5,
+  halfX: 0.62,
+  /** 몸체가 끝나는 곳 (뒤 +z) */
+  backZ: 45 * SITE_SCALE,
+  minZ: -0.75,
+  maxZ: 0.75,
+  height: 1.15,
+  /** 결속부가 끝나는 곳, 배출구(남동 벽) */
+  strapZ: -2.6,
+  outletZ: -66 * SITE_SCALE,
+  chuteY: 0.55,
 } as const;
-
-/** 레일 좌표계(월드 단위) → 월드 */
-export function railAt(u: number, w: number): P2 {
-  return [RAIL_FRAME.u[0] * u + RAIL_FRAME.w[0] * w, RAIL_FRAME.u[1] * u + RAIL_FRAME.w[1] * w];
-}
 
 /** 경사 레일: 로봇이 놓는 자리 아래에서 시작해 건물 안 압축기 투입구 위까지 오른다 (u는 레일 좌표계, 월드 단위) */
 export const RAIL = {
@@ -230,50 +379,47 @@ export const RAIL_SLOPE = Math.atan2(RAIL.endY - RAIL.startY, RAIL.endU - RAIL.s
 /** 레일 위 u(수평 거리)에서의 벨트 윗면 높이 */
 export const railY = (u: number): number => RAIL.startY + ((u - RAIL.startU) / (RAIL.endU - RAIL.startU)) * (RAIL.endY - RAIL.startY);
 
-export const BALE = { w: 0.75, h: 0.62, d: 0.95 } as const;
-/** 배출된 베일이 멈추는 자리 (배출구 밖 롤러 끝) */
-const REST = railAt(BALER.x, -(BALER.chuteEndZ + 0.6));
-export const BALE_REST: [number, number, number] = [REST[0], BALER.chuteY, REST[1]];
+/** 베일 (긴 쪽 d가 로컬 X). 사진의 줄 간격(13.3 × 13.8px)에 맞춘 크기와 틈 */
+export const BALE = { w: 0.9, h: 0.66, d: 0.95 } as const;
+export const BALE_GAP = 0.06;
 /** 베일이 배출구로 나오는 방향 (+w) */
 export const CHUTE_HEADING = RAIL_H + Math.PI / 2;
 
-/** 지게차가 포크를 내밀어 베일을 드는 거리(지게차 중심 → 베일 중심). 베일 뒤쪽이 포크 받침 바로 앞에 오도록 잡았다 */
-export const FORK_REACH = 1.1;
+/** 지게차 모형 배율(큰 베일을 든다) */
+export const FORKLIFT_SCALE = 1.15;
+/** 지게차가 클램프로 베일을 드는 거리(지게차 중심 → 베일 중심) */
+export const FORK_REACH = 1.1 * FORKLIFT_SCALE;
 
 // ── 섹터 더미 ─────────────────────────────────────────────────────────
 
 /**
- * 노천 파지 더미(칸막이 없음). 로봇이 집는 자리(PICK)를 품고 바깥으로 사진의 더미처럼 퍼진다.
- * 바닥 윤곽은 사진 px 다각형(A: 북서 갈색, C: 남동 흰 더미)이고, 높이는 서버 적재율(fillPercent)로 정한다.
- * 트럭이 쏟는 쪽(북쪽 끝)과 지게차 길·건물에서는 떨어지게 다듬었다.
+ * 노천 파지 더미(칸막이 없음). 사진의 로봇 양옆 큰 파지 더미(갈색 A, 흰 C) 크기로, 레일 축에 거울 대칭이다:
+ * 레일 좌표 (u, w) 윤곽 하나를 A는 (u, −w), C는 (u, +w)로 놓는다. 중심 (u −10, |w| 45)px, 로봇이 집는 점(u 0, |w| 36px)을 품는다.
+ * 레일(w 0)·옆동(u ≥ 33)·저울(u ≥ 50)과 떨어지게 다듬었다. 높이는 서버 적재율(fillPercent)로 정한다
  */
+export const PILE_UW: readonly P2[] = [
+  [-36, 16],
+  [-14, 13],
+  [8, 15],
+  [20, 30],
+  [22, 52],
+  [14, 72],
+  [-4, 82],
+  [-28, 80],
+  [-40, 58],
+  [-42, 34],
+];
 export const PILE_PX: Record<TankId, readonly P2[]> = {
-  'sector-a': [
-    [150, 328],
-    [196, 334],
-    [205, 356],
-    [192, 378],
-    [166, 392],
-    [142, 380],
-    [136, 350],
-  ],
-  'sector-c': [
-    [212, 398],
-    [236, 360],
-    [272, 356],
-    [304, 362],
-    [302, 392],
-    [270, 418],
-    [232, 430],
-  ],
+  'sector-a': PILE_UW.map(([u, w]) => railToPhoto(u, -w)),
+  'sector-c': PILE_UW.map(([u, w]) => railToPhoto(u, w)),
 };
 export const PILES: Record<TankId, readonly P2[]> = { 'sector-a': pts(PILE_PX['sector-a']), 'sector-c': pts(PILE_PX['sector-c']) };
 /** 더미의 가장 높은 곳 (적재율 100%) */
-export const PILE_MAX_H = 1.6;
+export const PILE_MAX_H = 1.9;
 
 // ── 베일 적치 구역 ────────────────────────────────────────────────────
 
-/** 북서 구역(ㄱ자, 고정 재고 "예시")과 남동 구역(ㄴ자, 서버 베일을 쌓는 곳)의 윤곽 */
+/** 북서 구역(ㄱ자, 적치 재고: 상차는 여기서)과 남동 구역(ㄴ자, 새 베일을 쌓는 곳)의 윤곽 (사진 노랑 표시) */
 export const BALE_AREA_PX = {
   nw: [
     [262, 22],
@@ -303,23 +449,30 @@ export const BALE_AREA_PX = {
     [395, 455],
     [300, 535],
     [285, 540],
-    [245, 488],
-    [240, 470],
-    [325, 398],
-    [366, 406],
-    [386, 392],
+    [250, 495],
+    [246, 480],
+    [325, 410],
+    [366, 410],
+    [386, 396],
     [384, 345],
   ] as readonly P2[],
 };
 export const BALE_AREAS = { nw: pts(BALE_AREA_PX.nw), se: pts(BALE_AREA_PX.se) } as const;
+/** 북쪽 그물망을 따라 숲 경계에 늘어선 베일 줄 (사진 px, 3단) */
+export const NORTH_ROW_PX: readonly [P2, P2] = [
+  [274, 14],
+  [404, 34],
+];
 
 /**
- * 남동 구역의 지게차 좌표계(마당 좌표계): 원점은 사진 (250.7, 483.3)px, +x는 ㄴ자 아랫줄의 긴 방향(사진 동북동),
- * +z는 그 직각으로 구역 안쪽(사진 남남동). 지게차 길은 z = 0의 한 줄이고, 칸은 길 앞(+z) 한 줄에 열을 늘어놓는다.
- * 베일 적치·출하 연출(sim/yard.ts)은 이 좌표계에서 돈다. 그리는 쪽은 YARD_FRAME으로 월드에 옮긴다.
+ * 마당 좌표계: 레일 좌표계를 뒤집어 남동 구역에 맞춘 것. +x = −u(사진 동북동, 남동 구역 줄 방향), +z = +w(사진 남남동, 구역 안쪽),
+ * 원점은 레일 좌표 (u 26, w 132)px. 레일 축과 나란해서 압축기 배출구·받침대·베일 저울이 축에 맞는다.
+ * 베일 적치·지게차 연출(sim/yard.ts)은 이 좌표계에서 돈다. 그리는 쪽은 YARD_FRAME으로 월드에 옮긴다.
  */
-const YARD_O = sitePx(250.7, 483.3);
-const YARD_A = siteHeading(0.78, -0.63);
+const YARD_U0 = 26;
+const YARD_W0 = 132;
+const YARD_O = railPx(YARD_U0, YARD_W0);
+const YARD_A = RAIL_H + Math.PI;
 export const YARD_FRAME = { x: YARD_O[0], z: YARD_O[1], rotY: YARD_A } as const;
 
 /** 마당 좌표 → 월드 */
@@ -343,62 +496,85 @@ export function worldToYard(x: number, z: number, out: { x: number; z: number })
 }
 
 /** 사진 px → 마당 좌표 */
-function yardPx(x: number, y: number): P2 {
+export function yardPx(x: number, y: number): P2 {
   const [wx, wz] = sitePx(x, y);
   const o = worldToYard(wx, wz, { x: 0, z: 0 });
   return [o.x, o.z];
 }
+/** 레일 좌표(px) → 마당 좌표 (축이 나란하다) */
+const railYard = (u: number, w: number): P2 => [-(u - YARD_U0) * SITE_SCALE, (w - YARD_W0) * SITE_SCALE];
 
-const SLOT_X0 = 0.5;
-const SLOT_DX = 0.95;
-const SLOT_Z = 2.43;
-const LANE_END = 13;
-const restYard = worldToYardP2(BALE_REST[0], BALE_REST[2]);
-function worldToYardP2(x: number, z: number): P2 {
-  const o = worldToYard(x, z, { x: 0, z: 0 });
-  return [o.x, o.z];
-}
-/** 지게차가 북서 구역의 고정 재고에서 베일을 집는(또는 내려놓는) 자리: 사진 (299, 227)px, 북서쪽을 본다 */
-const NW_FACE = yardPx(299, 227);
-const NW_HEADING = siteHeading(-0.75, -0.67) - YARD_A;
+const PITCH_X = BALE.w + BALE_GAP;
+const SLOT_GAP = 2.43;
+
+/** 남동 구역의 칸 열(x): 길(z 0)은 구역 안쪽 가장자리를 따르고, 칸은 길 앞(+z) 한 줄 */
+const SE_XS = Array.from({ length: YARD_FLOW.seColumns }, (_, i) => 3.1 + i * PITCH_X);
+/** 북서 구역의 길·칸 줄: 구역의 남동 면(마당 쪽)을 따라 길(z −13.5)을 두고, 칸은 길 뒤(−z, 북서 쪽) 한 줄 */
+const NW_LANE_Z = -13.47;
+const NW_XS = Array.from({ length: YARD_FLOW.nwColumns }, (_, i) => 11.0 + i * PITCH_X);
+
+/** 배출구 받침대: 남동 벽(w 66px)에서 마당 쪽으로 베일 세 개 길이. 새 베일이 나오면 앞 베일이 밀려 한 칸씩 나간다 */
+const STAND_X = railYard(80, 0)[0];
+const STAND_OUTLET_Z = railYard(0, 66)[1];
+const STAND_PITCH = BALE.d + 0.04;
+const STAND = {
+  x: STAND_X,
+  /** 받침대 위 자리(베일 가운데 z): 끝(지게차가 집는 곳)이 0번 */
+  slots: [0, 1, 2].map((k) => STAND_OUTLET_Z + 0.05 + (2.5 - k) * STAND_PITCH) as readonly number[],
+  pitch: STAND_PITCH,
+  /** 받침대 윗면 높이 */
+  y: 0.5,
+  /** 배출구 안쪽(결속부 끝): 새 베일이 여기서 나온다 */
+  fromZ: STAND_OUTLET_Z - 0.55,
+  outletZ: STAND_OUTLET_Z,
+  length: 3 * STAND_PITCH + 0.1,
+} as const;
+/** 베일 저울: 배출구 오른쪽(마당 쪽, 레일 좌표 u 58, w 83px). 베일 두 개를 위아래로 겹쳐 올려 한 번에 잰다 (무게 숫자 없음) */
+const BALE_SCALE_POS = railYard(58, 83);
+const BALE_SCALE = { x: BALE_SCALE_POS[0], z: BALE_SCALE_POS[1], y: 0.16, size: 1.3 } as const;
 
 /**
- * 남동 마당 (마당 좌표계). 칸은 길 앞 한 줄(slotZ)에 열(slotXs)을 늘어놓고 칸마다 levels단까지 쌓는다.
- * 배출구는 길의 서쪽 끝 곁에 있고, 지게차는 길에서 배출구 쪽(−w)을 보고 들어가 베일을 든다(chute).
- * 길 동쪽 끝(laneEnd)에서 북쪽으로 마당을 가로질러(crossing) 북서 구역으로 오간다.
+ * 마당(마당 좌표계)의 자리와 길.
+ *  - 남동: 길 laneZ(0), 칸 줄 seXs × levels (길 앞 +z, slotZ)
+ *  - 북서: 길 nwLaneZ, 칸 줄 nwXs × levels (길 뒤 −z, nwSlotZ)
+ *  - 받침대(stand)·저울(scale)은 남동 길의 서쪽 끝 뒤(−z)에 있다
+ *  - 가로지르는 길(crossing): 남동 길 동쪽 끝 → 마당 가운데(트럭 길) → 북서 길 동쪽 끝. 트럭과 같은 마당 차례를 잡고 지난다
  */
 export const YARD = {
   laneZ: 0,
-  slotZ: SLOT_Z,
-  pocketZ: SLOT_Z - FORK_REACH,
-  slotXs: Array.from({ length: YARD_FLOW.columns }, (_, i) => SLOT_X0 + i * SLOT_DX) as readonly number[],
+  slotZ: SLOT_GAP,
+  seXs: SE_XS as readonly number[],
+  nwLaneZ: NW_LANE_Z,
+  nwSlotZ: NW_LANE_Z - SLOT_GAP,
+  nwXs: NW_XS as readonly number[],
   levels: YARD_FLOW.levels,
-  /** 지게차 대기 자리(칸 줄 동쪽 밖, ㄴ자 안쪽 모서리). 길 앞(+z) 칸 앞 자리 높이 */
-  homes: [[9.05, SLOT_Z - FORK_REACH], [10.95, SLOT_Z - FORK_REACH]] as readonly P2[],
-  /** 길의 서쪽·동쪽 끝(x) */
-  laneStart: -5.2,
-  laneEnd: LANE_END,
-  /** 배출구 앞 자리: 지게차 중심과 바라보는 방향(마당 좌표계) */
-  chute: {
-    x: restYard[0] + Math.cos(CHUTE_HEADING - YARD_A) * FORK_REACH,
-    z: restYard[1] - Math.sin(CHUTE_HEADING - YARD_A) * FORK_REACH,
-    heading: CHUTE_HEADING - YARD_A + Math.PI,
-  },
-  /** 북서 고정 재고 앞 자리(지게차 중심, 바라보는 방향): 상차할 베일을 꺼내는 곳 */
-  stock: { x: NW_FACE[0], z: NW_FACE[1], heading: NW_HEADING },
-  /**
-   * 출하된 서버 베일을 북서 재고에 내려놓는 곳: 재고 동쪽 면(사진 338, 152px, 서쪽을 본다). 상차용 자리와 떨어져 있어
-   * 상차 지게차가 재고 앞에 머무는 동안에도 출하 베일을 옮길 수 있다. 가로지르는 길의 둘째 점에서 갈라져 이 점들을 지난다
-   * (계근대 곁 대기 자리 QUEUE에 선 트럭과 한 차 폭 넘게 떨어지게: 그 트럭은 지게차가 비키기를 기다리지 않는다)
-   */
-  drop: { via: [yardPx(332, 238), yardPx(332, 164)] as readonly P2[], x: yardPx(338, 152)[0], z: yardPx(338, 152)[1], heading: siteHeading(-1, 0) - YARD_A },
-  /** 길 동쪽 끝에서 북서 구역까지 가로지르는 길의 꺾이는 점(마당 좌표계): 남동 구역 서쪽 가장자리를 따라 북쪽으로, 레일·트럭 자리를 피한다. 첫 점은 트럭 길 밖의 대기점 */
-  crossing: [yardPx(377, 352), yardPx(374, 300), yardPx(330, 262), yardPx(310, 238)] as readonly P2[],
+  pitchX: PITCH_X,
+  /** 남동 길의 서쪽 끝(받침대 앞)·동쪽 끝(가로지르는 길로 나가는 곳) */
+  laneStart: STAND_X - 0.6,
+  laneEnd: SE_XS[SE_XS.length - 1]! + 1.2,
+  /** 북서 길의 동쪽 끝 (가로지르는 길이 닿는 곳) */
+  nwLaneEnd: NW_XS[NW_XS.length - 1]! + 1.2,
+  stand: STAND,
+  scale: BALE_SCALE,
+  /** 지게차 대기 자리 (남동 길 뒤 −z, 받침대·저울 동쪽): 길에서 도는 원이 닿지 않는 곳 */
+  homes: [
+    [0.25, -2.75],
+    [1.7, -2.75],
+  ] as readonly P2[],
+  /** 남동 길 동쪽 끝 → 북서 길 동쪽 끝: 꺾이는 점 (사진 px로 잡아 옮긴다). 상차 자리·쏟는 자리·대기 자리 트럭을 피한다 */
+  crossing: [yardPx(338, 398), yardPx(334, 330), yardPx(331, 262)] as readonly P2[],
 } as const;
 
-// ── 트럭 경로 (사진 px로 적고 옮긴다) ─────────────────────────────────
+/** 마당 좌표 → 월드 (그리는 쪽) */
+export function yardPoint(x: number, z: number): P2 {
+  const o = yardToWorld(x, z, { x: 0, z: 0 });
+  return [o.x, o.z];
+}
 
-export const TRUCK = { length: 2.9, width: 1.16 } as const;
+// ── 트럭 자리·경로 (사진 px로 적고 옮긴다) ─────────────────────────────
+
+/** 트럭(덤프·윙바디) 크기: 모형을 1.4배로 키운 값 */
+export const TRUCK = { length: 4.06, width: 1.62, scale: 1.4 } as const;
 
 /** 도로 차로의 가운데 선: 남쪽으로 가는 차로(부지 쪽, 서쪽)를 따라간다 */
 function roadLanePx(offset: number): P2[] {
@@ -409,7 +585,6 @@ function roadLanePx(offset: number): P2[] {
     const dx = b[0] - a[0];
     const dy = b[1] - a[1];
     const len = Math.hypot(dx, dy) || 1;
-    // 남쪽으로 가는 방향의 오른쪽(서쪽)
     out.push([ROAD_PX[i]![0] - (dy / len) * offset, ROAD_PX[i]![1] + (dx / len) * offset]);
   }
   return out;
@@ -427,105 +602,112 @@ const spot = (x: number, y: number, dx: number, dy: number): Spot => {
   return { x: wx, z: wz, heading: siteHeading(dx, dy) };
 };
 
-/** 섹터 더미에 쏟는 자리 (적재함 뒤가 더미 쪽) */
-export const TIP: Record<TankId, Spot> = {
-  'sector-a': spot(196, 318, 16, -32),
-  'sector-c': spot(288, 338, 0, -1),
-};
-/** 상차 자리(남동 구역 곁, 입구 가까이): 상차 차량("예시")이 서서 베일을 싣는다. 남쪽 길에서 한 차 폭 떨어져 있다 */
-export const HOLD = spot(440, 320, 1, 0);
-/**
- * 배정 더미 앞에 다른 트럭이 있을 때 기다리는 자리(계근대 서쪽 위, 트레일러와 계근대 사이). 계근대를 비워 줘야
- * 쏟고 나서 다시 재러 오는 트럭과 서로 막히지 않는다
- */
-export const QUEUE = spot(372, 220, -1, 0);
-/** 계근대 위에 서는 자리: 들어올 때는 서쪽을 보고, 쏟고 다시 잴 때는 동쪽을 본다 */
-export const SCALE_STOP = spot(454, 247, -1, 0);
-export const SCALE_STOP_EAST = spot(458, 247, 1, 0);
-/** 도로에서 계근대가 빌 때까지 기다리는 자리 */
-export const ROAD_HOLD = spot(LANE_PX[3]![0], LANE_PX[3]![1], -18, 100);
+/** 레일의 반대 방향(사진 북동): 쏟는 트럭이 보는 방향 */
+const NE: P2 = [-PU[0], -PU[1]];
+const tipPx = (sign: 1 | -1): P2 => railToPhoto(-72, sign * 45);
+const plus = (p: P2, d: P2, k: number): P2 => [p[0] + d[0] * k, p[1] + d[1] * k];
 
-/** 도로(사진 위 끝, 북쪽) → 입구 북쪽 차로 → 계근대 (서쪽으로 서서 잰다). 서버의 "계중대 도착" 무렵 계근대에 닿게 사진 끝에서 들어온다 */
-export const TRUCK_IN: P2[] = pts([LANE_PX[1]!, LANE_PX[2]!, LANE_PX[3]!, [531, 270], [505, 270], [482, 248], [454, 247]]);
+/** 섹터 더미에 쏟는 자리: 더미 북동 면 바깥, 적재함 뒤가 더미 쪽(앞이 북동). A·C가 레일 축에 대칭이다 */
+export const TIP_PX: Record<TankId, P2> = { 'sector-a': tipPx(-1), 'sector-c': tipPx(1) };
+export const TIP: Record<TankId, Spot> = {
+  'sector-a': spot(...TIP_PX['sector-a'], NE[0], NE[1]),
+  'sector-c': spot(...TIP_PX['sector-c'], NE[0], NE[1]),
+};
+/** 상차 자리(남동 구역 북동 날개 곁): 남쪽을 보고 선다. 지게차가 서쪽 곁에서 북서 재고의 베일을 싣는다 */
+export const HOLD = spot(366, 345, 0, 1);
+/** 배정 더미 앞에 다른 트럭이 있을 때 기다리는 자리 (계근대 서쪽 위, 서쪽을 봄) */
+export const QUEUE = spot(384, 217, -1, 0);
+/** 계근대 위에 서는 자리: 입차 계근은 서쪽을 보고(후진으로 올라옴), 출차 계근은 동쪽을 본다(앞으로 올라옴) */
+export const SCALE_STOP = spot(456, 247, -1, 0);
+export const SCALE_STOP_EAST = spot(456, 247, 1, 0);
+/** 계근대 서쪽 끝 앞: 입차 차가 서쪽을 보고 서서 후진으로 계근대에 오르는 곳 */
+export const SCALE_WEST = spot(372, 250, -1, 0);
+/** 도로에서 계근대가 빌 때까지 기다리는 자리 (남쪽으로 가는 차로, 입구 북쪽). 앞에서부터 차례로 줄 선다 */
+export const ROAD_HOLDS: readonly Spot[] = [3, 2, 1].map((i) => {
+  const p = LANE_PX[i]!;
+  const next = LANE_PX[i + 1]!;
+  return spot(p[0], p[1], next[0] - p[0], next[1] - p[1]);
+});
+export const ROAD_HOLD = ROAD_HOLDS[0]!;
+
+const RAMP_IN_PX: P2[] = [
+  [527, 296],
+  [500, 306],
+  [470, 305],
+  [440, 302],
+  [410, 285],
+  [392, 262],
+  [372, 250],
+];
+/** 도로(사진 위 끝, 북쪽) → 도로 대기 자리 */
+export const TRUCK_IN: P2[] = pts([LANE_PX[0]!, LANE_PX[1]!, LANE_PX[2]!, LANE_PX[3]!]);
+/** 도로 대기 자리 → 경사로로 올라 → 계근대 서쪽 끝 앞(서쪽을 봄) */
+export const ROAD_TO_SCALE: P2[] = pts([LANE_PX[3]!, ...RAMP_IN_PX]);
 /** 도로 대기 자리 → 입구에 들어가지 않고 도로를 따라 남쪽 밖으로 (들어오기 전에 출차 단계가 온 드문 차) */
 export const ROAD_PASS_BY: P2[] = pts(LANE_PX.slice(3));
-/** 도로 대기 자리 → 계근대 (TRUCK_IN의 뒷부분) */
-export const ROAD_TO_SCALE: P2[] = pts([LANE_PX[3]!, [531, 270], [505, 270], [482, 248], [454, 247]]);
+/** 계근대 서쪽 끝 앞 → 후진으로 계근대 위 (입차 계근) */
+export const SCALE_REVERSE_IN: P2[] = pts([
+  [372, 250],
+  [400, 248],
+  [456, 247],
+]);
+/** 계근대 위(동쪽을 봄) → 후진으로 서쪽에 내려옴 (출차 계근 뒤) */
+export const SCALE_REVERSE_OUT: P2[] = pts([
+  [456, 247],
+  [410, 248],
+  [380, 250],
+]);
+/** 계근대 서쪽에 내려온 곳(동쪽을 봄) → 경사로로 내려가 → 도로(남쪽 밖) */
+export const SCALE_TO_OUT: P2[] = pts([[380, 250], [420, 268], [460, 300], [486, 308], [500, 310], [516, 318], LANE_PX[5]!, LANE_PX[6]!, LANE_PX[7]!, LANE_PX[8]!, LANE_PX[9]!, LANE_PX[10]!]);
 
-/** 계근대 → 서쪽 차로 → 섹터 앞에서 꺾는 자리 */
+/** 계근대(서쪽을 봄) → 앞으로 내려가 → 더미 앞에서 후진할 자리 */
 const TO_TIP_PX: Record<TankId, readonly P2[]> = {
   'sector-a': [
-    [454, 247],
-    [396, 247],
-    [330, 264],
-    [250, 284],
-    [158, 284],
+    [456, 247],
+    [396, 248],
+    [330, 262],
+    [244, 278],
   ],
   'sector-c': [
-    [454, 247],
-    [396, 247],
-    [340, 262],
-    [268, 282],
+    [456, 247],
+    [396, 250],
+    [340, 290],
+    [300, 316],
   ],
 };
-/** 꺾는 자리에서 더미 쪽으로 후진해 쏟는 자리까지 */
+/** 후진할 자리 → 동쪽으로 물렸다가 더미 쪽으로 후진해 쏟는 자리까지 */
 const REVERSE_PX: Record<TankId, readonly P2[]> = {
-  'sector-a': [
-    [158, 284],
-    [212, 286],
-    [196, 318],
-  ],
-  'sector-c': [
-    [268, 282],
-    [296, 286],
-    [288, 338],
-  ],
+  'sector-a': [[244, 278], [270, 276], plus(TIP_PX['sector-a'], NE, 26), TIP_PX['sector-a']],
+  'sector-c': [[300, 316], [326, 318], plus(TIP_PX['sector-c'], NE, 26), TIP_PX['sector-c']],
 };
-/** 쏟는 자리 → 서쪽 차로를 거슬러(마당 차례를 잡았을 때만) → 계근대 서쪽 끝으로 올라 동쪽을 보고 다시 잰다 */
+/** 쏟는 자리 → 앞으로 북동쪽 → 계근대 서쪽 끝에서 앞으로 올라 동쪽을 보고 다시 잰다 (출차 계근) */
 const TIP_TO_SCALE_PX: Record<TankId, readonly P2[]> = {
-  'sector-a': [
-    [196, 318],
-    [210, 290],
-    [262, 284],
-    [330, 268],
-    [396, 251],
-    [424, 247],
-    [458, 247],
-  ],
-  'sector-c': [
-    [288, 338],
-    [290, 302],
-    [330, 280],
-    [396, 252],
-    [424, 247],
-    [458, 247],
-  ],
+  'sector-a': [TIP_PX['sector-a'], plus(TIP_PX['sector-a'], NE, 34), [330, 262], [396, 248], [456, 247]],
+  'sector-c': [TIP_PX['sector-c'], plus(TIP_PX['sector-c'], NE, 34), [340, 285], [396, 250], [456, 247]],
 };
-
-/** 기다리는 자리 → 서쪽 차로 → 섹터 앞에서 꺾는 자리 */
+/** 기다리는 자리 → 서쪽·남쪽으로 → 더미 앞에서 후진할 자리 */
 const QUEUE_TO_TIP_PX: Record<TankId, readonly P2[]> = {
   'sector-a': [
-    [372, 220],
-    [350, 224],
-    [336, 250],
-    [330, 264],
-    [250, 284],
-    [158, 284],
+    [384, 217],
+    [350, 220],
+    [330, 250],
+    [300, 268],
+    [244, 278],
   ],
   'sector-c': [
-    [372, 220],
-    [350, 224],
-    [336, 252],
-    [306, 272],
-    [268, 282],
+    [384, 217],
+    [350, 222],
+    [334, 256],
+    [322, 296],
+    [300, 316],
   ],
 };
-/** 계근대 → 서쪽으로 나가 북쪽으로 비켜 기다리는 자리 */
+/** 계근대(서쪽을 봄) → 앞으로 내려가 북쪽으로 비켜 기다리는 자리 */
 export const SCALE_TO_QUEUE: P2[] = pts([
-  [454, 247],
-  [422, 247],
-  [402, 222],
-  [372, 220],
+  [456, 247],
+  [420, 247],
+  [404, 224],
+  [384, 217],
 ]);
 
 export const truckToTip = (id: TankId): P2[] => pts(TO_TIP_PX[id]);
@@ -533,57 +715,44 @@ export const truckQueueToTip = (id: TankId): P2[] => pts(QUEUE_TO_TIP_PX[id]);
 export const truckReverse = (id: TankId): P2[] => pts(REVERSE_PX[id]);
 export const truckTipToScale = (id: TankId): P2[] => pts(TIP_TO_SCALE_PX[id]);
 
-/** 상차 자리 → 입구 안쪽으로 돌아 북쪽으로 → 계근대 (서쪽으로 서서 다시 잰다) */
-export const HOLD_TO_SCALE: P2[] = pts([
-  [440, 320],
-  [487, 320],
-  [487, 247],
-  [454, 247],
-]);
-/** 서쪽을 보고 잰 차(상차 차량, 쏟지 않고 출차하는 드문 차): 계근대 → 서쪽으로 나가 남쪽으로 돌아 → 남쪽 길로 동쪽 → 입구 남쪽 차로 → 도로(남쪽 밖) */
-export const SCALE_TO_OUT: P2[] = pts([
-  [454, 247],
-  [350, 247],
-  [350, 296],
-  [482, 296],
-  [506, 300],
-  LANE_PX[5]!,
-  LANE_PX[6]!,
-  LANE_PX[7]!,
-  LANE_PX[8]!,
-  LANE_PX[9]!,
-  LANE_PX[10]!,
-]);
-/** 다시 잰 트럭(동쪽을 봄): 계근대 → 동쪽 끝 → 입구 안쪽에서 남쪽으로 → 입구 남쪽 차로 → 도로(남쪽 밖) */
-export const SCALE_EAST_OUT: P2[] = pts([[458, 247], [497, 247], [503, 280], [521, 300], LANE_PX[5]!, LANE_PX[6]!, LANE_PX[7]!, LANE_PX[8]!, LANE_PX[9]!, LANE_PX[10]!]);
-/** 상차 차량(예시): 계근대 → 서쪽으로 나가 남쪽으로 돌아 → 상차 자리 */
+/** 상차 차량: 계근대(서쪽을 봄) → 상차 자리 (남쪽을 보고 선다) */
 export const SCALE_TO_HOLD: P2[] = pts([
-  [454, 247],
-  [342, 247],
-  [342, 320],
-  [440, 320],
+  [456, 247],
+  [400, 252],
+  [372, 290],
+  [366, 345],
 ]);
-/** 상차 차량이 다시 재러 갈 때 마당 안쪽 길을 벗어났다고 보는 곳: 입구 안쪽에서 북쪽으로 돈 뒤 (사진 px) */
-export const STRIP_CLEAR_PX: P2 = [487, 284];
-/** 쏟은 트럭이 다시 재러 갈 때 마당 안쪽 길을 벗어났다고 보는 곳: 계근대 서쪽 끝 (사진 px) */
+/** 상차 자리 → 후진으로 북쪽에 물림 */
+export const HOLD_REVERSE: P2[] = pts([
+  [366, 345],
+  [366, 292],
+]);
+/** 물린 곳(남쪽을 봄) → 마당 가운데에서 돌아 → 계근대 서쪽 끝에서 앞으로 올라 동쪽을 보고 잰다 */
+export const HOLD_TO_SCALE: P2[] = pts([
+  [366, 292],
+  [350, 312],
+  [322, 300],
+  [330, 268],
+  [370, 252],
+  [456, 247],
+]);
+
+/** 마당 안쪽 길을 벗어났다고 보는 곳: 계근대 서쪽 끝 (사진 px) */
 export const SCALE_WEST_PX: P2 = [424, 247];
-
 /** 마당 안쪽 길(트럭이 다니는 곳)에서 계근대 쪽 끝을 벗어났다고 보는 거리: 계근대 가운데에서 이만큼 서쪽 */
-export const SCALE_CLEAR = 5.2;
-/** 서쪽으로 돌아 나가는 차가 도로로 나가 입구를 지났다고 보는 자리(사진 y px) */
-export const OUT_CLEAR_PX_Y = 360;
-/** 동쪽으로 잰 트럭이 입구 북쪽 차로(들어오는 길) 아래로 내려섰다고 보는 자리(사진 y px) */
-export const EAST_OUT_CLEAR_PX_Y = 288;
+export const SCALE_CLEAR = 5.6;
+/** 나가는 차가 경사로를 내려가 도로에 올랐다고 보는 자리(사진 y px) */
+export const OUT_CLEAR_PX_Y = 352;
 
-/** 상차 차량(예시)에 베일을 놓는 자리: 적재함 위 (트럭 기준 앞뒤 거리, 단) */
+/** 상차 차량에 베일을 놓는 자리: 적재함 위 (트럭 기준 앞뒤 거리, 단) */
 export const LOAD_SLOTS: ReadonlyArray<readonly [number, number]> = [
-  [-1.05, 0],
-  [-0.15, 0],
-  [-1.05, 1],
-  [-0.15, 1],
+  [-1.55, 0],
+  [-0.55, 0],
+  [-1.55, 1],
+  [-0.55, 1],
 ];
 /** 상차 차량의 적재함 바닥 높이 */
-export const LOAD_BED_Y = 0.61;
+export const LOAD_BED_Y = 0.85;
 
 // ── 기준점 (핀·카메라) ────────────────────────────────────────────────
 
@@ -599,12 +768,12 @@ export function centroid(poly: readonly P2[]): P2 {
 }
 
 const railMid = railAt((RAIL.startU + RAIL.endU) / 2, 0);
-const balerCenter = railAt(BALER.x, -(BALER.minZ + BALER.strapZ) / 2);
+const balerCenter = railAt(BALER.x, -(BALER.backZ + BALER.outletZ) / 2);
 
 export function deviceCenter(id: DeviceId): V3 {
   if ((TANK_IDS as readonly string[]).includes(id)) {
     const [x, z] = centroid(PILES[id as TankId]);
-    return [x, 0.6, z];
+    return [x, 0.7, z];
   }
   if (id === 'robot-1') return [0, 1.6, 0];
   if (id === 'conveyor-z') return [railMid[0], (RAIL.startY + RAIL.endY) / 2, railMid[1]];
@@ -613,12 +782,8 @@ export function deviceCenter(id: DeviceId): V3 {
 
 export function devicePin(id: DeviceId): V3 {
   const [x, , z] = deviceCenter(id);
-  if ((TANK_IDS as readonly string[]).includes(id)) return [x, 2.5, z];
+  if ((TANK_IDS as readonly string[]).includes(id)) return [x, 2.8, z];
   if (id === 'robot-1') return [0, 4.1, 0];
   if (id === 'conveyor-z') return [x, 3.4, z];
-  return [x, 3.9, z];
+  return [x, 4.3, z];
 }
-
-/** 북서 고정 재고("예시") 이름표 자리 */
-const nwMid = centroid(BALE_AREAS.nw);
-export const STOCK_PIN: V3 = [nwMid[0], 2.6, nwMid[1]];
