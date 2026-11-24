@@ -24,12 +24,12 @@ const T5 = (plate: string, tareT: number): TruckFixture => ({ plate, tareT, netT
 const T11 = (plate: string, tareT: number): TruckFixture => ({ plate, tareT, netT: [6.6, 9.8] });
 
 export const COMPANIES: CompanyFixture[] = [
-  { name: '한빛자원', sectorId: 'tank-a1', trucks: [T11('12가 3456', 9.86), T5('87나 1203', 6.42)] },
-  { name: '동해페이퍼', sectorId: 'tank-a2', trucks: [T5('34다 7781', 6.51), T11('90라 4412', 10.12)] },
-  { name: '새솔리싸이클', sectorId: 'tank-b1', trucks: [T5('56마 2098', 6.33), T5('23바 6650', 6.78)] },
-  { name: '푸른들환경', sectorId: 'tank-b2', trucks: [T11('78사 5127', 9.64), T5('45아 8834', 6.47)] },
-  { name: '가람제지자원', sectorId: 'tank-a1', trucks: [T11('61자 9072', 10.05)] },
-  { name: '누리순환', sectorId: 'tank-b2', trucks: [T5('19차 3345', 6.6)] },
+  { name: '한빛자원', sectorId: 'sector-a', trucks: [T11('12가 3456', 9.86), T5('87나 1203', 6.42)] },
+  { name: '동해페이퍼', sectorId: 'sector-a', trucks: [T5('34다 7781', 6.51), T11('90라 4412', 10.12)] },
+  { name: '새솔리싸이클', sectorId: 'sector-c', trucks: [T5('56마 2098', 6.33), T5('23바 6650', 6.78)] },
+  { name: '푸른들환경', sectorId: 'sector-c', trucks: [T11('78사 5127', 9.64), T5('45아 8834', 6.47)] },
+  { name: '가람제지자원', sectorId: 'sector-a', trucks: [T11('61자 9072', 10.05)] },
+  { name: '누리순환', sectorId: 'sector-c', trucks: [T5('19차 3345', 6.6)] },
 ];
 
 /** 배합비 예시 (섹터 두 곳을 섞을 때의 %). 한 곳만 쓸 수 있으면 100% */
@@ -74,13 +74,13 @@ export const BATCH_TIMING_SEC = {
 
 /** 배치 하나에 로봇이 올리는 횟수 */
 export const PICKS_PER_BATCH = 5;
-/** 순중량 1 t가 섹터 적재율을 몇 %p 올리나 (예시 환산: 섹터 용량과 파지 밀도는 서버가 아는 값이다) */
-export const FILL_PERCENT_PER_TON = 1.4;
+/** 순중량 1 t가 섹터 적재율을 몇 %p 올리나 (예시 환산: 섹터 용량(노천 더미 16 m³)과 파지 밀도는 서버가 아는 값이다) */
+export const FILL_PERCENT_PER_TON = 0.7;
 /** 최근 목록 길이 (명세: 종류별 최근 20건 가정) */
 export const RECENT_LIMIT = 20;
 
 /** 하역 기록: 시작할 때 채워 둘 지난 날 수, 섹터마다 하루 하역 횟수 범위, 작업 시간(현장 시각), 기억할 날 수 */
-export const UNLOAD_HISTORY = { seedDays: 30, perSectorPerDay: [3, 7] as [number, number], workHours: [7, 18] as [number, number], keepDays: 40 };
+export const UNLOAD_HISTORY = { seedDays: 30, perSectorPerDay: [6, 14] as [number, number], workHours: [7, 18] as [number, number], keepDays: 40 };
 
 /** 배치 기록: 시작할 때 채워 둘 지난 날 수, 하루 배치 수 범위, 작업 시간(현장 시각), 건너뜀·일시정지됨 비율, 기억할 날 수 (차량 기록도 같은 기간을 기억한다) */
 export const BATCH_HISTORY = {

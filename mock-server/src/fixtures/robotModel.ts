@@ -5,7 +5,8 @@ export const ROBOT_MODEL: RobotModel = {
   deviceId: 'robot-1',
   axisCount: 6,
   joints: [
-    { name: 'base', minDeg: -170, maxDeg: 170, zeroDeg: 0 },
+    // base는 섹터 C(240°)까지 직선으로 돌 수 있게 ±270° (config/robotCycle.ts TANK_BASE_DEG)
+    { name: 'base', minDeg: -270, maxDeg: 270, zeroDeg: 0 },
     { name: 'shoulder', minDeg: -90, maxDeg: 90, zeroDeg: 0 },
     { name: 'elbow', minDeg: -135, maxDeg: 135, zeroDeg: 0 },
     { name: 'wrist1', minDeg: -180, maxDeg: 180, zeroDeg: 0 },

@@ -59,7 +59,7 @@ export const batchEvents = () => events;
 function event(batchId: string, type: BatchEvent['type'], actor: string, detail: string, baleId?: string, at = iso(Date.now())) {
   events.push({ id: `batch-event-${events.length + 1}`, batchId, type, actor, detail, ...(baleId ? { baleId } : {}), at });
 }
-const sectorCode = (id: TankId) => id.replace('tank-', '').toUpperCase();
+const sectorCode = (id: TankId) => id.replace('sector-', '').toUpperCase();
 const mixLabel = (mix: MixPart[]) => mix.map(m => `${sectorCode(m.sectorId)} ${m.percent}%`).join(' · ');
 /** 베일·기록에 남길 배합: 실제로 놓은 배합이 있으면 그것, 아니면 계획 */
 const pressedMix = (batch: Batch): MixPart[] => structuredClone(batch.actualMix?.length ? batch.actualMix : batch.mix);
@@ -172,7 +172,7 @@ function volumesFor(batch: Batch): Map<TankId, number> {
   return volumes;
 }
 
-/** 섹터별 부피 → 정수 % (합 100, 나머지가 큰 섹터부터 1씩 더한다). 섹터 순서는 A1·A2·B1·B2 */
+/** 섹터별 부피 → 정수 % (합 100, 나머지가 큰 섹터부터 1씩 더한다). 섹터 순서는 A·C */
 function percentMix(volumes: Map<TankId, number>): MixPart[] {
   const total = [...volumes.values()].reduce((a, b) => a + b, 0);
   if (total <= 0) return [];
@@ -622,8 +622,8 @@ function seedRecent(): void {
 
     const seq = pad(batchSeq - i, 4);
     const ratio = MIX_RATIOS[i % MIX_RATIOS.length] as [number, number];
-    const first = TANK_IDS[i % 4] as TankId;
-    const second = TANK_IDS[(i + 2) % 4] as TankId;
+    const first = TANK_IDS[i % TANK_IDS.length] as TankId;
+    const second = TANK_IDS[(i + 1) % TANK_IDS.length] as TankId;
     const done = at + 4 * 60_000;
     const batch: Batch = {
       id: `batch-${seq}`,
