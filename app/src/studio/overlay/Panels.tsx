@@ -1138,7 +1138,7 @@ const PIN_NAME: Partial<Record<DeviceId, string>> = { 'robot-1': '로봇팔', 'c
 
 export interface PinsProps extends PanelCommon {
   pins: MutableRefObject<PinElements>;
-  /** 출하 마당 칸이 다 차서 압축기가 기다린다: 압축기 핀에 알린다 */
+  /** 남동 적치 칸이 다 차서 압축기가 기다린다: 압축기 핀에 알린다 */
   yardFull?: boolean;
 }
 
@@ -1171,7 +1171,7 @@ export function Pins({ data, disconnected, selection, onSelect, pins, yardFull =
         const tone: DeviceStatus = disconnected || !line ? 'offline' : line.tone;
         const tank = device?.type === 'tank' ? device : null;
         const full = id === 'compressor-1' && yardFull;
-        const spoken = !line ? '불러오는 중' : disconnected ? STATUS_TEXT.offline : `${line.value}, ${line.statusText}${full ? ', 출하 마당 가득 참' : ''}`;
+        const spoken = !line ? '불러오는 중' : disconnected ? STATUS_TEXT.offline : `${line.value}, ${line.statusText}${full ? ', 적치 구역 가득 참' : ''}`;
         return (
           <button key={key} {...pinProps(key, `${DEVICE_NAMES[id]} ${spoken}`)} className={`st-pin st-pin-${tone}${tank ? ' st-pin-sector' : ''}`}>
             <span className="st-pin-card">
@@ -1187,7 +1187,7 @@ export function Pins({ data, disconnected, selection, onSelect, pins, yardFull =
               <span className="st-pin-text">
                 <small>{tank ? `${tank.grade}등급` : (PIN_NAME[id] ?? DEVICE_NAMES[id])}</small>
                 <strong>{!line ? '…' : disconnected ? '–' : line.value}</strong>
-                {full && <em className="st-pin-flag">출하 마당 가득 참</em>}
+                {full && <em className="st-pin-flag">적치 구역 가득 참</em>}
               </span>
             </span>
           </button>

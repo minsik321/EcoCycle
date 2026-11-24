@@ -106,7 +106,7 @@ export function StudioView({ data, jointSource, robotModel, tier, onFirstFrame, 
   const kpiOpen = useContext(KpiDetailOpenContext);
   const [selection, setSelection] = useState<string | null>(null);
   const [view, setView] = useState(DEFAULT_VIEW.key);
-  // 출하 마당 칸이 다 차서 압축기가 기다린다 (장면이 알려 준다)
+  // 남동 적치 칸이 다 차서 압축기가 기다린다 (장면이 알려 준다)
   const [yardFull, setYardFull] = useState(false);
   const root = useRef<HTMLElement>(null);
   const layout = useLayout(root);

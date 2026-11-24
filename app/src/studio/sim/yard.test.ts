@@ -113,7 +113,7 @@ function run(feed: Feed, seconds: number, director = new Director()): RunResult 
   return result;
 }
 
-describe('출하 마당: 생산 속도를 지게차가 따라간다', () => {
+describe('베일 적치·출하: 생산 속도를 지게차가 따라간다', () => {
   it('시연 원본(52초에 하나)을 10분 돌려도 마당이 쌓이지 않고 겹침이 없다', () => {
     const feed: Feed = (t) => demoData(T0, Math.floor(t)).bales as Bale[];
     const r = run(feed, 600);
@@ -217,7 +217,7 @@ describe('출하 마당: 생산 속도를 지게차가 따라간다', () => {
   });
 });
 
-describe('화면을 떠났다가 돌아온 출하 마당', () => {
+describe('화면을 떠났다가 돌아온 베일 적치 구역', () => {
   it('클램프를 닫고 운반하며 적치 후 열고 출하 후 빈 집게로 돌아온다', () => {
     const d = new Director();
     const bales = steadyFeed(40, 25)(0);

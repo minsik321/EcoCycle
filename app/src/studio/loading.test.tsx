@@ -138,7 +138,7 @@ describe('패널은 3D 조각을 기다리지 않는다', () => {
       const kpi = screen.getByRole('region', { name: '오늘 생산 베일' });
       expect(kpi.querySelector('.st-kpi-value')?.textContent).toMatch(/\d/);
       // 패널은 누를 수 있다: 지역 전환 목록을 연다 (3D가 없어도 화면이 막히지 않는다)
-      await user.click(screen.getByRole('button', { name: '지역: 섹터·로봇·압축' }));
+      await user.click(screen.getByRole('button', { name: '지역: 섹터·로봇' }));
       expect(within(screen.getByRole('listbox', { name: '카메라 지역' })).getByRole('option', { name: /부지 전체/ })).toBeInTheDocument();
       // 핀은 3D 장면이 자리를 계산해 줄 때까지 놓지 않는다
       expect(document.querySelector('.st-pins')).toBeNull();

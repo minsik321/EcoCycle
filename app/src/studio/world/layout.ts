@@ -304,7 +304,7 @@ export const BALE_AREAS = { nw: pts(BALE_AREA_PX.nw), se: pts(BALE_AREA_PX.se) }
 /**
  * 남동 구역의 지게차 좌표계(마당 좌표계): 원점은 사진 (250.7, 483.3)px, +x는 ㄴ자 아랫줄의 긴 방향(사진 동북동),
  * +z는 그 직각으로 구역 안쪽(사진 남남동). 지게차 길은 z = 0의 한 줄이고, 칸은 길 앞(+z) 한 줄에 열을 늘어놓는다.
- * 출하 마당 연출(sim/yard.ts)은 이 좌표계에서 돈다. 그리는 쪽은 YARD_FRAME으로 월드에 옮긴다.
+ * 베일 적치·출하 연출(sim/yard.ts)은 이 좌표계에서 돈다. 그리는 쪽은 YARD_FRAME으로 월드에 옮긴다.
  */
 const YARD_O = sitePx(250.7, 483.3);
 const YARD_A = siteHeading(0.78, -0.63);

@@ -193,7 +193,7 @@ const WORKERS: WorkerSpec[] = [
 ];
 
 export class Director {
-  /** 출하 마당의 베일·지게차 (그리는 쪽이 읽는다. 좌표는 마당 좌표계: world/layout의 YARD_FRAME) */
+  /** 베일 적치(남동)·출하의 베일·지게차 (그리는 쪽이 읽는다. 좌표는 마당 좌표계: world/layout의 YARD_FRAME) */
   get bales(): readonly BaleSim[] {
     return this.yard.bales;
   }
@@ -214,7 +214,7 @@ export class Director {
   /** 계근대·입구·도는 길 차례, 마당 안쪽 길·가로지르는 길 차례 */
   readonly scaleToken = new Token();
   readonly yardToken = new Token();
-  /** 출하 마당: 베일·지게차·칸 */
+  /** 베일 적치·출하: 베일·지게차·칸 */
   readonly yard = new Yard(this.yardToken);
   readonly lumps: LumpSim[] = [];
   readonly workers: WorkerSim[] = [];

@@ -120,21 +120,24 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     expect(truck.bedTilt).toBeCloseTo(1, 2);
     expect(truck.load).toBeLessThan(1);
 
-    // 하역이 끝나면 계근대로 돌아가 다시 재고(동쪽을 본다), 출차 단계가 올 때까지 그 위에서 기다린다
+    // 하역이 끝나도 출차 단계가 올 때까지는 더미 앞에서 기다린다 (계근대를 다음 트럭에 비워 준다)
     d.sync(input({ vehicles: [vehicle('v1', 'unloaded', 'sector-c', T0 + 60_000)] }), T0 + 60_000);
-    run(d, 20);
-    expect(truck.phase).toBe('atScale2');
-    expect(truck.x).toBeCloseTo(SCALE_STOP_EAST.x, 1);
-    expect(truck.z).toBeCloseTo(SCALE_STOP_EAST.z, 1);
+    run(d, 10);
+    expect(truck.phase).toBe('atTip');
+    expect(truck.bedTilt).toBeLessThan(0.02);
 
+    // 출차 단계가 오면 계근대로 돌아가 다시 재고(동쪽을 본다), 같은 입구(계근대와 남동 구역 사이)를 지나 남쪽 도로로 나간다
     d.sync(input({ vehicles: [vehicle('v1', 'departed', 'sector-c', T0 + 90_000)] }), T0 + 90_000);
-    // 같은 입구(계근대와 남동 구역 사이)를 지나 남쪽 도로로 나간다
+    let weighed: [number, number] | null = null;
     let throughGate = false;
-    run(d, 25, () => {
+    run(d, 40, () => {
       if (!truck.active) return;
+      if (truck.phase === 'atScale2') weighed = [truck.x, truck.z];
       const [x, y] = worldToPx(truck.x, truck.z);
-      if (x > 505 && x < 530 && y > 262 && y < 340) throughGate = true;
+      if (weighed && x > 505 && x < 530 && y > 262 && y < 340) throughGate = true;
     });
+    expect(weighed![0]).toBeCloseTo(SCALE_STOP_EAST.x, 1);
+    expect(weighed![1]).toBeCloseTo(SCALE_STOP_EAST.z, 1);
     expect(throughGate).toBe(true);
     expect(truck.active).toBe(false);
   });

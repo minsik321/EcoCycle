@@ -7,7 +7,7 @@ import { angleDelta, headingTo } from './paths';
 import type { P2, Path, Pose } from './paths';
 import type { Token } from './token';
 
-// 출하 마당의 연출. three 미사용, 테스트 가능. 좌표는 모두 "마당 좌표계"(world/layout의 YARD_FRAME: 남동 적치 구역에 맞춰 돈 좌표)다.
+// 베일 적치·출하의 연출. three 미사용, 테스트 가능. 좌표는 모두 "마당 좌표계"(world/layout의 YARD_FRAME: 남동 적치 구역에 맞춰 돈 좌표)다.
 //  - 남동 구역: 압축기 배출구에서 나온 서버 베일을 지게차가 길 앞 칸에 쌓는다. 칸은 고정이다: 열(YARD.slotXs) × 단(YARD.levels).
 //    베일은 서로 다른 칸에만 놓이고 같은 칸에 둘이 놓이지 않는다. 칸이 다 차면 압축기는 다음 베일을 내보내지 않고 기다린다(`yardFull`).
 //  - 북서 구역: 고정 재고("예시", world/buildWorld가 그린다). 서버 값이 아니고 쌓인 모양도 바뀌지 않는다.
