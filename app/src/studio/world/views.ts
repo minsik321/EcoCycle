@@ -39,11 +39,24 @@ export const TOP_VIEW: ViewPreset = { key: 'top', label: '위에서 보기', hin
 export const AREAS: readonly ViewPreset[] = [
   { key: 'process', label: '섹터·로봇', hint: '섹터 A·C 더미, 로봇팔', tier: 'mid', at: [210, 372], height: 0.4, distance: 44, azimuth: 26, polar: 50 },
   { key: 'inbound', label: '입구·계근대', hint: '입차, 계근, 번호판 인식, 출차', tier: 'mid', at: [462, 272], height: 0, distance: 42, azimuth: 30, polar: 50 },
-  { key: 'baler', label: '압축기·레일', hint: '경사 레일, 압축기 건물, 배출구', tier: 'mid', at: [160, 440], height: 0.6, distance: 40, azimuth: 18, polar: 50 },
-  { key: 'bales', label: '베일 적치', hint: '남동 적치, 지게차, 상차(예시)', tier: 'mid', at: [338, 378], height: 0.2, distance: 50, azimuth: 30, polar: 50 },
+  { key: 'baler', label: '압축기·레일', hint: '경사 레일, 압축기, 배출 받침대·베일 저울', tier: 'mid', at: [178, 462], height: 0.6, distance: 38, azimuth: 18, polar: 50 },
+  { key: 'bales', label: '베일 적치', hint: '남동 적치, 북서 재고, 지게차, 상차', tier: 'mid', at: [320, 330], height: 0.2, distance: 52, azimuth: 30, polar: 52 },
 ];
 
 export const VIEWS: readonly ViewPreset[] = [WIDE_VIEW, TOP_VIEW, ...AREAS];
+
+/**
+ * 현장 사진과 같은 방향의 화면 (지역 전환 목록에는 없다: 점검 스크립트가 사진과 나란히 견줄 때만 쓴다).
+ * entrance: 입구 남쪽 도로에서 서북서, gate: 입구에서 서쪽, weighbridge: 사무실 남동 모서리 도로에서 북서쪽,
+ * approach: 사무실 북동쪽 도로에서 남쪽, upperRoad: 남동 바깥 더 높은 도로에서 북서쪽
+ */
+export const PHOTO_VIEWS: Record<string, ViewPreset> = {
+  entrance: { key: 'photo-entrance', label: '입구에서', hint: 'entrance.png', tier: 'mid', at: [430, 312], height: 0.6, distance: 30, azimuth: 66, polar: 72 },
+  gate: { key: 'photo-gate', label: '입구 안에서 서쪽', hint: 'from-gate-inside.png', tier: 'mid', at: [350, 330], height: 0.8, distance: 26, azimuth: 92, polar: 74 },
+  weighbridge: { key: 'photo-weighbridge', label: '계근대 쪽', hint: 'weighbridge.png', tier: 'mid', at: [430, 236], height: 0.8, distance: 24, azimuth: 46, polar: 72 },
+  approach: { key: 'photo-approach', label: '북동 도로에서', hint: 'approach.png', tier: 'mid', at: [470, 230], height: 0.6, distance: 30, azimuth: 160, polar: 72 },
+  upperRoad: { key: 'photo-upper-road', label: '남동 도로에서', hint: 'from-upper-road.png', tier: 'mid', at: [380, 410], height: 0.8, distance: 32, azimuth: 40, polar: 68 },
+};
 export const DEFAULT_VIEW: ViewPreset = AREAS[0]!;
 
 /** 거리 단계별 기준 거리 (확대·축소 버튼이 이 단계를 오간다) */

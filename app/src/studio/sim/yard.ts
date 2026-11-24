@@ -146,6 +146,8 @@ const FACE_MINUS_Z = Math.PI / 2;
 const EJECT_SEC = 3.2;
 /** 두 베일을 한 번에 재는 동안 저울 위에 두는 시간(초, 연출) */
 export const WEIGH_SEC = 1.6;
+/** 압축기가 이만큼 넘게 기다리면 적치 구역이 가득 찬 것으로 알린다(초) */
+const FULL_AFTER_SEC = 20;
 /** 빈 포크 높이 */
 const LOW_FORK = 0.3;
 const IDLE_HOME_SEC = 0.4;
@@ -269,6 +271,8 @@ export class Yard {
   private seq = 0;
   /** 받침대 밀기(배출) 진행 0~1, 움직이지 않으면 -1 */
   private standMove = -1;
+  /** 내보낼 베일이 있는데 받침대가 막혀 기다린 시간(초) */
+  private blockedEjectT = 0;
   /** 저울 위 한 쌍을 잰 시간 */
   private weighT = 0;
   private readonly boxA = newBox();
@@ -584,7 +588,9 @@ export class Yard {
     this.stepBales();
     if (this.scaleCount() === 2 && !this.scaleBusy()) this.weighT += dt;
     this.dispatch();
-    const full = this.pending.length > 0 && !this.canEject();
+    // 압축기가 기다리는 것(받침대가 차서 내보내지 못함)이 잠깐이 아니면 "가득 참"으로 알린다 (평소 받침대 끝 베일을 집으러 오는 동안은 세지 않는다)
+    this.blockedEjectT = this.pending.length > 0 && !this.canEject() ? this.blockedEjectT + dt : 0;
+    const full = this.blockedEjectT > FULL_AFTER_SEC;
     if (full !== this.yardFull) {
       this.yardFull = full;
       this.events.onFull?.(full);

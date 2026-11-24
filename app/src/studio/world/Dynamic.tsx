@@ -16,7 +16,7 @@ import { buildFloor, disposeFloor } from '../three/floorTexture';
 import { bakeGroundShadow, disposeBaked } from '../three/bakedShadow';
 import { buildWorld, edgeDistance, inside } from './buildWorld';
 
-// 월드의 고정물과, 기기 값에 따라 움직이는 부분(벨트·램·더미). 입구에는 차단봉이 없다(차가 그대로 지난다).
+// 월드의 고정물과, 기기 값에 따라 움직이는 부분(벨트·램·더미). 입구는 열린 경사로다(차가 멈추지 않고 그대로 지난다).
 
 const HIT = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 /** 압축기 건물의 파란 지붕을 걷는 카메라 거리 (부지 전체에서는 사진처럼 덮여 보이고, 구역 거리부터는 안이 보인다) */

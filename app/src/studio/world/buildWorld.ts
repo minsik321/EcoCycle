@@ -790,6 +790,7 @@ function staticBale(k: Kit, x: number, y: number, z: number, rot: number, tone: 
 }
 
 const TONES = [C.kraft, C.kraftLight, C.paperGrey, C.kraftDark, C.kraftLight, C.paper];
+const tone = (n: number): string => TONES[((n % TONES.length) + TONES.length) % TONES.length]!;
 
 /** 마당 좌표의 격자(같은 방향·간격)로 다각형 안을 채운다. keep(x, z)이 false면 비운다. 블록(4열)마다 4단 또는 5단 */
 function baleBlocks(k: Kit, poly: readonly P2[], keep: (x: number, z: number) => boolean, seed: number): number {
@@ -817,7 +818,7 @@ function baleBlocks(k: Kit, poly: readonly P2[], keep: (x: number, z: number) =>
       const block = Math.floor(i / 4) * 7 + Math.floor(j / 3);
       const edge = Math.min(...corners.map((c) => edgeDistance(c, poly)));
       const levels = (edge < 0.9 ? 3 : 4) + ((block * 2654435761) >>> 0) % 2;
-      for (let l = 0; l < levels; l += 1) staticBale(k, wx, TOP + 0.06 + l * BALE.h, wz, YARD_FRAME.rotY - Math.PI / 2, TONES[(i * 3 + j * 5 + l + Math.floor(rnd() * 2)) % TONES.length]!);
+      for (let l = 0; l < levels; l += 1) staticBale(k, wx, TOP + 0.06 + l * BALE.h, wz, YARD_FRAME.rotY - Math.PI / 2, tone(i * 3 + j * 5 + l + Math.floor(rnd() * 2)));
       n += 1;
     }
   }
@@ -828,16 +829,17 @@ function bales(k: Kit): void {
   // 북서: 칸 줄(지게차가 쓰는 곳, 길 앞) 뒤쪽을 모두 채운다
   const nwBack = YARD.nwSlotZ - BALE.d / 2 - 0.1;
   baleBlocks(k, BALE_AREAS.nw, (_x, z) => z + BALE.d / 2 < nwBack, 11);
-  // 남동: 칸 줄·길·대기 자리 밖, 북동 날개(높은 벽)
-  const seLaneEnd = YARD.laneEnd + 0.8;
-  baleBlocks(k, BALE_AREAS.se, (x, z) => x > seLaneEnd || (z > YARD.slotZ + BALE.d / 2 + 0.1 && x > YARD.seXs[YARD.seXs.length - 1]! + 0.8), 23);
+  // 남동: 지게차 길·칸 줄·가로지르는 길 밖을 모두 채운다 (북동 날개는 입구에서 보이는 높은 벽)
+  const lane = (x: number, z: number) => x > YARD.laneStart - 1.2 && x < YARD.laneEnd + 0.4 && z > -2.2 && z < YARD.slotZ + BALE.d / 2 + 0.05;
+  const exit = (x: number, z: number) => x > YARD.laneEnd - 1.6 && x < YARD.laneEnd + 2.6 && z < 1.2;
+  baleBlocks(k, BALE_AREAS.se, (x, z) => !lane(x, z) && !exit(x, z), 23);
   // 북쪽 그물망 곁 숲 경계 줄 (3단)
   const [a, b] = NORTH_ROW_PX.map(([x, y]) => sitePx(x, y));
   const len = Math.hypot(b![0] - a![0], b![1] - a![1]);
   const rot = Math.atan2(-(b![1] - a![1]), b![0] - a![0]);
   for (let s = 0.5; s < len; s += BALE.d + BALE_GAP) {
     const p: P2 = [a![0] + ((b![0] - a![0]) * s) / len, a![1] + ((b![1] - a![1]) * s) / len];
-    for (let l = 0; l < 3; l += 1) staticBale(k, p[0], TOP + 0.06 + l * BALE.h, p[1], rot, TONES[(Math.round(s * 3) + l) % TONES.length]!);
+    for (let l = 0; l < 3; l += 1) staticBale(k, p[0], TOP + 0.06 + l * BALE.h, p[1], rot, tone(Math.round(s * 3) + l));
   }
 }
 

@@ -1,25 +1,135 @@
+// 3D 홈을 현장 사진과 견주는 스크린샷 (S2e): /scene-demo(예시 원본)와 실제 홈(모의 서버 + admin 로그인)을
+// 390×844·820×1180·1440×900에서 부지 전체·기본 구역·위에서 보기와, 현장 사진과 같은 방향의 화면으로 찍는다.
+//   node app/scripts/yardStatic.mjs   (로컬 Chromium 필요, 약 10~15분. 포트: SITE_SHOTS_PORT(앱, 기본 5522)·SITE_SHOTS_MOCK_PORT(모의 서버, 기본 5521))
+//   SITE_SHOTS_ONLY=demo|live 로 한쪽만 찍는다
+// 사진 방향 화면은 장면이 ?yardprobe 주소(실제 홈은 세션 저장소 'ecocycle.yardprobe')에서만 내주는 window.__studioView(key)(StudioScene, world/views의 PHOTO_VIEWS)로 카메라를 옮긴다.
+// 결과: docs/screenshots/studio/site-layout/{demo,live}-<화면>-<크기>.png
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright-core';
 import { findChromium, start } from './browserKit.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
-const out = path.join(root, 'docs/screenshots/studio/yard-static');
+const out = path.join(root, 'docs/screenshots/studio/site-layout');
 fs.mkdirSync(out, { recursive: true });
-const app = start('app', ['run', 'dev', '-w', '@ecocycle/app', '--', '--port', '5199', '--strictPort'], root, {}, 'Local:');
+const APP_PORT = process.env.SITE_SHOTS_PORT ?? '5522';
+const MOCK_PORT = process.env.SITE_SHOTS_MOCK_PORT ?? '5521';
+const ONLY = process.env.SITE_SHOTS_ONLY ?? '';
+const origin = `http://localhost:${APP_PORT}`;
+const SIZES = [
+  [390, 844],
+  [820, 1180],
+  [1440, 900],
+];
+/** 지역 전환 목록의 화면 (이름표 → 파일 이름) */
+const AREAS = [
+  [/부지 전체/, 'wide'],
+  [/섹터·로봇/, 'default'],
+  [/위에서 보기/, 'top'],
+];
+/** 사진 방향 화면 (모든 크기), 1440에서만 더 찍는 것 */
+const PHOTO = ['gate', 'weighbridge', 'upperRoad'];
+const PHOTO_WIDE_ONLY = ['entrance', 'approach'];
+const EXTRA_AREAS = [
+  [/입구·계근대/, 'inbound'],
+  [/압축기·레일/, 'baler'],
+  [/베일 적치/, 'bales'],
+];
+
+const exe = findChromium();
+if (!exe) {
+  console.error('Chromium을 찾지 못했습니다. CHROMIUM_PATH에 실행 파일 경로를 주세요.');
+  process.exit(2);
+}
+const live = ONLY !== 'demo';
+const mock = live ? start('mock', ['run', 'start', '-w', '@ecocycle/mock-server'], root, { PORT: MOCK_PORT, CORS_ORIGINS: origin }, '[mock-server]') : null;
+const app = start('app', ['run', 'dev', '-w', '@ecocycle/app', '--', '--port', APP_PORT, '--strictPort'], root, live ? { VITE_API_BASE: `http://localhost:${MOCK_PORT}/api/v1`, VITE_WS_BASE: `ws://localhost:${MOCK_PORT}/ws/v1/stream`, VITE_USE_MOCK: 'true' } : {}, 'Local:');
+
 let browser;
-try {
-  await app.ready;
-  browser = await chromium.launch({ executablePath: findChromium(), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  await page.goto('http://localhost:5199/scene-demo?tier=standard&yardprobe=1');
-  await page.waitForFunction(() => typeof window.__yardAudit === 'function', null, { timeout: 60000 });
-  await page.locator('.st-area-button').click();
-  await page.getByRole('option', { name: /베일 적치/ }).click();
+let failed = 0;
+async function area(page, name) {
+  // (폰 폭에서 클릭 뒤 "예정된 이동"을 기다리다 멈추는 일이 있어 요소의 click()을 직접 부른다)
+  await page.locator('.st-area-button').evaluate((el) => el.click());
+  await page.getByRole('option', { name }).first().evaluate((el) => el.click());
   await page.waitForTimeout(5000);
-  await page.screenshot({ path: path.join(out, 'three-fixed-bales.png') });
-  console.log(JSON.stringify(await page.evaluate(() => window.__yardAudit())));
+}
+async function photo(page, key) {
+  const ok = await page.evaluate((k) => window.__studioView?.(k) ?? false, key);
+  if (!ok) throw new Error(`사진 방향 화면 ${key}를 열지 못했다`);
+  await page.waitForTimeout(5000);
+}
+async function shots(page, prefix, width, height) {
+  const size = `${width}x${height}`;
+  for (const [name, file] of AREAS) {
+    await area(page, name);
+    await page.screenshot({ path: path.join(out, `${prefix}-${file}-${size}.png`) });
+    console.log(`✓ ${prefix} ${file} ${size}`);
+  }
+  for (const key of [...PHOTO, ...(width >= 1200 ? PHOTO_WIDE_ONLY : [])]) {
+    await photo(page, key);
+    await page.screenshot({ path: path.join(out, `${prefix}-photo-${key}-${size}.png`) });
+    console.log(`✓ ${prefix} photo ${key} ${size}`);
+  }
+  if (width >= 1200) {
+    for (const [name, file] of EXTRA_AREAS) {
+      await area(page, name);
+      await page.screenshot({ path: path.join(out, `${prefix}-${file}-${size}.png`) });
+      console.log(`✓ ${prefix} ${file} ${size}`);
+    }
+  }
+}
+
+try {
+  await Promise.all([app.ready, mock?.ready]);
+  browser = await chromium.launch({ executablePath: exe, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  for (const [width, height] of SIZES) {
+    const phone = width < 600;
+    if (ONLY !== 'live') {
+      const context = await browser.newContext({ viewport: { width, height }, hasTouch: phone, locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+      const page = await context.newPage();
+      page.on('pageerror', (e) => {
+        failed += 1;
+        console.log('PAGE ERROR', e.message);
+      });
+      await page.goto(`${origin}/scene-demo?tier=standard&yardprobe=1`);
+      await page.waitForFunction(() => typeof window.__studioView === 'function', null, { timeout: 180_000 });
+      // 시연 원본이 차량·베일을 몇 개 내보내도록 잠깐 돌린다
+      await page.waitForTimeout(20_000);
+      await shots(page, 'demo', width, height);
+      await context.close();
+    }
+    if (live) {
+      const context = await browser.newContext({ viewport: { width, height }, hasTouch: phone, locale: 'ko-KR', timezoneId: 'Asia/Seoul' });
+      await context.addInitScript(() => {
+        localStorage.setItem('ecocycle.homeMode', '3d');
+        sessionStorage.setItem('ecocycle.yardprobe', '1');
+      });
+      const page = await context.newPage();
+      page.on('pageerror', (e) => {
+        failed += 1;
+        console.log('PAGE ERROR', e.message);
+      });
+      await page.goto(`${origin}/login`);
+      await page.getByLabel('아이디').fill('admin');
+      await page.getByLabel('비밀번호').fill('1234');
+      await page.getByRole('button', { name: '로그인', exact: true }).click();
+      await page.waitForURL((u) => u.pathname === '/');
+      // 폰은 홈이 대시보드로 열릴 수 있다: 3D로 바꾼다
+      const tab3d = page.getByRole('tab', { name: '3D' });
+      if ((await tab3d.getAttribute('aria-selected')) !== 'true') await tab3d.evaluate((el) => el.click());
+      await page.waitForFunction(() => typeof window.__studioView === 'function', null, { timeout: 180_000 });
+      await page.waitForTimeout(20_000);
+      await shots(page, 'live', width, height);
+      await context.close();
+    }
+  }
+} catch (error) {
+  failed += 1;
+  console.error(String(error));
 } finally {
   await browser?.close();
   app.stop();
+  mock?.stop();
 }
+console.log(failed === 0 ? '✓ 현장 사진 비교 스크린샷' : '✗ 실패');
+process.exit(failed === 0 ? 0 : 1);
