@@ -146,7 +146,8 @@ describe('알람 검색 (실제 모의 서버)', () => {
     const byDevice = (await (await get('/alarms', { from: range(30).from, q: '압축기' })).json()) as Alarm[];
     expect(byDevice.length).toBeGreaterThan(0);
     expect(byDevice.every((a) => a.deviceId === 'compressor-1')).toBe(true);
-    const bySector = (await (await get('/alarms', { from: range(30).from, q: '섹터a1' })).json()) as Alarm[];
+    const bySector = (await (await get('/alarms', { from: range(30).from, q: '섹터a' })).json()) as Alarm[];
+    expect(bySector.length).toBeGreaterThan(0);
     expect(bySector.every((a) => a.deviceId === 'sector-a')).toBe(true);
     const byMessage = (await (await get('/alarms', { from: range(30).from, q: '적재율80%' })).json()) as Alarm[];
     expect(byMessage.length).toBeGreaterThan(0);
