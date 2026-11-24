@@ -5,7 +5,7 @@ import type { PerspectiveCamera } from 'three';
 import type { Director } from '../sim/director';
 import { useWaker } from './motion';
 import { angleDelta } from '../sim/paths';
-import { DEFAULT_VIEW, SITE, TIER_DISTANCE, WIDE_VIEW, closeDistance, siteHeading, sitePx, tierOf } from '../world/layout';
+import { DEFAULT_VIEW, TIER_DISTANCE, WIDE_VIEW, clampToSite, closeDistance, siteHeading, sitePx, tierOf } from '../world/layout';
 import type { ViewPreset, ViewTier } from '../world/layout';
 
 // 스튜디오 카메라. 거리는 세 단계(wide 부지 전체 / mid 한 구역 / close 대상 하나)이고 그 사이를 부드럽게 미끄러져 간다.
@@ -165,8 +165,8 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
       const a = cur.current.az * DEG;
       const upp = unitsPerPx();
       const fwd = (dy * upp) / Math.max(0.3, Math.cos(cur.current.pol * DEG));
-      g.x = Math.min(SITE.maxX + 4, Math.max(SITE.minX - 4, g.x + Math.sin(a) * dx * upp - Math.cos(a) * fwd));
-      g.z = Math.min(SITE.maxZ + 4, Math.max(SITE.minZ - 4, g.z + Math.cos(a) * dx * upp + Math.sin(a) * fwd));
+      // 보는 점은 부지(사진 사각형) 밖으로 나가지 않는다: 사진 좌표에서 맞춘다 (월드 축 상자는 돈 사진보다 넓다)
+      clampToSite(g.x + Math.sin(a) * dx * upp - Math.cos(a) * fwd, g.z + Math.cos(a) * dx * upp + Math.sin(a) * fwd, g);
     };
     const up = (e: PointerEvent) => {
       pointers.delete(e.pointerId);

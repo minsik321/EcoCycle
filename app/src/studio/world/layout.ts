@@ -56,6 +56,18 @@ export function worldToPx(x: number, z: number): P2 {
   return [X * COS - Z * SIN + SITE_ANCHORS.robot[0], X * SIN + Z * COS + SITE_ANCHORS.robot[1]];
 }
 
+/**
+ * 월드 바닥 점을 부지(사진 사각형 0~613 × 0~616px) 안으로 들인다: 사진 좌표로 되돌려 사각형에 맞춘 뒤 다시 월드로.
+ * 카메라를 끌어 옮길 때 보는 점이 부지 밖으로 나가지 않게 쓴다(사각형 가장자리를 따라 미끄러지므로 움직임이 끊기지 않는다)
+ */
+export function clampToSite(x: number, z: number, out: { x: number; z: number }): { x: number; z: number } {
+  const [px, py] = worldToPx(x, z);
+  const [cx, cz] = sitePx(Math.min(PHOTO.width, Math.max(0, px)), Math.min(PHOTO.height, Math.max(0, py)));
+  out.x = cx;
+  out.z = cz;
+  return out;
+}
+
 /** 사진에서 (dx, dy) 쪽을 보는 방향 → 월드 방향(라디안) */
 export const siteHeading = (dx: number, dy: number): number => photoHeading(dx, dy) + SITE_ROTATION;
 /** 사진 축에 맞춘 상자를 월드에 놓을 때의 회전(rotation.y) */

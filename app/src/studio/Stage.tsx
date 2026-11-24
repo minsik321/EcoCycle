@@ -21,7 +21,6 @@ import { Motion, MotionContext } from './three/motion';
 import { Rig } from './three/Rig';
 import type { RigApi } from './three/Rig';
 import { BalerParts, Belt, DeviceHits, GateArms, Piles, World } from './world/Dynamic';
-import { ParkedCars } from './world/ParkedCars';
 
 // 스튜디오의 3D 무대. 데이터는 모두 props와 Director로 받는다 (store를 직접 읽지 않는다).
 // 화질 단계(quality.ts)마다 그리는 것이 다르다: high는 실시간 부드러운 그림자·N8AO·빛 번짐·얕은 심도,
@@ -186,7 +185,6 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
         <Rig director={director} focusKey={selection} api={rig} inset={inset} />
 
         <World baked={baked} />
-        <ParkedCars />
         <Piles director={director} grades={grades} />
         <Belt director={director} />
         <BalerParts director={director} status={frozen ? 'offline' : balerStatus} />

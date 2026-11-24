@@ -19,6 +19,7 @@ import {
   TIP,
   YARD,
   centroid,
+  clampToSite,
   sitePx,
   siteHeading,
   worldToPx,
@@ -146,5 +147,29 @@ describe('남동 마당: 서버 베일 칸은 ㄴ자 구역 안에 있다', () =
     expect(px).toBeLessThan(200);
     expect(py).toBeGreaterThan(475);
     expect(py).toBeLessThan(505);
+  });
+});
+
+describe('카메라가 보는 점은 부지 밖으로 나가지 않는다 (clampToSite)', () => {
+  it('부지 밖 먼 점은 사진 사각형 가장자리로 들어오고, 안의 점은 그대로다', () => {
+    const out = { x: 0, z: 0 };
+    // 월드 축 상자 구석(사진 밖): 예전 끌기 범위로는 사진 (858, 28)px까지 갔다
+    for (const [x, z] of [
+      [43.56, 41.15],
+      [-80, 5],
+      [5, -80],
+      [200, 200],
+    ] as const) {
+      clampToSite(x, z, out);
+      const [px, py] = worldToPx(out.x, out.z);
+      expect(px).toBeGreaterThanOrEqual(-1e-6);
+      expect(px).toBeLessThanOrEqual(613 + 1e-6);
+      expect(py).toBeGreaterThanOrEqual(-1e-6);
+      expect(py).toBeLessThanOrEqual(616 + 1e-6);
+    }
+    const [ix, iz] = sitePx(300, 300);
+    clampToSite(ix, iz, out);
+    expect(out.x).toBeCloseTo(ix, 9);
+    expect(out.z).toBeCloseTo(iz, 9);
   });
 });

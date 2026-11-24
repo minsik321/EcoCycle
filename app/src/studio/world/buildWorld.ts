@@ -1,6 +1,6 @@
 import { TANK_IDS } from '@ecocycle/shared';
 import type { Group } from 'three';
-import { C, CAR_PAINTS } from '../theme';
+import { C } from '../theme';
 import { Kit } from '../three/kit';
 import type { Footprint } from '../three/kit';
 import { YARD_FLOW } from '../../config/yard';
@@ -31,12 +31,12 @@ import {
   railPx,
   sitePx,
 } from './layout';
-import { car, lamp, pallet } from './props';
+import { lamp, pallet } from './props';
 
 // 스튜디오 월드의 고정물. 전부 코드로 조립하고 재질별 메시 몇 개로 합친다. 배치는 모두 위성사진 좌표를 world/layout의 sitePx로 옮긴 값이다.
 // 압축기 건물 본동의 벽은 방향별로 따로 만들어 카메라 쪽 벽을 숨기고(안이 들여다보이는 "인형의 집" 방식), 파란 지붕은 가까이 오면 걷는다.
 // 모양은 참고 화면(docs/reference/)을 따른다: 흰 벽 + 지붕선·모서리·문틀의 파랑 선, 컨베이어 틀·압축기는 채도 높은 파랑, 모터·결속 타래는 노랑.
-// 주변은 북서쪽 숲과 동쪽 도로만 둔다 (도로 옆 주차 차량·이웃 건물은 넣지 않는다). 부지 안 사무실 동쪽 곁에 직원 차 두 대만 둔다(사진에 있는 자리).
+// 주변은 북서쪽 숲과 동쪽 도로만 둔다. 주차 차량·이웃 건물은 넣지 않고, 사무실 곁에 세워 둔 트레일러 하나만 둔다.
 
 export interface Wall {
   group: Group;
@@ -582,31 +582,6 @@ function utilities(k: Kit): void {
   }
 }
 
-export interface ParkedCar {
-  x: number;
-  z: number;
-  rotY: number;
-  paint: string;
-}
-
-/** 사무실 동쪽 곁에 세운 직원 차 (사진 px 자리, 남북으로 선다). 모델 파일이든 코드 모형이든 같은 자리 */
-export const PARKED: ParkedCar[] = (
-  [
-    [507, 150, 0],
-    [507, 182, 4],
-  ] as const
-).map(([x, y, paint]) => {
-  const [wx, wz] = sitePx(x, y);
-  return { x: wx, z: wz, rotY: SITE_ROT_Y - Math.PI / 2, paint: CAR_PAINTS[paint] ?? C.white };
-});
-
-/** 코드로 만든 주차 차량 (모델 파일을 못 받았을 때 쓰는 모형) */
-export function buildParkedCars(): Group {
-  const k = new Kit();
-  for (const c of PARKED) car(k, c.x, c.z, c.rotY, c.paint);
-  return k.build('parked-cars');
-}
-
 export function buildWorld(): World {
   const footprints: Footprint[] = [];
   const k = new Kit();
@@ -626,7 +601,6 @@ export function buildWorld(): World {
     rail(k);
     baler(k);
   });
-  for (const c of PARKED) footprints.push({ x0: c.x - 0.6, x1: c.x + 0.6, z0: c.z - 0.6, z1: c.z + 0.6, y0: 0, y1: 0.7 });
   const { main } = BALER_HOUSE;
   const houseCenter = railPx(mid(main.u0, main.u1), mid(main.w0, main.w1));
   return { base: k.build('world'), walls: houseWalls(footprints), roof: houseRoof(), houseCenter, footprints };

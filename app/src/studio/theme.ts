@@ -72,8 +72,6 @@ export const C = {
   gradeC: '#fbebd3',
 } as const;
 
-/** 주차된 승용차: 흰색·은색 사이에 산호색·청록·남색·파랑 몇 대 (첫 스튜디오 시안의 색) */
-export const CAR_PAINTS = [C.white, '#f08a7e', '#6fc7bb', '#7d8fb5', '#d9dde3', C.blue] as const;
 
 /**
  * 트럭 회사별 띠 색 (차분한 색). 회사 이름은 서버 값이고, 여기서는 이름 → 색을 고르기만 한다.
