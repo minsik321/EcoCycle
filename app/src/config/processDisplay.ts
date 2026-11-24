@@ -1,4 +1,5 @@
-import type { Bale, BaleStage, Batch, BatchResult, BatchStage, MixPart, RobotState, TankId, Vehicle, VehicleRecordStatus, VehicleStage } from '@ecocycle/shared';
+import type { Bale, BaleStage, Batch, BatchResult, BatchStage, MixPart, RobotState, TankId, Vehicle, VehicleKind, VehicleRecordStatus, VehicleStage } from '@ecocycle/shared';
+import { VEHICLE_KIND_TEXT } from '@ecocycle/shared';
 import { formatPressureMpa } from './display';
 
 // 공정 흐름(차량·배치·베일)을 화면에 적는 문구와 "공정 추적" 계산. 서버가 준 stage를 여섯 단계 칸에 옮겨 적을 뿐, 값을 만들지 않는다.
@@ -19,8 +20,24 @@ export const VEHICLE_STAGE_TEXT: Record<VehicleStage, string> = {
   identified: '인식 완료',
   unloading: '하역 중',
   unloaded: '하역 완료',
+  loading: '상차 중',
+  loaded: '상차 완료',
+  weighing_out: '출차 계근',
   departed: '출차',
 };
+
+/** 차량 종류 이름 ("입고"·"상차"). 서버 검색이 찾는 이름과 같다(`shared/search.ts`) */
+export const VEHICLE_KIND_LABEL: Record<VehicleKind, string> = VEHICLE_KIND_TEXT;
+
+/** 회사 안에 있는 차량: 출차(`departed`)하지 않은 입고·상차 차량(출차 계근 중 포함) */
+export const isOnSite = (vehicle: Pick<Vehicle, 'stage'>): boolean => vehicle.stage !== 'departed';
+
+/**
+ * 회사 안 차량 목록, 최근 것부터. 3D 홈 표·폰 시트 "차량" 탭의 목록이고 그 길이가 탭 숫자다(명세 3절, 장면의 트럭 대수와 같다).
+ * 출차한 차량은 "기록 보기"(공정 기록)에서 본다. 상태 판정은 서버 `stage` 그대로.
+ */
+export const onSiteVehicles = <V extends Pick<Vehicle, 'stage' | 'updatedAt'>>(vehicles: readonly V[]): V[] =>
+  vehicles.filter(isOnSite).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
 
 export const BATCH_STAGE_TEXT: Record<BatchStage, string> = {
   planned: '계획',
@@ -66,7 +83,17 @@ export function robotHoldText(robot: Pick<RobotState, 'heldSectorId' | 'phase' |
 export const VEHICLE_RECORD_STATUS_TEXT: Record<VehicleRecordStatus, string> = {
   identified: '인식',
   unloading: '하역',
+  loading: '상차',
+  weighing_out: '출차 계근',
   departed: '출차',
+};
+
+/**
+ * 공정 기록: 종류별 계중대 무게 이름표와 출차 계근 전 안내 (입고: 들어올 때 총중량·출차 계근 때 공차, 상차: 들어올 때 공차·출차 계근 때 총중량)
+ */
+export const VEHICLE_WEIGHT_TEXT: Record<VehicleKind, { first: string; second: string; pending: string; pendingShort: string }> = {
+  inbound: { first: '총중량 (입차)', second: '공차 (출차 계근)', pending: '공차와 순중량은 출차 계근 뒤에 확정됩니다.', pendingShort: '공차·순중량은 출차 계근 뒤' },
+  outbound: { first: '공차 (입차)', second: '총중량 (출차 계근)', pending: '총중량과 순중량은 출차 계근 뒤에 확정됩니다.', pendingShort: '총중량·순중량은 출차 계근 뒤' },
 };
 
 /** 공정 기록: 배치 결과. 진행 중이면 결과가 아직 없다(null) */
@@ -100,7 +127,10 @@ export interface CycleStep {
   select: string | null;
 }
 
-/** 입고 → 차량 인식 → 하역 → 배합 → 압축 → 출하. 각 칸에는 그 단계에 가장 최근 들어선 대상을 적는다 */
+/**
+ * 입고 → 차량 인식 → 하역 → 배합 → 압축 → 출하. 각 칸에는 그 단계에 가장 최근 들어선 대상을 적는다.
+ * 입고 차량의 출차 계근은 하역 칸에, 상차 차량(상차 중·상차 완료·출차 계근)은 출하 칸에 단계 이름(VEHICLE_STAGE_TEXT)으로 적는다.
+ */
 export function cycleSteps(data: ProcessLists): CycleStep[] {
   const { vehicles, batches, bales } = data;
   const arrivedNow = latest(vehicles, (v) => v.stage === 'arrived');
@@ -109,6 +139,8 @@ export function cycleSteps(data: ProcessLists): CycleStep[] {
   const identLast = identNow ?? latest(vehicles, (v) => !!v.stageTimes.identified);
   const unloadNow = latest(vehicles, (v) => v.stage === 'unloading');
   const unloadLast = unloadNow ?? latest(vehicles, (v) => !!v.stageTimes.unloading);
+  // 하역을 마치고 출차 계근 중인 입고 차량 (하역 칸에 함께 적는다)
+  const inboundWeighing = latest(vehicles, (v) => v.kind === 'inbound' && v.stage === 'weighing_out');
   const mixNow = latest(batches, (b) => b.stage === 'mixing');
   const mixLast = mixNow ?? latest(batches, (b) => !!b.stageTimes.mixing);
   const pressNow = latest(batches, (b) => b.stage === 'compressing');
@@ -116,6 +148,8 @@ export function cycleSteps(data: ProcessLists): CycleStep[] {
   const waiting = latest(bales, (b) => b.stage === 'created');
   const shipped = latest(bales, (b) => b.stage === 'shipped');
   const ship: Bale | undefined = waiting ?? shipped;
+  // 회사 안 상차 차량 (상차 · 출차 계근). 있으면 출하 칸은 이 차량을 적는다
+  const outboundNow = latest(vehicles, (v) => v.kind === 'outbound' && (v.stage === 'loading' || v.stage === 'loaded' || v.stage === 'weighing_out'));
 
   const vehicleKey = (v: Vehicle | undefined) => (v && v.stage !== 'departed' ? `veh:${v.id}` : null);
   return [
@@ -131,10 +165,16 @@ export function cycleSteps(data: ProcessLists): CycleStep[] {
     {
       key: 'unload',
       label: '하역',
-      active: !!unloadNow,
-      detail: unloadLast?.sectorId ? `섹터 ${SECTOR_LABEL[unloadLast.sectorId]}` : null,
-      at: unloadLast?.stageTimes.unloading ?? null,
-      select: unloadLast?.sectorId ? `dev:${unloadLast.sectorId}` : null,
+      active: !!unloadNow || !!inboundWeighing,
+      detail: unloadNow?.sectorId
+        ? `섹터 ${SECTOR_LABEL[unloadNow.sectorId]}`
+        : inboundWeighing
+          ? `${inboundWeighing.plate ?? ''} ${VEHICLE_STAGE_TEXT.weighing_out}`.trim()
+          : unloadLast?.sectorId
+            ? `섹터 ${SECTOR_LABEL[unloadLast.sectorId]}`
+            : null,
+      at: unloadNow?.stageTimes.unloading ?? inboundWeighing?.stageTimes.weighing_out ?? unloadLast?.stageTimes.unloading ?? null,
+      select: !unloadNow && inboundWeighing ? vehicleKey(inboundWeighing) : unloadLast?.sectorId ? `dev:${unloadLast.sectorId}` : null,
     },
     { key: 'mix', label: '배합', active: !!mixNow, detail: mixLast ? mixText(mixLast) : null, at: mixLast?.stageTimes.mixing ?? null, select: 'dev:robot-1' },
     {
@@ -148,10 +188,18 @@ export function cycleSteps(data: ProcessLists): CycleStep[] {
     {
       key: 'ship',
       label: '출하',
-      active: !!waiting,
-      detail: ship ? `베일 ${shortId(ship.id)} ${BALE_STAGE_TEXT[ship.stage]}` : null,
-      at: ship ? (ship.stageTimes.shipped ?? ship.stageTimes.created ?? null) : null,
-      select: waiting ? `bale:${waiting.id}` : null,
+      active: !!waiting || !!outboundNow,
+      detail: outboundNow
+        ? `${outboundNow.plate ?? ''} ${VEHICLE_STAGE_TEXT[outboundNow.stage]} · 베일 ${outboundNow.baleIds.length}개`.trim()
+        : ship
+          ? `베일 ${shortId(ship.id)} ${BALE_STAGE_TEXT[ship.stage]}`
+          : null,
+      at: outboundNow
+        ? (outboundNow.stageTimes[outboundNow.stage] ?? null)
+        : ship
+          ? (ship.stageTimes.shipped ?? ship.stageTimes.created ?? null)
+          : null,
+      select: outboundNow ? vehicleKey(outboundNow) : waiting ? `bale:${waiting.id}` : null,
     },
   ];
 }

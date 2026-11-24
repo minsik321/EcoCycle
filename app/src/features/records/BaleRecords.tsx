@@ -17,12 +17,13 @@ const COLUMNS: readonly Column<BaleRecord>[] = [
   { key: 'id', header: '베일', cell: (r) => <span className="font-semibold tabular-nums">{r.id}</span> },
   { key: 'batch', header: '배치', cell: (r) => <span title={r.batchId}>{shortId(r.batchId)}</span> },
   { key: 'pressure', header: '압력', align: 'right', cell: (r) => <span className="tabular-nums">{formatPressureMpa(r.pressureMpa)}</span> },
-  { key: 'moisture', header: '평균 수분', align: 'right', cell: (r) => <span className="tabular-nums">{formatPercent(r.avgMoisturePercent)}</span> },
+  { key: 'moisture', header: '평균 수분', align: 'right', hideOnNarrow: 'xl', cell: (r) => <span className="tabular-nums">{formatPercent(r.avgMoisturePercent)}</span> },
+  { key: 'vehicle', header: '실은 차량', cell: (r) => (r.vehicleId ? <span className="tabular-nums" title={r.vehicleId}>{shortId(r.vehicleId)}</span> : '–') },
   { key: 'stage', header: '상태', cell: (r) => <BaleStagePill stage={r.stage} /> },
 ];
 
 /**
- * 공정 기록의 "베일" 탭: 베일 ID, 생산 시각, 배치, 압력, 평균 수분, 상태(적치·출하).
+ * 공정 기록의 "베일" 탭: 베일 ID, 생산 시각, 배치, 압력, 평균 수분, 실은 상차 차량(출하된 베일), 상태(적치·출하).
  * 값은 모두 서버가 준다(`GET /bales/records`). 줄을 누르면 베일 팝업이 뜬다.
  */
 export function BaleRecords() {
@@ -39,6 +40,7 @@ export function BaleRecords() {
       detail={(r) => (
         <span className="tabular-nums">
           배치 {shortId(r.batchId)} · {formatPressureMpa(r.pressureMpa)} · 수분 {formatPercent(r.avgMoisturePercent)}
+          {r.vehicleId ? ` · 차량 ${shortId(r.vehicleId)}` : ''}
         </span>
       )}
       columns={COLUMNS}

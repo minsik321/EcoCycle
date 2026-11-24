@@ -20,7 +20,7 @@ export function RecordPopup({ target, previous, onClose, onOpen }: { target: Pop
           닫으면 이전 팝업({NAME[previous.kind]} {previous.kind === 'vehicle' ? previous.id : shortId(previous.id)})이 다시 보입니다
         </p>
       )}
-      {target.kind === 'vehicle' && <VehicleDetail id={target.id} />}
+      {target.kind === 'vehicle' && <VehicleDetail id={target.id} onOpen={onOpen} />}
       {target.kind === 'batch' && <BatchDetail id={target.id} onOpen={onOpen} />}
       {target.kind === 'bale' && <BaleDetail id={target.id} onOpen={onOpen} />}
     </Dialog>

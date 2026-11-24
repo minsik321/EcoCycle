@@ -35,6 +35,7 @@ function steadyFeed(everySec: number, shipAfterSec: number, keep = 14): Feed {
         id: `BL-${String(n).padStart(4, '0')}`,
         batchId: `batch-${n}`,
         stage: shipped ? 'shipped' : 'created',
+        vehicleId: null,
         stageTimes: shipped ? { created: iso(T0 + created * 1000), shipped: iso(T0 + (created + shipAfterSec) * 1000) } : { created: iso(T0 + created * 1000) },
         updatedAt: iso(T0 + created * 1000),
       });

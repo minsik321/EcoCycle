@@ -42,6 +42,8 @@ const processState: ProcessState = {
   vehicles: [
     {
       id: 'veh-20261013-031',
+      kind: 'inbound',
+      baleIds: [],
       stage: 'identified',
       plate: '12가 3456',
       companyName: '한빛자원',

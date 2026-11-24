@@ -47,6 +47,7 @@ beforeEach(() => {
     id,
     batchId: 'batch-0407',
     stage: 'created',
+    vehicleId: null,
     stageTimes: { created: '2026-10-15T04:24:10.000Z' },
     updatedAt: '2026-10-15T04:24:10.000Z',
     pressureMpa: 28.3,

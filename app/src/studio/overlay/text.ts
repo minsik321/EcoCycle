@@ -2,7 +2,7 @@ import type { DeviceState, DeviceStatus } from '@ecocycle/shared';
 import { PHASE_STEPS, ROBOT_STATUS_TEXT, ROBOT_STATUS_TONE, STATUS_TEXT, formatPercent, formatPressureMpa } from '../../config/display';
 
 // 스튜디오 패널의 문구. 공정 문구와 "공정 추적" 계산은 대시보드와 함께 쓰므로 config/processDisplay에 있다.
-export { BALE_STAGE_TEXT, BATCH_STAGE_TEXT, VEHICLE_STAGE_TEXT, cycleSteps, mixText, shortId } from '../../config/processDisplay';
+export { BALE_STAGE_TEXT, BATCH_STAGE_TEXT, VEHICLE_STAGE_TEXT, cycleSteps, mixText, onSiteVehicles, shortId } from '../../config/processDisplay';
 export type { CycleStep } from '../../config/processDisplay';
 
 /** 핀에 적을 한 줄과 상태 */

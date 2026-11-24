@@ -1,6 +1,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { COMMAND_RULES, TANK_IDS } from '@ecocycle/shared';
 import type { Alarm, CommandType, DeviceId, DeviceState, Permission, TankState } from '@ecocycle/shared';
+import { onSiteVehicles } from '../config/processDisplay';
 import type { RootState } from './index';
 
 // 화면은 state를 직접 뒤지지 않고 이 선택자를 쓴다.
@@ -72,3 +73,8 @@ export const selectIsCommandPending = (deviceId: DeviceId, type: CommandType) =>
   Object.values(state.commands.byKey).some(
     (e) => e.deviceId === deviceId && e.type === type && (e.status === "sending" || e.status === "accepted"),
   );
+
+// --- 공정 흐름 ---
+
+/** 회사 안 차량(출차하지 않은 입고·상차, 최근 것부터). 3D 홈 표·시트 "차량" 탭의 목록과 숫자 */
+export const selectOnSiteVehicles = createSelector([(state: RootState) => state.process.vehicles], (vehicles) => onSiteVehicles(vehicles));

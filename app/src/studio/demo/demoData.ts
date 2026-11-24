@@ -64,6 +64,9 @@ export function demoData(startMs: number, tSec: number): StudioData {
     const known = stage !== 'arrived';
     vehicles.push({
       id: `ex-veh-${String(n + 100).padStart(3, '0')}`,
+      // S2f 임시 맞춤: 예시 원본은 입고 차량만 만든다(상차 차량은 장면의 "예시" 상차가 맡는다, S2e가 다시 정함)
+      kind: 'inbound',
+      baleIds: [],
       stage,
       plate: known ? company.plate : null,
       companyName: known ? company.name : null,
@@ -121,6 +124,8 @@ export function demoData(startMs: number, tSec: number): StudioData {
         id: `ex-BL-${seq}`,
         batchId: batch.id,
         stage: shipped ? 'shipped' : 'created',
+        // S2f 임시 맞춤: 예시 원본에는 서버 상차 차량이 없어 실은 차량이 없다
+        vehicleId: null,
         stageTimes: shipped ? { created: iso(created), shipped: iso(created + SHIP_AFTER * 1000) } : { created: iso(created) },
         updatedAt: iso(shipped ? created + SHIP_AFTER * 1000 : created),
       });

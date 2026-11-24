@@ -235,7 +235,7 @@ export const RECORD_RANGES: ReadonlyArray<{ key: RecordRangeKey; label: string }
 
 /** 기록 목록별 검색 상자의 안내 글. 서버가 찾는 값과 같아야 한다 (명세 6절 "기록 목록"의 검색 대상 표) */
 export const RECORD_SEARCH_HINT = {
-  vehicles: '번호판, 회사 검색',
+  vehicles: '번호판, 회사, 입고·상차 검색',
   batches: '배치 ID, 섹터 검색',
   bales: '베일 ID, 배치 ID 검색',
   unloads: '번호판, 회사 검색',
