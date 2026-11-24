@@ -10,7 +10,7 @@ app/
 ├── vite.config.ts
 ├── capacitor.config.ts
 ├── .env.example          VITE_API_BASE, VITE_WS_BASE, VITE_USE_MOCK
-├── public/               아이콘, 장면용 작은 텍스처(미리 그린 바닥 그림자 등), `models/`(3D 홈의 glTF 모델과 라이선스), `studio/`(3D 홈을 준비하는 동안 덮는 포스터)
+├── public/               아이콘, 장면용 작은 텍스처(미리 그린 바닥 그림자 등), `models/`(3D 홈의 glTF 모델과 라이선스, 지금은 없음), `studio/`(3D 홈을 준비하는 동안 덮는 포스터)
 ├── android/              `npx cap add android`로 생성 — 미리 만들지 않는다
 └── src/
     ├── main.tsx, App.tsx, routes.tsx

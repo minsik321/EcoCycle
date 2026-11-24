@@ -58,6 +58,10 @@ try {
     };
     const bar = page.locator('header[data-topbar]');
     const home3d = async () => {
+      // 로그인하면 폰은 대시보드에서 시작하므로(기기별 시작 홈) 3D로 바꾼다
+      const tab3d = bar.getByRole('tab', { name: '3D' });
+      await tab3d.waitFor();
+      if ((await tab3d.getAttribute('aria-selected')) !== 'true') await tab3d.click();
       await page.waitForSelector('.st-root', { timeout: 30_000 });
       await page.waitForFunction(() => !document.querySelector('.st-poster'), null, { timeout: 90_000 }).catch(() => undefined);
       await page.waitForTimeout(1500);

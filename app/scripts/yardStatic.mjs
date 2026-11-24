@@ -15,7 +15,7 @@ try {
   await page.goto('http://localhost:5199/scene-demo?tier=standard&yardprobe=1');
   await page.waitForFunction(() => typeof window.__yardAudit === 'function', null, { timeout: 60000 });
   await page.locator('.st-area-button').click();
-  await page.getByRole('option', { name: /출하 마당/ }).click();
+  await page.getByRole('option', { name: /베일 적치/ }).click();
   await page.waitForTimeout(5000);
   await page.screenshot({ path: path.join(out, 'three-fixed-bales.png') });
   console.log(JSON.stringify(await page.evaluate(() => window.__yardAudit())));

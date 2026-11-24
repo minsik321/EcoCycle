@@ -10,7 +10,7 @@ shared/
 ├── package.json        name: @ecocycle/shared (소스를 그대로 내보낸다, 빌드 없음)
 └── src/
     ├── index.ts        재수출
-    ├── ids.ts          기기 ID 7개(상수 배열)와 DeviceId·TankId 등, deviceTypeOf
+    ├── ids.ts          기기 ID 5개(섹터 `sector-a`·`sector-c` + 로봇·컨베이어·압축기, 상수 배열)와 DeviceId·TankId 등, deviceTypeOf(`sector-*` → `tank`)
     ├── common.ts       IsoTimestamp, DeviceStatus, 단위 규칙(주석)
     ├── robot.ts        Phase, RobotStatus, RobotMode, RobotModel(제안안)
     ├── auth.ts         Role, Permission, Me, 로그인(remember·refreshTokenDelivery)·리프레시·로그아웃·ws-ticket 요청/응답,
@@ -22,7 +22,7 @@ shared/
     ├── process.ts      공정 흐름: Vehicle·Batch·Bale(stage와 stageTimes), ProcessState, PLANT_METRICS (제안안, 서버 합의 전)
     ├── alarms.ts       Alarm, AlarmLevel, AlarmState
     ├── cameras.ts      Camera, StreamInfo
-    ├── commands.ts     Command(type으로 구분), COMMAND_RULES(위험도·필요 권한·대상·confirm), CommandStatus, 202·조회 응답
+    ├── commands.ts     Command(type으로 구분), COMMAND_RULES(위험도·필요 권한·대상·confirm), CommandStatus, 202·조회 응답, 섹터 지정 개수(`PINNED_SECTORS_MIN/MAX` 1~2, `isValidPinnedSectors`)
     ├── ws.ts           Topic, ClientMessage, ServerMessage(9종, process.* 포함)
     └── errors.ts       ApiErrorBody(code는 문자열), 클라이언트가 구분하는 상태 코드(404 포함)
 ```
