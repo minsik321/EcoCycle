@@ -27,7 +27,7 @@ describe('Sidebar', () => {
   });
 
   it('지금 보는 화면을 표시한다 (홈은 다른 화면에서 켜지지 않는다)', () => {
-    renderWithStore(<Sidebar />, { route: '/tanks/tank-a1' });
+    renderWithStore(<Sidebar />, { route: '/tanks/sector-a' });
     expect(screen.getByRole('link', { name: '섹터' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: '홈' })).not.toHaveAttribute('aria-current');
   });
@@ -63,9 +63,9 @@ describe('Sidebar', () => {
     expect(screen.queryByLabelText(/활성 알람/)).not.toBeInTheDocument();
 
     act(() => {
-      store.dispatch(alarmReceived({ id: 'a1', level: 'caution', deviceId: 'tank-a1', message: 'm', state: 'active', ts: '2026-10-13T05:00:00.000Z' }));
-      store.dispatch(alarmReceived({ id: 'a2', level: 'alarm', deviceId: 'tank-b2', message: 'm', state: 'active', ts: '2026-10-13T05:01:00.000Z' }));
-      store.dispatch(alarmReceived({ id: 'a3', level: 'caution', deviceId: 'tank-a2', message: 'm', state: 'acknowledged', ts: '2026-10-13T05:02:00.000Z' }));
+      store.dispatch(alarmReceived({ id: 'a1', level: 'caution', deviceId: 'sector-a', message: 'm', state: 'active', ts: '2026-10-13T05:00:00.000Z' }));
+      store.dispatch(alarmReceived({ id: 'a2', level: 'alarm', deviceId: 'sector-c', message: 'm', state: 'active', ts: '2026-10-13T05:01:00.000Z' }));
+      store.dispatch(alarmReceived({ id: 'a3', level: 'caution', deviceId: 'sector-a', message: 'm', state: 'acknowledged', ts: '2026-10-13T05:02:00.000Z' }));
     });
     expect(screen.getByLabelText('활성 알람 2건')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /알람/ })).toHaveTextContent('2');

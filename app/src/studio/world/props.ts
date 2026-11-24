@@ -59,21 +59,3 @@ export function bale(k: Kit, x: number, y: number, z: number, rotY = 0): void {
     for (const dx of [-0.3, 0, 0.3]) k.box(C.dark, [0.028, h + 0.02, w + 0.02], [dx, -0.01, 0], { r: 0.008 });
   });
 }
-
-/** 주차된 승용차 (고정 소품). +X를 본다 */
-export function car(k: Kit, x: number, z: number, rotY: number, paint: string): void {
-  k.at([x, 0.02, z], rotY, () => {
-    k.box(paint, [1.55, 0.34, 0.74], [0, 0.13, 0], { r: 0.13, mat: 'gloss', seg: 4 });
-    k.box(paint, [0.86, 0.3, 0.66], [-0.1, 0.42, 0], { r: 0.12, mat: 'gloss', seg: 4 });
-    k.box(C.dark, [0.8, 0.2, 0.675], [-0.1, 0.46, 0], { r: 0.06 });
-    k.box(C.dark, [0.875, 0.2, 0.56], [-0.1, 0.46, 0], { r: 0.06 });
-    for (const dx of [-0.48, 0.48]) for (const dz of [-0.36, 0.36]) {
-      k.cyl(C.rubber, 0.16, 0.12, [dx, 0.16, dz], { axis: 'z', seg: 16 });
-      k.cyl(C.steelLight, 0.08, 0.125, [dx, 0.16, dz], { axis: 'z', seg: 12, mat: 'metal' });
-    }
-    for (const dz of [-0.25, 0.25]) {
-      k.box('#fff6d6', [0.03, 0.07, 0.16], [0.775, 0.3, dz], { r: 0.012, mat: 'glow', glow: 1.3 });
-      k.box(C.red, [0.03, 0.06, 0.16], [-0.775, 0.32, dz], { r: 0.012, mat: 'glow', glow: 1.2 });
-    }
-  });
-}

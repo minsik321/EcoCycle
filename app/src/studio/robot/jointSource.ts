@@ -73,11 +73,11 @@ function lerp(a: Pose, b: Pose, p: number): number[] {
 
 const CYCLE_SEC = DEMO_CYCLE.pickSec + DEMO_CYCLE.moveSec + DEMO_CYCLE.placeSec + DEMO_CYCLE.idleSec;
 
-/** 시연 동작의 한 시점: 탱크 4개를 차례로 돌며 집기 → 이동 → 놓기를 반복한다. 시각만으로 정해진다. */
+/** 시연 동작의 한 시점: 섹터를 차례로 돌며 집기 → 이동 → 놓기를 반복한다. 시각만으로 정해진다. */
 export function demoPose(tSec: number): JointSample {
   const t = ((tSec % (CYCLE_SEC * TANK_IDS.length)) + CYCLE_SEC * TANK_IDS.length) % (CYCLE_SEC * TANK_IDS.length);
   const index = Math.floor(t / CYCLE_SEC);
-  const tankId: TankId = TANK_IDS[index] ?? 'tank-a1';
+  const tankId: TankId = TANK_IDS[index] ?? 'sector-a';
   const base = TANK_BASE_DEG[tankId];
   const conveyor = DEMO_CYCLE.conveyorBaseDeg;
   const local = t - index * CYCLE_SEC;

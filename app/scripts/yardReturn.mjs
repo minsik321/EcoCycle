@@ -16,7 +16,7 @@ try {
   await page.goto('http://localhost:5198/scene-demo?tier=standard&yardprobe=1');
   await page.waitForFunction(() => typeof window.__yardAudit === 'function');
   await page.locator('.st-area-button').click();
-  await page.getByRole('option', { name: /출하 마당/ }).click();
+  await page.getByRole('option', { name: /베일 적치/ }).click();
   await page.waitForTimeout(2500);
   await page.evaluate(async () => {
     const { Director } = await import('/src/studio/sim/director.ts');

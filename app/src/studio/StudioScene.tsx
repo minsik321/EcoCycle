@@ -12,7 +12,7 @@ import type { StudioData } from './types';
 export interface StudioSceneProps extends Omit<StageProps, 'director' | 'robotSpec'> {
   data: StudioData;
   robotModel?: RobotModel;
-  /** 출하 마당 칸이 다 차서 압축기가 기다리기 시작하거나 멈췄을 때 (바뀔 때만) */
+  /** 남동 적치 칸이 다 차서 압축기가 기다리기 시작하거나 멈췄을 때 (바뀔 때만) */
   onYardFull?: (full: boolean) => void;
 }
 
@@ -34,11 +34,11 @@ export default function StudioScene({ data, robotModel, onYardFull, ...stage }: 
     };
   }, [director, onYardFull]);
 
-  // 점검용: 주소에 ?yardprobe가 있으면 출하 마당의 겹침·칸 정합을 읽는 함수를 내준다 (scripts/yardSoak.mjs). 화면 값에는 영향이 없다
+  // 점검용: 주소에 ?yardprobe가 있으면 베일 적치의 겹침·칸 정합과 트럭끼리의 겹침을 읽는 함수를 내준다 (scripts/yardSoak.mjs). 화면 값에는 영향이 없다
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has('yardprobe')) return;
     const probe = window as unknown as { __yardAudit?: () => unknown };
-    probe.__yardAudit = () => ({ t: director.t, ...director.yard.audit(director.trucks), ...director.yard.stats });
+    probe.__yardAudit = () => ({ t: director.t, ...director.yard.audit(director.trucks), truckOnTruck: director.truckOverlaps(), ...director.yard.stats });
     return () => void delete probe.__yardAudit;
   }, [director]);
 

@@ -60,7 +60,7 @@ describe('sendCommand', () => {
     // 타입이 막는 경우를 일부러 우회해 런타임 보호를 확인한다
     const bad = { type: 'set_mode', mode: 'manual' } as unknown as Parameters<typeof sendCommand>[1];
     await expect(sendCommand('robot-1', bad, ALL)).rejects.toThrow('confirm');
-    const wrong = { type: 'pick_from', tankId: 'tank-a1', confirm: false } as unknown as Parameters<typeof sendCommand>[1];
+    const wrong = { type: 'pick_from', tankId: 'sector-a', confirm: false } as unknown as Parameters<typeof sendCommand>[1];
     await expect(sendCommand('robot-1', wrong, ALL)).rejects.toThrow('confirm');
     expect(calls).toHaveLength(0);
 

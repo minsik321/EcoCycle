@@ -1,6 +1,6 @@
 # 스마트 폐지 처리 대시보드 개발 플랜 및 API 명세서
 
-Oct 17, 2026 · @민식 · 현재 구현(모의 서버 + 앱) 기준으로 정리한 판
+Nov 24, 2026 · @민식 · 현재 구현(모의 서버 + 앱) 기준으로 정리한 판 (섹터 2곳·실제 부지 배치 반영)
 
 이 문서는 지금 동작하는 것을 적은 **단일 기준**이다. 결정의 이유는 `docs/decisions.md`, 아직 답을 받지 못한 질문은 `docs/questions.md`에 있다.
 ⚠ 표시는 서버 담당·대표님과 합의하기 전의 프론트 제안안이며, 질문 번호(A·B)를 함께 적었다.
@@ -24,7 +24,7 @@ Oct 17, 2026 · @민식 · 현재 구현(모의 서버 + 앱) 기준으로 정�
 
 | 용어 | 뜻 |
 | --- | --- |
-| 섹터 | 파지를 등급별로 쌓아 두는 수납 칸 A1·A2·B1·B2. 예전 이름 "탱크"와 같은 대상이고 기기 ID·주소는 `tank-…`를 그대로 쓴다. 화면 글은 "섹터 A1"처럼 적는다 |
+| 섹터 | 파지를 등급별로 쌓아 두는 노천 더미 두 곳(칸막이 없음): A급 `sector-a`, C급 `sector-c`. 로봇 자리에서 레일(컨베이어)을 바라볼 때 오른쪽이 A, 왼쪽이 C다. 예전 이름 "탱크"와 같은 대상이라 기기 종류(`type: "tank"`)·필드 이름(`tankId`, `targetTankId`)·화면 주소(`/tanks`)는 그대로 쓴다. 화면 글은 "섹터 A"처럼 적는다 |
 | 배치(batch) | 섹터 배합·평균 수분·목표 압력을 정해 압축기에 공급하는 혼합 작업 한 번 |
 | 베일(bale) | 압축·결속해 배출한 블록 하나. 목업은 배치당 1개, 모델은 `Batch.baleIds[]`·`Bale.batchId`로 1→N을 허용한다 |
 | 섹터 지정 | 로봇 모드 `auto_pinned`("자동 · 섹터 지정"): 배합 순서 대신 사람이 고른 섹터만 돌며 집는다 |
@@ -60,8 +60,8 @@ Oct 17, 2026 · @민식 · 현재 구현(모의 서버 + 앱) 기준으로 정�
 | 화면 | 주소 | 내용 | 조작 |
 | --- | --- | --- | --- |
 | 로그인 | `/login` | 아이디·비밀번호, "자동 로그인" | 없음 |
-| 3D 홈 | `/` (3D) | 공장 장면(입고 도로·게이트·계중대, 본관의 섹터 4칸, 로봇팔, 컨베이어 Section Z, 압축기, 출하 마당), 지표 카드 3개, 6단계 공정 추적, 표(차량·섹터·배치·베일), 핀, 상세 패널 | 상세 패널: 시작·일시정지·재개·정지, 로봇 운전 모드(아래) |
-| 대시보드 홈 | `/` (대시보드) | 열린 알람, 상태 요약, 지표 3장, 섹터 4칸, 지금 배치, 6단계 공정 추적, 최근 차량·베일 5건 | 알람 확인 |
+| 3D 홈 | `/` (3D) | 실제 부지 배치의 공장 장면(동쪽 도로·입구·사무실·계근대, 노천 섹터 2곳, 로봇팔, 압축기 건물로 올라가는 경사 레일(컨베이어 Section Z), 압축기, 베일 적치 구역 2곳, 북서쪽 숲), 지표 카드 3개, 6단계 공정 추적, 표(차량·섹터·배치·베일), 핀, 상세 패널 | 상세 패널: 시작·일시정지·재개·정지, 로봇 운전 모드(아래) |
+| 대시보드 홈 | `/` (대시보드) | 열린 알람, 상태 요약, 지표 3장, 섹터 2곳, 지금 배치, 6단계 공정 추적, 최근 차량·베일 5건 | 알람 확인 |
 | 섹터 목록 | `/tanks` | 섹터 칸 그림(적재율·부피, 수분·등급·상태) | 없음 |
 | 섹터 상세 | `/tanks/{tank-…}` | 칸 그림 안의 적재율·부피와 서버 주의선, 지금/다음, 자세히(이력 그래프·설정·알람 이력 5건), 하역 기록 | 알람 확인, 설정값 변경 |
 | 로봇팔 | `/robot` | 모드·현재 작업·이번 시간 집기·그리퍼, 운전 모드 카드, 자세히(진단 관절 표·설정·오류 로그), 사이클 통계, 집기 기록 | 시작·일시정지·재개·정지, 운전 모드, 설정값 변경 |
@@ -80,17 +80,20 @@ Oct 17, 2026 · @민식 · 현재 구현(모의 서버 + 앱) 기준으로 정�
 
 - 홈 맨 위의 전환 "3D | 대시보드"로 오가고, 고른 쪽은 기기에 기억한다(고른 적이 없으면 폰은 대시보드, 그 밖은 3D). WebGL을 쓸 수 없거나 3D에서 오류가 나면 대시보드로 보여 주고 짧게 알린다. 대시보드는 3D 라이브러리를 내려받지 않는다.
 - 3D 홈 배치는 폰(390×844) → 세로 태블릿(820×1180) → 데스크톱 순으로 맞춘다. 폰은 지표 칩 한 줄 + 아래 시트(공정 막대, 배치·차량·섹터·베일 탭), 태블릿·데스크톱은 지표 카드, 오른쪽 상세 패널, 아래 표(접기 기억)와 공정 추적.
-- 카메라: 거리 세 단계(부지 전체 · 한 구역 · 고른 대상), 지역 전환, 끌어서 이동, 핀치·휠 확대(거리 제한), 위아래 기울기 24~74도, 지도 도구로 45도씩 돌리기. 핀이나 표의 줄을 누르면 그 대상으로 다가가고 움직이면 따라간다. 장면에 없는 대상(출차한 차량, 출하된 베일, 배치)은 카메라를 두고 기록 상세 팝업만 연다.
+- 카메라: 거리 세 단계(부지 전체 · 한 구역 · 고른 대상), 지역 전환, 끌어서 이동, 핀치·휠 확대(거리 제한), 위아래 기울기 24~74도, 지도 도구로 45도씩 돌리기, 끌어서 이동은 부지(사진 범위) 안에서만. 지역: 부지 전체, 위에서 보기(사진처럼 북쪽이 위), 섹터·로봇(기본), 입구·계근대, 압축기·레일, 베일 적치. 핀이나 표의 줄을 누르면 그 대상으로 다가가고 움직이면 따라간다. 장면에 없는 대상(출차한 차량, 출하된 베일, 배치)은 카메라를 두고 기록 상세 팝업만 연다.
 - 상세 패널: 상태와 주요 값 4~5줄 + "자세히", 그 기기의 알람(표시만), 조작(시작·일시정지·재개·정지), 로봇이면 운전 모드, "상세 보기"(기기 페이지). 위험 조작은 로봇 운전 모드 하나뿐이고 기기 페이지와 같은 컴포넌트·확인 단계다.
 - 지표: 오늘 생산 베일, 평균 수분, 압축기 가동률(작은 추이선). 누르면 KPI 상세 팝업(오늘·7일·30일, 서버 집계).
 - 6단계 공정 추적은 서버 `stageTimes`를 표시만 한다. 차량·배치·베일을 하나의 사이클로 묶는 값은 서버에 없으므로 "출차하지 않은 가장 최근 차량, 진행 중인 배치, 가장 최근 베일"을 나란히 보여 준다.
-- 트럭·지게차·작업자의 경로·속도는 화면 연출이고 센서 값이 아니다. 움직임은 받은 `stage`까지만 간다. 출하 마당은 고정 칸이고 칸이 차면 압축기가 기다리는 연출을 한다.
+- 장면은 실제 부지 배치를 따른다(위성사진 기준, 위가 북쪽): 동쪽 도로에서 사무실 옆을 지나 계근대 아래쪽 입구로 들어온다. 사무실 바로 아래 계근대, 가운데는 빈 콘크리트 마당, 로봇팔(지금 포크레인 자리) 양옆에 노천 섹터 두 곳(로봇에서 레일을 볼 때 오른쪽 A·북서, 왼쪽 C·남동), 로봇에서 남서쪽으로 내려가 압축기 건물 안으로 올라가는 경사 레일(컨베이어 Section Z), 건물 남동쪽 모서리의 베일 배출구, 베일 적치 구역 두 곳(북서 ㄱ자·남동 ㄴ자), 북서쪽 숲. 섹터 더미 높이는 서버 적재율을 따른다.
+- 차량 흐름(연출): 입고 차량은 입구 → 계근대(번호판 인식 단계까지 대기) → 배정 섹터 더미 앞(하역 단계에서만 적재함을 든다, 출차 단계까지 대기) → 계근대에서 다시 계근 → 같은 입구로 출차. 상차 차량은 서버 값이 없어 "예시"로만 움직인다: 입구 → 계근 → 남동 적치 구역 옆 상차 자리 → 지게차가 북서 재고에서 베일을 실음 → 다시 계근 → 같은 입구로 출차. 번호판·회사·무게는 보여 주지 않는다.
+- 베일(연출): 배출구에서 나온 서버 베일(`created`)은 지게차가 남동 구역에 쌓고, 칸이 차면 압축기가 기다리는 연출을 한다. 북서 구역은 고정 재고("예시")이고 출하 때 지게차가 북서에서 꺼내 상차 차량에 싣는다. 서버 베일이 `shipped`가 되면 지게차가 그 베일을 남동에서 북서 재고로 옮긴다(허공에서 사라지지 않게, 실려 나가는 모습은 북서 재고가 맡는다).
+- 트럭·지게차·작업자의 경로·속도는 화면 연출이고 센서 값이 아니다. 움직임은 받은 `stage`까지만 간다.
 
 ### 기기 페이지
 
 - 네 기기 모두 같은 틀: 머리(이름·상태) → 주요 수치(최대 4개) → 지금/다음 → 조작 줄(위험도 낮은 조작 + 이 기기의 알람 확인) → 자세히(처음엔 닫힘: 이력 그래프 · 설정 · 알람 이력 5건) → 기록. 그림이 있는 것은 섹터뿐이다.
 - 이력 그래프: 일(24시간·10분 간격) / 주(7일·1시간) / 월(30일·6시간), 구간 단위로 넘긴다.
-- 로봇 운전 모드 카드(로봇팔 페이지·3D 홈 로봇 패널 같은 컴포넌트): 세 칸 자동 | 자동 · 섹터 지정 | 수동. 칸을 고르는 것은 초안이고 "적용"을 눌러 확인 단계를 거쳐야 명령이 나간다. 서버가 확정한 모드에 "지금"이 붙는다. 수동은 "집기"(섹터에서 집어 듦) → "컨베이어에 놓기" 두 조작이며 사이 상태("A1에서 집음 · 놓기 대기")를 보여 준다. 머리에 마지막 로봇 명령의 결과(적용 대기 → 적용됨·거부됨).
+- 로봇 운전 모드 카드(로봇팔 페이지·3D 홈 로봇 패널 같은 컴포넌트): 세 칸 자동 | 자동 · 섹터 지정 | 수동. 칸을 고르는 것은 초안이고 "적용"을 눌러 확인 단계를 거쳐야 명령이 나간다. 서버가 확정한 모드에 "지금"이 붙는다. 수동은 "집기"(섹터에서 집어 듦) → "컨베이어에 놓기" 두 조작이며 사이 상태("A에서 집음 · 놓기 대기")를 보여 준다. 머리에 마지막 로봇 명령의 결과(적용 대기 → 적용됨·거부됨).
 - 설정 폼은 현재 설정값을 읽는 API가 없어(B18) 마지막으로 보낸 값만 알려 준다. 로봇 사이클 통계(B21)·압축기 점검 이력(B22)은 서버 API가 없어 안내 문구만 둔다.
 
 ### 기록 목록 (화면)
@@ -164,8 +167,8 @@ Oct 17, 2026 · @민식 · 현재 구현(모의 서버 + 앱) 기준으로 정�
 | 시각 | ISO 8601 UTC 문자열(예: `2026-10-13T05:23:11.250Z`). 화면에 적을 때만 현지 시각 |
 | 단위 | 적재율·수분·적재 정도 %(0~100), 부피 m³, 압력 MPa, 온도 °C, 각도 도, 무게 t(차량·하역 기록에만). 필드 이름에 단위를 드러낸다(`fillPercent`, `volumeM3`, `pressureMpa`, `temperatureC`, `netT`) |
 | 인증 | `Authorization: Bearer {accessToken}`. WebSocket은 1회용 티켓 |
-| 기기 ID | `tank-a1`, `tank-a2`, `tank-b1`, `tank-b2`, `robot-1`, `conveyor-z`, `compressor-1` (고정) |
-| 섹터 이름 | 섹터 = 기존 탱크. ID는 `tank-a1`, 짧은 이름 `A1`, 화면 이름 `섹터 A1`. 검색은 세 이름을 모두 찾는다 |
+| 기기 ID | `sector-a`, `sector-c`, `robot-1`, `conveyor-z`, `compressor-1` (고정) |
+| 섹터 이름 | 섹터 = 기존 탱크. ID는 `sector-a`·`sector-c`, 짧은 이름 `A`·`C`, 화면 이름 `섹터 A`·`섹터 C`. 등급은 A·C(섹터 이름과 같다). 검색은 세 이름을 모두 찾는다 |
 | 상태 판정 | `status`는 서버가 기준값으로 정해서 보낸다. 화면은 표시만 한다 |
 | 오류 형식 | `{"error":{"code":"FORBIDDEN","message":"..."}}` |
 
@@ -310,12 +313,12 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 기록 | 기록 시각 | 검색 대상(`q`) |
 | --- | --- | --- |
 | 섹터 하역 `/devices/{id}/unloads/records` | `unloadedAt` | 번호판, 회사 |
-| 로봇 집기 `/robots/robot-1/picks/records` | `pickedAt` | 섹터(`tank-a1`·`A1`·`섹터 A1`), 배치 ID |
+| 로봇 집기 `/robots/robot-1/picks/records` | `pickedAt` | 섹터(`sector-a`·`A`·`섹터 A`), 배치 ID |
 | 차량 `/vehicles/records` | `arrivedAt` | 번호판, 회사 |
 | 배치 `/batches/records` | `startedAt` | 배치 ID, 배합 섹터 |
 | 베일 `/bales/records` | `createdAt` | 베일 ID, 배치 ID |
 | 배치·베일 사건 `/batches/events/records` | `at` | 배치 ID, 베일 ID, 사건 종류 이름(배치 생성·배합 변경·압력 변경·일시정지·재개·건너뜀·베일 생산·섹터 지정·섹터 지정 변경·섹터 지정 해제), 수행자 |
-| 알람 `GET /alarms` (쪽 없음) | `ts` | 기기 이름(`tank-a1`·`섹터 A1`·`압축기` …), 알람 메시지 |
+| 알람 `GET /alarms` (쪽 없음) | `ts` | 기기 이름(`sector-a`·`섹터 A`·`압축기` …), 알람 메시지 |
 
 #### 공정 기록
 
@@ -323,19 +326,19 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 
 ```json
 // 섹터 하역: 하역하고 출차 계량을 마치면 한 줄
-{ "id": "unl-20261015-034", "vehicleId": "veh-20261015-034", "sectorId": "tank-a1",
+{ "id": "unl-20261015-034", "vehicleId": "veh-20261015-034", "sectorId": "sector-a",
   "plate": "12가 3456", "companyName": "한빛자원", "unloadedAt": "2026-10-15T04:12:40.000Z",
   "grossT": 18.42, "tareT": 9.86, "netT": 8.56, "fillBeforePercent": 42.0, "fillAfterPercent": 55.1 }
 
 // 차량 (GET /vehicles/{id}도 같은 모양)
 { "id": "veh-20261015-034", "status": "departed",
-  "plate": "12가 3456", "companyName": "한빛자원", "sectorId": "tank-a1",
+  "plate": "12가 3456", "companyName": "한빛자원", "sectorId": "sector-a",
   "arrivedAt": "...", "departedAt": "...", "grossT": 18.42, "tareT": 9.86, "netT": 8.56,
   "stageTimes": { "arrived": "...", "identified": "...", "unloading": "...", "unloaded": "...", "departed": "..." } }
 
 // 배치 (GET /batches/{id}도 같은 모양)
 { "id": "batch-0407", "result": "completed", "startedAt": "...", "endedAt": "...",
-  "mix": [{ "sectorId": "tank-a1", "percent": 40 }, { "sectorId": "tank-b2", "percent": 60 }],
+  "mix": [{ "sectorId": "sector-a", "percent": 40 }, { "sectorId": "sector-c", "percent": 60 }],
   "actualMix": null, "pinChanges": [],
   "avgMoisturePercent": 11.8, "targetPressureMpa": 28.5, "actualPressureMpa": 28.3,
   "balesProduced": 1, "baleIds": ["BL-20261015-0407"] }
@@ -346,7 +349,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 
 // 로봇 집기: 컨베이어에 놓은 것만 한 줄
 { "id": "pick-…", "pickedAt": "...", "grabbedAt": "...", "grabbedBy": null, "placedBy": null,
-  "mode": "auto", "sectorId": "tank-a1", "volumeM3": 0.42, "conveyorId": "conveyor-z", "batchId": "batch-0407" }
+  "mode": "auto", "sectorId": "sector-a", "volumeM3": 0.42, "conveyorId": "conveyor-z", "batchId": "batch-0407" }
 ```
 
 - 하역: 무게는 계중대 값(t), `netT = grossT − tareT`(서버 계산). `fillBeforePercent`·`fillAfterPercent`는 하역 직전·직후 섹터 적재율, 화면은 두 값과 차이(%p)만 적는다.
@@ -360,15 +363,15 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 `status`는 `normal`·`caution`·`alarm`·`offline` 중 하나이고 서버가 기준값으로 정한다. 기기 상태에는 무게가 없다.
 
 ```json
-// 섹터: GET /devices/tank-a1/state
-{ "id": "tank-a1", "type": "tank", "section": "A1", "grade": "A", "status": "normal",
+// 섹터: GET /devices/sector-a/state
+{ "id": "sector-a", "type": "tank", "section": "A", "grade": "A", "status": "normal",
   "fillPercent": 72.4, "volumeM3": 5.8, "capacityM3": 8.0, "cautionThresholdPercent": 80,
   "moisturePercent": 11.8, "updatedAt": "2026-10-13T05:23:11.250Z" }
 
 // 로봇팔: GET /devices/robot-1/state
 { "id": "robot-1", "type": "robot", "status": "running", "mode": "auto",
   "pinnedSectors": [], "pickRecordsRevision": 12,
-  "phase": "move", "targetTankId": "tank-a1", "heldSectorId": null,
+  "phase": "move", "targetTankId": "sector-a", "heldSectorId": null,
   "gripper": { "closed": true, "holding": true }, "updatedAt": "..." }
 
 // 컨베이어: GET /devices/conveyor-z/state
@@ -421,9 +424,9 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 ```json
 { "type": "robot.joints", "deviceId": "robot-1", "seq": 1204, "ts": "2026-10-13T05:23:11.250Z",
   "joints": [12.5, -45.0, 80.2, 0.0, 35.7, 90.0], "gripper": { "closed": true, "holding": true },
-  "phase": "move", "targetTankId": "tank-a1" }
+  "phase": "move", "targetTankId": "sector-a" }
 
-{ "type": "alarm", "alarm": { "id": "al-3301", "level": "caution", "deviceId": "tank-a2",
+{ "type": "alarm", "alarm": { "id": "al-3301", "level": "caution", "deviceId": "sector-c",
   "message": "적재율 80% 초과", "state": "active", "ts": "2026-10-13T05:23:11.250Z" } }
 ```
 
@@ -443,7 +446,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | --- | --- | --- | --- | --- |
 | `start`, `pause`, `resume`, `stop` | 로봇·컨베이어·압축기 | 낮음(홈 가능) | `robot.control` | 없음 |
 | `ack_alarm` | 그 알람의 `deviceId` 경로 ⚠ B16 | 낮음 | `alarm.ack` | `alarmId` |
-| `set_mode` | 로봇 | 높음 | `robot.manual` | `mode`: `auto`·`manual`·`auto_pinned`. `auto_pinned`만 `pinnedSectors`(중복 없는 섹터 1~4개), `confirm: true` |
+| `set_mode` | 로봇 | 높음 | `robot.manual` | `mode`: `auto`·`manual`·`auto_pinned`. `auto_pinned`만 `pinnedSectors`(중복 없는 섹터 1~2개), `confirm: true` |
 | `pick_from` | 로봇 | 높음 | `robot.manual` | `tankId`, `confirm: true` |
 | `place_on_conveyor` | 로봇 | 높음 | `robot.manual` | `confirm: true` |
 | `update_setting` | 모든 기기 | 높음(기기 페이지만) | `settings.write` | `key`, `value`, `confirm: true`. 키와 범위 ⚠ B17·B18: 섹터 `cautionThresholdPercent` 1~94 %, 로봇·컨베이어 `speedPercent` 10~100 %, 압축기 `pressureLimitMpa` 10~40 MPa |
@@ -454,7 +457,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 
 ```json
 // 요청: POST /devices/robot-1/commands  (Idempotency-Key: 4f1c…)
-{ "type": "pick_from", "tankId": "tank-a1", "confirm": true }
+{ "type": "pick_from", "tankId": "sector-a", "confirm": true }
 
 // 응답 202: 접수되었을 뿐 완료가 아니다
 { "commandId": "cmd-8841", "status": "accepted" }
@@ -515,13 +518,13 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 // process.vehicle — stage: arrived(계중대 도착) → identified → unloading → unloaded → departed
 { "type": "process.vehicle", "vehicle": {
     "id": "veh-20261013-031", "stage": "identified",
-    "plate": "12가 3456", "companyName": "한빛자원", "sectorId": "tank-a1",
+    "plate": "12가 3456", "companyName": "한빛자원", "sectorId": "sector-a",
     "stageTimes": { "arrived": "...", "identified": "..." }, "updatedAt": "..." } }
 
 // process.batch — stage: planned → mixing → compressing → completed
 { "type": "process.batch", "batch": {
     "id": "batch-0412", "stage": "compressing",
-    "mix": [ { "sectorId": "tank-a1", "percent": 40 }, { "sectorId": "tank-b2", "percent": 60 } ],
+    "mix": [ { "sectorId": "sector-a", "percent": 40 }, { "sectorId": "sector-c", "percent": 60 } ],
     "actualMix": null, "pinning": null, "pinChanges": [],
     "avgMoisturePercent": 11.8, "targetPressureMpa": 28.5,
     "stageTimes": { "planned": "...", "mixing": "...", "compressing": "..." }, "updatedAt": "..." } }
@@ -557,20 +560,21 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 수동 조작 | 시작·일시정지·재개·정지, 알람 확인, 설정 변경, 로봇 모드 전환(섹터 지정 포함), 수동 집기·놓기(두 단계), 배치 배합·압력·일시정지·재개·건너뛰기 | `shared/commands.ts`, `config/controls.ts` |
 | 로봇 기종 | 범용 6축, 링크 길이·축은 설정값, 각도 단위 도 | `config/robotModel.ts`, 구조가 크게 다르면 `studio/actors/Robot` |
 | 이상 기준 | 적재율 80% 이상이 주의, 서버가 `status`로 판정 | 서버 설정(화면은 `status`와 `cautionThresholdPercent`만 표시) |
-| 장면 구성 | 게이트·계중대, 섹터 4개, 로봇팔 1개, 긴 컨베이어 1개(Section Z), 압축기 1개, 출하 마당 | `studio/world/layout.ts` |
+| 장면 구성 | 실제 부지(태화리싸이클링 위성사진, 위가 북쪽) 배치: 동쪽 도로·입구, 사무실과 그 아래 계근대, 가운데 콘크리트 마당, 노천 섹터 2곳, 로봇팔(지금 포크레인 자리), 남서쪽 압축기 건물로 올라가는 경사 레일(Section Z), 압축기 1개, 베일 적치 구역 2곳(남동 = 서버 베일, 북서 = 고정 재고 "예시"), 북서쪽 숲 | `studio/world/layout.ts` |
 | 태블릿·화질 | 기종 제한 없음, 화질 3단계 자동 선택, `low`가 저사양 안전판 | `studio/quality.ts`, `config/quality.ts` |
 | 접속 | 현장 밖 포함, 로그인으로 보호 | 서버 보안 설정, VPN 병행 여부 |
 | 자동 로그인 | 웹 HttpOnly 쿠키, 안드로이드 보안 저장소. 자동 로그인 14일, 아니면 브라우저·앱을 닫을 때까지. 재사용 유예 30초 | `shared/auth.ts`, `app/src/api/tokens.ts`, 모의 서버 `auth.ts` |
 | 카메라 | 1대 이상, HLS 우선 | CCTV 방식 |
 | 알림 | 켜져 있으면 WebSocket, 닫혀 있으면 FCM | 서버가 FCM을 못 보내면 켜져 있을 때만 |
-| 수납 섹터·등급 | A1·A2·B1·B2(기존 탱크와 같은 대상, ID 그대로), 등급 A·C | 기기 ID 목록, 장면 배치, `shared/devices.ts` |
+| 수납 섹터·등급 | 노천 더미 2곳 `sector-a`(A급)·`sector-c`(C급), 로봇에서 레일을 볼 때 A 오른쪽·C 왼쪽 | 기기 ID 목록(`shared/ids.ts`), 장면 배치, 로봇 집는 각도(`config/robotCycle.ts`, 모의 서버 `sim/robot.ts`) |
 | 계중대와 무게 | 차량·하역 기록에만 계중대 t(총중량·공차·순중량 셋 다), 섹터는 적재율·부피, 집기는 부피 | `shared/records.ts`·`processRecords.ts`, `config/display.ts` |
 | 기록 목록 | `from`·`to`·`page`·`pageSize`·`q`와 `{items,total,page,pageSize}`, 한 쪽 10줄, 지난 30일 | `shared/records.ts`, 모의 서버 `routes/records.ts`, `components/records` |
 | 차량·회사·섹터 배정 | 서버가 정한다. 모의 서버는 가상의 회사(한빛자원, 동해페이퍼, 새솔리싸이클)와 번호판 | 모의 서버 예시 데이터 |
 | 배합과 압력 | 배치별 배합비·평균 수분·목표 압력은 서버가 정한다 | 모의 서버 `sim/process.ts` |
 | 배치·베일 | 배치당 베일 1개(모델 1→N), `batch.control` 관리자만, 투입 전 배합·압축 전 압력만 변경, 압축 중 건너뛰기 거부 | `shared/commands.ts`, 모의 서버 `fixtures/accounts.ts`·`sim/process.ts` |
 | 로봇 운전 모드 | 섹터 지정의 실제 배합, 수동 집기·놓기 두 단계(6절 "로봇팔 7단위") | `shared/process.ts`·`devices.ts`·`robot.ts`, 모의 서버 `sim/robot.ts`·`sim/commands.ts` |
-| 출하 마당 연출 | 고정 칸(8열×3단), 지게차 1~2대, 칸이 차면 압축기 대기 | `config/yard.ts` |
+| 베일 적치 연출 | 남동 적치 구역의 고정 칸에 서버 베일을 쌓고(칸이 차면 압축기 대기), 북서 구역은 고정 재고("예시"). 출하된 서버 베일은 북서로 옮겨지고, 상차는 지게차가 북서에서 꺼내 싣는 연출. 연출 속도(트럭 4.0 m/s, 지게차 5.6 m/s, 상차 차량 5분마다)도 가정 | `config/yard.ts` |
+| 상차(출하) 차량 | 서버 값이 없어 3D 홈에서만 "예시"로 움직인다: 입구 → 계근 → 남동 적치 구역 옆 상차 → 계근 → 출차 | `studio/sim/director.ts` (명세에 넣으면 6절 공정 흐름부터) |
 
 ## 위험과 대응
 

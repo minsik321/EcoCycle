@@ -9,7 +9,7 @@ export interface HistoryChartProps {
   metric: Pick<HistoryMetric, 'label' | 'unit' | 'domain'>;
   /** x축 눈금 형식 */
   tick: HistoryUnit['tick'];
-  /** 접근성 설명(예: "탱크 A1 적재율, 10/12 15:00 ~ 10/13 15:00") */
+  /** 접근성 설명(예: "섹터 A 적재율, 10/12 15:00 ~ 10/13 15:00") */
   description: string;
   height?: number;
 }

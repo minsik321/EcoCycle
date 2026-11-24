@@ -42,9 +42,9 @@ export const conveyorState = (): DeviceState => ({
 });
 
 export const tankState = (): DeviceState => ({
-  id: 'tank-a1',
+  id: 'sector-a',
   type: 'tank',
-  section: 'A1',
+  section: 'A',
   grade: 'A',
   status: 'normal',
   fillPercent: 72.4,

@@ -32,7 +32,7 @@ const device: DeviceState = {
 const alarm = (id: string, state: Alarm['state']): Alarm => ({
   id,
   level: 'caution',
-  deviceId: 'tank-a1',
+  deviceId: 'sector-a',
   message: 'm',
   state,
   ts: '2026-10-13T05:00:00.000Z',
@@ -45,7 +45,7 @@ const processState: ProcessState = {
       stage: 'identified',
       plate: '12가 3456',
       companyName: '한빛자원',
-      sectorId: 'tank-a1',
+      sectorId: 'sector-a',
       stageTimes: { arrived: '2026-10-13T05:00:00.000Z', identified: '2026-10-13T05:00:06.000Z' },
       updatedAt: '2026-10-13T05:00:06.000Z',
     },

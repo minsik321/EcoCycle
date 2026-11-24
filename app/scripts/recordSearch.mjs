@@ -111,14 +111,14 @@ try {
     assert.match(await section.innerText(), /검색어 “없는-번호판-zzz”/);
     await shot(page, width, height, 'records-empty-search');
 
-    // ── 공정 기록 · 배치: 섹터 A1
+    // ── 공정 기록 · 배치: 섹터 A
     await go(page, '/records?tab=batches');
     section = page.getByRole('region', { name: '배치 기록' });
     await section.getByRole('button', { name: '최근 7일' }).click();
     const batchesAll = await waitTotal(section, (n) => n > 2, '배치 전체');
     assert.equal(await section.getByRole('searchbox').getAttribute('placeholder'), '배치 ID, 섹터 검색');
-    await search(section, '배치 기록 검색', '섹터 A1');
-    const batchesA1 = await waitTotal(section, (n) => n >= 1 && n <= batchesAll, '배치 A1');
+    await search(section, '배치 기록 검색', '섹터 A');
+    const batchesA = await waitTotal(section, (n) => n >= 1 && n <= batchesAll, '배치 A');
     await shot(page, width, height, 'records-batches-search');
 
     // ── 공정 기록 · 베일: 베일 ID 일부
@@ -134,7 +134,7 @@ try {
     await shot(page, width, height, 'records-bales-search');
 
     // ── 섹터 하역 기록
-    await go(page, '/tanks/tank-a1');
+    await go(page, '/tanks/sector-a');
     section = page.getByRole('region', { name: '하역 기록' });
     await section.scrollIntoViewIfNeeded();
     await section.getByRole('button', { name: '최근 7일' }).click();
@@ -160,7 +160,7 @@ try {
     await main.getByText('검색 결과가 없습니다').waitFor();
     await shot(page, width, height, 'alarms-empty-search');
 
-    console.log(`${width}×${height}: 차량 ${all}→${found}, 배치 ${batchesAll}→${batchesA1}, 베일 ${balesAll}, 하역 ${unloadsAll}, 알람 ${alarmsAll}→${alarmsFound}`);
+    console.log(`${width}×${height}: 차량 ${all}→${found}, 배치 ${batchesAll}→${batchesA}, 베일 ${balesAll}, 하역 ${unloadsAll}, 알람 ${alarmsAll}→${alarmsFound}`);
     await context.close();
   }
   assert.deepEqual(problems, []);

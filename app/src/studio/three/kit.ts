@@ -4,6 +4,7 @@ import {
   Color,
   CylinderGeometry,
   Euler,
+  ExtrudeGeometry,
   Float32BufferAttribute,
   Group,
   Matrix4,
@@ -12,7 +13,9 @@ import {
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   Quaternion,
+  Shape,
   SphereGeometry,
+  Vector2,
   Vector3,
 } from 'three';
 import type { Material, Object3D } from 'three';
@@ -149,6 +152,23 @@ export class Kit {
   /** 공(scale로 눌러 타원체로). center는 중심 */
   ball(hex: string, radius: number, center: Vec3, o: PartOptions = {}): this {
     this.add(new SphereGeometry(radius, o.seg ?? 16, Math.max(8, Math.round((o.seg ?? 16) * 0.7))), hex, center, 0, o);
+    return this;
+  }
+
+  /**
+   * 바닥에 까는 판: 바닥 위 다각형(x, z 꼭짓점)을 y에서 두께 h만큼 세운다. 숲 바닥·적치 구역·도로처럼 축에 맞지 않는 면에 쓴다.
+   * 그림자 투영 기록은 하지 않는다(얇은 판)
+   */
+  flat(hex: string, points: ReadonlyArray<readonly [number, number]>, y: number, h: number, o: PartOptions = {}): this {
+    if (points.length < 3) return this;
+    // 모양은 (x, −z)로 그리고 x축으로 −90° 돌려 바닥에 눕힌다: (x, y', 0) → (x, 0, −y')
+    const shape = new Shape(points.map(([x, z]) => new Vector2(x, -z)));
+    const geometry = new ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+    geometry.rotateX(-Math.PI / 2);
+    const saved = this.footprints;
+    this.footprints = null;
+    this.add(geometry, hex, [0, y, 0], 0, o);
+    this.footprints = saved;
     return this;
   }
 

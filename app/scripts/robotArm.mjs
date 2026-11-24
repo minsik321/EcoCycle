@@ -29,8 +29,8 @@ try {
     throw Error('명령 시간 초과');
   };
   const command = async body => { const r = await post(body); assert.equal(r.status, 202, await r.clone().text()); await finish((await r.json()).commandId); };
-  const pinned = { type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['tank-a1', 'tank-b1'], confirm: true };
-  for (const pins of [[], ['tank-a1', 'tank-a1'], ['bad'], null]) assert.equal((await post({ ...pinned, pinnedSectors: pins })).status, 422);
+  const pinned = { type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['sector-a', 'sector-c'], confirm: true };
+  for (const pins of [[], ['sector-a', 'sector-a'], ['sector-a', 'sector-c', 'sector-a'], ['bad'], null]) assert.equal((await post({ ...pinned, pinnedSectors: pins })).status, 422);
   assert.equal((await post({ ...pinned, confirm: false })).status, 422);
   for (const role of ['operator', 'viewer']) assert.equal((await post(pinned, crypto.randomUUID(), { ...headers, Authorization: `Bearer ${await login(role)}` })).status, 403);
   const key = crypto.randomUUID();
@@ -39,12 +39,12 @@ try {
   assert.equal((await (await post(pinned, key)).json()).commandId, id);
   await finish(id);
   assert.deepEqual((await get('/devices/robot-1/state')).pinnedSectors, pinned.pinnedSectors);
-  await command({ ...pinned, pinnedSectors: ['tank-a2'] }); // 같은 모드에서 지정 변경
+  await command({ ...pinned, pinnedSectors: ['sector-a'] }); // 같은 모드에서 지정 변경
   const query = () => `/robots/robot-1/picks/records?from=${new Date(Date.now() - 86400000).toISOString()}&to=${new Date(Date.now() + 1000).toISOString()}&page=1&pageSize=10`;
   const after = Date.now();
   let live;
   for (let i = 0; i < 450; i++) {
-    live = (await get(query())).items.find(r => Date.parse(r.pickedAt) > after && r.mode === 'auto_pinned' && r.sectorId === 'tank-a2');
+    live = (await get(query())).items.find(r => Date.parse(r.pickedAt) > after && r.mode === 'auto_pinned' && r.sectorId === 'sector-a');
     if (live) break;
     await pause(100);
   }
@@ -52,9 +52,9 @@ try {
   assert.ok(live.volumeM3 > 0 && live.batchId && live.conveyorId === 'conveyor-z');
   await command({ type: 'set_mode', mode: 'manual', confirm: true });
   while ((await get('/devices/robot-1/state')).phase !== 'idle') await pause(100);
-  await command({ type: 'pick_from', tankId: 'tank-b2', confirm: true });
+  await command({ type: 'pick_from', tankId: 'sector-c', confirm: true });
   assert.equal((await get(query())).items[0].mode, 'manual');
-  assert.equal((await get(query())).items[0].sectorId, 'tank-b2');
+  assert.equal((await get(query())).items[0].sectorId, 'sector-c');
   await pause(1400);
   assert.equal((await get('/devices/robot-1/state')).phase, 'idle');
   await command({ type: 'set_mode', mode: 'auto', confirm: true });
@@ -103,15 +103,15 @@ try {
       await shot('2-manual', mode);
       await shot('2-manual-alignment', mode.getByLabel('집을 섹터'));
       await radio(/^자동 · 섹터 지정/).click();
-      await mode.getByRole('button', { name: '섹터 A1', exact: true }).click();
-      await mode.getByRole('button', { name: '섹터 B1', exact: true }).click();
+      await mode.getByRole('button', { name: '섹터 A', exact: true }).click();
+      await mode.getByRole('button', { name: '섹터 C', exact: true }).click();
       await mode.getByRole('button', { name: '적용', exact: true }).click();
       await shot('3-confirm');
       await page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
       assert.equal((await get('/devices/robot-1/state')).mode, 'manual');
       await apply();
       await current(/^자동 · 섹터 지정/).waitFor();
-      assert.deepEqual((await get('/devices/robot-1/state')).pinnedSectors, ['tank-a1', 'tank-b1']);
+      assert.deepEqual((await get('/devices/robot-1/state')).pinnedSectors, ['sector-a', 'sector-c']);
       await shot('4-pinned', mode);
       await shot('5-records', page.getByRole('region', { name: '집기 기록', exact: true }));
       await radio(/^자동(?! ·)/).click();

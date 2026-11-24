@@ -83,10 +83,8 @@ export const ROLE_TEXT: Record<Role, string> = {
 };
 
 export const DEVICE_NAMES: Record<DeviceId, string> = {
-  'tank-a1': '섹터 A1',
-  'tank-a2': '섹터 A2',
-  'tank-b1': '섹터 B1',
-  'tank-b2': '섹터 B2',
+  'sector-a': '섹터 A',
+  'sector-c': '섹터 C',
   'robot-1': '로봇팔',
   'conveyor-z': '컨베이어 Section Z',
   'compressor-1': '압축기',

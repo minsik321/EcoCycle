@@ -89,15 +89,25 @@ export async function runAuthReload({ exe, appUrl, apiBase }) {
     check(res.ok() && flashes.length === 0 && !new URL(page.url()).pathname.startsWith('/login'), `${label}: 세션을 되살린다 (리프레시 ${res.status()})`);
   }
 
+  // 세션을 되살리면 앱은 홈에서 시작한다(기기별 기본 홈, docs/decisions.md·RequireAuth). 다른 주소로 열어도 홈으로 온다
   async function expectSignedIn(page, label) {
     const flashes = watchLoginFlash(page);
     await page.goto(`${appUrl}/settings`);
     const ok = await page
-      .getByRole('heading', { name: '설정' })
+      .getByRole('tablist', { name: '홈 보기' })
       .waitFor({ timeout: 30_000 })
       .then(() => true)
       .catch(() => false);
-    check(ok && new URL(page.url()).pathname === '/settings' && flashes.length === 0, `${label}: 로그인 화면 없이 그대로 들어간다`);
+    check(ok && new URL(page.url()).pathname === '/' && flashes.length === 0, `${label}: 로그인 화면 없이 홈으로 들어간다`);
+  }
+
+  /** 앱 안에서(새로 읽지 않고) 설정 화면으로 간다 */
+  async function openSettings(page) {
+    await page.evaluate(() => {
+      history.pushState({}, '', '/settings');
+      dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await page.getByRole('heading', { name: '설정' }).waitFor({ timeout: 30_000 });
   }
 
   async function expectLoginScreen(page, label) {
@@ -169,6 +179,7 @@ export async function runAuthReload({ exe, appUrl, apiBase }) {
     await expectSignedIn(page, '자동 로그인 후 브라우저를 다시 염');
 
     // 설정 화면 본문의 로그아웃 (상단 바 메뉴에도 같은 이름의 버튼이 있다)
+    await openSettings(page);
     await page.getByRole('main').getByRole('button', { name: '로그아웃' }).click();
     await page.waitForURL((u) => u.pathname.startsWith('/login'), { timeout: 30_000 });
     check(!(await refreshCookie(context)), '로그아웃: 리프레시 쿠키가 지워진다');

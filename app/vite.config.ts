@@ -8,7 +8,8 @@ import tailwindcss from '@tailwindcss/vite';
 
 /**
  * three의 DRACOLoader는 Draco 디코더 두 벌(일반용·glTF용)과 asm.js 예비본을 new URL로 가리켜, 빌드에 디코더가 두 벌 나온다.
- * 스튜디오는 glTF만 읽으므로 모두 glTF용 한 벌(wasm + 감싸개)을 가리키게 바꾼다 (studio/models.ts).
+ * 스튜디오는 glTF만 읽으므로 모두 glTF용 한 벌(wasm + 감싸개)을 가리키게 바꾼다.
+ * 지금은 모델 불러오기가 없어(2026-11-24 studio/models.ts 삭제) 하는 일이 없다. Draco 모델을 다시 쓰면 그대로 효과가 난다.
  */
 function dracoOnce(): Plugin {
   return {

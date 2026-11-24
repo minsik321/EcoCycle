@@ -10,6 +10,7 @@ import type {
   RobotState,
   TankState,
 } from '@ecocycle/shared';
+import { deviceTypeOf } from '@ecocycle/shared';
 import { SETTING_DEFS } from '../fixtures/settings';
 
 // 현재 값 저장소. 값은 sim/ 의 시뮬레이터가 바꾸고, routes/ 와 stream 은 여기서 읽는다.
@@ -32,7 +33,7 @@ const settings = new Map<string, number>();
 export function getSetting(deviceId: DeviceId, key: string): number {
   const stored = settings.get(`${deviceId}.${key}`);
   if (stored !== undefined) return stored;
-  const type = deviceId.split('-')[0] as DeviceState['type'];
+  const type = deviceTypeOf(deviceId);
   return SETTING_DEFS[type].find((d) => d.key === key)?.default ?? 0;
 }
 
@@ -47,7 +48,8 @@ function tank(
   fill: number,
   moisture: number,
 ): TankState {
-  const capacityM3 = 8.0;
+  // 노천 더미 한 곳의 용량(예시 값). 예전 칸(8 m³)의 두 배라 차량·로봇이 두 곳에 몰려도 적재율 변화 속도가 비슷하다
+  const capacityM3 = 16.0;
   return {
     id,
     type: 'tank',
@@ -64,10 +66,8 @@ function tank(
 }
 
 export const devices: Record<DeviceId, DeviceState> = {
-  'tank-a1': tank('tank-a1', 'A1', 'A', 62.4, 11.8),
-  'tank-a2': tank('tank-a2', 'A2', 'A', 45.0, 10.2),
-  'tank-b1': tank('tank-b1', 'B1', 'C', 30.5, 12.6),
-  'tank-b2': tank('tank-b2', 'B2', 'C', 58.8, 9.7),
+  'sector-a': tank('sector-a', 'A', 'A', 62.4, 11.8),
+  'sector-c': tank('sector-c', 'C', 'C', 48.6, 10.9),
   'robot-1': {
     id: 'robot-1',
     type: 'robot',
@@ -115,7 +115,7 @@ export const alarms: Alarm[] = [
   {
     id: 'al-3290',
     level: 'caution',
-    deviceId: 'tank-b2',
+    deviceId: 'sector-c',
     message: '적재율 80% 초과',
     state: 'cleared',
     ts: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
@@ -131,7 +131,7 @@ export const alarms: Alarm[] = [
   {
     id: 'al-3281',
     level: 'caution',
-    deviceId: 'tank-a1',
+    deviceId: 'sector-a',
     message: '수분 높음',
     state: 'cleared',
     ts: new Date(Date.now() - 1000 * 60 * 60 * 50).toISOString(),
@@ -155,7 +155,7 @@ export const alarms: Alarm[] = [
   {
     id: 'al-3262',
     level: 'caution',
-    deviceId: 'tank-b1',
+    deviceId: 'sector-a',
     message: '적재율 80% 초과',
     state: 'cleared',
     ts: new Date(Date.now() - 1000 * 60 * 60 * 146).toISOString(),

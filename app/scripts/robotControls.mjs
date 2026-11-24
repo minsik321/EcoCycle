@@ -104,7 +104,7 @@ try {
     const mixing = await waitFor(async () => (await get('/process/state')).batches.find((b) => b.stage === 'mixing'), '배합 중인 배치');
     const tanks = (await get('/devices')).filter((d) => d.type === 'tank' && d.volumeM3 > 0.5);
     const pin = (tanks.filter((t) => !mixing.mix.some((m) => m.sectorId === t.id)).sort((a, b) => b.volumeM3 - a.volumeM3)[0] ?? tanks[0]).id;
-    const pinLabel = pin.replace('tank-', '').toUpperCase();
+    const pinLabel = pin.replace('sector-', '').toUpperCase();
     await radio(/^자동 · 섹터 지정/).click();
     await mode.getByRole('button', { name: `섹터 ${pinLabel}`, exact: true }).click();
     if (phone) assert.ok(await sameRow(apply, mode.getByRole('button', { name: `섹터 ${pinLabel}` })), '폰: 적용은 섹터 칩 줄의 마지막 칩');

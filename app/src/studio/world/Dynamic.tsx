@@ -1,27 +1,30 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
-import { Color, Matrix4, MeshBasicMaterial, Quaternion, Vector3 } from 'three';
-import type { Group, InstancedMesh, Mesh } from 'three';
+import { Color, Matrix4, MeshBasicMaterial, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
+import type { BufferGeometry, Group, InstancedMesh, Mesh } from 'three';
 import { TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, DeviceStatus, SectorGrade, TankId } from '@ecocycle/shared';
 import { buildLump } from '../actors/build';
 import type { Director } from '../sim/director';
+import type { P2 } from '../sim/paths';
 import { C } from '../theme';
 import { Kit, MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { useClockWaker } from '../three/motion';
-import { BALER, BAY, BAY_Z, CONVEYOR, GATE, HALL, ROAD, SITE, deviceCenter } from './layout';
+import { BALER, GATE, PILES, PILE_MAX_H, RAIL, RAIL_FRAME, RAIL_LEN, RAIL_SLOPE, SITE, centroid, railAt, railY } from './layout';
 import { bakeGroundShadow, disposeBaked } from '../three/bakedShadow';
-import { buildWorld } from './buildWorld';
+import { buildWorld, edgeDistance, inside } from './buildWorld';
 
 // 월드의 고정물과, 기기 값에 따라 움직이는 부분(벨트·램·더미·차단기).
 
 const HIT = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+/** 압축기 건물의 파란 지붕을 걷는 카메라 거리 (부지 전체에서는 사진처럼 덮여 보이고, 구역 거리부터는 안이 보인다) */
+const ROOF_HIDE_DIST = 75;
 
-/** 고정물. 카메라 쪽을 향한 본관 벽은 숨겨 안이 보이게 한다. baked면 미리 구운 바닥 그림자를 얹는다 (low 단계) */
+/** 고정물. 카메라 쪽을 향한 압축기 건물 벽은 숨겨 안이 보이게 한다. baked면 미리 구운 바닥 그림자를 얹는다 (low 단계) */
 export function World({ baked = false }: { baked?: boolean }) {
   const world = useMemo(buildWorld, []);
-  const shadow = useMemo(() => (baked ? bakeGroundShadow(world.footprints, { minX: SITE.minX - 6, maxX: SITE.maxX + 6, minZ: SITE.minZ - 6, maxZ: SITE.maxZ + 6 }) : null), [baked, world]);
+  const shadow = useMemo(() => (baked ? bakeGroundShadow(world.footprints, { minX: SITE.minX - 4, maxX: SITE.maxX + 4, minZ: SITE.minZ - 4, maxZ: SITE.maxZ + 4 }) : null), [baked, world]);
   useEffect(() => () => {
     if (shadow) disposeBaked(shadow);
   }, [shadow]);
@@ -29,21 +32,24 @@ export function World({ baked = false }: { baked?: boolean }) {
   useEffect(
     () => () => {
       disposeTree(world.base);
+      disposeTree(world.roof);
       world.walls.forEach((w) => disposeTree(w.group));
     },
     [world],
   );
   useFrame(() => {
-    const cx = (HALL.minX + HALL.maxX) / 2;
+    const [cx, cz] = world.houseCenter;
     const dx = camera.position.x - cx;
-    const dz = camera.position.z;
+    const dz = camera.position.z - cz;
     const len = Math.hypot(dx, dz) || 1;
     for (const wall of world.walls) wall.group.visible = (wall.nx * dx + wall.nz * dz) / len < 0.18;
+    world.roof.visible = Math.hypot(dx, camera.position.y, dz) > ROOF_HIDE_DIST;
   });
   return (
     <>
       <primitive object={world.base} />
       {shadow && <primitive object={shadow} />}
+      <primitive object={world.roof} />
       {world.walls.map((w) => (
         <primitive key={w.group.name} object={w.group} />
       ))}
@@ -51,17 +57,17 @@ export function World({ baked = false }: { baked?: boolean }) {
   );
 }
 
-// ── 섹터의 파지 더미 ──────────────────────────────────────────────────
+// ── 섹터의 노천 파지 더미 ─────────────────────────────────────────────
 
-const PER_BAY = 300;
+const PER_PILE = 380;
+const LAYERS = 8;
 const PILE_TONES: Record<SectorGrade, string[]> = {
   // 등급은 서버 값이다. 화면은 등급에 따라 색 섞임만 달리한다
   A: [C.kraftLight, C.paper, C.kraft, C.kraftLight, C.paperGrey, C.paper],
   C: [C.kraft, C.kraftLight, C.kraftDark, C.kraft, C.paperGrey, C.kraftDark],
 };
-/** 칸 바닥의 등급 색과 입구 띠 색 */
+/** 더미 바닥의 등급 색 (theme의 A·C 등급 색) */
 const GRADE_FLOOR: Record<SectorGrade, string> = { A: C.gradeA, C: C.gradeC };
-const GRADE_EDGE: Record<SectorGrade, string> = { A: '#b8cdf6', C: '#f3cf8f' };
 const NO_GRADE = C.concreteDark;
 
 interface Chunk {
@@ -74,50 +80,67 @@ interface Chunk {
   s: number;
 }
 
-/** 칸 하나의 조각 자리: 아래층부터 차곡차곡, 위로 갈수록 좁아지는 더미 */
-function pileChunks(id: TankId, seed0: number): Chunk[] {
+/** 더미 하나의 조각 자리: 아래층부터 차곡차곡, 위로 갈수록 테두리에서 안쪽으로 물러나는 둔덕 (적재율만큼 앞에서부터 보인다) */
+export function pileChunks(id: TankId, seed0: number): Chunk[] {
   let seed = seed0;
   const rnd = () => {
     seed = (seed * 1103515245 + 12345) & 0x7fffffff;
     return seed / 0x7fffffff;
   };
-  const [z0, z1] = BAY_Z[id];
-  const out: Chunk[] = [];
-  const layers = 7;
-  const weights = Array.from({ length: layers }, (_, i) => (layers - i * 0.72) ** 2);
+  const poly = PILES[id];
+  const xs = poly.map((p) => p[0]);
+  const zs = poly.map((p) => p[1]);
+  const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+  let deepest = 0;
+  for (let i = 0; i < 400; i += 1) {
+    const p: P2 = [x0 + rnd() * (x1 - x0), z0 + rnd() * (z1 - z0)];
+    if (inside(p, poly)) deepest = Math.max(deepest, edgeDistance(p, poly));
+  }
+  const weights = Array.from({ length: LAYERS }, (_, i) => (LAYERS - i * 0.8) ** 2);
   const total = weights.reduce((a, b) => a + b, 0);
-  for (let layer = 0; layer < layers; layer += 1) {
-    const count = Math.round((weights[layer]! / total) * PER_BAY);
-    const inset = layer * 0.11;
-    for (let i = 0; i < count && out.length < PER_BAY; i += 1) {
-      out.push({
-        x: BAY.minX + 0.22 + inset * 0.7 + rnd() * (BAY.maxX - BAY.minX - 0.5 - inset * 2.2),
-        y: 0.14 + layer * (BAY.pileMaxH / layers) + rnd() * 0.07,
-        z: z0 + 0.2 + inset + rnd() * (z1 - z0 - 0.4 - inset * 2),
-        rx: (rnd() - 0.5) * 0.9,
-        ry: rnd() * Math.PI,
-        rz: (rnd() - 0.5) * 0.9,
-        s: 0.8 + rnd() * 0.55,
-      });
+  const out: Chunk[] = [];
+  for (let layer = 0; layer < LAYERS; layer += 1) {
+    const count = Math.round((weights[layer]! / total) * PER_PILE);
+    // 층이 오를수록 테두리에서 그만큼 안쪽에만 놓는다
+    const inset = 0.18 + (layer / LAYERS) * deepest * 0.92;
+    let placed = 0;
+    for (let tries = 0; placed < count && tries < count * 40 && out.length < PER_PILE; tries += 1) {
+      const p: P2 = [x0 + rnd() * (x1 - x0), z0 + rnd() * (z1 - z0)];
+      if (!inside(p, poly) || edgeDistance(p, poly) < inset) continue;
+      out.push({ x: p[0], y: 0.1 + layer * (PILE_MAX_H / LAYERS) + rnd() * 0.08, z: p[1], rx: (rnd() - 0.5) * 0.9, ry: rnd() * Math.PI, rz: (rnd() - 0.5) * 0.9, s: 0.85 + rnd() * 0.6 });
+      placed += 1;
     }
   }
+  while (out.length < PER_PILE) out.push({ ...out[out.length - 1]!, s: 0 });
   return out;
+}
+
+/** 더미 바닥(등급 색) 판: 윤곽을 조금 넓혀 깐다 */
+function pileFloor(id: TankId): BufferGeometry {
+  const poly = PILES[id];
+  const [cx, cz] = centroid(poly);
+  const k = new Kit();
+  k.flat(C.white, poly.map(([x, z]) => [cx + (x - cx) * 1.08, cz + (z - cz) * 1.08] as P2), 0.0, 0.05);
+  const mesh = k.build().children[0] as Mesh;
+  return mesh.geometry;
 }
 
 export function Piles({ director, grades }: { director: Director; grades: Partial<Record<TankId, SectorGrade>> }) {
   const ref = useRef<InstancedMesh>(null);
-  const geometry = useMemo(() => chunkGeometry(0.34, 0.2, 0.27, 0.05), []);
+  const geometry = useMemo(() => chunkGeometry(0.46, 0.26, 0.36, 0.06), []);
   const chunks = useMemo(() => TANK_IDS.map((id, i) => pileChunks(id, 11 + i * 101)), []);
-  const shown = useRef<number[]>([-1, -1, -1, -1]);
-  const tints = useRef<InstancedMesh>(null);
-  const slab = useMemo(() => chunkGeometry(1, 1, 1, 0.002), []);
+  const floors = useMemo(() => TANK_IDS.map((id) => ({ geometry: pileFloor(id), material: new MeshStandardMaterial({ color: NO_GRADE, roughness: 0.85, vertexColors: true }) })), []);
+  const shown = useRef<number[]>(TANK_IDS.map(() => -1));
   const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(), e: new Color() }), []);
   useEffect(
     () => () => {
       geometry.dispose();
-      slab.dispose();
+      floors.forEach((f) => {
+        f.geometry.dispose();
+        f.material.dispose();
+      });
     },
-    [geometry, slab],
+    [geometry, floors],
   );
 
   const gradeKey = TANK_IDS.map((id) => grades[id] ?? '-').join('');
@@ -126,31 +149,13 @@ export function Piles({ director, grades }: { director: Director; grades: Partia
     if (!mesh) return;
     TANK_IDS.forEach((id, b) => {
       const tones = PILE_TONES[grades[id] ?? 'C'];
-      for (let i = 0; i < PER_BAY; i += 1) mesh.setColorAt(b * PER_BAY + i, tmp.e.set(tones[(i * 7 + b) % tones.length]!));
+      for (let i = 0; i < PER_PILE; i += 1) mesh.setColorAt(b * PER_PILE + i, tmp.e.set(tones[(i * 7 + b) % tones.length]!));
+      const grade = grades[id];
+      floors[b]!.material.color.set(grade ? GRADE_FLOOR[grade] : NO_GRADE);
     });
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    // 칸 바닥(옅은 등급 색), 입구 띠, 칸막이 안쪽 띠 두 장 (칸마다 네 장)
-    const floor = tints.current;
-    if (floor) {
-      TANK_IDS.forEach((id, b) => {
-        const grade = grades[id];
-        const [z0, z1] = BAY_Z[id];
-        const zc = (z0 + z1) / 2;
-        floor.setMatrixAt(b * 4, tmp.m.compose(tmp.p.set((BAY.minX + BAY.maxX) / 2, 0.087, zc), tmp.q.identity(), tmp.s.set(BAY.maxX - BAY.minX - 0.1, 0.012, z1 - z0 - 0.22)));
-        floor.setColorAt(b * 4, tmp.e.set(grade ? GRADE_FLOOR[grade] : NO_GRADE));
-        floor.setMatrixAt(b * 4 + 1, tmp.m.compose(tmp.p.set(BAY.maxX - 0.12, 0.094, zc), tmp.q.identity(), tmp.s.set(0.16, 0.012, z1 - z0 - 0.22)));
-        floor.setColorAt(b * 4 + 1, tmp.e.set(grade ? GRADE_EDGE[grade] : NO_GRADE));
-        // 칸막이 안쪽 면의 아래 띠 (중간 거리에서도 등급 색이 보이게)
-        for (const [j, z] of [[2, z0 + 0.112], [3, z1 - 0.112]] as const) {
-          floor.setMatrixAt(b * 4 + j, tmp.m.compose(tmp.p.set((BAY.minX + BAY.maxX) / 2, 0.36, z), tmp.q.identity(), tmp.s.set(BAY.maxX - BAY.minX - 0.12, 0.5, 0.02)));
-          floor.setColorAt(b * 4 + j, tmp.e.set(grade ? GRADE_EDGE[grade] : NO_GRADE));
-        }
-      });
-      floor.instanceMatrix.needsUpdate = true;
-      if (floor.instanceColor) floor.instanceColor.needsUpdate = true;
-    }
     // gradeKey(등급 묶음)가 바뀔 때만 다시 칠한다
-  }, [gradeKey, tmp]);
+  }, [gradeKey, tmp, floors]);
 
   useFrame(() => {
     const mesh = ref.current;
@@ -163,11 +168,11 @@ export function Piles({ director, grades }: { director: Director; grades: Partia
       shown.current[b] = count;
       changed = true;
       list.forEach((c, i) => {
-        if (i < count) {
+        if (i < count && c.s > 0) {
           tmp.q.setFromAxisAngle(tmp.p.set(c.rx, 1, c.rz).normalize(), c.ry);
-          mesh.setMatrixAt(b * PER_BAY + i, tmp.m.compose(tmp.p.set(c.x, c.y, c.z), tmp.q, tmp.s.setScalar(c.s)));
+          mesh.setMatrixAt(b * PER_PILE + i, tmp.m.compose(tmp.p.set(c.x, c.y, c.z), tmp.q, tmp.s.setScalar(c.s)));
         } else {
-          mesh.setMatrixAt(b * PER_BAY + i, tmp.m.makeScale(0, 0, 0));
+          mesh.setMatrixAt(b * PER_PILE + i, tmp.m.makeScale(0, 0, 0));
         }
       });
     });
@@ -176,28 +181,30 @@ export function Piles({ director, grades }: { director: Director; grades: Partia
 
   return (
     <>
-      <instancedMesh ref={ref} args={[geometry, MAT.clay, PER_BAY * TANK_IDS.length]} castShadow receiveShadow frustumCulled={false} />
-      <instancedMesh ref={tints} args={[slab, MAT.clay, TANK_IDS.length * 4]} receiveShadow frustumCulled={false} />
+      <instancedMesh ref={ref} args={[geometry, MAT.clay, PER_PILE * TANK_IDS.length]} castShadow receiveShadow frustumCulled={false} />
+      {floors.map((f, i) => (
+        <mesh key={TANK_IDS[i]} geometry={f.geometry} material={f.material} receiveShadow />
+      ))}
     </>
   );
 }
 
-// ── 컨베이어 벨트와 뭉치 ──────────────────────────────────────────────
+// ── 경사 레일의 벨트와 뭉치 (레일 좌표계: 로컬 x = u) ─────────────────
 
 const SLAT_GAP = 0.24;
 
 export function Belt({ director }: { director: Director }) {
-  const length = CONVEYOR.startX - CONVEYOR.endX;
-  const count = Math.floor(length / SLAT_GAP);
+  const count = Math.floor(RAIL_LEN / SLAT_GAP);
   const slats = useRef<InstancedMesh>(null);
   const body = useMemo(() => {
     const k = new Kit('clay');
-    k.box('#9aa3b1', [length, 0.07, CONVEYOR.width], [(CONVEYOR.startX + CONVEYOR.endX) / 2, CONVEYOR.topY - 0.075, CONVEYOR.z], { r: 0.03 });
+    const um = (RAIL.startU + RAIL.endU) / 2;
+    k.box('#9aa3b1', [RAIL_LEN, 0.07, RAIL.width], [um, railY(um) - 0.075, 0], { r: 0.03, rot: [0, 0, RAIL_SLOPE] });
     return k.build('belt');
-  }, [length]);
-  const slatGeometry = useMemo(() => chunkGeometry(0.07, 0.012, CONVEYOR.width - 0.1, 0.004), []);
+  }, []);
+  const slatGeometry = useMemo(() => chunkGeometry(0.07, 0.012, RAIL.width - 0.1, 0.004), []);
   const lumps = useMemo(() => director.lumps.map((_, i) => buildLump(i + 1)), [director]);
-  const m = useMemo(() => new Matrix4(), []);
+  const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), RAIL_SLOPE), p: new Vector3(), s: new Vector3(1, 1, 1) }), []);
   useEffect(
     () => () => {
       disposeTree(body);
@@ -218,9 +225,12 @@ export function Belt({ director }: { director: Director }) {
     const mesh = slats.current;
     if (mesh) {
       const span = count * SLAT_GAP;
+      const du = RAIL.endU - RAIL.startU - 0.12;
       for (let i = 0; i < count; i += 1) {
+        // 벨트 윗면은 투입구 쪽(+u)으로 오르며 흐른다
         const d = (i * SLAT_GAP + director.beltOffset) % span;
-        mesh.setMatrixAt(i, m.makeTranslation(CONVEYOR.startX - 0.06 - d * ((length - 0.12) / span), CONVEYOR.topY - 0.002, CONVEYOR.z));
+        const u = RAIL.startU + 0.06 + (d / span) * du;
+        mesh.setMatrixAt(i, tmp.m.compose(tmp.p.set(u, railY(u) - 0.002, 0), tmp.q, tmp.s));
       }
       mesh.instanceMatrix.needsUpdate = true;
     }
@@ -229,24 +239,25 @@ export function Belt({ director }: { director: Director }) {
       lump.visible = sim.active;
       if (!sim.active) return;
       const d = sim.drop;
-      lump.position.set(d > 0 ? CONVEYOR.endX - d * 0.4 : sim.x, CONVEYOR.topY + 0.02 - d * d * 0.75, CONVEYOR.z + (((sim.seed * 31) % 9) / 9 - 0.5) * 0.3);
-      lump.rotation.set(d * 1.5, sim.seed * 1.3, 0);
+      const u = d > 0 ? RAIL.endU + d * 0.4 : sim.u;
+      lump.position.set(u, (d > 0 ? RAIL.endY : railY(u)) + 0.02 - d * d * 1.2, (((sim.seed * 31) % 9) / 9 - 0.5) * 0.3);
+      lump.rotation.set(d * 1.5, sim.seed * 1.3, d > 0 ? 0 : RAIL_SLOPE);
       lump.scale.setScalar(1 - d * 0.35);
     });
   });
 
   return (
-    <>
+    <group rotation-y={RAIL_FRAME.heading}>
       <primitive object={body} />
       <instancedMesh ref={slats} args={[slatGeometry, MAT.clay, count]} frustumCulled={false} />
       {lumps.map((lump, i) => (
         <primitive key={i} object={lump} />
       ))}
-    </>
+    </group>
   );
 }
 
-// ── 압축기의 움직이는 부분 ────────────────────────────────────────────
+// ── 압축기의 움직이는 부분 (레일 좌표계) ──────────────────────────────
 
 const LIGHTS: Array<{ key: Exclude<DeviceStatus, 'offline'>; on: string; y: number }> = [
   { key: 'alarm', on: '#ff5a4a', y: 0.3 },
@@ -304,7 +315,7 @@ export function BalerParts({ director, status }: { director: Director; status: D
 
   const y0 = 0.1;
   return (
-    <>
+    <group rotation-y={RAIL_FRAME.heading}>
       <group ref={ram} position={[BALER.x, y0, BALER.maxZ - 0.22]}>
         <primitive object={parts.ram} />
       </group>
@@ -319,23 +330,27 @@ export function BalerParts({ director, status }: { director: Director; status: D
           </mesh>
         ))}
       </group>
-    </>
+    </group>
   );
 }
 
-// ── 정문 차단기 ───────────────────────────────────────────────────────
+// ── 입구 차단기 ───────────────────────────────────────────────────────
 
+/** 입구 차단기 둘: 북쪽 기둥에서 들어오는 차로를, 남쪽 기둥에서 나가는 차로를 막는다 (트럭이 다가오면 든다) */
 export function GateArms({ director }: { director: Director }) {
   const inArm = useRef<Group>(null);
   const outArm = useRef<Group>(null);
+  const span = Math.hypot(GATE.south[0] - GATE.north[0], GATE.south[1] - GATE.north[1]);
+  // 팔은 로컬 +z로 뻗는다: 북쪽 기둥에서 남쪽 기둥 쪽으로
+  const along = Math.atan2(GATE.south[0] - GATE.north[0], GATE.south[1] - GATE.north[1]);
   const arm = useMemo(() => {
     const k = new Kit('gloss');
-    const len = (ROAD.maxZ - ROAD.minZ) / 2 - 0.05;
+    const len = span / 2 - 0.3;
     k.box(C.white, [0.07, 0.09, len], [0, -0.045, len / 2 + 0.1], { r: 0.03 });
-    for (let i = 0; i < 4; i += 1) k.box(C.yellow, [0.075, 0.095, 0.16], [0, -0.0475, 0.36 + i * 0.36], { r: 0.03 });
+    for (let i = 0; i < Math.floor(len / 0.36) - 1; i += 1) k.box(C.yellow, [0.075, 0.095, 0.16], [0, -0.0475, 0.36 + i * 0.36], { r: 0.03 });
     k.box(C.dark, [0.2, 0.26, 0.26], [0, -0.13, 0], { r: 0.06, mat: 'clay' });
     return k.build('gate-arm');
-  }, []);
+  }, [span]);
   const arm2 = useMemo(() => arm.clone(), [arm]);
   useEffect(() => () => disposeTree(arm), [arm]);
   useFrame(() => {
@@ -344,11 +359,12 @@ export function GateArms({ director }: { director: Director }) {
   });
   return (
     <>
-      <group ref={inArm} position={[GATE.x, 1.0, ROAD.minZ - 0.02]}>
-        <primitive object={arm} />
+      <group position={[GATE.north[0], 1.0, GATE.north[1]]} rotation-y={along}>
+        <group ref={inArm}>
+          <primitive object={arm} />
+        </group>
       </group>
-      {/* 나가는 차로 쪽은 반대편 기둥에서 뻗는다 */}
-      <group position={[GATE.x, 1.0, ROAD.maxZ + 0.02]} rotation={[0, Math.PI, 0]}>
+      <group position={[GATE.south[0], 1.0, GATE.south[1]]} rotation-y={along + Math.PI}>
         <group ref={outArm}>
           <primitive object={arm2} />
         </group>
@@ -359,34 +375,52 @@ export function GateArms({ director }: { director: Director }) {
 
 // ── 기기를 누르는 영역 ────────────────────────────────────────────────
 
-const HITS: Array<{ id: DeviceId; size: [number, number, number]; lift: number }> = [
-  ...TANK_IDS.map((id) => ({ id, size: [BAY.maxX - BAY.minX, 1.9, BAY.width - 0.1] as [number, number, number], lift: 0.4 })),
-  { id: 'conveyor-z', size: [CONVEYOR.startX - CONVEYOR.endX, 1.7, CONVEYOR.width + 0.3], lift: -0.55 },
-  { id: 'compressor-1', size: [2.1, 2.0, 5.2], lift: 0.25 },
+interface Hit {
+  id: DeviceId;
+  size: [number, number, number];
+  at: [number, number, number];
+  rotY: number;
+}
+
+function railAtY(u: number, w: number, y: number): [number, number, number] {
+  const [x, z] = railAt(u, w);
+  return [x, y, z];
+}
+
+function pileHit(id: TankId): Hit {
+  const poly = PILES[id];
+  const [cx, cz] = centroid(poly);
+  const r = Math.max(...poly.map(([x, z]) => Math.hypot(x - cx, z - cz)));
+  return { id, size: [r * 1.5, 1.9, r * 1.5], at: [cx, 0.95, cz], rotY: 0 };
+}
+
+const RAIL_MID = (RAIL.startU + RAIL.endU) / 2;
+const HITS: Hit[] = [
+  ...TANK_IDS.map(pileHit),
+  { id: 'conveyor-z', size: [RAIL.endU - RAIL.startU, 1.4, RAIL.width + 0.3], at: railAtY(RAIL_MID, 0, railY(RAIL_MID) - 0.3), rotY: RAIL_FRAME.heading },
+  { id: 'compressor-1', size: [2.1, 2.0, BALER.maxZ - BALER.chuteEndZ], at: railAtY(BALER.x, -(BALER.maxZ + BALER.chuteEndZ) / 2, 1.0), rotY: RAIL_FRAME.heading },
 ];
 
 export function DeviceHits({ onSelect }: { onSelect: (key: string) => void }) {
   const gl = useThree((s) => s.gl);
   return (
     <>
-      {HITS.map((hit) => {
-        const [x, y, z] = deviceCenter(hit.id);
-        return (
-          <mesh
-            key={hit.id}
-            material={HIT}
-            position={[x, y + hit.lift, hit.id === 'compressor-1' ? z + 0.2 : z]}
-            onClick={(e: ThreeEvent<MouseEvent>) => {
-              e.stopPropagation();
-              onSelect(`dev:${hit.id}`);
-            }}
-            onPointerOver={() => void (gl.domElement.style.cursor = 'pointer')}
-            onPointerOut={() => void (gl.domElement.style.cursor = '')}
-          >
-            <boxGeometry args={hit.size} />
-          </mesh>
-        );
-      })}
+      {HITS.map((hit) => (
+        <mesh
+          key={hit.id}
+          material={HIT}
+          position={hit.at}
+          rotation-y={hit.rotY}
+          onClick={(e: ThreeEvent<MouseEvent>) => {
+            e.stopPropagation();
+            onSelect(`dev:${hit.id}`);
+          }}
+          onPointerOver={() => void (gl.domElement.style.cursor = 'pointer')}
+          onPointerOut={() => void (gl.domElement.style.cursor = '')}
+        >
+          <boxGeometry args={hit.size} />
+        </mesh>
+      ))}
     </>
   );
 }

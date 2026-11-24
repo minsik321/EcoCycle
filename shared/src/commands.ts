@@ -1,4 +1,4 @@
-import type { DeviceType, TankId } from './ids';
+import { TANK_IDS, type DeviceType, type TankId } from './ids';
 import type { Permission } from './auth';
 
 /** 명령 처리 상태. `rejected`와 `failed`에는 reason이 따른다. */
@@ -25,6 +25,21 @@ export type Command =
   | { type: 'ack_alarm'; alarmId: string };
 
 export type CommandType = Command['type'];
+
+/** `auto_pinned`의 지정 섹터 개수 범위: 중복 없는 섹터 1~2개 (명세 6절 명령 표) */
+export const PINNED_SECTORS_MIN = 1;
+export const PINNED_SECTORS_MAX = TANK_IDS.length;
+
+/** `pinnedSectors`가 명세 규칙(중복 없는 유효 섹터 1~2개)을 지키는가. 화면과 모의 서버 검증이 함께 쓴다 */
+export function isValidPinnedSectors(pins: unknown): pins is TankId[] {
+  return (
+    Array.isArray(pins) &&
+    pins.length >= PINNED_SECTORS_MIN &&
+    pins.length <= PINNED_SECTORS_MAX &&
+    new Set(pins).size === pins.length &&
+    pins.every((id) => (TANK_IDS as readonly unknown[]).includes(id))
+  );
+}
 
 /** 명령 하나에 대해 `type`으로 좁힌 본문 타입 */
 export type CommandOf<T extends CommandType> = Extract<Command, { type: T }>;

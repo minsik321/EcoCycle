@@ -28,7 +28,7 @@ const DEPARTED: VehicleRecord = {
   status: 'departed',
   plate: '12가 3456',
   companyName: '한빛자원',
-  sectorId: 'tank-a1',
+  sectorId: 'sector-a',
   arrivedAt: '2026-10-15T04:11:58.000Z',
   departedAt: '2026-10-15T04:13:25.000Z',
   grossT: 18.42,
@@ -60,8 +60,8 @@ const BATCH = (over: Partial<BatchRecord> = {}): BatchRecord => ({
   startedAt: '2026-10-15T04:20:00.000Z',
   endedAt: '2026-10-15T04:24:10.000Z',
   mix: [
-    { sectorId: 'tank-a1', percent: 40 },
-    { sectorId: 'tank-b2', percent: 60 },
+    { sectorId: 'sector-a', percent: 40 },
+    { sectorId: 'sector-c', percent: 60 },
   ],
   actualMix: null,
   pinChanges: [],
@@ -126,8 +126,8 @@ const BALE = (id: string, batchId: string, over: Partial<BaleDetailData> = {}): 
   pressureMpa: 28.3,
   avgMoisturePercent: 11.8,
   mix: [
-    { sectorId: 'tank-a1', percent: 40 },
-    { sectorId: 'tank-b2', percent: 60 },
+    { sectorId: 'sector-a', percent: 40 },
+    { sectorId: 'sector-c', percent: 60 },
   ],
   ...over,
 });
@@ -185,7 +185,7 @@ describe('공정 기록 화면', () => {
     expect(api.getRecords).toHaveBeenCalledWith('/vehicles/records', expect.objectContaining({ page: 1, pageSize: 10 }), expect.anything());
     const row = within(table).getByText('12가 3456').closest('tr') as HTMLElement;
     expect(within(row).getByText('한빛자원')).toBeInTheDocument();
-    expect(within(row).getByText('A1')).toBeInTheDocument();
+    expect(within(row).getByText('A')).toBeInTheDocument();
     expect(within(row).getByText('18.42 t')).toBeInTheDocument();
     expect(within(row).getByText('9.86 t')).toBeInTheDocument();
     expect(within(row).getByText('8.56 t')).toBeInTheDocument();
@@ -207,7 +207,7 @@ describe('공정 기록 화면', () => {
     const table = await screen.findByRole('table', { name: '배치 기록' });
     expect(api.getRecords).toHaveBeenCalledWith('/batches/records', expect.anything(), expect.anything());
     const done = within(table).getByText('#0407').closest('tr') as HTMLElement;
-    expect(within(done).getByText('A1 40% · B2 60%')).toBeInTheDocument();
+    expect(within(done).getByText('A 40% · C 60%')).toBeInTheDocument();
     expect(within(done).getByText('28.5 → 28.3')).toBeInTheDocument();
     expect(within(done).getByText('완료')).toBeInTheDocument();
     expect(within(done).getByText('1개')).toBeInTheDocument();
@@ -468,7 +468,7 @@ describe('차량 기록 상세', () => {
     expect(within(weights).getByText('18.42 t')).toBeInTheDocument();
     expect(within(weights).getByText('9.86 t')).toBeInTheDocument();
     expect(within(weights).getByText('8.56 t')).toBeInTheDocument();
-    expect(within(popup()).getByRole('link', { name: '섹터 A1' })).toHaveAttribute('href', '/tanks/tank-a1');
+    expect(within(popup()).getByRole('link', { name: '섹터 A' })).toHaveAttribute('href', '/tanks/sector-a');
     const stages = within(popup()).getByRole('region', { name: '단계별 시각' });
     expect(within(stages).getByText('번호판 인식')).toBeInTheDocument();
     expect(within(stages).getByText('출차')).toBeInTheDocument();
@@ -499,7 +499,7 @@ describe('배치·베일 상세', () => {
   it('배치 팝업: 스냅샷과 만든 베일 목록, 베일마다 "베일 보기"', async () => {
     app('/records/batches/batch-0407');
     expect(await within(popup()).findByText('만든 베일 2개')).toBeInTheDocument();
-    expect(within(popup()).getByText('A1 40% · B2 60%')).toBeInTheDocument();
+    expect(within(popup()).getByText('A 40% · C 60%')).toBeInTheDocument();
     expect(within(popup()).getByRole('button', { name: `베일 ${BALE_A} 보기` })).toBeInTheDocument();
     expect(within(popup()).getByRole('button', { name: `베일 ${BALE_B} 보기` })).toBeInTheDocument();
   });

@@ -12,12 +12,12 @@ import { streamGate } from './gate';
 
 const log = (message: string) => console.log(`[scenario:${config.scenario}] ${message}`);
 
-/** tank-alarm: A1 탱크가 곧 80%를 넘고 계속 올라 95%에서 alarm이 된다 (로봇이 A1을 건너뛴다) */
+/** tank-alarm: 섹터 A가 곧 80%를 넘고 계속 올라 95%에서 alarm이 된다 (로봇이 A를 건너뛰어 C만 집는다) */
 function tankAlarm(): void {
-  setTankFill('tank-a1', 79.5);
-  setFillRateFactor('tank-a1', 5);
-  excludeFromRotation('tank-a1');
-  log('tank-a1 적재율 79.5%에서 시작, 곧 caution, 약 2~3분 뒤 alarm');
+  setTankFill('sector-a', 79.5);
+  setFillRateFactor('sector-a', 5);
+  excludeFromRotation('sector-a');
+  log('sector-a 적재율 79.5%에서 시작, 곧 caution, 약 2~3분 뒤 alarm');
 }
 
 /** disconnect: 연결은 열어 둔 채 25초 동안 아무 메시지도 보내지 않는다 (35초 정상 → 25초 침묵 반복) */

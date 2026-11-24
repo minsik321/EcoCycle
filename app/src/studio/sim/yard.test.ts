@@ -2,11 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Bale } from '@ecocycle/shared';
 import { YARD_CAPACITY } from '../../config/yard';
 import { demoData } from '../demo/demoData';
+import { sitePx } from '../world/layout';
 import { Director } from './director';
 import type { YardAudit } from './yard';
 
-// 출하 마당: 베일이 쌓여도 마당이 한정되고, 어떤 것도 겹치지 않고, 서버 값(적치/출하)과 장면이 맞는지 오래 돌려 본다.
-// 값은 서버 단계를 흉내 낸 생산 속도(만든 뒤 얼마 만에 출하 단계가 오는가)이고, 월드 시계를 20Hz로 돌린다.
+// 베일 적치(남동 구역)와 출하(북서 재고로 옮기기): 베일이 쌓여도 마당이 한정되고, 어떤 것도 겹치지 않고, 서버 값(적치/출하)과 장면이 맞는지 오래 돌려 본다.
+// 값은 서버 단계를 흉내 낸 생산 속도(만든 뒤 얼마 만에 출하 단계가 오는가)이고, 월드 시계를 20Hz로 돌린다. 상차 차량("예시")도 함께 돈다.
+// 출하 베일은 마당을 가로질러 북서 재고까지 가고, 트럭 길을 건널 때는 트럭과 같은 마당 차례를 기다린다. 그래서 막혀 기다린 시간(maxBlocked)에는
+// 차례를 기다린 시간이 들어 있다(트럭·상차 차량이 마당 안쪽 길을 지나는 동안). 그 상한은 멈춰 버림(교착)을 잡는 기준이다.
 
 // 수십 분어치 월드 시계를 돌리므로 다른 시험과 함께 돌 때를 위해 여유를 둔다
 vi.setConfig({ testTimeout: 60_000 });
@@ -110,15 +113,15 @@ function run(feed: Feed, seconds: number, director = new Director()): RunResult 
   return result;
 }
 
-describe('출하 마당: 생산 속도를 지게차가 따라간다', () => {
+describe('베일 적치·출하: 생산 속도를 지게차가 따라간다', () => {
   it('시연 원본(52초에 하나)을 10분 돌려도 마당이 쌓이지 않고 겹침이 없다', () => {
     const feed: Feed = (t) => demoData(T0, Math.floor(t)).bales as Bale[];
     const r = run(feed, 600);
     expect(r.maxStacked).toBeLessThanOrEqual(3);
     expect(r.maxWaiting).toBe(0);
     expect(r.fullSeconds).toBe(0);
-    expect(r.maxBlocked).toBeLessThan(15);
-    expect(r.maxShipLag).toBeLessThan(40);
+    expect(r.maxBlocked).toBeLessThan(40);
+    expect(r.maxShipLag).toBeLessThan(60);
     expect(r.shipped).toBeGreaterThanOrEqual(9);
   });
 
@@ -128,18 +131,19 @@ describe('출하 마당: 생산 속도를 지게차가 따라간다', () => {
     [30, 20],
   ])('모의 서버 같은 생산(%s초에 하나, %s초 뒤 출하)을 15분 돌려도 마당이 쌓이지 않는다', (every, shipAfter) => {
     const r = run(steadyFeed(every, shipAfter), 900);
-    expect(r.maxStacked).toBeLessThanOrEqual(4);
-    expect(r.maxWaiting).toBe(0);
+    expect(r.maxStacked).toBeLessThanOrEqual(5);
+    expect(r.maxWaiting).toBeLessThanOrEqual(1);
     expect(r.fullSeconds).toBe(0);
-    expect(r.maxBlocked).toBeLessThan(15);
-    expect(r.shipped).toBeGreaterThanOrEqual(Math.floor((900 - shipAfter - 30) / every));
+    expect(r.maxBlocked).toBeLessThan(40);
+    // 출하 베일은 북서 재고까지 가로질러 가고 상차(예시)와 트럭 차례를 기다리므로 끝 무렵 몇 개는 아직 칸에 있거나 길 위에 있다 (2분 이내)
+    expect(r.shipped).toBeGreaterThanOrEqual(Math.floor((900 - shipAfter - 120) / every));
   });
 
   it('서버 값과 장면이 맞는다: 서버가 적치라 센 베일은 모두 장면에 있고, 출하 단계가 온 베일은 지게차가 가져가면 사라진다', () => {
     const r = run(steadyFeed(40, 25), 600);
     // 출하 단계가 온 뒤 지게차가 가져갈 때까지의 짧은 어긋남뿐이다
     expect(r.mismatchSeconds).toBeLessThanOrEqual(2);
-    expect(r.maxShipLag).toBeLessThan(40);
+    expect(r.maxShipLag).toBeLessThan(60);
   });
 
   it('지게차가 못 따라갈 만큼 빠른 생산(8초에 하나)에서는 압축기가 기다리고, 마당은 칸 수를 넘지 않으며 겹치지 않는다', () => {
@@ -147,9 +151,9 @@ describe('출하 마당: 생산 속도를 지게차가 따라간다', () => {
     // 생산이 지게차를 앞질러도 압축기가 기다릴 뿐 마당은 늘지 않는다 (서버 목록에서 빠진 베일은 출하된 것으로 본다)
     expect(r.maxOnSite).toBeLessThanOrEqual(YARD_CAPACITY);
     expect(r.maxWaiting).toBeGreaterThan(0);
-    expect(r.maxBlocked).toBeLessThan(25);
-    // 막히지 않고 계속 출하한다 (지게차 두 대가 낼 수 있는 만큼)
-    expect(r.shipped).toBeGreaterThanOrEqual(80);
+    expect(r.maxBlocked).toBeLessThan(40);
+    // 막히지 않고 계속 출하한다 (지게차 두 대가 가로지르는 길을 번갈아 쓰며 낼 수 있는 만큼)
+    expect(r.shipped).toBeGreaterThanOrEqual(70);
   });
 
   it('출하 단계가 오지 않으면 칸이 차고 압축기가 기다린다 (베일을 얹어 떨어뜨리지 않는다)', () => {
@@ -188,33 +192,32 @@ describe('출하 마당: 생산 속도를 지게차가 따라간다', () => {
     expect(d.yard.stats.swaps).toBeGreaterThan(0);
   });
 
-  it('길에 트럭이 서 있으면 지게차는 닿지 않고 기다렸다가, 트럭이 비키면 간다', () => {
+  it('가로지르는 길에 트럭이 서 있으면 지게차는 닿지 않고 기다렸다가, 트럭이 비키면 간다', () => {
     const d = new Director();
     const truck = d.trucks[0]!;
-    truck.active = true;
-    truck.x = -6.4;
-    truck.z = -7.08;
-    truck.heading = 0;
-    truck.phase = 'atBay';
-    const feed = steadyFeed(40, 25);
-    const bale = feed(0);
-    d.sync({ devices: {}, vehicles: [], batches: [], bales: bale }, T0);
+    // 남동 길 끝에서 북서 재고로 가는 길 위(사진 374, 300px)에 트럭을 세운다
+    const [x, z] = sitePx(374, 300);
+    Object.assign(truck, { active: true, x, z, heading: 0, phase: 'atTip', bay: null, id: 'stopped' });
+    const old = steadyFeed(40, 25);
+    // 오래전에 만든 베일은 칸에 바로 놓이고, 곧 출하 단계가 온다
+    d.sync({ devices: {}, vehicles: [], batches: [], bales: old(0).map((b) => ({ ...b, stageTimes: { created: iso(T0 - 60_000) } })) }, T0);
+    d.sync({ devices: {}, vehicles: [], batches: [], bales: old(0).map((b) => ({ ...b, stage: 'shipped' as const })) }, T0 + 1000);
     let waited = 0;
-    for (let i = 0; i < 20 * 40; i += 1) {
+    for (let i = 0; i < 20 * 60; i += 1) {
       d.step(DT);
       const a = d.yard.audit(d.trucks);
       expect(a.forkOnTruck).toBe(0);
       if (d.forklifts.some((f) => f.waiting)) waited += DT;
     }
     expect(waited).toBeGreaterThan(5);
-    expect(d.yard.stats.stored).toBe(0);
+    expect(d.yard.stats.shipped).toBe(0);
     truck.active = false;
-    for (let i = 0; i < 20 * 40; i += 1) d.step(DT);
-    expect(d.yard.stats.stored).toBe(1);
+    for (let i = 0; i < 20 * 60; i += 1) d.step(DT);
+    expect(d.yard.stats.shipped).toBe(1);
   });
 });
 
-describe('화면을 떠났다가 돌아온 출하 마당', () => {
+describe('화면을 떠났다가 돌아온 베일 적치 구역', () => {
   it('클램프를 닫고 운반하며 적치 후 열고 출하 후 빈 집게로 돌아온다', () => {
     const d = new Director();
     const bales = steadyFeed(40, 25)(0);
@@ -242,7 +245,7 @@ describe('화면을 떠났다가 돌아온 출하 마당', () => {
     }
     expect(closing && opening && carried && requestedShip).toBe(true);
     expect(d.yard.stats.shipped).toBe(1);
-    expect(d.forklifts.every((f) => !f.away && !f.carrying && f.clamp === 0)).toBe(true);
+    expect(d.forklifts.every((f) => !f.carrying && f.clamp === 0)).toBe(true);
   });
 
   it.each(['new-scene', 'paused-with-sync', 'paused-without-sync'] as const)('%s: 밀린 베일을 반영하고 재개해도 겹치지 않는다', (mode) => {
@@ -278,7 +281,8 @@ describe('화면을 떠났다가 돌아온 출하 마당', () => {
     // 복귀 첫 프레임의 큰 delta와 이후 적치·출하 동작을 모두 검사한다.
     d.step(600);
     check();
-    for (let i = 0; i < 600 / DT; i += 1) {
+    // 출하 베일은 마당을 가로질러 북서 재고까지 가므로 밀린 31개를 다 옮기도록 15분 돌린다
+    for (let i = 0; i < 900 / DT; i += 1) {
       if (i === 60 / DT) sync(660, true);
       d.step(DT);
       check();
@@ -301,10 +305,11 @@ describe('지게차 한 대 설정', () => {
     expect(d.forklifts).toHaveLength(1);
     const feed: Feed = (t) => demoData(T0, Math.floor(t)).bales as Bale[];
     const r = run(feed, 900, d as unknown as Director);
-    expect(r.maxStacked).toBeLessThanOrEqual(4);
+    expect(r.maxStacked).toBeLessThanOrEqual(5);
     expect(r.maxWaiting).toBeLessThanOrEqual(1);
     expect(r.fullSeconds).toBe(0);
-    expect(r.maxShipLag).toBeLessThan(60);
+    // 한 대가 입고·출하·상차(예시)를 모두 맡는다
+    expect(r.maxShipLag).toBeLessThan(120);
     vi.doUnmock('../../config/yard');
     vi.resetModules();
   });

@@ -23,7 +23,7 @@ function rows(count: number): Row[] {
     id: `r${i + 1}`,
     ts: new Date(NOW.getTime() - i * 60_000).toISOString(),
     plate: `12가 ${String(1000 + i)}`,
-    note: `섹터 A1 · 순중량 ${(8 + i / 10).toFixed(1)} t`,
+    note: `섹터 A · 순중량 ${(8 + i / 10).toFixed(1)} t`,
   }));
 }
 
@@ -122,8 +122,8 @@ describe('RecordList', () => {
     expect(screen.getByRole('table', { name: '하역 기록' }).parentElement).toHaveClass('hidden', 'md:block');
     const first = within(ul).getAllByRole('listitem')[0]!;
     expect(first).toHaveTextContent('12가 1000');
-    expect(first).toHaveTextContent('섹터 A1 · 순중량 8.0 t');
-    expect(within(first).getByText('섹터 A1 · 순중량 8.0 t')).toHaveClass('truncate');
+    expect(first).toHaveTextContent('섹터 A · 순중량 8.0 t');
+    expect(within(first).getByText('섹터 A · 순중량 8.0 t')).toHaveClass('truncate');
     expect(first.querySelector('time')).toHaveAttribute('dateTime', NOW.toISOString());
   });
 

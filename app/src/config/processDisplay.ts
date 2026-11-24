@@ -5,7 +5,7 @@ import { formatPressureMpa } from './display';
 // 3D 홈(studio)과 대시보드가 함께 쓴다. three·React를 import하지 않는다.
 
 /** 섹터 이름 (섹터와 탱크는 같은 대상이다) */
-export const SECTOR_LABEL: Record<TankId, string> = { 'tank-a1': 'A1', 'tank-a2': 'A2', 'tank-b1': 'B1', 'tank-b2': 'B2' };
+export const SECTOR_LABEL: Record<TankId, string> = { 'sector-a': 'A', 'sector-c': 'C' };
 
 /** 공정 추적이 읽는 값 */
 export interface ProcessLists {
@@ -36,13 +36,13 @@ export const BALE_STAGE_TEXT: Record<BaleStage, string> = {
 
 export const mixText = (batch: Pick<Batch, 'mix'>): string => batch.mix.map((m) => `${SECTOR_LABEL[m.sectorId]} ${m.percent}`).join(' : ');
 
-/** 배합을 %로 분명히 적은 것 (공정 기록: "A1 40% · B2 60%") */
+/** 배합을 %로 분명히 적은 것 (공정 기록: "A 40% · C 60%") */
 export const mixPercentText = (batch: Pick<Batch, 'mix'>): string => partsText(batch.mix);
 
-/** 배합 조각 목록을 %로 ("A1 40% · B2 60%"). 실제 배합을 적을 때도 쓴다 */
+/** 배합 조각 목록을 %로 ("A 40% · C 60%"). 실제 배합을 적을 때도 쓴다 */
 export const partsText = (parts: readonly MixPart[]): string => parts.map((m) => `${SECTOR_LABEL[m.sectorId]} ${m.percent}%`).join(' · ');
 
-/** 지정 섹터 목록 ("A1 · B1") */
+/** 지정 섹터 목록 ("A · C") */
 export const sectorsText = (ids: readonly TankId[]): string => ids.map((id) => SECTOR_LABEL[id]).join(' · ');
 
 /**
@@ -52,7 +52,7 @@ export const sectorsText = (ids: readonly TankId[]): string => ids.map((id) => S
 export const actualMixText = (batch: Pick<Batch, 'actualMix'>): string | null =>
   batch.actualMix === null ? null : batch.actualMix.length ? partsText(batch.actualMix) : '아직 놓은 파지가 없습니다';
 
-/** 로봇이 집어 든 상태 한 줄 ("A1에서 집음 · 놓기 대기"). 들고 있지 않고 집는 중도 아니면 null (서버 `heldSectorId`·`phase`) */
+/** 로봇이 집어 든 상태 한 줄 ("A에서 집음 · 놓기 대기"). 들고 있지 않고 집는 중도 아니면 null (서버 `heldSectorId`·`phase`) */
 export function robotHoldText(robot: Pick<RobotState, 'heldSectorId' | 'phase' | 'targetTankId'>): string | null {
   if (robot.heldSectorId) {
     const sector = SECTOR_LABEL[robot.heldSectorId];

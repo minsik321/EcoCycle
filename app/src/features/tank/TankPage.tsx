@@ -23,7 +23,7 @@ import { SectorUnloads } from './SectorUnloads';
 const isTankId = (value: string | undefined): value is TankId => !!value && (TANK_IDS as readonly string[]).includes(value);
 
 /**
- * 섹터 기기 페이지 = "왜 그런가, 설정은, 이력은": 칸 그림(안에 적재율·부피, 위에 수분·등급·상태 칩), 지금/다음,
+ * 섹터 기기 페이지 = "왜 그런가, 설정은, 이력은": 더미 그림(안에 적재율·부피, 위에 수분·등급·상태 칩), 지금/다음,
  * 자세히(이력 그래프·기준값 설정·알람 이력), 맨 아래 하역 기록. 따로 된 수치 칸은 두지 않는다(추이는 자세히의 이력 그래프).
  * 설정 변경은 위험도가 높아 이 페이지의 "자세히" 안에서만, 확인 단계를 거쳐 보낸다.
  */

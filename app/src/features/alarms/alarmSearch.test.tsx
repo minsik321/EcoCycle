@@ -21,9 +21,9 @@ const at = (daysAgo: number) => new Date(daysAgo === 0 ? midnight + (Date.now() 
 const alarm = (id: string, deviceId: Alarm['deviceId'], message: string, daysAgo: number): Alarm => ({ id, level: 'caution', deviceId, message, state: 'cleared', ts: at(daysAgo) });
 
 const ALL = [
-  alarm('a-1', 'tank-a1', '수분 높음', 0),
+  alarm('a-1', 'sector-a', '수분 높음', 0),
   alarm('a-2', 'compressor-1', '온도 상승', 0),
-  alarm('a-3', 'tank-b2', '적재율 80% 초과', 1),
+  alarm('a-3', 'sector-c', '적재율 80% 초과', 1),
   alarm('a-4', 'compressor-1', '압력 낮음', 3),
 ];
 

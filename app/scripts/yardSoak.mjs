@@ -1,8 +1,8 @@
-// 출하 마당 장시간 점검: /scene-demo를 실제 Chromium으로 오래 돌리며 마당이 한정되고 겹침이 없는지 5초마다 본다.
+// 베일 적치(남동 구역)·출하 장시간 점검: /scene-demo를 실제 Chromium으로 오래 돌리며 마당이 한정되고 겹침이 없는지 5초마다 본다.
 //   node scripts/yardSoak.mjs            (기본 10분, 앱 개발 서버를 스스로 띄운다. 로컬 Chromium 필요)
 //   YARD_SOAK_MIN=1 node scripts/yardSoak.mjs   (분 단위로 줄여 시험)
-// 월드 시계가 목표(분)에 이르면 1440×900과 390×844로 키워 출하 마당 구역의 스크린샷을 docs/screenshots/studio/yard/에 둔다.
-// 점검 값은 장면이 ?yardprobe 주소에서만 내주는 window.__yardAudit()(StudioScene)이다: 베일끼리·지게차와 베일·지게차끼리·지게차와 트럭의 겹침, 칸 정합.
+// 월드 시계가 목표(분)에 이르면 1440×900과 390×844로 키워 "베일 적치" 구역의 스크린샷을 docs/screenshots/studio/site-layout/yard/에 둔다.
+// 점검 값은 장면이 ?yardprobe 주소에서만 내주는 window.__yardAudit()(StudioScene)이다: 베일끼리·지게차와 베일·지게차끼리·지게차와 트럭·트럭끼리의 겹침, 칸 정합.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +11,7 @@ import { findChromium, start } from './browserKit.mjs';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rootDir = path.resolve(appDir, '..');
-const outDir = path.join(rootDir, 'docs', 'screenshots', 'studio', 'yard');
+const outDir = path.join(rootDir, 'docs', 'screenshots', 'studio', 'site-layout', 'yard');
 const PORT = process.env.YARD_SOAK_PORT ?? '5197';
 const MINUTES = Number(process.env.YARD_SOAK_MIN ?? 10);
 const SAMPLE_MS = 5000;
@@ -52,7 +52,7 @@ try {
     r.maxStacked = Math.max(r.maxStacked, a.stacked);
     r.maxActive = Math.max(r.maxActive, a.active);
     r.maxWaiting = Math.max(r.maxWaiting, a.waiting);
-    const bad = a.baleOnBale + a.forkOnBale + a.forkOnFork + a.forkOnTruck + a.slotErrors.length;
+    const bad = a.baleOnBale + a.forkOnBale + a.forkOnFork + a.forkOnTruck + a.truckOnTruck + a.slotErrors.length;
     if (bad > 0) r.problems.push(`t=${a.t.toFixed(0)}s 겹침/정합 ${JSON.stringify(a)}`);
     if (a.active > a.slots) r.problems.push(`t=${a.t.toFixed(0)}s 베일 ${a.active}개가 칸 ${a.slots}을 넘음`);
     if (a.t >= goal) break;
@@ -61,12 +61,12 @@ try {
       break;
     }
   }
-  // 두 크기로 키워 출하 마당 구역을 찍는다 (핀 이름이 장면에 놓이는 것을 기다린다)
+  // 두 크기로 키워 베일 적치 구역을 찍는다 (핀 이름이 장면에 놓이는 것을 기다린다)
   for (const shot of SHOTS) {
     await page.setViewportSize({ width: shot.width, height: shot.height });
     await page.waitForTimeout(1500);
     await page.locator('.st-area-button').click({ timeout: 10_000 });
-    await page.getByRole('option', { name: /출하 마당/ }).click({ timeout: 10_000 });
+    await page.getByRole('option', { name: /베일 적치/ }).click({ timeout: 10_000 });
     await page.waitForTimeout(5000);
     await page.screenshot({ path: path.join(outDir, `yard-after-${MINUTES}min-${shot.name}.png`) });
   }

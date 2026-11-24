@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Response } from 'express';
 import type { Command, CommandAcceptedResponse, CommandResultResponse, DeviceId } from '@ecocycle/shared';
-import { COMMAND_RULES, IDEMPOTENCY_KEY_HEADER, ROBOT_MODES, TANK_IDS } from '@ecocycle/shared';
+import { COMMAND_RULES, IDEMPOTENCY_KEY_HEADER, PINNED_SECTORS_MAX, PINNED_SECTORS_MIN, ROBOT_MODES, TANK_IDS, isValidPinnedSectors } from '@ecocycle/shared';
 import type { CommandType } from '@ecocycle/shared';
 import { sendError } from '../errors';
 import { ROLE_PERMISSIONS } from '../fixtures/accounts';
@@ -59,8 +59,8 @@ function parseCommand(type: CommandType, body: Record<string, unknown>, deviceId
       }
       if (mode === 'auto_pinned') {
         const pins = body.pinnedSectors;
-        if (!Array.isArray(pins) || !pins.length || pins.length > TANK_IDS.length || new Set(pins).size !== pins.length || !pins.every(id => TANK_IDS.includes(id))) {
-          return { error: '지정 섹터는 중복 없는 유효 섹터 1~4개여야 합니다.' };
+        if (!isValidPinnedSectors(pins)) {
+          return { error: `지정 섹터는 중복 없는 유효 섹터 ${PINNED_SECTORS_MIN}~${PINNED_SECTORS_MAX}개여야 합니다.` };
         }
         return { command: { type, mode, pinnedSectors: pins, confirm: true } };
       }

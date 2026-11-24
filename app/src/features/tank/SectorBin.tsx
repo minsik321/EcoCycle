@@ -1,23 +1,31 @@
 import { useId } from 'react';
 import { formatLocalClock, formatPercent, formatVolumeM3 } from '../../config/display';
 
-// 섹터 그림: 위가 트인 납작한 2D 칸(사각 통). 안에는 크라프트 파지가 아래에서 적재율만큼 차 있고,
-// 서버가 준 주의 기준 적재율에 가는 점선(+ 글자)을 긋는다. 값이 바뀌면 채움이 부드럽게 오르내린다(CSS transform 전환).
-// 적재율(큰 글자)과 부피(그 아래)는 채움 윗선 바로 위, 비어 있는 밝은 곳에 붙는다. 거의 다 차면 칸 위 여백(headroom)까지
+// 섹터 그림: 칸막이 없는 노천 더미(2D 옆모습). 콘크리트 바닥 위에 크라프트 파지 더미가 적재율만큼 솟아 있고,
+// 서버가 준 주의 기준 적재율 높이에 가는 점선(+ 글자)을 긋는다. 값이 바뀌면 더미가 부드럽게 오르내린다(CSS transform 전환:
+// 100% 더미 모양을 바닥 아래로 내려 바닥 위로 나온 만큼만 보이므로, 적을수록 낮고 좁은 더미가 된다).
+// 적재율(큰 글자)과 부피(그 아래)는 더미 꼭대기 높이 바로 위, 비어 있는 밝은 곳에 붙는다. 거의 다 차면 그림 위 여백(headroom)까지
 // 올라가므로 파지 무늬 위에 글자가 놓이는 일이 없다. 연결이 끊기면(frozen) 전환을 멈추고 글자는 "–"와 마지막 수신 시각이다.
 // 값을 계산하지 않고 받은 %를 높이로 옮길 뿐이다. 섹터 목록(sm)과 상세(lg)가 같은 그림을 쓴다.
 
 // 그림 좌표 (viewBox 단위)
-const X0 = 16; // 칸 안쪽 왼쪽
-const W = 140; // 칸 안쪽 너비
-const Y0 = 14; // 칸 안쪽 위 = 100%
-const H = 100; // 칸 안쪽 높이 (100% = 100단위)
-const WALL = 6; // 벽 두께
+const X0 = 16; // 더미 자리 왼쪽
+const W = 140; // 더미 자리 너비 (100% 더미의 밑변)
+const Y0 = 14; // 더미 꼭대기 = 100%
+const H = 100; // 더미 높이 (100% = 100단위)
+const WALL = 6; // 바닥 두께
 const VIEW = { w: X0 + W + WALL + 34, h: Y0 + H + WALL + 10 }; // 오른쪽에 기준선 글자 자리
 const FLOOR = Y0 + H;
 const EASE = '1.2s ease-in-out';
 
-// 글자 크기별: 숫자 두 줄 높이(rem)보다 조금 큰 칸 위 여백. 100%로 차도 글자가 이 여백 안에 들어간다
+// 100% 더미의 옆모습: 바닥 양 끝에서 올라 위가 넓고 둥근 둔덕 (덜 차도 낮고 넓은 더미로 보이게 윗부분을 넓게)
+const MOUND_TOP =
+  `M${X0} ${FLOOR} C${X0 + W * 0.1} ${FLOOR} ${X0 + W * 0.14} ${Y0 + H * 0.12} ${X0 + W * 0.3} ${Y0 + H * 0.03}` +
+  ` Q${X0 + W / 2} ${Y0 - H * 0.05} ${X0 + W * 0.7} ${Y0 + H * 0.03}` +
+  ` C${X0 + W * 0.86} ${Y0 + H * 0.12} ${X0 + W * 0.9} ${FLOOR} ${X0 + W} ${FLOOR}`;
+const MOUND = `${MOUND_TOP} Z`;
+
+// 글자 크기별: 숫자 두 줄 높이(rem)보다 조금 큰 그림 위 여백. 100%로 차도 글자가 이 여백 안에 들어간다
 const SIZE = {
   lg: { headroom: 'pt-16', value: 'text-3xl leading-9', sub: 'text-sm leading-5' },
   sm: { headroom: 'pt-12', value: 'text-xl leading-7', sub: 'text-xs leading-4' },
@@ -66,7 +74,7 @@ export function SectorBin({
   const level = fillPercent === null ? 0 : (clampPercent(fillPercent) / 100) * H;
   const caution = cautionPercent === null ? null : (clampPercent(cautionPercent) / 100) * H;
   const cautionY = caution === null ? 0 : FLOOR - caution;
-  // 채움 윗선이 그림 아래에서 얼마나 위에 있는지 (그림 높이 %)
+  // 더미 꼭대기가 그림 아래에서 얼마나 위에 있는지 (그림 높이 %)
   const lineFromBottom = ((VIEW.h - FLOOR + level) / VIEW.h) * 100;
   const transition = frozen ? 'none' : undefined;
   const text = SIZE[size];
@@ -90,34 +98,25 @@ export function SectorBin({
               <polygon points="22,14 34,13 33,19 23,20" fill="var(--color-kraft-light)" opacity="0.5" />
               <path d="M1 25 L9 24 M16 26 L24 25 M28 8 L35 9" stroke="var(--color-kraft-deep)" strokeWidth="0.7" opacity="0.3" />
             </pattern>
+            {/* 바닥 위만 보이게 자른다 (내려간 더미의 아랫부분은 바닥 밑으로 숨는다) */}
             <clipPath id={clip}>
-              <rect x={X0} y={Y0} width={W} height={H} />
+              <rect x={X0 - 2} y={Y0 - 2} width={W + 4} height={H + 2} />
             </clipPath>
           </defs>
 
-          {/* 칸 안쪽 빈 곳 */}
-          <rect x={X0} y={Y0} width={W} height={H} fill="var(--color-concrete)" />
-
-          {/* 파지 채움: 꽉 찬 사각을 그려 두고 비어 있는 만큼 아래로 내린다 (전환이 부드럽고 무늬가 늘어나지 않는다) */}
+          {/* 파지 더미: 100% 더미를 그려 두고 비어 있는 만큼 아래로 내린다 (전환이 부드럽고 무늬가 늘어나지 않는다) */}
           {fillPercent !== null && (
             <g clipPath={`url(#${clip})`}>
               <g data-testid="bin-pile" style={{ transform: `translateY(${Math.round((H - level) * 100) / 100}px)`, transition: transition ?? `transform ${EASE}` }}>
-                <rect x={X0} y={Y0} width={W} height={H} fill={`url(#${paper})`} />
+                <path d={MOUND} fill={`url(#${paper})`} />
                 {/* 윗가장자리: 채움보다 살짝 짙은 선 */}
-                <line x1={X0} y1={Y0 + 1} x2={X0 + W} y2={Y0 + 1} stroke="var(--color-kraft-deep)" strokeWidth="2" />
+                <path d={MOUND_TOP} fill="none" stroke="var(--color-kraft-deep)" strokeWidth="2" />
               </g>
             </g>
           )}
 
-          {/* 칸 벽: 왼쪽·오른쪽·바닥만(위는 트임) */}
-          <path
-            d={`M${X0 - WALL / 2} ${Y0 - 4} V${FLOOR + WALL / 2} H${X0 + W + WALL / 2} V${Y0 - 4}`}
-            fill="none"
-            stroke="var(--color-concrete-edge)"
-            strokeWidth={WALL}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
+          {/* 콘크리트 바닥 (칸막이·벽은 없다) */}
+          <rect x={X0 - 8} y={FLOOR} width={W + 16} height={WALL / 2} rx={1} fill="var(--color-concrete-shade)" />
 
           {/* 주의선: 가는 점선 (채움 위에 그어 늘 보인다), 오른쪽 바깥에 "주의"와 기준값 */}
           {caution !== null && (

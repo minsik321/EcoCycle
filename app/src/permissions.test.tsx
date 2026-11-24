@@ -56,7 +56,7 @@ const MATRIX: Record<Role, { quick: boolean; ack: boolean; danger: boolean; sett
   viewer: { quick: false, ack: false, danger: false, settings: false, batch: false },
 };
 
-const openAlarm: Alarm = { id: 'al-1', level: 'caution', deviceId: 'tank-a1', message: '적재율 80% 초과', state: 'active', ts: NOW };
+const openAlarm: Alarm = { id: 'al-1', level: 'caution', deviceId: 'sector-a', message: '적재율 80% 초과', state: 'active', ts: NOW };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -159,7 +159,7 @@ describe.each(ROLES)('역할 %s', (role) => {
     const button = screen.queryByRole('button', { name: '알람 확인' });
     if (m.ack) expect(button).toBeEnabled();
     else expect(button).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /섹터 A1 · 적재율 80% 초과/ })).toBeInTheDocument(); // 알람 조회는 모두 가능
+    expect(screen.getByRole('link', { name: /섹터 A · 적재율 80% 초과/ })).toBeInTheDocument(); // 알람 조회는 모두 가능
   });
 
   it('알람 화면: 알람 확인 버튼', () => {
@@ -170,7 +170,7 @@ describe.each(ROLES)('역할 %s', (role) => {
     const button = screen.queryByRole('button', { name: '알람 확인' });
     if (m.ack) expect(button).toBeEnabled();
     else expect(button).not.toBeInTheDocument();
-    expect(screen.getByLabelText('열린 알람')).toHaveTextContent('섹터 A1');
+    expect(screen.getByLabelText('열린 알람')).toHaveTextContent('섹터 A');
   });
 
   it('로봇팔 페이지: 조작 줄(낮은 위험), 운전 모드(위험 조작), 진단, 설정', async () => {
@@ -236,7 +236,7 @@ describe.each(ROLES)('역할 %s', (role) => {
       );
     renderWithStore(element, {
       me,
-      route: kind === '탱크' ? '/tanks/tank-a1' : '/',
+      route: kind === '탱크' ? '/tanks/sector-a' : '/',
       devices: [tankState(), conveyorState(), { id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 28, temperatureC: 40, cycleStage: 'pressing', updatedAt: NOW }],
     });
     // 설정은 "자세히" 안에 있다 (기기 페이지 틀)

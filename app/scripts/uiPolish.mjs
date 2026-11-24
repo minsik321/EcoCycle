@@ -72,7 +72,10 @@ try {
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     await page.waitForURL((u) => u.pathname === '/');
 
-    // 4. 3D 홈 지역 전환
+    // 4. 3D 홈 지역 전환 (로그인하면 폰은 대시보드에서 시작하므로 3D로 바꾼다)
+    const homeTab = page.getByRole('tab', { name: '3D' });
+    await homeTab.waitFor();
+    if ((await homeTab.getAttribute('aria-selected')) !== 'true') await homeTab.click();
     await page.locator('.st-area-dock').waitFor();
     await page.waitForTimeout(2500);
     await shot('4-3d-home');
@@ -166,8 +169,8 @@ try {
     await shot('2-batch-bale');
 
     // 1·6. 섹터 상세와 알람 이력
-    await go('/tanks/tank-a1');
-    await page.getByRole('heading', { name: /섹터 A1/, level: 1 }).waitFor();
+    await go('/tanks/sector-a');
+    await page.getByRole('heading', { name: /섹터 A/, level: 1 }).waitFor();
     await page.waitForTimeout(800);
     await shot('1-sector-detail');
     if (size === 'desktop') {
@@ -183,11 +186,11 @@ try {
     const items = await alarmCard.locator('ul > li').count();
     assert.ok(items <= 5, `알람 이력 ${items}건`);
     const link = alarmCard.getByRole('link', { name: '전체 알람 보기' });
-    assert.equal(await link.getAttribute('href'), '/alarms?device=tank-a1');
+    assert.equal(await link.getAttribute('href'), '/alarms?device=sector-a');
     await alarmCard.scrollIntoViewIfNeeded();
     await shot('6-alarm-history');
     await link.click();
-    await page.getByText('섹터 A1 알람만 보는 중').waitFor();
+    await page.getByText('섹터 A 알람만 보는 중').waitFor();
     await shot('6-alarms-filtered');
     await context.close();
   }

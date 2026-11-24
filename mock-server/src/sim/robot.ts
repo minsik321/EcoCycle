@@ -20,8 +20,10 @@ const IDLE_GAP_SEC = 1;
 type Pose = [number, number, number, number, number, number];
 
 const HOME: Pose = [0, 10, -20, 0, 10, 0];
-const TANK_BASE_DEG: Record<TankId, number> = { 'tank-a1': -60, 'tank-a2': -25, 'tank-b1': 25, 'tank-b2': 60 };
-const CONVEYOR_BASE_DEG = 150;
+// 레일 쪽 150°를 기준으로 A = 150 − 90, C = 150 + 90. 앱 config/robotCycle.ts의 TANK_BASE_DEG와 같은 값이어야 한다.
+// C를 −120°가 아니라 240°로 두어 직선 보간이 240° → 150°로 짧게 돈다(A 쪽으로 돌아가지 않는다).
+export const CONVEYOR_BASE_DEG = 150;
+export const TANK_BASE_DEG: Record<TankId, number> = { 'sector-a': 60, 'sector-c': 240 };
 
 const above = (base: number): Pose => [base, 25, -35, 0, 20, 0];
 const down = (base: number): Pose => [base, 45, -70, 0, 25, 0];
@@ -195,7 +197,7 @@ function advance(dtSec: number): void {
   // 진행 중인 사이클은 모드를 바꿔도 끝까지 마친다.
   const speed = getSetting('robot-1', 'speedPercent') / 100;
   const phase = r.phase;
-  const tankId = r.targetTankId ?? 'tank-a1';
+  const tankId = r.targetTankId ?? 'sector-a';
   const duration = phase === 'pick' && cycleKind === 'grab' ? GRAB_SEC : DURATION_SEC[phase];
   elapsedSec += dtSec * speed;
   const progress = Math.min(1, elapsedSec / duration);

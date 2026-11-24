@@ -22,6 +22,8 @@ import { WebSocket as NodeWebSocket } from 'ws';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { createAppStore, loginUser, sendDeviceCommand } from '../store';
+import { homeModeChanged } from '../store/slices/ui';
+import { DEVICE_IDS, TANK_IDS } from '@ecocycle/shared';
 import { acquireJoints, getJointBuffer, stopRealtime } from '../store/realtimeClient';
 import type { StageProps } from '../studio/Stage';
 
@@ -65,10 +67,11 @@ beforeAll(async () => {
 
 describe('연결 끊김 통합 점검 (disconnect 시나리오)', () => {
   it('끊김 표시 → 대시보드·3D 홈·조작·관절 값 정지 → 명령 결과 조회 → 복구 후 재동기화', async () => {
-    localStorage.setItem('ecocycle.homeMode', 'dashboard');
     const store = createAppStore();
     await store.dispatch(loginUser({ id: 'operator', password: '1234' }));
     expect(store.getState().auth.status).toBe('loggedIn');
+    // 로그인하면 기기별 기본 홈(태블릿·PC는 3D)에서 시작한다. 사람이 고르듯 대시보드로 바꿔 둔다
+    store.dispatch(homeModeChanged('dashboard'));
     expect(store.getState().ui.homeMode).toBe('dashboard');
 
     const releaseJoints = acquireJoints(); // 3D 홈처럼 관절 값을 구독하는 화면이 있다고 본다
@@ -83,7 +86,7 @@ describe('연결 끊김 통합 점검 (disconnect 시나리오)', () => {
     // ── 평소: 연결됨, 대시보드에 값이 채워지고, 끊김 안내는 없다 ──
     await wait(() => {
       expect(store.getState().connection.status).toBe('online');
-      expect(Object.keys(store.getState().devices.byId)).toHaveLength(7);
+      expect(Object.keys(store.getState().devices.byId)).toHaveLength(DEVICE_IDS.length);
       expect(store.getState().plant.summary).not.toBeNull();
     }, 20_000);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -119,7 +122,7 @@ describe('연결 끊김 통합 점검 (disconnect 시나리오)', () => {
     const sectorsOff = screen.getByRole('region', { name: '섹터' });
     expect(within(sectorsOff).queryByText('정상')).not.toBeInTheDocument();
     expect(within(sectorsOff).queryByText('주의')).not.toBeInTheDocument();
-    expect(within(sectorsOff).getAllByText('연결 끊김')).toHaveLength(4);
+    expect(within(sectorsOff).getAllByText('연결 끊김')).toHaveLength(TANK_IDS.length);
     expect(within(sectorsOff).queryByText(/\d%$/)).not.toBeInTheDocument();
     for (const meter of within(sectorsOff).getAllByRole('meter')) expect(meter).toHaveAttribute('aria-valuenow', '0');
     expect(within(screen.getByRole('region', { name: '공정 추적' })).queryByRole('listitem', { current: 'step' })).not.toBeInTheDocument();
@@ -133,7 +136,7 @@ describe('연결 끊김 통합 점검 (disconnect 시나리오)', () => {
     expect(within(alert3d!).getByText('연결 끊김')).toBeInTheDocument();
     expect(alert3d!.querySelector('time')).toHaveAttribute('datetime', lastReceivedAt!);
     expect(screen.getByLabelText('압축기 연결 끊김')).toBeInTheDocument();
-    expect(screen.getByLabelText('섹터 A1 연결 끊김')).toBeInTheDocument();
+    expect(screen.getByLabelText('섹터 A 연결 끊김')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: '공정 추적' })).queryByText('진행 중')).not.toBeInTheDocument();
     // 로봇팔을 골라도 시작·일시정지 같은 조작은 누를 수 없다
     await userEvent.click(screen.getByLabelText('로봇팔 연결 끊김'));
@@ -182,7 +185,9 @@ describe('연결 끊김 통합 점검 (disconnect 시나리오)', () => {
       expect(shellAlert()).toBeNull();
       const back = screen.getByRole('region', { name: '섹터' });
       expect(within(back).queryByText('연결 끊김')).not.toBeInTheDocument();
-      expect(within(back).getAllByText(/^\d+(\.\d+)?%$/)).toHaveLength(4); // 적재율 4칸 (수분 줄은 "수분 …%")
+      // 섹터 2곳 모두 적재율 막대와 숫자가 돌아온다
+      expect(within(back).getAllByRole('meter')).toHaveLength(TANK_IDS.length);
+      for (const link of within(back).getAllByRole('link')) expect(link).toHaveTextContent(/\d+(\.\d+)?%/);
       expect(within(screen.getByRole('region', { name: '상태 요약' })).getByText('실시간')).toBeInTheDocument();
       for (const name of KPI_NAMES) expect(within(screen.getByRole('region', { name })).queryByText('–')).not.toBeInTheDocument();
     }, 10_000);

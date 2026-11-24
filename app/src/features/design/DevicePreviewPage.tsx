@@ -60,7 +60,7 @@ export function DevicePreviewPage() {
                   ]}
                 />
               }
-              now={<NowNext now="batch-0412 · A1 40% + B2 60% · 평균 수분 11.8%" next="마지막 베일 BL-20261014-0411" />}
+              now={<NowNext now="batch-0412 · A 40% + C 60% · 평균 수분 11.8%" next="마지막 베일 BL-20261014-0411" />}
               actions={
                 <ActionBar>
                   <div className="flex flex-wrap gap-3">

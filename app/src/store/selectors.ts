@@ -1,5 +1,5 @@
 import { createSelector } from '@reduxjs/toolkit';
-import { COMMAND_RULES } from '@ecocycle/shared';
+import { COMMAND_RULES, TANK_IDS } from '@ecocycle/shared';
 import type { Alarm, CommandType, DeviceId, DeviceState, Permission, TankState } from '@ecocycle/shared';
 import type { RootState } from './index';
 
@@ -36,7 +36,7 @@ export const selectDevice = (id: DeviceId) => (state: RootState): DeviceState | 
 export const selectTanks = createSelector(
   (state: RootState) => state.devices.byId,
   (byId): TankState[] =>
-    (['tank-a1', 'tank-a2', 'tank-b1', 'tank-b2'] as const).flatMap((id) => {
+    TANK_IDS.flatMap((id) => {
       const d = byId[id];
       return d && d.type === 'tank' ? [d] : [];
     }),

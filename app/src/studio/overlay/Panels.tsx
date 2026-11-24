@@ -486,11 +486,24 @@ export function Detail({ data, disconnected, selection, onSelect, deviceActions,
     );
   }
 
+  if (kind === 'example') {
+    // 상차 차량: 서버 값이 없는 3D 연출이다. 번호판·회사·무게를 지어내지 않는다
+    return (
+      <aside className={shell} aria-label="상차 차량 상세 (예시)">
+        <DetailHead icon="truck" eyebrow="예시" title="상차 차량" onClose={close} />
+        <div className="st-detail-status">
+          <span className="st-pill st-pill-kraft">예시</span>
+        </div>
+        <p className="st-muted">출하 흐름을 보여 주는 예시 연출입니다. 서버 값이 아니며 번호판·회사·무게를 표시하지 않습니다. 입구로 들어와 빈 차를 재고, 남동 적치 구역 곁에서 지게차가 북서 고정 재고의 베일을 실은 뒤 다시 재고 나갑니다.</p>
+      </aside>
+    );
+  }
+
   if (kind === 'forklift') {
     return (
       <aside className={shell} aria-label="지게차 상세">
-        <DetailHead icon="forklift" eyebrow="출하 마당" title="지게차" onClose={close} />
-        <p className="st-muted">지게차의 움직임은 베일의 단계(적치 → 출하)를 화면에 옮긴 연출입니다. 지게차 위치는 서버가 보내는 값이 아닙니다.</p>
+        <DetailHead icon="forklift" eyebrow="베일 적치" title="지게차" onClose={close} />
+        <p className="st-muted">지게차의 움직임은 베일의 단계(적치 → 출하)를 화면에 옮긴 연출입니다. 적치 베일은 남동 구역 칸에 쌓고, 출하된 베일은 북서 고정 재고(예시)로 옮깁니다. 지게차 위치는 서버가 보내는 값이 아닙니다.</p>
         <Rows
           rows={[
             ['지게차', `${YARD_FLOW.forkliftCount}대`],
@@ -1125,7 +1138,7 @@ const PIN_NAME: Partial<Record<DeviceId, string>> = { 'robot-1': '로봇팔', 'c
 
 export interface PinsProps extends PanelCommon {
   pins: MutableRefObject<PinElements>;
-  /** 출하 마당 칸이 다 차서 압축기가 기다린다: 압축기 핀에 알린다 */
+  /** 남동 적치 칸이 다 차서 압축기가 기다린다: 압축기 핀에 알린다 */
   yardFull?: boolean;
 }
 
@@ -1158,7 +1171,7 @@ export function Pins({ data, disconnected, selection, onSelect, pins, yardFull =
         const tone: DeviceStatus = disconnected || !line ? 'offline' : line.tone;
         const tank = device?.type === 'tank' ? device : null;
         const full = id === 'compressor-1' && yardFull;
-        const spoken = !line ? '불러오는 중' : disconnected ? STATUS_TEXT.offline : `${line.value}, ${line.statusText}${full ? ', 출하 마당 가득 참' : ''}`;
+        const spoken = !line ? '불러오는 중' : disconnected ? STATUS_TEXT.offline : `${line.value}, ${line.statusText}${full ? ', 적치 구역 가득 참' : ''}`;
         return (
           <button key={key} {...pinProps(key, `${DEVICE_NAMES[id]} ${spoken}`)} className={`st-pin st-pin-${tone}${tank ? ' st-pin-sector' : ''}`}>
             <span className="st-pin-card">
@@ -1174,7 +1187,7 @@ export function Pins({ data, disconnected, selection, onSelect, pins, yardFull =
               <span className="st-pin-text">
                 <small>{tank ? `${tank.grade}등급` : (PIN_NAME[id] ?? DEVICE_NAMES[id])}</small>
                 <strong>{!line ? '…' : disconnected ? '–' : line.value}</strong>
-                {full && <em className="st-pin-flag">출하 마당 가득 참</em>}
+                {full && <em className="st-pin-flag">적치 구역 가득 참</em>}
               </span>
             </span>
           </button>
@@ -1214,6 +1227,23 @@ export function Pins({ data, disconnected, selection, onSelect, pins, yardFull =
             </button>
           );
         })}
+      {/* 서버 값이 없는 3D 연출: "예시"만 적는다 (번호판·회사·무게를 지어내지 않는다) */}
+      <button key="example:loader" {...pinProps('example:loader', '상차 차량 예시')} className="st-pin st-pin-vehicle st-pin-example">
+        <span className="st-pin-card">
+          <span className="st-pin-text">
+            <small>상차 차량</small>
+            <strong>예시</strong>
+          </span>
+        </span>
+      </button>
+      <span key="stock:nw" ref={bind('stock:nw')} className="st-pin st-pin-example st-pin-label" role="note" aria-label="북서 고정 재고 예시" style={{ visibility: 'hidden' }}>
+        <span className="st-pin-card">
+          <span className="st-pin-text">
+            <small>고정 재고</small>
+            <strong>예시</strong>
+          </span>
+        </span>
+      </span>
       {Array.from({ length: YARD_FLOW.forkliftCount }, (_, i) => {
         const key = `forklift:${i + 1}`;
         return (

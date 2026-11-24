@@ -50,6 +50,14 @@ export const C = {
   greenDeep: '#6abd68',
   greenLight: '#b4e3a0',
   trunk: '#c9b29a',
+  /** 북서쪽 숲: 숲 바닥과 짙은 수관 */
+  forestFloor: '#93c886',
+  forest: '#5aa85c',
+  /** 압축기 건물의 파란 지붕 (사진의 파란 지붕): 본동, 옆동·골판 줄 */
+  roofBlue: '#4f8fe0',
+  roofBlueDeep: '#2f6fc4',
+  /** 사무실 지붕: 사진처럼 짙은 회색 */
+  roofOffice: '#8e98a7',
   skin: '#f0c4a0',
   /** 작업자 조끼도 안전 노랑 */
   vest: '#ffc31f',
@@ -64,8 +72,6 @@ export const C = {
   gradeC: '#fbebd3',
 } as const;
 
-/** 주차된 승용차: 흰색·은색 사이에 산호색·청록·남색·파랑 몇 대 (첫 스튜디오 시안의 색) */
-export const CAR_PAINTS = [C.white, '#f08a7e', '#6fc7bb', '#7d8fb5', '#d9dde3', C.blue] as const;
 
 /**
  * 트럭 회사별 띠 색 (차분한 색). 회사 이름은 서버 값이고, 여기서는 이름 → 색을 고르기만 한다.

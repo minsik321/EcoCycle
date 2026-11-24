@@ -19,18 +19,16 @@ export function matchesSearch(q: string | undefined, values: ReadonlyArray<strin
   return values.some((value) => value != null && normalizeSearch(value).includes(needle));
 }
 
-/** 섹터가 찾아지는 이름들: 코드(`tank-a1`), 짧은 이름(`A1`), 화면 이름(`섹터 A1`) */
+/** 섹터가 찾아지는 이름들: 코드(`sector-a`), 짧은 이름(`A`), 화면 이름(`섹터 A`) */
 export const sectorSearchTerms = (id: TankId): string[] => {
-  const short = id.replace('tank-', '').toUpperCase();
+  const short = id.replace('sector-', '').toUpperCase();
   return [id, short, `섹터 ${short}`];
 };
 
 /** 기기가 찾아지는 이름들(화면에 적는 이름과 같다) */
 export const DEVICE_SEARCH_NAMES: Record<DeviceId, string> = {
-  'tank-a1': '섹터 A1',
-  'tank-a2': '섹터 A2',
-  'tank-b1': '섹터 B1',
-  'tank-b2': '섹터 B2',
+  'sector-a': '섹터 A',
+  'sector-c': '섹터 C',
   'robot-1': '로봇팔',
   'conveyor-z': '컨베이어 Section Z',
   'compressor-1': '압축기',

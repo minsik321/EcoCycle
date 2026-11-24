@@ -95,7 +95,7 @@ async function run(browser) {
           await check(page, `시트 ${tab}`, zoom);
         }
         for (const [pin, name] of [
-          ['섹터 A1', '섹터 상세'],
+          ['섹터 A', '섹터 상세'],
           ['로봇팔', '로봇팔 상세'],
           ['압축기', '압축기 상세'],
           ['컨베이어', '컨베이어 상세'],
@@ -134,7 +134,7 @@ async function run(browser) {
       }
       for (const [route, name] of [
         ['/tanks', '섹터 목록'],
-        ['/tanks/tank-a1', '섹터 페이지'],
+        ['/tanks/sector-a', '섹터 페이지'],
         ['/robot', '로봇팔 페이지'],
         ['/compressor', '압축기 페이지'],
         ['/conveyor', '컨베이어 페이지'],
@@ -162,7 +162,7 @@ async function run(browser) {
           };
           await mode.scrollIntoViewIfNeeded();
           await radio(/^자동 · 섹터 지정/).click();
-          await mode.getByRole('button', { name: '섹터 A1', exact: true }).click();
+          await mode.getByRole('button', { name: '섹터 A', exact: true }).click();
           await mode.getByRole('button', { name: '적용', exact: true }).click();
           await check(page, '로봇 지정 자동 확인', zoom);
           await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
@@ -230,8 +230,8 @@ async function run(browser) {
       await page.getByText('검색 결과가 없습니다').waitFor({ timeout: 15_000 });
       await check(page, '알람 검색 결과 없음', zoom);
       await go('/records/batches');
-      await page.getByLabel('A1 (%)', {exact:true}).waitFor();
-      await page.getByLabel('A1 (%)', {exact:true}).fill('99');
+      await page.getByLabel('A (%)', {exact:true}).waitFor();
+      await page.getByLabel('A (%)', {exact:true}).fill('99');
       await check(page, '배합 검증', zoom);
       await page.getByRole('button', {name:/^배치 (일시정지|재개)$/}).click();
       await check(page, '배치 확인 대화상자', zoom);

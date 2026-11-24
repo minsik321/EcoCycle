@@ -51,7 +51,10 @@ function stripeGroup(k: Kit, material: MeshPhysicalMaterial): Group {
 const BED_PAINTS = [C.steelLight, C.blue, C.wall, C.blueSoft];
 const CAB_PAINT = C.yellow;
 
-export function buildTruck(variant: number): TruckModel {
+/**
+ * 트럭. flatbed면 상차 차량("예시"): 들리는 적재함 대신 낮은 평판(베일을 싣는다), 회색 운전석. 실린 베일은 Bales가 그린다
+ */
+export function buildTruck(variant: number, flatbed = false): TruckModel {
   const root = new Group();
   const k = new Kit('gloss');
 
@@ -66,8 +69,8 @@ export function buildTruck(variant: number): TruckModel {
   const stripe = (MAT.gloss as MeshPhysicalMaterial).clone();
   const band = new Kit('gloss');
 
-  // 운전석 (노랑) + 아래쪽 회사 띠
-  k.box(CAB_PAINT, [0.92, 0.98, 1.12], [1.0, 0.38, 0], { r: 0.16, seg: 5 });
+  // 운전석 (노랑, 상차 차량은 흰색) + 아래쪽 회사 띠
+  k.box(flatbed ? C.wall : CAB_PAINT, [0.92, 0.98, 1.12], [1.0, 0.38, 0], { r: 0.16, seg: 5 });
   band.box(C.white, [0.96, 0.2, 1.16], [1.0, 0.36, 0], { r: 0.08, seg: 3 });
   k.box(C.dark, [0.06, 0.4, 0.92], [1.44, 0.82, 0], { r: 0.03, mat: 'clay' });
   k.box(C.glass, [0.03, 0.34, 0.86], [1.468, 0.85, 0], { r: 0.015, mat: 'glass' });
@@ -119,6 +122,24 @@ export function buildTruck(variant: number): TruckModel {
   const b = new Kit('gloss');
   const bedBand = new Kit('gloss');
   const L = 1.9;
+  if (flatbed) {
+    // 평판: 바닥판(윗면이 LOAD_BED_Y) + 낮은 옆판 + 앞 가림판 + 기둥
+    b.box(C.steel, [L, 0.1, 1.14], [L / 2, 0, 0], { r: 0.025, mat: 'metal' });
+    for (const dz of [-0.56, 0.56]) {
+      b.box(C.blue, [L, 0.1, 0.04], [L / 2, 0.1, dz], { r: 0.015 });
+      for (const x of [0.15, L / 2, L - 0.15]) b.box(C.dark, [0.05, 0.36, 0.05], [x, 0.1, dz], { r: 0.015, mat: 'clay' });
+    }
+    b.box(C.blue, [0.07, 0.62, 1.14], [L - 0.035, 0.1, 0], { r: 0.03 });
+    b.box(C.dark, [1.2, 0.1, 0.5], [L / 2, -0.08, 0], { r: 0.03, mat: 'clay' });
+    bed.add(b.build('truck-flatbed'));
+    bed.add(stripeGroup(bedBand, stripe));
+    const gate = new Group();
+    const load = new Group();
+    load.visible = false;
+    bed.add(gate, load);
+    root.add(bed);
+    return { root, bed, gate, load, wheels, beacon, pivot, stripe };
+  }
   b.box(paint, [L, 0.08, 1.14], [L / 2, 0, 0], { r: 0.03 });
   for (const dz of [-0.55, 0.55]) {
     b.box(paint, [L, 0.62, 0.06], [L / 2, 0.06, dz], { r: 0.025 });

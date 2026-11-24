@@ -3,10 +3,11 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import { Color, Matrix4, Quaternion, Vector3 } from 'three';
 import type { InstancedMesh, Mesh } from 'three';
-import { C, companyStripe } from '../theme';
+import { C, UNKNOWN_STRIPE, companyStripe } from '../theme';
 import { MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { blobShadow } from '../three/bakedShadow';
 import type { Director } from '../sim/director';
+import { YARD_FRAME } from '../world/layout';
 import { buildBale, buildForklift, buildTruck, buildWorker } from './build';
 
 // 스스로 움직이는 것들을 그린다. 위치·자세는 모두 Director가 정하고 여기서는 옮겨 적기만 한다.
@@ -29,7 +30,7 @@ const stop = (e: ThreeEvent<MouseEvent>, fn: () => void) => {
 };
 
 export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
-  const models = useMemo(() => director.trucks.map((_, i) => buildTruck(i)), [director]);
+  const models = useMemo(() => director.trucks.map((t, i) => buildTruck(i, t.example)), [director]);
   useEffect(() => {
     if (!blobs) return;
     const added = models.map((m) => {
@@ -67,7 +68,7 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
       if (sim.active) {
         model.root.position.set(sim.x, GROUND_Y, sim.z);
         model.root.rotation.y = sim.heading;
-        model.stripe.color.set(companyStripe(sim.company));
+        model.stripe.color.set(sim.example ? UNKNOWN_STRIPE : companyStripe(sim.company));
         const angle = sim.bedTilt * BED_MAX;
         model.bed.rotation.z = angle;
         model.gate.rotation.z = -angle * 1.3;
@@ -104,7 +105,16 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
   return (
     <>
       {models.map((model, i) => (
-        <primitive key={i} object={model.root} onClick={(e: ThreeEvent<MouseEvent>) => stop(e, () => director.trucks[i]?.active && onSelect(`veh:${director.trucks[i].id}`))} />
+        <primitive
+          key={i}
+          object={model.root}
+          onClick={(e: ThreeEvent<MouseEvent>) =>
+            stop(e, () => {
+              const t = director.trucks[i];
+              if (t?.active) onSelect(t.example ? 'example:loader' : `veh:${t.id}`);
+            })
+          }
+        />
       ))}
       <instancedMesh ref={pour} args={[geometry, MAT.clay, director.trucks.length * POUR_PER_TRUCK]} castShadow frustumCulled={false} />
     </>
@@ -128,7 +138,6 @@ export function Forklifts({ director, onSelect, blobs = false }: ActorProps) {
   useFrame(() => {
     director.forklifts.forEach((sim, i) => {
       const model = models[i]!;
-      model.root.visible = !sim.away;
       model.root.position.set(sim.x, GROUND_Y, sim.z);
       model.root.rotation.y = sim.heading;
       model.carriage.position.y = sim.fork + 0.02;
@@ -140,16 +149,17 @@ export function Forklifts({ director, onSelect, blobs = false }: ActorProps) {
     });
   });
 
+  // 지게차 좌표는 마당 좌표계다 (sim/yard): 그룹 하나로 월드에 옮긴다
   return (
-    <>
+    <group position={[YARD_FRAME.x, 0, YARD_FRAME.z]} rotation-y={YARD_FRAME.rotY}>
       {models.map((model, i) => (
         <primitive key={i} object={model.root} onClick={(e: ThreeEvent<MouseEvent>) => stop(e, () => onSelect(`forklift:${i + 1}`))} />
       ))}
-    </>
+    </group>
   );
 }
 
-/** 베일은 모두 한 지오메트리의 인스턴스다: 칸 수 + 여유만큼 만들어 두고, 쓰지 않는 것은 크기 0으로 접는다 */
+/** 베일은 모두 한 지오메트리의 인스턴스다: 칸 수 + 여유만큼 만들어 두고, 쓰지 않는 것은 크기 0으로 접는다. 좌표는 마당 좌표계 */
 export function Bales({ director, onSelect }: ActorProps) {
   const source = useMemo(() => {
     const group = buildBale();
@@ -190,11 +200,12 @@ export function Bales({ director, onSelect }: ActorProps) {
 
   const pick = (e: ThreeEvent<MouseEvent>) => {
     const sim = e.instanceId === undefined ? undefined : director.bales[e.instanceId];
-    if (sim?.active) stop(e, () => onSelect(`bale:${sim.id}`));
+    // 상차 차량에 실린 예시 베일(아이디 없음)은 고르지 않는다
+    if (sim?.active && sim.id) stop(e, () => onSelect(`bale:${sim.id}`));
   };
 
   return (
-    <>
+    <group position={[YARD_FRAME.x, 0, YARD_FRAME.z]} rotation-y={YARD_FRAME.rotY}>
       {source.meshes.map((mesh, k) => (
         <instancedMesh
           key={k}
@@ -206,7 +217,7 @@ export function Bales({ director, onSelect }: ActorProps) {
           onClick={pick}
         />
       ))}
-    </>
+    </group>
   );
 }
 

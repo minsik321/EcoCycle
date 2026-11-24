@@ -24,15 +24,15 @@ vi.mock('../../api', async (importOriginal) => ({
   getPlantHistory: vi.fn(),
 }));
 
-const tank = (id: 'tank-a1' | 'tank-a2' | 'tank-b1' | 'tank-b2', fill: number, status: 'normal' | 'caution' | 'alarm' = 'normal'): DeviceState => ({
+const tank = (id: 'sector-a' | 'sector-c', fill: number, status: 'normal' | 'caution' | 'alarm' = 'normal'): DeviceState => ({
   id,
   type: 'tank',
-  section: id.slice(-2).toUpperCase() as 'A1',
-  grade: id.startsWith('tank-a') ? 'A' : 'C',
+  section: id === 'sector-a' ? 'A' : 'C',
+  grade: id === 'sector-a' ? 'A' : 'C',
   status,
   fillPercent: fill,
-  volumeM3: Math.round(fill) / 10,
-  capacityM3: 8,
+  volumeM3: Math.round(fill * 1.6) / 10,
+  capacityM3: 16,
   moisturePercent: 11.8,
   cautionThresholdPercent: 80,
   updatedAt: NOW,
@@ -48,7 +48,7 @@ const vehicle = (id: string, stage: Vehicle['stage'], min: number, plate: string
   stage,
   plate,
   companyName: plate ? '한빛자원' : null,
-  sectorId: plate ? 'tank-a1' : null,
+  sectorId: plate ? 'sector-a' : null,
   stageTimes: { arrived: at(min), ...(plate ? { identified: at(min) } : {}), ...(stage === 'unloading' ? { unloading: at(min) } : {}) },
   updatedAt: at(min),
 });
@@ -56,8 +56,8 @@ const batch = (id: string, stage: Batch['stage'], min: number): Batch => ({
   id,
   stage,
   mix: [
-    { sectorId: 'tank-a1', percent: 60 },
-    { sectorId: 'tank-b1', percent: 40 },
+    { sectorId: 'sector-a', percent: 60 },
+    { sectorId: 'sector-c', percent: 40 },
   ],
   actualMix: null,
   pinning: null,
@@ -69,7 +69,7 @@ const batch = (id: string, stage: Batch['stage'], min: number): Batch => ({
 });
 const bale = (id: string, stage: Bale['stage'], min: number): Bale => ({ id, batchId: 'batch-1', stage, stageTimes: { created: at(min), ...(stage === 'shipped' ? { shipped: at(min) } : {}) }, updatedAt: at(min) });
 
-const devices = (): DeviceState[] => [tank('tank-a1', 72.4), tank('tank-a2', 45), tank('tank-b1', 30.5), tank('tank-b2', 82, 'caution'), robotState(), conveyorState(), compressor];
+const devices = (): DeviceState[] => [tank('sector-a', 72.4), tank('sector-c', 82, 'caution'), robotState(), conveyorState(), compressor];
 
 function page() {
   const utils = renderWithStore(
@@ -137,17 +137,20 @@ describe('대시보드 홈', () => {
     await vi.waitFor(() => expect(screen.getByRole('region', { name: '평균 수분' }).querySelector('svg path')).not.toBeNull());
   });
 
-  it('섹터 4칸: 적재율 막대, 등급, 수분, 상태. 누르면 섹터 페이지', async () => {
+  it('섹터 2곳: 적재율 막대, 등급, 부피·수분·주의 기준, 상태. 누르면 섹터 페이지', async () => {
     page();
     const sectors = screen.getByRole('region', { name: '섹터' });
-    expect(within(sectors).getAllByRole('link')).toHaveLength(4);
-    const b2 = within(sectors).getByRole('link', { name: '섹터 B2 페이지 열기' });
-    expect(within(b2).getByText('C등급')).toBeInTheDocument();
-    expect(within(b2).getByText('82.0%')).toBeInTheDocument();
-    expect(within(b2).getByText('수분 11.8%')).toBeInTheDocument();
-    expect(within(b2).getByText('주의')).toBeInTheDocument();
-    expect(within(b2).getByRole('meter')).toHaveAttribute('aria-valuenow', '82');
-    await userEvent.click(b2);
+    expect(within(sectors).getAllByRole('link')).toHaveLength(2);
+    expect(within(sectors).getByRole('link', { name: '섹터 A 페이지 열기' })).toHaveTextContent('A등급');
+    const c = within(sectors).getByRole('link', { name: '섹터 C 페이지 열기' });
+    expect(within(c).getByText('C등급')).toBeInTheDocument();
+    expect(within(c).getByText('82.0%')).toBeInTheDocument();
+    expect(within(c).getByText('수분').nextElementSibling).toHaveTextContent('11.8%');
+    expect(within(c).getByText('부피').nextElementSibling).toHaveTextContent('13.1 / 16.0 m³');
+    expect(within(c).getByText('주의 기준').nextElementSibling).toHaveTextContent('80%');
+    expect(within(c).getByText('주의')).toBeInTheDocument();
+    expect(within(c).getByRole('meter')).toHaveAttribute('aria-valuenow', '82');
+    await userEvent.click(c);
     expect(screen.getByText('탱크 페이지')).toBeInTheDocument();
   });
 
@@ -156,7 +159,7 @@ describe('대시보드 홈', () => {
     const card = screen.getByRole('region', { name: '지금 배치' });
     expect(within(card).getByText('batch-1129')).toBeInTheDocument();
     expect(within(card).getByText('압축 중')).toBeInTheDocument();
-    expect(within(card).getByText('A1 60 : B1 40')).toBeInTheDocument();
+    expect(within(card).getByText('A 60 : C 40')).toBeInTheDocument();
     expect(within(card).getByText('10.6%')).toBeInTheDocument();
     expect(within(card).getByText('28.2 MPa')).toBeInTheDocument();
     expect(within(card).getByText('22.5 MPa')).toBeInTheDocument();
@@ -205,10 +208,10 @@ describe('대시보드 홈', () => {
   it('열린 알람은 맨 위에 보이고 확인할 수 있다', () => {
     const { store } = page();
     act(() => {
-      store.dispatch(alarmReceived({ id: 'al-1', level: 'alarm', deviceId: 'tank-b2', message: '적재율 80% 초과', state: 'active', ts: NOW }));
+      store.dispatch(alarmReceived({ id: 'al-1', level: 'alarm', deviceId: 'sector-c', message: '적재율 80% 초과', state: 'active', ts: NOW }));
     });
     const alarms = screen.getByRole('region', { name: '알람' });
-    expect(within(alarms).getByText(/섹터 B2 · 적재율 80% 초과/)).toBeInTheDocument();
+    expect(within(alarms).getByText(/섹터 C · 적재율 80% 초과/)).toBeInTheDocument();
     // 알람은 상태 요약보다 앞에 있다
     expect(alarms.compareDocumentPosition(screen.getByRole('region', { name: '상태 요약' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole('button', { name: '알람 확인' })).toBeEnabled();
@@ -240,7 +243,7 @@ describe('대시보드: 연결 끊김 (마지막 값을 정상처럼 보여 주�
     const sectors = screen.getByRole('region', { name: '섹터' });
     expect(within(sectors).queryByText('정상')).not.toBeInTheDocument();
     expect(within(sectors).queryByText('주의')).not.toBeInTheDocument();
-    expect(within(sectors).getAllByText('연결 끊김')).toHaveLength(4);
+    expect(within(sectors).getAllByText('연결 끊김')).toHaveLength(2);
     expect(within(sectors).queryByText('82.0%')).not.toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: '지금 배치' })).queryByText('22.5 MPa')).not.toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: '공정 추적' })).queryByRole('listitem', { current: 'step' })).not.toBeInTheDocument();
