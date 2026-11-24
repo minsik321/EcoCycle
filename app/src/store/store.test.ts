@@ -38,7 +38,7 @@ const viewer: Me = { id: 'viewer', name: '열람자', role: 'viewer', permission
 const tank = (id: TankState['id'], fill: number, updatedAt: string): TankState => ({
   id,
   type: 'tank',
-  section: 'A1',
+  section: 'A',
   grade: 'A',
   status: 'normal',
   fillPercent: fill,
@@ -49,7 +49,7 @@ const tank = (id: TankState['id'], fill: number, updatedAt: string): TankState =
   updatedAt,
 });
 
-const alarm = (id: string, state: Alarm['state'], ts: string, deviceId: Alarm['deviceId'] = 'tank-a1'): Alarm => ({
+const alarm = (id: string, state: Alarm['state'], ts: string, deviceId: Alarm['deviceId'] = 'sector-a'): Alarm => ({
   id,
   level: 'caution',
   deviceId,
@@ -100,7 +100,7 @@ describe('auth', () => {
   it('로그아웃하면 모든 슬라이스가 초기화되고 loggedOut이 된다', async () => {
     vi.mocked(api.logout).mockResolvedValue(undefined);
     const store = await loggedInStore();
-    store.dispatch(devicesReceived([tank('tank-a1', 50, '2026-10-13T05:00:00.000Z')]));
+    store.dispatch(devicesReceived([tank('sector-a', 50, '2026-10-13T05:00:00.000Z')]));
     store.dispatch(alarmReceived(alarm('al-1', 'active', '2026-10-13T05:00:00.000Z')));
     store.dispatch(connectionChanged({ status: 'online', lastReceivedAt: '2026-10-13T05:00:00.000Z' }));
     store.dispatch(deviceSelected('robot-1'));
@@ -163,7 +163,7 @@ describe('auth', () => {
 
   it('토큰 갱신이 거부되어 세션을 잃으면 초기화되고 loggedOut이 된다', async () => {
     const store = await loggedInStore();
-    store.dispatch(devicesReceived([tank('tank-a1', 50, '2026-10-13T05:00:00.000Z')]));
+    store.dispatch(devicesReceived([tank('sector-a', 50, '2026-10-13T05:00:00.000Z')]));
     store.dispatch(sessionLost());
     expect(store.getState().auth).toMatchObject({ status: 'loggedOut', me: null });
     expect(store.getState().devices.byId).toEqual({});
@@ -199,21 +199,21 @@ describe('devices, plant', () => {
     const store = createAppStore();
     store.dispatch(
       devicesReceived([
-        tank('tank-b1', 30, '2026-10-13T05:00:00.000Z'),
-        tank('tank-a1', 72, '2026-10-13T05:00:00.000Z'),
+        tank('sector-c', 30, '2026-10-13T05:00:00.000Z'),
+        tank('sector-a', 72, '2026-10-13T05:00:00.000Z'),
       ]),
     );
-    expect(selectTanks(store.getState()).map((t) => t.id)).toEqual(['tank-a1', 'tank-b1']);
+    expect(selectTanks(store.getState()).map((t) => t.id)).toEqual(['sector-a', 'sector-c']);
   });
 
   it('더 오래된 값(늦게 도착한 REST 응답)은 최신 값을 덮어쓰지 않는다', () => {
     const store = createAppStore();
-    store.dispatch(devicesReceived([tank('tank-a1', 80, '2026-10-13T05:00:10.000Z')]));
-    store.dispatch(devicesReceived([tank('tank-a1', 70, '2026-10-13T05:00:05.000Z')]));
-    expect((store.getState().devices.byId['tank-a1'] as TankState).fillPercent).toBe(80);
+    store.dispatch(devicesReceived([tank('sector-a', 80, '2026-10-13T05:00:10.000Z')]));
+    store.dispatch(devicesReceived([tank('sector-a', 70, '2026-10-13T05:00:05.000Z')]));
+    expect((store.getState().devices.byId['sector-a'] as TankState).fillPercent).toBe(80);
 
-    store.dispatch(devicesReceived([tank('tank-a1', 81, '2026-10-13T05:00:10.000Z')])); // 같은 시각은 반영
-    expect((store.getState().devices.byId['tank-a1'] as TankState).fillPercent).toBe(81);
+    store.dispatch(devicesReceived([tank('sector-a', 81, '2026-10-13T05:00:10.000Z')])); // 같은 시각은 반영
+    expect((store.getState().devices.byId['sector-a'] as TankState).fillPercent).toBe(81);
   });
 
   it('요약도 더 오래된 값으로 덮어쓰지 않는다', () => {
@@ -225,20 +225,20 @@ describe('devices, plant', () => {
 
   it('서버가 보낸 status를 그대로 쓴다 (판정하지 않는다)', () => {
     const store = createAppStore();
-    const d: DeviceState = { ...tank('tank-a1', 10, '2026-10-13T05:00:00.000Z'), status: 'alarm' };
+    const d: DeviceState = { ...tank('sector-a', 10, '2026-10-13T05:00:00.000Z'), status: 'alarm' };
     store.dispatch(devicesReceived([d]));
-    expect(store.getState().devices.byId['tank-a1']?.status).toBe('alarm');
+    expect(store.getState().devices.byId['sector-a']?.status).toBe('alarm');
   });
 });
 
 describe('alarms', () => {
   it('열린 알람만 두고, 해제되면 지운다. 최신순으로 고른다', () => {
     const store = createAppStore();
-    store.dispatch(alarmReceived(alarm('al-1', 'active', '2026-10-13T05:00:00.000Z', 'tank-a1')));
-    store.dispatch(alarmReceived(alarm('al-2', 'active', '2026-10-13T05:01:00.000Z', 'tank-b2')));
+    store.dispatch(alarmReceived(alarm('al-1', 'active', '2026-10-13T05:00:00.000Z', 'sector-a')));
+    store.dispatch(alarmReceived(alarm('al-2', 'active', '2026-10-13T05:01:00.000Z', 'sector-c')));
     expect(selectOpenAlarms(store.getState()).map((a) => a.id)).toEqual(['al-2', 'al-1']);
     expect(selectActiveAlarmCount(store.getState())).toBe(2);
-    expect(selectAlarmsForDevice('tank-a1')(store.getState()).map((a) => a.id)).toEqual(['al-1']);
+    expect(selectAlarmsForDevice('sector-a')(store.getState()).map((a) => a.id)).toEqual(['al-1']);
 
     store.dispatch(alarmReceived(alarm('al-1', 'acknowledged', '2026-10-13T05:02:00.000Z')));
     expect(selectActiveAlarmCount(store.getState())).toBe(1);

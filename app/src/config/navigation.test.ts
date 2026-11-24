@@ -41,7 +41,7 @@ describe('navigation', () => {
       const p = devicePagePath(id);
       expect(paths.some((base) => base !== "/" && p.startsWith(base))).toBe(true);
     }
-    expect(devicePagePath("tank-a2")).toBe("/tanks/tank-a2");
+    expect(devicePagePath("sector-a")).toBe("/tanks/sector-a");
     expect(devicePagePath("robot-1")).toBe("/robot");
   });
 });

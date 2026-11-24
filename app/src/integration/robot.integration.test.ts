@@ -6,6 +6,7 @@
 //      사건 기록에 지정 시작·해제(누가·어느 섹터)가 남고, 지정이 끝나면 배치의 지정이 풀린다.
 // 로봇 상태를 바꾸므로 끝나면 자동 모드로 되돌린다. 실행: npm run test:integration
 import { afterAll, describe, expect, it } from 'vitest';
+import { TANK_IDS } from '@ecocycle/shared';
 import type { Batch, BatchEvent, Command, CommandResultResponse, DeviceState, PickRecord, ProcessState, RecordPage, RobotState, TankId, TankState } from '@ecocycle/shared';
 
 const API = (process.env.VITE_API_BASE ?? 'http://localhost:4099/api/v1').replace(/\/$/, '');
@@ -86,11 +87,12 @@ describe('수동 두 단계: 집기 → 컨베이어에 놓기 (실제 모의 �
   it('자동 모드에서는 집기·놓기를 받지 않는다 (409)', async () => {
     const r = await robot();
     expect(r.mode).toBe('auto');
-    expect((await send({ type: 'pick_from', tankId: 'tank-a1', confirm: true })).status).toBe(409);
+    expect((await send({ type: 'pick_from', tankId: 'sector-a', confirm: true })).status).toBe(409);
     expect((await send({ type: 'place_on_conveyor', confirm: true })).status).toBe(409);
   });
 
-  it('놓기 → 집기 순서는 거부하고, 집기 → 놓기만 받는다. 들고 있는 동안은 다시 집기·모드 전환을 거부한다', async () => {
+  // 섹터 두 곳(A·C) 모두 같은 순서 규칙을 따른다
+  it.each(TANK_IDS)('놓기 → 집기 순서는 거부하고, 집기 → 놓기만 받는다. 들고 있는 동안은 다시 집기·모드 전환을 거부한다 (%s)', async (tankId) => {
     await idleEmpty();
     expect((await run({ type: 'set_mode', mode: 'manual', confirm: true })).status).toBe('completed');
     // 모드가 바뀌기 전에 시작한 자동 사이클은 끝까지 마친다
@@ -101,10 +103,9 @@ describe('수동 두 단계: 집기 → 컨베이어에 놓기 (실제 모의 �
     expect(early.status).toBe(409);
     expect(early.message).toMatch(/집어 든 파지가 없습니다/);
 
-    // 가장 많이 찬 섹터에서 집는다 (빈 섹터면 집지 못한다)
-    const devices = await get<DeviceState[]>('/devices');
-    const fullest = devices.filter((d): d is TankState => d.type === 'tank').sort((a, b) => b.volumeM3 - a.volumeM3)[0]!;
-    const tankId: TankId = fullest.id;
+    // 빈 섹터면 집지 못한다 (모의 서버의 두 섹터는 적재율 수십 %에서 시작한다)
+    const sector = await get<TankState>(`/devices/${tankId}/state`);
+    expect(sector.volumeM3).toBeGreaterThan(0);
     const revision = (await robot()).pickRecordsRevision;
 
     const pick = await send({ type: 'pick_from', tankId, confirm: true });
@@ -187,7 +188,7 @@ describe('자동 · 섹터 지정: 계획 배합과 실제 배합 (실제 모의
     const to = encodeURIComponent(new Date(Date.now() + 60_000).toISOString());
     const events = await get<RecordPage<BatchEvent>>(`/batches/events/records?from=${from}&to=${to}&page=1&pageSize=50`);
     const started = events.items.find((e) => (e.type === 'pin_started' || e.type === 'pin_changed') && e.actor === ACTOR);
-    expect(started?.detail).toContain(pin.replace('tank-', '').toUpperCase());
+    expect(started?.detail).toContain(pin.replace('sector-', '').toUpperCase());
 
     // 지정을 끝내면 배합 중인 배치의 지정이 풀리고(실제 배합 기록은 남는다) 해제 사건이 남는다
     expect((await run({ type: 'set_mode', mode: 'auto', confirm: true })).status).toBe('completed');
@@ -203,5 +204,21 @@ describe('자동 · 섹터 지정: 계획 배합과 실제 배합 (실제 모의
     const record = await get<{ actualMix: unknown; pinChanges: Array<{ actor: string; sectors: TankId[] }> }>(`/batches/${batch.id}`);
     expect(record.actualMix).not.toBeNull();
     expect(record.pinChanges[0]).toMatchObject({ actor: ACTOR, sectors: [pin] });
+  });
+});
+
+describe('자동 · 섹터 지정의 지정 섹터 검사: 중복 없는 유효 섹터 1~2개 (실제 모의 서버)', () => {
+  it('0개·3개 이상·중복·없는 섹터는 422, 1개·2개는 받는다', async () => {
+    const pinned = (pinnedSectors: unknown) => ({ type: 'set_mode', mode: 'auto_pinned', pinnedSectors, confirm: true }) as unknown as Command;
+    for (const pins of [[], ['sector-a', 'sector-c', 'sector-a'], ['sector-a', 'sector-c', 'robot-1'], ['sector-a', 'sector-a'], ['tank-a1'], ['sector-b'], null]) {
+      const res = await send(pinned(pins));
+      expect(res.status, JSON.stringify(pins)).toBe(422);
+      expect(res.message).toMatch(/1~2개/);
+    }
+    expect((await run(pinned(['sector-c']))).status).toBe('completed');
+    expect((await robot()).pinnedSectors).toEqual(['sector-c']);
+    expect((await run(pinned(['sector-a', 'sector-c']))).status).toBe('completed');
+    expect((await robot()).pinnedSectors).toEqual(['sector-a', 'sector-c']);
+    expect((await run({ type: 'set_mode', mode: 'auto', confirm: true })).status).toBe('completed');
   });
 });

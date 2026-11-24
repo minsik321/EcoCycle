@@ -166,8 +166,8 @@ try {
     await shot('2-batch-bale');
 
     // 1·6. 섹터 상세와 알람 이력
-    await go('/tanks/tank-a1');
-    await page.getByRole('heading', { name: /섹터 A1/, level: 1 }).waitFor();
+    await go('/tanks/sector-a');
+    await page.getByRole('heading', { name: /섹터 A/, level: 1 }).waitFor();
     await page.waitForTimeout(800);
     await shot('1-sector-detail');
     if (size === 'desktop') {
@@ -183,11 +183,11 @@ try {
     const items = await alarmCard.locator('ul > li').count();
     assert.ok(items <= 5, `알람 이력 ${items}건`);
     const link = alarmCard.getByRole('link', { name: '전체 알람 보기' });
-    assert.equal(await link.getAttribute('href'), '/alarms?device=tank-a1');
+    assert.equal(await link.getAttribute('href'), '/alarms?device=sector-a');
     await alarmCard.scrollIntoViewIfNeeded();
     await shot('6-alarm-history');
     await link.click();
-    await page.getByText('섹터 A1 알람만 보는 중').waitFor();
+    await page.getByText('섹터 A 알람만 보는 중').waitFor();
     await shot('6-alarms-filtered');
     await context.close();
   }

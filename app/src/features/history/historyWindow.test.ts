@@ -73,8 +73,8 @@ describe('windowAt', () => {
 
 describe('cacheKey / formatWindowLabel', () => {
   it('기기, metric, 간격, from으로 키를 만든다', () => {
-    expect(cacheKey('tank-a1', 'level', '10m', '2026-10-12T05:20:00.000Z')).toBe('tank-a1|level|10m|2026-10-12T05:20:00.000Z');
-    expect(cacheKey('tank-a1', 'level', '10m', 'x')).not.toBe(cacheKey('tank-a1', 'moisture', '10m', 'x'));
+    expect(cacheKey('sector-a', 'level', '10m', '2026-10-12T05:20:00.000Z')).toBe('sector-a|level|10m|2026-10-12T05:20:00.000Z');
+    expect(cacheKey('sector-a', 'level', '10m', 'x')).not.toBe(cacheKey('sector-a', 'moisture', '10m', 'x'));
   });
 
   it('현재 구간을 현지 시각 "월/일 시:분 ~ 월/일 시:분"으로 보여 준다', () => {

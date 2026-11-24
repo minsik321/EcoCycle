@@ -119,7 +119,7 @@ describe('관절 입력 (JointSource): 그리기와 분리', () => {
       joints: [1, 2, 3, 4, 5, 6],
       gripper: { closed: true, holding: true },
       phase: 'move',
-      targetTankId: 'tank-a1',
+      targetTankId: 'sector-a',
     };
     buffer.push(msg, 1_000);
     expect(sampleOf(s, 1_000)!.joints).toEqual([1, 2, 3, 4, 5, 6]);
@@ -134,7 +134,7 @@ describe('관절 입력 (JointSource): 그리기와 분리', () => {
     expect(demoPose(DEMO_CYCLE.pickSec + DEMO_CYCLE.moveSec + 1).phase).toBe('place');
     expect(demoPose(cycle - 0.5).phase).toBe('idle');
     expect(TANK_IDS.map((_, i) => demoPose(i * cycle + 1).targetTankId)).toEqual([...TANK_IDS]);
-    expect(demoPose(TANK_IDS.length * cycle + 1).targetTankId).toBe('tank-a1'); // 다시 처음으로
+    expect(demoPose(TANK_IDS.length * cycle + 1).targetTankId).toBe('sector-a'); // 다시 처음으로
   });
 
   it('demo는 집을 때 그리퍼를 닫아 들고, 놓은 뒤에 연다', () => {

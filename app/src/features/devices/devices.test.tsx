@@ -50,8 +50,8 @@ const batch = (id: string, stage: Batch['stage'], targetPressureMpa = 28.5): Bat
   id,
   stage,
   mix: [
-    { sectorId: 'tank-a1', percent: 60 },
-    { sectorId: 'tank-b2', percent: 40 },
+    { sectorId: 'sector-a', percent: 60 },
+    { sectorId: 'sector-c', percent: 40 },
   ],
   actualMix: null,
   pinning: null,
@@ -71,7 +71,7 @@ function jointsMessage(joints: number[], seq = 1): RobotJointsMessage {
     joints,
     gripper: { closed: true, holding: true },
     phase: 'move',
-    targetTankId: 'tank-a1',
+    targetTankId: 'sector-a',
   };
 }
 
@@ -105,10 +105,10 @@ afterEach(() => {
 
 describe('RobotPage', () => {
   it('그림 없이 머리 줄(이름·상태·지금 하는 일), 주요 수치 4칸(모드·현재 작업·이번 시간 집기·그리퍼)', async () => {
-    renderWithStore(<RobotPage />, { me: ADMIN, devices: [robotState({ phase: 'move', targetTankId: 'tank-a2', gripper: { closed: true, holding: true } })] });
+    renderWithStore(<RobotPage />, { me: ADMIN, devices: [robotState({ phase: 'move', targetTankId: 'sector-a', gripper: { closed: true, holding: true } })] });
     expect(screen.getByRole('heading', { name: '로봇팔' })).toBeInTheDocument();
     expect(within(screen.getByLabelText('로봇팔 상태')).getByText('작동 중')).toBeInTheDocument();
-    expect(screen.getByLabelText('지금 하는 일')).toHaveTextContent('섹터 A2 파지를 컨베이어로 옮기는 중');
+    expect(screen.getByLabelText('지금 하는 일')).toHaveTextContent('섹터 A 파지를 컨베이어로 옮기는 중');
     // 정보 없는 그림은 없다: 옆모습 그림이 없고 주요 수치가 폭 전체 격자에 놓인다
     expect(screen.queryByRole('img', { name: /옆모습/ })).not.toBeInTheDocument();
     expect(screen.getByLabelText('주요 수치')).toHaveClass('md:grid-cols-4');
@@ -138,14 +138,14 @@ describe('RobotPage', () => {
   it('지금/다음은 서버 값으로: 작업 섹터 → 컨베이어, 섹터 지정이면 지정 섹터 차례', () => {
     const { store } = renderWithStore(<RobotPage />, {
       me: ADMIN,
-      devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['tank-a1', 'tank-b1'], phase: 'pick', targetTankId: 'tank-a1' })],
+      devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['sector-a', 'sector-c'], phase: 'pick', targetTankId: 'sector-a' })],
     });
     act(() => {
       store.dispatch(processStateReceived({ vehicles: [], batches: [batch('batch-0413', 'mixing')], bales: [], updatedAt: NOW }));
     });
     const nowNext = screen.getByLabelText('지금과 다음');
-    expect(nowNext).toHaveTextContent('섹터 A1 → 컨베이어 · 배치 #0413');
-    expect(nowNext).toHaveTextContent('지정 섹터 A1·B1 차례로');
+    expect(nowNext).toHaveTextContent('섹터 A → 컨베이어 · 배치 #0413');
+    expect(nowNext).toHaveTextContent('지정 섹터 A·C 차례로');
     expect(tile('모드')).toHaveTextContent('섹터 지정');
   });
 
@@ -217,7 +217,7 @@ describe('RobotPage', () => {
     expect(rows).toHaveLength(6);
     expect(rows[0]).toHaveTextContent('1. base');
     expect(rows[0]).toHaveTextContent('12.5°');
-    expect(rows[0]).toHaveTextContent('-170° ~ 170°');
+    expect(rows[0]).toHaveTextContent('-270° ~ 270°');
     expect(rows[1]).toHaveTextContent('-45.0°');
     expect(rows[5]).toHaveTextContent('90.0°');
     expect(within(table).getByRole('meter', { name: 'shoulder 범위 안 위치' })).toHaveAttribute('aria-valuenow', '-45');
@@ -310,7 +310,7 @@ describe('ConveyorPage', () => {
     });
     const nowNext = screen.getByLabelText('지금과 다음');
     expect(nowNext).toHaveTextContent('배치 #0413 파지를 압축기로 이송');
-    expect(nowNext).toHaveTextContent('배치 #0414 (A1 60% · B2 40%)');
+    expect(nowNext).toHaveTextContent('배치 #0414 (A 60% · C 40%)');
   });
 
   it('이력 그래프·속도 설정·알람 이력은 "자세히" 안에 있고 열 때 요청한다', async () => {
@@ -381,7 +381,7 @@ describe('CompressorPage', () => {
       store.dispatch(processStateReceived({ vehicles: [], batches: [batch('batch-0413', 'mixing', 27.8), batch('batch-0412', 'compressing', 28.5)], bales: [], updatedAt: NOW }));
     });
     const nowNext = screen.getByLabelText('지금과 다음');
-    expect(nowNext).toHaveTextContent('배치 #0412 · A1 60% · B2 40% · 목표 28.5 MPa');
+    expect(nowNext).toHaveTextContent('배치 #0412 · A 60% · C 40% · 목표 28.5 MPa');
     expect(within(nowNext).getByRole('link', { name: '배치·베일에서 보기' })).toHaveAttribute('href', '/records/batches');
     expect(nowNext).toHaveTextContent('배치 #0413');
   });

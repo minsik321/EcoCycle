@@ -66,9 +66,9 @@ vi.mock('./store/realtimeClient', () => ({
 const user = (role: Role): Me => ({ id: role, name: `${role}-user`, role, permissions: [...ROLE_PERMISSIONS[role]] });
 
 const compressor: DeviceState = { id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 28, temperatureC: 40, cycleStage: 'pressing', updatedAt: NOW };
-const openAlarm: Alarm = { id: 'al-1', level: 'caution', deviceId: 'tank-a1', message: '적재율 80% 초과', state: 'active', ts: NOW };
+const openAlarm: Alarm = { id: 'al-1', level: 'caution', deviceId: 'sector-a', message: '적재율 80% 초과', state: 'active', ts: NOW };
 const controlled: ControlledBatch = {
-  batch: { id: 'batch-test', stage: 'planned', mix: [{ sectorId: 'tank-a1', percent: 100 }], actualMix: null, pinning: null, pinChanges: [], avgMoisturePercent: 12, targetPressureMpa: 28, stageTimes: { planned: NOW }, updatedAt: NOW },
+  batch: { id: 'batch-test', stage: 'planned', mix: [{ sectorId: 'sector-a', percent: 100 }], actualMix: null, pinning: null, pinChanges: [], avgMoisturePercent: 12, targetPressureMpa: 28, stageTimes: { planned: NOW }, updatedAt: NOW },
   paused: false,
   skipped: false,
   progressPercent: 0,
@@ -130,13 +130,13 @@ const typeSkipReason = async (ui: Ui) => {
   if (input && !(input as HTMLInputElement).disabled) await ui.type(input, '품질 재점검');
 };
 const manual = robotState({ mode: 'manual' });
-const holding = robotState({ mode: 'manual', heldSectorId: 'tank-a1', gripper: { closed: true, holding: true } });
+const holding = robotState({ mode: 'manual', heldSectorId: 'sector-a', gripper: { closed: true, holding: true } });
 
 const SPOTS: Spot[] = [
   // --- 조회: 모든 역할 ---
   { row: 'view.home3d', place: '3D 홈', render: (me) => renderStudio(me, robotState()), find: () => region('공정 기록'), denied: 'hidden' },
   { row: 'view.dashboard', place: '대시보드 홈', render: (me) => renderWithStore(<HomePage />, { me, devices: devices() }), find: () => region('상태 요약'), denied: 'hidden' },
-  { row: 'view.devices', place: '섹터 페이지', render: (me) => renderWithStore(tankRoute(<TankPage />), { me, route: '/tanks/tank-a1', devices: devices() }), find: () => screen.queryByRole('heading', { name: '섹터 A1' }), denied: 'hidden' },
+  { row: 'view.devices', place: '섹터 페이지', render: (me) => renderWithStore(tankRoute(<TankPage />), { me, route: '/tanks/sector-a', devices: devices() }), find: () => screen.queryByRole('heading', { name: '섹터 A' }), denied: 'hidden' },
   { row: 'view.devices', place: '로봇팔 페이지', render: (me) => renderRobotPage(me, robotState()), find: () => screen.queryByRole('heading', { name: '로봇팔' }), denied: 'hidden' },
   { row: 'view.devices', place: '컨베이어 페이지', render: (me) => renderWithStore(<ConveyorPage />, { me, devices: devices() }), find: () => screen.queryByRole('heading', { name: /컨베이어/ }), denied: 'hidden' },
   { row: 'view.devices', place: '압축기 페이지', render: (me) => renderWithStore(<CompressorPage />, { me, devices: devices() }), find: () => screen.queryByRole('heading', { name: '압축기' }), denied: 'hidden' },
@@ -175,7 +175,7 @@ const SPOTS: Spot[] = [
       place,
       render: (me) => {
         const el = place === '대시보드 홈' ? <HomePage /> : place === '알람 화면' ? <AlarmsPage /> : tankRoute(<TankPage />);
-        const { store } = renderWithStore(el, { me, devices: devices(), route: place === '섹터 페이지 조작 줄' ? '/tanks/tank-a1' : '/' });
+        const { store } = renderWithStore(el, { me, devices: devices(), route: place === '섹터 페이지 조작 줄' ? '/tanks/sector-a' : '/' });
         act(() => void store.dispatch(alarmReceived(openAlarm)));
       },
       find: () => screen.queryByRole('button', { name: '알람 확인' }),
@@ -197,7 +197,7 @@ const SPOTS: Spot[] = [
       place,
       render: (me) => {
         const el = place.startsWith('섹터') ? tankRoute(<TankPage />) : place.startsWith('로봇') ? <RobotPage /> : place.startsWith('컨베이어') ? <ConveyorPage /> : <CompressorPage />;
-        renderWithStore(el, { me, devices: devices([robotState()]), route: place.startsWith('섹터') ? '/tanks/tank-a1' : '/' });
+        renderWithStore(el, { me, devices: devices([robotState()]), route: place.startsWith('섹터') ? '/tanks/sector-a' : '/' });
       },
       prepare: openDetails,
       find: () => screen.queryByLabelText(label),
@@ -240,7 +240,7 @@ const SPOTS: Spot[] = [
       const pinned = inRegion('운전 모드', 'radio', '자동 · 섹터 지정');
       if (!pinned) return;
       await ui.click(pinned);
-      const chip = inRegion('운전 모드', 'button', '섹터 A1');
+      const chip = inRegion('운전 모드', 'button', '섹터 A');
       if (chip && !(chip as HTMLButtonElement).disabled) await ui.click(chip);
     },
     find: () => inRegion('운전 모드', 'button', '적용'),
@@ -257,7 +257,7 @@ const SPOTS: Spot[] = [
       const pinned = within(robotPanel()).queryByRole('radio', { name: '자동 · 섹터 지정' });
       if (!pinned) return;
       await ui.click(pinned);
-      await ui.click(within(robotPanel()).getByRole('button', { name: '섹터 A1' }));
+      await ui.click(within(robotPanel()).getByRole('button', { name: '섹터 A' }));
     },
     find: () => inPanel('적용'),
     denied: 'hidden',
@@ -294,13 +294,13 @@ const SPOTS: Spot[] = [
 /** api 클라이언트 점검에 보낼 명령 (줄마다, 값은 올바른 모양) */
 const SAMPLES: Partial<Record<MatrixRowId, Array<{ device: DeviceId; command: Command }>>> = {
   'cmd.run': (['start', 'pause', 'resume', 'stop'] as const).map((type) => ({ device: 'conveyor-z', command: { type } })),
-  'cmd.ack': [{ device: 'tank-a1', command: { type: 'ack_alarm', alarmId: 'al-1' } }],
-  'cmd.setting': [{ device: 'tank-a1', command: { type: 'update_setting', key: 'cautionThresholdPercent', value: 80, confirm: true } }],
+  'cmd.ack': [{ device: 'sector-a', command: { type: 'ack_alarm', alarmId: 'al-1' } }],
+  'cmd.setting': [{ device: 'sector-a', command: { type: 'update_setting', key: 'cautionThresholdPercent', value: 80, confirm: true } }],
   'cmd.mode': [{ device: 'robot-1', command: { type: 'set_mode', mode: 'manual', confirm: true } }],
-  'cmd.pin': [{ device: 'robot-1', command: { type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['tank-a1'], confirm: true } }],
-  'cmd.pick': [{ device: 'robot-1', command: { type: 'pick_from', tankId: 'tank-a1', confirm: true } }],
+  'cmd.pin': [{ device: 'robot-1', command: { type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['sector-a'], confirm: true } }],
+  'cmd.pick': [{ device: 'robot-1', command: { type: 'pick_from', tankId: 'sector-a', confirm: true } }],
   'cmd.place': [{ device: 'robot-1', command: { type: 'place_on_conveyor', confirm: true } }],
-  'cmd.batchMix': [{ device: 'compressor-1', command: { type: 'set_batch_mix', batchId: 'b', mix: [{ sectorId: 'tank-a1', percent: 100 }], confirm: true } }],
+  'cmd.batchMix': [{ device: 'compressor-1', command: { type: 'set_batch_mix', batchId: 'b', mix: [{ sectorId: 'sector-a', percent: 100 }], confirm: true } }],
   'cmd.batchPressure': [{ device: 'compressor-1', command: { type: 'set_batch_pressure', batchId: 'b', targetPressureMpa: 28, confirm: true } }],
   'cmd.batchPause': [
     { device: 'compressor-1', command: { type: 'pause_batch', batchId: 'b', confirm: true } },
@@ -327,7 +327,7 @@ beforeEach(() => {
     result: 'completed',
     startedAt: NOW,
     endedAt: NOW,
-    mix: [{ sectorId: 'tank-a1', percent: 100 }],
+    mix: [{ sectorId: 'sector-a', percent: 100 }],
     actualMix: null,
     pinChanges: [],
     avgMoisturePercent: 11.8,

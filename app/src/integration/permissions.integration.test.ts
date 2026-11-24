@@ -51,10 +51,10 @@ const PROBES: Partial<Record<MatrixRowId, Probe[]>> = {
     { device: 'conveyor-z', body: { type: 'pause' }, sideEffect: true },
     { device: 'conveyor-z', body: { type: 'stop' }, sideEffect: true },
   ],
-  'cmd.ack': [{ device: 'tank-a1', body: { type: 'ack_alarm', alarmId: 'none' } }], // 없는 알람이라 422
-  'cmd.setting': [{ device: 'tank-a1', body: { type: 'update_setting', key: 'nope', value: 1, confirm: true } }], // 없는 설정이라 422
+  'cmd.ack': [{ device: 'sector-a', body: { type: 'ack_alarm', alarmId: 'none' } }], // 없는 알람이라 422
+  'cmd.setting': [{ device: 'sector-a', body: { type: 'update_setting', key: 'nope', value: 1, confirm: true } }], // 없는 설정이라 422
   'cmd.mode': [{ device: 'robot-1', body: { type: 'set_mode', mode: 'manual' } }], // confirm이 없어 422
-  'cmd.pin': [{ device: 'robot-1', body: { type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['tank-a1'] } }], // confirm이 없어 422
+  'cmd.pin': [{ device: 'robot-1', body: { type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['sector-a'] } }], // confirm이 없어 422
   'cmd.pick': [{ device: 'robot-1', body: { type: 'pick_from', confirm: true } }], // tankId가 없어 422
   'cmd.place': [{ device: 'robot-1', body: { type: 'place_on_conveyor' } }], // confirm이 없어 422
   'cmd.batchMix': [{ device: 'compressor-1', body: { type: 'set_batch_mix' } }], // batchId가 없어 422
@@ -76,9 +76,9 @@ const READS: Partial<Record<MatrixRowId, () => string[]>> = {
   'view.home3d': () => ['/plant/summary', '/devices', '/process/state', `/plant/history?metric=balesToday&${range}&interval=1d`, '/robots/robot-1/model', '/alarms?state=active', 'POST /auth/ws-ticket'],
   'view.dashboard': () => ['/plant/summary', '/process/state', '/plant/kpi-history?metric=balesToday&range=today&timeZone=Asia/Seoul', '/plant/kpi-history?metric=averageMoisturePercent&range=7d'],
   'view.devices': () => [
-    '/devices/tank-a1/state',
-    `/devices/tank-a1/history?metric=level&${range}&interval=1d`,
-    `/devices/tank-a1/unloads/records?${page}`,
+    '/devices/sector-a/state',
+    `/devices/sector-a/history?metric=level&${range}&interval=1d`,
+    `/devices/sector-a/unloads/records?${page}`,
     '/devices/robot-1/state',
     `/robots/robot-1/picks/records?${page}`,
     `/devices/conveyor-z/history?metric=load&${range}&interval=1d`,

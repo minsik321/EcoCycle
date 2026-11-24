@@ -35,7 +35,7 @@ function makeFetcher(points: number[] = [10, 20, 30]) {
 }
 
 const panel = (fetcher: ReturnType<typeof makeFetcher>, metrics = HISTORY_METRICS.tank) =>
-  render(<HistoryPanel deviceId="tank-a1" metrics={metrics} now={now} fetcher={fetcher} />);
+  render(<HistoryPanel deviceId="sector-a" metrics={metrics} now={now} fetcher={fetcher} />);
 
 const calls = (f: ReturnType<typeof makeFetcher>) => f.mock.calls.map((c) => c[0]);
 
@@ -47,7 +47,7 @@ describe('HistoryPanel: 구간', () => {
 
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(calls(fetcher)[0]).toEqual({
-      deviceId: 'tank-a1',
+      deviceId: 'sector-a',
       metric: 'level',
       from: new Date(ANCHOR - DAY).toISOString(),
       to: new Date(NOW).toISOString(),
@@ -132,7 +132,7 @@ describe('HistoryPanel: 구간', () => {
           );
         }),
     );
-    render(<HistoryPanel deviceId="tank-a1" metrics={HISTORY_METRICS.tank} now={now} fetcher={fetcher} />);
+    render(<HistoryPanel deviceId="sector-a" metrics={HISTORY_METRICS.tank} now={now} fetcher={fetcher} />);
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
 
     await userEvent.click(screen.getByLabelText('이전 구간'));
@@ -147,7 +147,7 @@ describe('HistoryPanel: 구간', () => {
 describe('HistoryPanel: 불러오는 중, 실패, 빈 구간', () => {
   it('처음에는 불러오는 중이라고 보여 준다', async () => {
     const fetcher = vi.fn(() => new Promise<HistoryResponse>(() => undefined));
-    render(<HistoryPanel deviceId="tank-a1" metrics={HISTORY_METRICS.tank} now={now} fetcher={fetcher} />);
+    render(<HistoryPanel deviceId="sector-a" metrics={HISTORY_METRICS.tank} now={now} fetcher={fetcher} />);
     expect(screen.getByRole('status')).toHaveTextContent('이력을 불러오는 중');
   });
 
@@ -157,7 +157,7 @@ describe('HistoryPanel: 불러오는 중, 실패, 빈 구간', () => {
     const fetcher = vi.fn((q: HistoryQuery, s?: AbortSignal) =>
       fetcher.mock.calls.length === 1 ? first(q, s) : new Promise<HistoryResponse>((resolve) => (release = () => resolve({ deviceId: q.deviceId, metric: q.metric, interval: q.interval, from: q.from, to: q.to, points: [] }))),
     );
-    render(<HistoryPanel deviceId="tank-a1" metrics={HISTORY_METRICS.tank} now={now} fetcher={fetcher} />);
+    render(<HistoryPanel deviceId="sector-a" metrics={HISTORY_METRICS.tank} now={now} fetcher={fetcher} />);
     const before = await screen.findByRole('img');
 
     await userEvent.click(screen.getByLabelText('이전 구간'));
@@ -174,7 +174,7 @@ describe('HistoryPanel: 불러오는 중, 실패, 빈 구간', () => {
       if (fetcher.mock.calls.length === 1) throw new api.ApiError(503, 'X', '서버가 준비되지 않았습니다.');
       return ok(q, s);
     });
-    render(<HistoryPanel deviceId="tank-a1" metrics={HISTORY_METRICS.tank} now={now} fetcher={fetcher} />);
+    render(<HistoryPanel deviceId="sector-a" metrics={HISTORY_METRICS.tank} now={now} fetcher={fetcher} />);
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('이력을 불러오지 못했습니다');
@@ -194,7 +194,7 @@ describe('HistoryPanel: 불러오는 중, 실패, 빈 구간', () => {
   it('그래프에는 접근성용 요약(최소·최대·마지막 값)이 붙는다', async () => {
     panel(makeFetcher([10, 20, 30]));
     const label = (await screen.findByRole('img')).getAttribute('aria-label')!;
-    expect(label).toContain('섹터 A1 적재율');
+    expect(label).toContain('섹터 A 적재율');
     expect(label).toContain('최소 10%');
     expect(label).toContain('최대 30%');
     expect(label).toContain('마지막 30%');
@@ -252,11 +252,11 @@ describe('DeviceAlarmHistory', () => {
 
   it('이 기기의 알람만 최신순으로 보여 주고 상태를 글자로 알린다', async () => {
     vi.mocked(api.getAlarms).mockResolvedValue([
-      alarm('al-1', 'tank-a1', 'cleared', '2026-10-12T05:00:00.000Z'),
-      alarm('al-2', 'tank-b2', 'active', '2026-10-13T01:00:00.000Z'),
-      alarm('al-3', 'tank-a1', 'active', '2026-10-13T04:00:00.000Z'),
+      alarm('al-1', 'sector-a', 'cleared', '2026-10-12T05:00:00.000Z'),
+      alarm('al-2', 'sector-c', 'active', '2026-10-13T01:00:00.000Z'),
+      alarm('al-3', 'sector-a', 'active', '2026-10-13T04:00:00.000Z'),
     ]);
-    renderWithStore(<DeviceAlarmHistory deviceId="tank-a1" now={now} />);
+    renderWithStore(<DeviceAlarmHistory deviceId="sector-a" now={now} />);
 
     const items = await screen.findAllByRole('listitem');
     expect(items.map((li) => li.textContent)).toEqual([expect.stringContaining('al-3 메시지'), expect.stringContaining('al-1 메시지')]);
@@ -267,27 +267,27 @@ describe('DeviceAlarmHistory', () => {
 
   it('최신 5건만 보여 주고, 목록은 스스로 스크롤하며, "전체 알람 보기"는 그 기기로 거른 알람 화면을 연다', async () => {
     vi.mocked(api.getAlarms).mockResolvedValue(
-      Array.from({ length: 8 }, (_, i) => alarm(`al-${i + 1}`, 'tank-a1', 'cleared', `2026-10-1${i}T05:00:00.000Z`)),
+      Array.from({ length: 8 }, (_, i) => alarm(`al-${i + 1}`, 'sector-a', 'cleared', `2026-10-1${i}T05:00:00.000Z`)),
     );
-    renderWithStore(<DeviceAlarmHistory deviceId="tank-a1" now={now} />);
+    renderWithStore(<DeviceAlarmHistory deviceId="sector-a" now={now} />);
 
     const items = await screen.findAllByRole('listitem');
     expect(items).toHaveLength(5);
     expect(items[0]).toHaveTextContent('al-8 메시지');
     expect(items[4]).toHaveTextContent('al-4 메시지');
     expect(screen.getByRole('list')).toHaveClass('max-h-56', 'overflow-y-auto');
-    expect(screen.getByRole('link', { name: '전체 알람 보기' })).toHaveAttribute('href', '/alarms?device=tank-a1');
+    expect(screen.getByRole('link', { name: '전체 알람 보기' })).toHaveAttribute('href', '/alarms?device=sector-a');
   });
 
   it('알람이 없으면 없다고 알린다', async () => {
     vi.mocked(api.getAlarms).mockResolvedValue([]);
-    renderWithStore(<DeviceAlarmHistory deviceId="tank-a1" now={now} />);
+    renderWithStore(<DeviceAlarmHistory deviceId="sector-a" now={now} />);
     expect(await screen.findByText('최근 7일간 알람이 없습니다.')).toBeInTheDocument();
   });
 
   it('실패하면 오류와 다시 시도 버튼을 보여 준다', async () => {
     vi.mocked(api.getAlarms).mockRejectedValueOnce(new api.ApiError(503, 'X', '')).mockResolvedValue([]);
-    renderWithStore(<DeviceAlarmHistory deviceId="tank-a1" now={now} />);
+    renderWithStore(<DeviceAlarmHistory deviceId="sector-a" now={now} />);
     const alert = await screen.findByRole('alert');
     await userEvent.click(within(alert).getByRole('button', { name: '다시 시도' }));
     expect(await screen.findByText('최근 7일간 알람이 없습니다.')).toBeInTheDocument();
@@ -300,7 +300,7 @@ describe('DeviceAlarmHistory', () => {
     render(
       <Provider store={store}>
         <MemoryRouter>
-          <DeviceAlarmHistory deviceId="tank-a1" now={now} />
+          <DeviceAlarmHistory deviceId="sector-a" now={now} />
         </MemoryRouter>
       </Provider>,
     );
@@ -308,7 +308,7 @@ describe('DeviceAlarmHistory', () => {
     expect(api.getAlarms).toHaveBeenCalledTimes(1);
 
     act(() => {
-      store.dispatch(alarmReceived(alarm('al-9', 'tank-a1', 'active', '2026-10-13T05:00:00.000Z')));
+      store.dispatch(alarmReceived(alarm('al-9', 'sector-a', 'active', '2026-10-13T05:00:00.000Z')));
     });
     await waitFor(() => expect(api.getAlarms).toHaveBeenCalledTimes(2));
   });

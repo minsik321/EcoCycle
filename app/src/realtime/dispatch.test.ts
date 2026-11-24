@@ -4,10 +4,10 @@ import { createDispatcher } from './dispatch';
 import { createJointBuffer } from './jointBuffer';
 import type { RealtimeSink } from './types';
 
-const tank = (fill: number, id: TankState['id'] = 'tank-a1'): TankState => ({
+const tank = (fill: number, id: TankState['id'] = 'sector-a'): TankState => ({
   id,
   type: 'tank',
-  section: 'A1',
+  section: 'A',
   grade: 'A',
   status: 'normal',
   fillPercent: fill,
@@ -30,7 +30,7 @@ const summary = (fill: number): PlantSummary => ({
 const alarm: Alarm = {
   id: 'al-1',
   level: 'caution',
-  deviceId: 'tank-a1',
+  deviceId: 'sector-a',
   message: '적재율 80% 초과',
   state: 'active',
   ts: '2026-10-13T05:00:00.000Z',
@@ -66,15 +66,15 @@ describe('dispatcher', () => {
 
     d.handle({ type: 'device.state', state: tank(70) }, 0);
     d.handle({ type: 'device.state', state: tank(71) }, 0);
-    d.handle({ type: 'device.state', state: tank(72, 'tank-a2') }, 0);
+    d.handle({ type: 'device.state', state: tank(72, 'sector-c') }, 0);
     expect(sink.onDeviceStates).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(250);
     expect(sink.onDeviceStates).toHaveBeenCalledTimes(1);
     const states = vi.mocked(sink.onDeviceStates).mock.calls[0]![0] as DeviceState[];
     expect(states.map((s) => (s.type === 'tank' ? [s.id, s.fillPercent] : null))).toEqual([
-      ['tank-a1', 71],
-      ['tank-a2', 72],
+      ['sector-a', 71],
+      ['sector-c', 72],
     ]);
   });
 

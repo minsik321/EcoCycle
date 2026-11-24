@@ -56,7 +56,7 @@ describe('DeviceControls: 표시', () => {
   });
 
   it('탱크에는 조작이 없다', () => {
-    const { container } = renderWithStore(<DeviceControls deviceId="tank-a1" context="home" />, { devices: [tankState()], me: ADMIN });
+    const { container } = renderWithStore(<DeviceControls deviceId="sector-a" context="home" />, { devices: [tankState()], me: ADMIN });
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -143,10 +143,10 @@ describe('RobotModeControl: 세 칸 하나와 확인 단계', () => {
     // 안내 글과 같은 줄
     expect(apply().parentElement).toContainElement(within(card()).getByText(/배합 중인 배치의 배합비/));
     await userEvent.click(radio('자동 · 섹터 지정'));
-    // 섹터 칩 넷 + 적용 = 다섯 칸 한 줄
-    const chips = within(card()).getByRole('button', { name: '섹터 A1' }).parentElement!;
+    // 섹터 칩 둘 + 적용 = 세 칸 한 줄
+    const chips = within(card()).getByRole('button', { name: '섹터 A' }).parentElement!;
     expect(chips).toContainElement(apply());
-    expect(within(chips).getAllByRole('button')).toHaveLength(5);
+    expect(within(chips).getAllByRole('button')).toHaveLength(3);
   });
 
   it('태블릿·데스크톱은 "적용"이 세 칸 오른쪽에 붙는다', () => {
@@ -196,33 +196,33 @@ describe('RobotModeControl: 세 칸 하나와 확인 단계', () => {
     await userEvent.click(radio('자동 · 섹터 지정'));
     expect(within(card()).getByRole('button', { name: '적용' })).toBeDisabled();
     expect(within(card()).getByText(/섹터를 1개 이상 고르세요/)).toBeInTheDocument();
-    await userEvent.click(within(card()).getByRole('button', { name: '섹터 B1' }));
-    await userEvent.click(within(card()).getByRole('button', { name: '섹터 A1' }));
-    expect(within(card()).getByRole('button', { name: '섹터 A1' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(within(card()).getByRole('button', { name: '섹터 C' }));
+    await userEvent.click(within(card()).getByRole('button', { name: '섹터 A' }));
+    expect(within(card()).getByRole('button', { name: '섹터 A' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(within(card()).getByRole('button', { name: '적용' }));
     const dialog = screen.getByRole('dialog', { name: '모드 전환' });
-    expect(within(dialog).getByText(/자동 → 자동 · 섹터 지정 \(섹터 A1, 섹터 B1\)/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/자동 → 자동 · 섹터 지정 \(섹터 A, 섹터 C\)/)).toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByRole('button', { name: '취소' }));
     expect(api.sendCommand).not.toHaveBeenCalled();
     await userEvent.click(within(card()).getByRole('button', { name: '적용' }));
     await userEvent.click(screen.getByRole('button', { name: '실행' }));
-    expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['tank-a1', 'tank-b1'], confirm: true });
+    expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'set_mode', mode: 'auto_pinned', pinnedSectors: ['sector-a', 'sector-c'], confirm: true });
     await within(card()).findByRole('button', { name: '적용 중' });
     finish(store, 'cmd-1');
   });
 
   it('지정 모드에서는 적용된 섹터를 칩에 표시하고, 같은 섹터면 적용할 것이 없다', async () => {
-    renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['tank-b2'] })], me: ADMIN });
+    renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['sector-c'] })], me: ADMIN });
     expect(radio('자동 · 섹터 지정')).toHaveAttribute('aria-checked', 'true');
-    expect(within(card()).getByRole('button', { name: '섹터 B2 (적용됨)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(card()).getByRole('button', { name: '섹터 C (적용됨)' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(card()).getByRole('button', { name: '적용' })).toBeDisabled();
-    await userEvent.click(within(card()).getByRole('button', { name: '섹터 A2' }));
+    await userEvent.click(within(card()).getByRole('button', { name: '섹터 A' }));
     expect(within(card()).getByRole('button', { name: '적용' })).toBeEnabled();
   });
 
   it('지정 모드에서 자동으로 돌아가는 것은 지정 없는 명령이다', async () => {
-    const { store } = renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['tank-b2'] })], me: ADMIN });
+    const { store } = renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'auto_pinned', pinnedSectors: ['sector-c'] })], me: ADMIN });
     await userEvent.click(radio('자동'));
     await userEvent.click(within(card()).getByRole('button', { name: '적용' }));
     expect(within(screen.getByRole('dialog')).getByText(/자동 · 섹터 지정 → 자동/)).toBeInTheDocument();
@@ -253,23 +253,23 @@ describe('RobotModeControl: 세 칸 하나와 확인 단계', () => {
     expect(within(card()).getByText(/놓기: 먼저 집기를 하세요/)).toBeInTheDocument();
     const select = within(card()).getByLabelText('집을 섹터');
     expect(select.parentElement).toContainElement(within(card()).getByRole('button', { name: '집기' }));
-    await userEvent.selectOptions(select, 'tank-b1');
+    await userEvent.selectOptions(select, 'sector-c');
     await userEvent.click(within(card()).getByRole('button', { name: '집기' }));
     const dialog = screen.getByRole('dialog', { name: '집기' });
-    expect(within(dialog).getByText(/섹터 B1/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/섹터 C/)).toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByRole('button', { name: '실행' }));
-    expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'pick_from', tankId: 'tank-b1', confirm: true });
+    expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'pick_from', tankId: 'sector-c', confirm: true });
     await within(card()).findByRole('button', { name: '집기 처리 중' });
     finish(store, 'cmd-1');
   });
 
-  it('집어 든 동안: "A1에서 집음 · 놓기 대기", 집기는 막히고 놓기만 된다. 모드 전환도 놓은 뒤에', async () => {
+  it('집어 든 동안: "A에서 집음 · 놓기 대기", 집기는 막히고 놓기만 된다. 모드 전환도 놓은 뒤에', async () => {
     const { store } = renderWithStore(<RobotModeControl />, {
-      devices: [robotState({ mode: 'manual', heldSectorId: 'tank-a1', gripper: { closed: true, holding: true } })],
+      devices: [robotState({ mode: 'manual', heldSectorId: 'sector-a', gripper: { closed: true, holding: true } })],
       me: ADMIN,
     });
-    expect(within(card()).getByRole('status', { name: '수동 집기 상태' })).toHaveTextContent('A1에서 집음 · 놓기 대기');
+    expect(within(card()).getByRole('status', { name: '수동 집기 상태' })).toHaveTextContent('A에서 집음 · 놓기 대기');
     expect(within(card()).getByRole('button', { name: '집기' })).toBeDisabled();
     expect(within(card()).getByText(/집기: 먼저 컨베이어에 놓으세요/)).toBeInTheDocument();
     // 모드를 바꿀 수 없다(들고 있는 것이 어디로 갈지 모른다)
@@ -281,7 +281,7 @@ describe('RobotModeControl: 세 칸 하나와 확인 단계', () => {
     expect(place).toBeEnabled();
     await userEvent.click(place);
     const dialog = screen.getByRole('dialog', { name: '컨베이어에 놓기' });
-    expect(within(dialog).getByText(/섹터 A1에서 집은 파지/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/섹터 A에서 집은 파지/)).toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByRole('button', { name: '실행' }));
     expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'place_on_conveyor', confirm: true });
@@ -290,8 +290,8 @@ describe('RobotModeControl: 세 칸 하나와 확인 단계', () => {
   });
 
   it('작업 중(집는 중)에는 집기·놓기 둘 다 기다린다', () => {
-    renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'manual', phase: 'pick', targetTankId: 'tank-b2' })], me: ADMIN });
-    expect(within(card()).getByRole('status', { name: '수동 집기 상태' })).toHaveTextContent('B2에서 집는 중');
+    renderWithStore(<RobotModeControl />, { devices: [robotState({ mode: 'manual', phase: 'pick', targetTankId: 'sector-c' })], me: ADMIN });
+    expect(within(card()).getByRole('status', { name: '수동 집기 상태' })).toHaveTextContent('C에서 집는 중');
     expect(within(card()).getByRole('button', { name: '집기' })).toBeDisabled();
     expect(within(card()).getByRole('button', { name: '컨베이어에 놓기' })).toBeDisabled();
   });
@@ -331,7 +331,7 @@ describe('RobotModeControl: 세 칸 하나와 확인 단계', () => {
   it('서버 모드가 바뀌면 초안을 서버 값으로 되돌린다', async () => {
     const { store } = renderWithStore(<RobotModeControl />, { devices: [robotState()], me: ADMIN });
     await userEvent.click(radio('자동 · 섹터 지정'));
-    await userEvent.click(within(card()).getByRole('button', { name: '섹터 A2' }));
+    await userEvent.click(within(card()).getByRole('button', { name: '섹터 A' }));
     act(() => {
       store.dispatch(devicesReceived([robotState({ mode: 'manual', updatedAt: '2026-10-13T05:00:05.000Z' })]));
     });
@@ -349,20 +349,20 @@ describe('DeviceControls: 홈', () => {
 
 describe('AckAlarmButton', () => {
   it('권한이 있으면 그 기기의 경로로 알람 확인을 보낸다', async () => {
-    const { store } = renderWithStore(<AckAlarmButton deviceId="tank-a1" alarmId="al-3301" />);
+    const { store } = renderWithStore(<AckAlarmButton deviceId="sector-a" alarmId="al-3301" />);
     await userEvent.click(screen.getByRole('button', { name: '알람 확인' }));
-    expect(api.sendCommand).toHaveBeenCalledWith('tank-a1', { type: 'ack_alarm', alarmId: 'al-3301' }, expect.anything());
+    expect(api.sendCommand).toHaveBeenCalledWith('sector-a', { type: 'ack_alarm', alarmId: 'al-3301' }, expect.anything());
     await screen.findByRole('button', { name: '알람 확인 처리 중' });
     finish(store, 'cmd-1');
   });
 
   it('권한이 없으면 아무것도 그리지 않는다', () => {
-    const { container } = renderWithStore(<AckAlarmButton deviceId="tank-a1" alarmId="al-1" />, { me: VIEWER });
+    const { container } = renderWithStore(<AckAlarmButton deviceId="sector-a" alarmId="al-1" />, { me: VIEWER });
     expect(container).toBeEmptyDOMElement();
   });
 
   it('연결이 끊기면 비활성화한다', () => {
-    renderWithStore(<AckAlarmButton deviceId="tank-a1" alarmId="al-1" />, { connection: 'offline' });
+    renderWithStore(<AckAlarmButton deviceId="sector-a" alarmId="al-1" />, { connection: 'offline' });
     expect(screen.getByRole('button', { name: '알람 확인' })).toBeDisabled();
   });
 });

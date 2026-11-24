@@ -35,13 +35,13 @@ async function records<T>(path: string, q?: string, days = 30): Promise<RecordPa
 
 describe('기록 검색 (실제 모의 서버)', () => {
   it('번호판의 공백을 무시하고 대소문자를 가리지 않고 부분 일치한다', async () => {
-    const all = await records<UnloadRecord>('/devices/tank-a1/unloads/records');
+    const all = await records<UnloadRecord>('/devices/sector-a/unloads/records');
     expect(all.items.length).toBeGreaterThan(0);
     const plate = all.items[0]!.plate;
     expect(plate).toMatch(/\s/); // 모의 번호판은 "12가 3456"처럼 공백이 있다
     const squeezed = plate.replace(/\s+/g, '');
     for (const q of [squeezed, plate, squeezed.slice(0, 4), ` ${squeezed} `]) {
-      const found = await records<UnloadRecord>('/devices/tank-a1/unloads/records', q);
+      const found = await records<UnloadRecord>('/devices/sector-a/unloads/records', q);
       expect(found.items.some((r) => r.id === all.items[0]!.id), q).toBe(true);
       expect(found.items.every((r) => normalizeSearch(r.plate).includes(normalizeSearch(q)) || normalizeSearch(r.companyName).includes(normalizeSearch(q)))).toBe(true);
       expect(found.total).toBe(found.items.length);
@@ -74,7 +74,7 @@ describe('기록 검색 (실제 모의 서버)', () => {
     // 전체를 100줄씩 모두 받아 직접 거른 건수와, 서버가 2줄씩 나눠 준 검색 결과의 total이 같다
     const everything: UnloadRecord[] = [];
     for (let page = 1; ; page++) {
-      const res = await get('/devices/tank-a1/unloads/records', { ...range(30), page, pageSize: 100 });
+      const res = await get('/devices/sector-a/unloads/records', { ...range(30), page, pageSize: 100 });
       const body = (await res.json()) as RecordPage<UnloadRecord>;
       everything.push(...body.items);
       if (everything.length >= body.total) break;
@@ -83,15 +83,15 @@ describe('기록 검색 (실제 모의 서버)', () => {
     const expected = everything.filter((r) => normalizeSearch(`${r.plate}${r.companyName}`).includes(q));
     expect(expected.length).toBeGreaterThan(2);
     expect(expected.length).toBeLessThan(everything.length); // 검색이 실제로 거른다
-    const res = await get('/devices/tank-a1/unloads/records', { ...range(30), page: 1, pageSize: 2, q });
+    const res = await get('/devices/sector-a/unloads/records', { ...range(30), page: 1, pageSize: 2, q });
     const first = (await res.json()) as RecordPage<UnloadRecord>;
     expect(first.total).toBe(expected.length);
     expect(first.items).toHaveLength(2);
     // 마지막 쪽은 검색 결과 기준으로 계산된다
     const lastPage = Math.ceil(expected.length / 2);
-    const last = (await (await get('/devices/tank-a1/unloads/records', { ...range(30), page: lastPage, pageSize: 2, q })).json()) as RecordPage<UnloadRecord>;
+    const last = (await (await get('/devices/sector-a/unloads/records', { ...range(30), page: lastPage, pageSize: 2, q })).json()) as RecordPage<UnloadRecord>;
     expect(last.items.length).toBe(expected.length - (lastPage - 1) * 2);
-    const beyond = (await (await get('/devices/tank-a1/unloads/records', { ...range(30), page: lastPage + 1, pageSize: 2, q })).json()) as RecordPage<UnloadRecord>;
+    const beyond = (await (await get('/devices/sector-a/unloads/records', { ...range(30), page: lastPage + 1, pageSize: 2, q })).json()) as RecordPage<UnloadRecord>;
     expect(beyond.items).toEqual([]);
   });
 
@@ -99,9 +99,9 @@ describe('기록 검색 (실제 모의 서버)', () => {
     const batches = await records<BatchRecord>('/batches/records');
     const batch = batches.items[0]!;
     expect((await records<BatchRecord>('/batches/records', batch.id.toLowerCase())).items.some((r) => r.id === batch.id)).toBe(true);
-    const bySector = await records<BatchRecord>('/batches/records', '섹터 A1');
-    expect(bySector.items.every((r) => r.mix.some((m) => m.sectorId === 'tank-a1'))).toBe(true);
-    expect((await records<BatchRecord>('/batches/records', 'tank-a1')).total).toBe(bySector.total);
+    const bySector = await records<BatchRecord>('/batches/records', '섹터 A');
+    expect(bySector.items.every((r) => r.mix.some((m) => m.sectorId === 'sector-a'))).toBe(true);
+    expect((await records<BatchRecord>('/batches/records', 'sector-a')).total).toBe(bySector.total);
 
     const bales = await records<BaleRecord>('/bales/records');
     const bale = bales.items[0]!;
@@ -116,7 +116,7 @@ describe('기록 검색 (실제 모의 서버)', () => {
     expect(picks.items.length).toBeGreaterThan(0);
     const b2 = await records<PickRecord>('/robots/robot-1/picks/records', 'b2');
     expect(b2.items.length).toBeGreaterThan(0);
-    expect(b2.items.every((r) => r.sectorId === 'tank-b2')).toBe(true);
+    expect(b2.items.every((r) => r.sectorId === 'sector-c')).toBe(true);
   });
 
   it('사건 기록은 사건 종류·수행자·배치 ID로 찾는다', async () => {
@@ -143,7 +143,7 @@ describe('알람 검색 (실제 모의 서버)', () => {
     expect(byDevice.length).toBeGreaterThan(0);
     expect(byDevice.every((a) => a.deviceId === 'compressor-1')).toBe(true);
     const bySector = (await (await get('/alarms', { from: range(30).from, q: '섹터a1' })).json()) as Alarm[];
-    expect(bySector.every((a) => a.deviceId === 'tank-a1')).toBe(true);
+    expect(bySector.every((a) => a.deviceId === 'sector-a')).toBe(true);
     const byMessage = (await (await get('/alarms', { from: range(30).from, q: '적재율80%' })).json()) as Alarm[];
     expect(byMessage.length).toBeGreaterThan(0);
     // 기간: 사흘 전~이틀 전 사이로 좁히면 그 사이의 알람만 남는다

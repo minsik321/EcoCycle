@@ -105,35 +105,35 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     run(d, 10);
     expect(truck.phase).toBe('atScale');
 
-    d.sync(input({ vehicles: [vehicle('v1', 'identified', 'tank-b1', T0 + 22_000)] }), T0 + 22_000);
+    d.sync(input({ vehicles: [vehicle('v1', 'identified', 'sector-c', T0 + 22_000)] }), T0 + 22_000);
     run(d, 25);
     expect(truck.phase).toBe('atBay');
     expect(truck.x).toBeCloseTo(TRUCK.parkX, 1);
-    expect(truck.z).toBeCloseTo(bayCenterZ('tank-b1'), 1);
+    expect(truck.z).toBeCloseTo(bayCenterZ('sector-c'), 1);
     expect(truck.bedTilt).toBe(0); // 하역 단계가 오기 전에는 적재함을 들지 않는다
 
-    d.sync(input({ vehicles: [vehicle('v1', 'unloading', 'tank-b1', T0 + 50_000)] }), T0 + 50_000);
+    d.sync(input({ vehicles: [vehicle('v1', 'unloading', 'sector-c', T0 + 50_000)] }), T0 + 50_000);
     run(d, 6);
     expect(truck.bedTilt).toBeCloseTo(1, 2);
     expect(truck.load).toBeLessThan(1);
 
-    d.sync(input({ vehicles: [vehicle('v1', 'unloaded', 'tank-b1', T0 + 60_000)] }), T0 + 60_000);
+    d.sync(input({ vehicles: [vehicle('v1', 'unloaded', 'sector-c', T0 + 60_000)] }), T0 + 60_000);
     run(d, 14);
     expect(truck.phase).toBe('atExit');
     expect(truck.x).toBeCloseTo(APRON.exitX, 1);
 
-    d.sync(input({ vehicles: [vehicle('v1', 'departed', 'tank-b1', T0 + 80_000)] }), T0 + 80_000);
+    d.sync(input({ vehicles: [vehicle('v1', 'departed', 'sector-c', T0 + 80_000)] }), T0 + 80_000);
     run(d, 20);
     expect(truck.active).toBe(false);
   });
 
   it('처음 본 차량이 이미 하역 중이면 들어오는 장면을 지어내지 않고 그 자리에 놓는다. 출차한 차량은 만들지 않는다', () => {
     const d = new Director();
-    d.sync(input({ vehicles: [vehicle('v1', 'unloading', 'tank-a2', T0 - 60_000), vehicle('v0', 'departed', 'tank-a1', T0 - 300_000)] }), T0);
+    d.sync(input({ vehicles: [vehicle('v1', 'unloading', 'sector-a', T0 - 60_000), vehicle('v0', 'departed', 'sector-a', T0 - 300_000)] }), T0);
     const active = d.trucks.filter((t) => t.active);
     expect(active).toHaveLength(1);
     expect(active[0]!.phase).toBe('atBay');
-    expect(active[0]!.z).toBeCloseTo(bayCenterZ('tank-a2'), 3);
+    expect(active[0]!.z).toBeCloseTo(bayCenterZ('sector-a'), 3);
     expect(active[0]!.bedTilt).toBe(1);
   });
 
@@ -145,9 +145,9 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
       if (a!.active && b!.active) minGap = Math.min(minGap, Math.hypot(a!.x - b!.x, a!.z - b!.z));
     };
     // 첫 차는 하역을 마치고 나가려 하고, 둘째 차는 그 옆 칸으로 들어온다
-    d.sync(input({ vehicles: [vehicle('v1', 'unloaded', 'tank-a2', T0 - 20_000), vehicle('v2', 'identified', 'tank-a1', T0 - 30_000)] }), T0);
+    d.sync(input({ vehicles: [vehicle('v1', 'unloaded', 'sector-a', T0 - 20_000), vehicle('v2', 'identified', 'sector-a', T0 - 30_000)] }), T0);
     run(d, 40, watch);
-    d.sync(input({ vehicles: [vehicle('v1', 'departed', 'tank-a2', T0 + 40_000), vehicle('v2', 'unloading', 'tank-a1', T0 + 40_000)] }), T0 + 40_000);
+    d.sync(input({ vehicles: [vehicle('v1', 'departed', 'sector-a', T0 + 40_000), vehicle('v2', 'unloading', 'sector-a', T0 + 40_000)] }), T0 + 40_000);
     run(d, 30, watch);
 
     expect(d.trucks[1]!.phase).toBe('atBay'); // 막혀서 멈춘 채로 끝나지 않는다
@@ -183,14 +183,14 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
 
   it('섹터 더미는 서버 적재율을 따라가고, 압축 연출은 압축 중인 배치와 압축기 가동이 함께일 때만 돈다', () => {
     const d = new Director();
-    const batch: Batch = { id: 'b1', stage: 'compressing', mix: [{ sectorId: 'tank-a1', percent: 100 }], actualMix: null, pinning: null, pinChanges: [], avgMoisturePercent: 11, targetPressureMpa: 28, stageTimes: {}, updatedAt: NOW };
-    d.sync(input({ devices: { 'tank-a1': tankState(), 'compressor-1': compressorState() }, batches: [batch] }), T0);
-    expect(d.fill['tank-a1']).toBe(72.4); // 처음 받은 값은 바로 보여 준다
+    const batch: Batch = { id: 'b1', stage: 'compressing', mix: [{ sectorId: 'sector-a', percent: 100 }], actualMix: null, pinning: null, pinChanges: [], avgMoisturePercent: 11, targetPressureMpa: 28, stageTimes: {}, updatedAt: NOW };
+    d.sync(input({ devices: { 'sector-a': tankState(), 'compressor-1': compressorState() }, batches: [batch] }), T0);
+    expect(d.fill['sector-a']).toBe(72.4); // 처음 받은 값은 바로 보여 준다
     run(d, 1);
     expect(d.pressing).toBe(true);
     expect(d.ram).toBeGreaterThan(0);
 
-    d.sync(input({ devices: { 'tank-a1': tankState(), 'compressor-1': compressorState() }, batches: [{ ...batch, stage: 'completed' }] }), T0 + 9000);
+    d.sync(input({ devices: { 'sector-a': tankState(), 'compressor-1': compressorState() }, batches: [{ ...batch, stage: 'completed' }] }), T0 + 9000);
     run(d, 3);
     expect(d.pressing).toBe(false);
     expect(d.ram).toBeLessThan(0.01);
@@ -297,7 +297,7 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
     expect(within(alert).getByText(/모든 움직임을 멈췄습니다/)).toBeInTheDocument();
     expect(alert.querySelector('time')).toHaveAttribute('datetime', NOW);
     expect(screen.getByLabelText('압축기 연결 끊김')).toBeInTheDocument();
-    expect(screen.getByLabelText('섹터 A1 연결 끊김')).toBeInTheDocument();
+    expect(screen.getByLabelText('섹터 A 연결 끊김')).toBeInTheDocument();
     expect(screen.getByText('시스템 연결 끊김')).toBeInTheDocument();
     for (const label of ['오늘 생산 베일', '평균 수분', '압축기 가동률']) {
       const kpi = within(screen.getByRole('region', { name: label }));
@@ -313,7 +313,7 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
     rerender(view({ data: input({ vehicles: [vehicle('v9', 'arrived')] }), disconnected: true }));
     expect(stage.last?.director.trucks.some((t) => t.active)).toBe(false);
     // 복구되면 받은 상태를 반영한다
-    rerender(view({ data: input({ vehicles: [vehicle('v9', 'identified', 'tank-a1')] }), disconnected: false }));
+    rerender(view({ data: input({ vehicles: [vehicle('v9', 'identified', 'sector-a')] }), disconnected: false }));
     expect(stage.last?.director.trucks.filter((t) => t.active)).toHaveLength(1);
   });
 
@@ -338,8 +338,8 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
   it('표에서 장면에 없는 대상(출차한 차량)을 누르면 카메라는 그대로 두고 기록 팝업만 연다', async () => {
     const user = userEvent.setup();
     const openRecord = vi.fn();
-    const gone: Vehicle = { ...vehicle('v-gone', 'departed', 'tank-a1'), plate: '34나 7788' };
-    render(view({ data: input({ vehicles: [gone, vehicle('v1', 'unloading', 'tank-b1')] }), openRecord }));
+    const gone: Vehicle = { ...vehicle('v-gone', 'departed', 'sector-a'), plate: '34나 7788' };
+    render(view({ data: input({ vehicles: [gone, vehicle('v1', 'unloading', 'sector-c')] }), openRecord }));
     const table = screen.getByRole('region', { name: '공정 기록' });
     await user.click(within(table).getByText('34나 7788'));
     expect(openRecord).toHaveBeenCalledWith({ kind: 'vehicle', id: 'v-gone' });
@@ -373,7 +373,7 @@ describe('LiveStudio: 기존 store·조작 컴포넌트에 연결한다', () => 
 
   it('store의 공정 값(차량)을 그대로 표와 핀에 보여 주고 연출 감독에게 넘긴다', () => {
     const { store } = renderWithStore(<LiveStudio onFailed={() => {}} />, { devices });
-    act(() => void store.dispatch(vehicleReceived(vehicle('veh-7', 'identified', 'tank-a1', Date.now()))));
+    act(() => void store.dispatch(vehicleReceived(vehicle('veh-7', 'identified', 'sector-a', Date.now()))));
     expect(screen.getByLabelText('차량 12가 3456 인식 완료')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: '공정 기록' })).getByText('예시자원')).toBeInTheDocument();
     expect(stage.last?.director.trucks.filter((t) => t.active)).toHaveLength(1);
@@ -398,12 +398,12 @@ describe('LiveStudio: 기존 store·조작 컴포넌트에 연결한다', () => 
 
   it('열람자에게도 로봇 패널은 상태(모드·들고 있는 섹터)만 보이고 조작은 없다', async () => {
     const user = userEvent.setup();
-    const held = [tankState(), robotState({ mode: 'manual', heldSectorId: 'tank-a1', gripper: { closed: true, holding: true } }), conveyorState(), compressorState()];
+    const held = [tankState(), robotState({ mode: 'manual', heldSectorId: 'sector-a', gripper: { closed: true, holding: true } }), conveyorState(), compressorState()];
     const { store } = renderWithStore(<LiveStudio onFailed={() => {}} />, { devices: held, me: VIEWER });
     act(() => void store.dispatch(devicesReceived(held)));
     await user.click(screen.getByLabelText(/로봇팔 대기, 작동 중/));
     const panel = screen.getByRole('complementary', { name: '로봇팔 상세' });
-    expect(within(panel).getByText('A1에서 집음 · 놓기 대기')).toBeInTheDocument();
+    expect(within(panel).getByText('A에서 집음 · 놓기 대기')).toBeInTheDocument();
     expect(within(panel).queryByRole('button', { name: /적용|집기|놓기|일시정지/ })).not.toBeInTheDocument();
   });
 
@@ -416,7 +416,7 @@ describe('LiveStudio: 기존 store·조작 컴포넌트에 연결한다', () => 
     const mode = within(panel).getByRole('region', { name: '운전 모드' });
     expect(within(mode).getAllByRole('radio').map((r) => r.firstChild?.textContent)).toEqual(['자동', '자동 · 섹터 지정', '수동']);
     await user.click(within(mode).getAllByRole('radio')[1]!);
-    expect(within(mode).getByRole('button', { name: '섹터 A1' })).toBeInTheDocument();
+    expect(within(mode).getByRole('button', { name: '섹터 A' })).toBeInTheDocument();
     await user.click(within(mode).getAllByRole('radio')[2]!);
     expect(within(mode).getByRole('button', { name: '집기' })).toBeDisabled();
     expect(within(mode).getByRole('button', { name: '컨베이어에 놓기' })).toBeDisabled();
@@ -428,8 +428,8 @@ describe('LiveStudio: 기존 store·조작 컴포넌트에 연결한다', () => 
 
 describe('공정 추적: 서버 단계를 여섯 칸에 옮겨 적는다', () => {
   it('지금 그 단계에 있는 대상이 있는 칸만 진행 중이다', () => {
-    const batch: Batch = { id: 'batch-0412', stage: 'compressing', mix: [{ sectorId: 'tank-a1', percent: 40 }, { sectorId: 'tank-b1', percent: 60 }], actualMix: null, pinning: null, pinChanges: [], avgMoisturePercent: 11, targetPressureMpa: 28.4, stageTimes: { compressing: NOW }, updatedAt: NOW };
-    const steps = cycleSteps({ vehicles: [vehicle('v1', 'identified', 'tank-a2')], batches: [batch], bales: [] });
+    const batch: Batch = { id: 'batch-0412', stage: 'compressing', mix: [{ sectorId: 'sector-a', percent: 40 }, { sectorId: 'sector-c', percent: 60 }], actualMix: null, pinning: null, pinChanges: [], avgMoisturePercent: 11, targetPressureMpa: 28.4, stageTimes: { compressing: NOW }, updatedAt: NOW };
+    const steps = cycleSteps({ vehicles: [vehicle('v1', 'identified', 'sector-a')], batches: [batch], bales: [] });
     expect(steps.map((s) => s.label)).toEqual(['입고', '차량 인식', '하역', '배합', '압축', '출하']);
     expect(steps.filter((s) => s.active).map((s) => s.key)).toEqual(['identify', 'press']);
     expect(steps[1]!.detail).toBe('12가 3456 · 예시자원');
@@ -449,14 +449,14 @@ describe('참고 화면에 맞춘 화면 구성', () => {
     expect(DEFAULT_VIEW.tier).toBe('mid');
     expect(tierOf(WIDE_VIEW.distance)).toBe('wide');
     AREAS.forEach((area) => expect(tierOf(area.distance)).toBe('mid'));
-    ['veh:v1', 'forklift', 'bale:b1', 'dev:compressor-1', 'dev:robot-1', 'dev:tank-a1'].forEach((key) => expect(tierOf(closeDistance(key))).toBe('close'));
+    ['veh:v1', 'forklift', 'bale:b1', 'dev:compressor-1', 'dev:robot-1', 'dev:sector-a'].forEach((key) => expect(tierOf(closeDistance(key))).toBe('close'));
     expect(TIER_DISTANCE.wide).toBeGreaterThan(TIER_DISTANCE.mid);
     expect(TIER_DISTANCE.mid).toBeGreaterThan(TIER_DISTANCE.close);
   });
 
   it('경로 점선은 고른 차량에만 그리고, 대상을 고르면 그 위에 작은 이름표가 뜬다', async () => {
     const user = userEvent.setup();
-    const data = input({ vehicles: [vehicle('v1', 'identified', 'tank-a1')] });
+    const data = input({ vehicles: [vehicle('v1', 'identified', 'sector-a')] });
     render(view({ data }));
     expect(stage.last?.routeKeys.current).toEqual([]);
     const pin = screen.getByLabelText('차량 12가 3456 인식 완료');
@@ -468,7 +468,7 @@ describe('참고 화면에 맞춘 화면 구성', () => {
 
   it('상세 패널은 4~5줄만 바로 보이고 나머지는 "자세히" 안에 있다', async () => {
     const user = userEvent.setup();
-    render(view({ data: input({ vehicles: [vehicle('v1', 'unloading', 'tank-b1')] }) }));
+    render(view({ data: input({ vehicles: [vehicle('v1', 'unloading', 'sector-c')] }) }));
     await user.click(screen.getByLabelText('차량 12가 3456 하역 중'));
     const panel = screen.getByRole('complementary', { name: '차량 상세' });
     const visibleRows = [...panel.querySelectorAll('dl.st-rows > div')].filter((row) => !row.closest('details'));
@@ -562,7 +562,7 @@ describe('폰 배치: 아래 시트', () => {
   it('대상을 고르면 펼쳐서 그 상세를 보여 주고, 닫기는 고르기를 푼다', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    render(<PhoneSheet data={demoData(T0, 30)} disconnected={false} selection="dev:tank-b2" onSelect={onSelect} />);
+    render(<PhoneSheet data={demoData(T0, 30)} disconnected={false} selection="dev:sector-c" onSelect={onSelect} />);
     const detail = screen.getByRole('complementary', { name: /상세/ });
     await user.click(within(detail).getByRole('button', { name: '상세 패널 닫기' }));
     expect(onSelect).toHaveBeenCalledWith(null);
@@ -591,7 +591,7 @@ describe('세로 태블릿: 배치 요약 칩', () => {
 
   it('대상을 고르면 접힌 칩 대신 그 상세를 보여 주고, 끊기면 칩의 현재 압력은 "–"', () => {
     const data = demoData(T0, 30);
-    const { rerender } = render(<Detail data={data} disconnected={false} selection="dev:tank-a1" onSelect={() => {}} collapsible />);
+    const { rerender } = render(<Detail data={data} disconnected={false} selection="dev:sector-a" onSelect={() => {}} collapsible />);
     expect(screen.getByRole('complementary', { name: /상세/ })).toBeInTheDocument();
     rerender(<Detail data={data} disconnected selection={null} onSelect={() => {}} collapsible />);
     expect(screen.getByRole('button', { name: /, 펼치기$/ })).toHaveTextContent(/–/);
@@ -721,7 +721,7 @@ describe('표: 접기·펼치기와 장면에 없는 대상', () => {
       { devices: [tankState(), robotState(), conveyorState()], me: ADMIN },
     );
     act(() => {
-      store.dispatch(vehicleReceived({ ...vehicle('v-gone', 'departed', 'tank-a1'), plate: '34나 7788' }));
+      store.dispatch(vehicleReceived({ ...vehicle('v-gone', 'departed', 'sector-a'), plate: '34나 7788' }));
     });
     await user.click(within(screen.getByRole('region', { name: '공정 기록' })).getByText('34나 7788'));
     expect(screen.getByText('차량 기록 팝업 주소')).toBeInTheDocument();

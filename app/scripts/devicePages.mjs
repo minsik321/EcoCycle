@@ -95,14 +95,14 @@ try {
       await shot('robot-mode-1-auto', mode);
 
       await radio(/^자동 · 섹터 지정/).click();
-      await mode.getByRole('button', { name: '섹터 A1', exact: true }).click();
-      await mode.getByRole('button', { name: '섹터 B1', exact: true }).click();
+      await mode.getByRole('button', { name: '섹터 A', exact: true }).click();
+      await mode.getByRole('button', { name: '섹터 C', exact: true }).click();
       await mode.getByRole('button', { name: '적용', exact: true }).click();
       await shot('robot-mode-2-pinned-confirm');
       await page.getByRole('dialog').getByRole('button', { name: '실행', exact: true }).click();
       await current(/^자동 · 섹터 지정/).waitFor();
       await mode.getByRole('status', { name: '모드 전환 결과' }).getByText('적용됨').waitFor();
-      assert.deepEqual((await get('/devices/robot-1/state')).pinnedSectors, ['tank-a1', 'tank-b1']);
+      assert.deepEqual((await get('/devices/robot-1/state')).pinnedSectors, ['sector-a', 'sector-c']);
       await shot('robot-mode-2-pinned', mode);
 
       await radio(/^수동/).click();
@@ -128,7 +128,7 @@ try {
 
       // 섹터·압축기·컨베이어: 맨 위(전체), "자세히" 열기(전체). 열린 자세히가 폭 전체에 펼쳐지는지는 스크린샷으로 본다
       for (const [route, name] of [
-        ['/tanks/tank-a1', 'sector'],
+        ['/tanks/sector-a', 'sector'],
         ['/compressor', 'compressor'],
         ['/conveyor', 'conveyor'],
       ]) {
@@ -148,7 +148,7 @@ try {
   fs.writeFileSync(
     path.join(out, 'validation.txt'),
     `PASS (${new Date().toISOString()}): ${notes.join(', ')}.\n` +
-      '로봇 운전 모드 자동 → 자동 · 섹터 지정(A1·B1, 확인 단계, 적용됨) → 수동(이름표·선택·집기 한 줄 정렬), 진단(관리자), 섹터·압축기·컨베이어 맨 위(자세히 닫힘)와 자세히 열림 전체 화면.\n' +
+      '로봇 운전 모드 자동 → 자동 · 섹터 지정(A·C, 확인 단계, 적용됨) → 수동(이름표·선택·집기 한 줄 정렬), 진단(관리자), 섹터·압축기·컨베이어 맨 위(자세히 닫힘)와 자세히 열림 전체 화면.\n' +
       '모의 서버: 집기 부피 0.06~0.14 m³ 여러 값, 컨베이어 itemsToBaler, 압축기 cycleStage.\n',
   );
   console.log(`PASS: ${notes.join(', ')}`);

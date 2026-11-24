@@ -29,7 +29,7 @@ function Example() {
 const alarm = (over: Partial<Alarm> = {}): Alarm => ({
   id: 'al-1',
   level: 'caution',
-  deviceId: 'tank-a1',
+  deviceId: 'sector-a',
   message: '적재율 80% 초과',
   state: 'active',
   ts: NOW,
@@ -126,7 +126,7 @@ describe('조작 줄', () => {
   });
 
   it('탱크는 확인할 알람이 있을 때만 알람 확인이 나온다', () => {
-    const { store } = renderWithStore(<DeviceActionBar deviceId="tank-a1" />, { me: ADMIN, devices: [tankState()] });
+    const { store } = renderWithStore(<DeviceActionBar deviceId="sector-a" />, { me: ADMIN, devices: [tankState()] });
     expect(screen.queryByRole('region', { name: '조작' })).not.toBeInTheDocument();
     act(() => {
       store.dispatch(alarmReceived(alarm()));

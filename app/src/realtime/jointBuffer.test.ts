@@ -13,7 +13,7 @@ function frame(seq: number, offsetMs: number, joints: number[], extra: Partial<R
     joints,
     gripper: { closed: false, holding: false },
     phase: 'move',
-    targetTankId: 'tank-a1',
+    targetTankId: 'sector-a',
     ...extra,
   };
 }
@@ -152,7 +152,7 @@ describe('sampleInto (매 프레임용: 새 객체를 만들지 않는다)', () 
   });
 
   it('비어 있으면 out을 건드리지 않고 false를 돌려준다', () => {
-    const out = { joints: [1, 2], gripper: { closed: true, holding: true }, phase: 'move' as const, targetTankId: 'tank-a1' as const };
+    const out = { joints: [1, 2], gripper: { closed: true, holding: true }, phase: 'move' as const, targetTankId: 'sector-a' as const };
     expect(createJointBuffer().sampleInto(T0, out)).toBe(false);
     expect(out.joints).toEqual([1, 2]);
     expect(out.phase).toBe('move');

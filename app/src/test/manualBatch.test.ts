@@ -36,17 +36,17 @@ it('수동 집기는 기다리고 놓기 완료 시 실제 배합·수분·압�
       robot.tickRobot();
     }
   };
-  expect(robot.requestManualPick('tank-a1', 'tester')).toBe(true);
+  expect(robot.requestManualPick('sector-a', 'tester')).toBe(true);
   advanceRobot(20);
-  expect(state.heldSectorId).toBe('tank-a1');
+  expect(state.heldSectorId).toBe('sector-a');
   expect(batch().actualMix).toBeNull();
   expect(robot.requestManualPlace('tester')).toBe(true);
   advanceRobot(25);
   expect(state.heldSectorId).toBeNull();
-  expect(batch().actualMix).toEqual([{ sectorId: 'tank-a1', percent: 100 }]);
+  expect(batch().actualMix).toEqual([{ sectorId: 'sector-a', percent: 100 }]);
   expect(batch().mix).toEqual(planned.mix);
   expect(batch().pinChanges).toEqual([]);
-  const sector = devices['tank-a1'];
+  const sector = devices['sector-a'];
   if (sector.type !== 'tank') throw new Error('tank expected');
   expect(batch().avgMoisturePercent).toBe(sector.moisturePercent);
   const { PRESSURE_PER_MOISTURE_MPA, TARGET_PRESSURE_MPA } = await import('../../../mock-server/src/fixtures/process');
@@ -58,18 +58,18 @@ it('수동 집기는 기다리고 놓기 완료 시 실제 배합·수분·압�
 
 it('수동 전후 자동 투입량도 포함하며 직접 설정한 압력은 유지한다', async () => {
   const { process, batchId, batch } = await setup();
-  process.notePlaced('tank-a1', batchId, 1);
+  process.notePlaced('sector-a', batchId, 1);
   expect(batch().actualMix).toBeNull();
   expect(process.applyBatchCommand({ type: 'set_batch_pressure', batchId, targetPressureMpa: 28, confirm: true }, 'tester')).toBeUndefined();
-  process.notePlaced('tank-b1', batchId, 3, 'manual');
-  expect(batch().actualMix).toEqual([{ sectorId: 'tank-a1', percent: 25 }, { sectorId: 'tank-b1', percent: 75 }]);
-  process.notePlaced('tank-a1', batchId, 2);
-  expect(batch().actualMix).toEqual([{ sectorId: 'tank-a1', percent: 50 }, { sectorId: 'tank-b1', percent: 50 }]);
+  process.notePlaced('sector-c', batchId, 3, 'manual');
+  expect(batch().actualMix).toEqual([{ sectorId: 'sector-a', percent: 25 }, { sectorId: 'sector-c', percent: 75 }]);
+  process.notePlaced('sector-a', batchId, 2);
+  expect(batch().actualMix).toEqual([{ sectorId: 'sector-a', percent: 50 }, { sectorId: 'sector-c', percent: 50 }]);
   expect(batch().targetPressureMpa).toBe(28);
-  expect(process.notePlaced('tank-b2', null, 1, 'manual')).toBeNull();
+  expect(process.notePlaced('sector-c', null, 1, 'manual')).toBeNull();
   expect(batch().actualMix).toHaveLength(2);
-  process.notePlaced('tank-a1', batchId, 1, 'manual');
-  process.notePlaced('tank-b1', batchId, 1, 'manual');
+  process.notePlaced('sector-a', batchId, 1, 'manual');
+  process.notePlaced('sector-c', batchId, 1, 'manual');
   const actual = batch().actualMix;
   for (let i = 0; i < 10; i++) {
     vi.advanceTimersByTime(1_000);

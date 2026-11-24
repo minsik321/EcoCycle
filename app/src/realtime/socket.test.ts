@@ -152,7 +152,7 @@ describe('연결', () => {
     await startAndOpen();
     last().serverSend({
       type: 'alarm',
-      alarm: { id: 'al-1', level: 'caution', deviceId: 'tank-a1', message: 'm', state: 'active', ts: '2026-10-13T05:00:00.000Z' },
+      alarm: { id: 'al-1', level: 'caution', deviceId: 'sector-a', message: 'm', state: 'active', ts: '2026-10-13T05:00:00.000Z' },
     });
     last().serverSend({ type: 'command.result', commandId: 'cmd-1', status: 'completed', reason: null });
     expect(sink.onAlarm).toHaveBeenCalledTimes(1);

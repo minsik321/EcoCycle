@@ -14,7 +14,7 @@ vi.mock('../../api', async (importOriginal) => ({
   sendCommand: vi.fn(),
 }));
 
-const alarm = (id: string, state: Alarm['state'], ts: string, deviceId: Alarm['deviceId'] = 'tank-a1', level: Alarm['level'] = 'caution'): Alarm => ({
+const alarm = (id: string, state: Alarm['state'], ts: string, deviceId: Alarm['deviceId'] = 'sector-a', level: Alarm['level'] = 'caution'): Alarm => ({
   id,
   level,
   deviceId,
@@ -55,11 +55,11 @@ describe('AlarmsPage: 열린 알람', () => {
     const { store } = page();
     act(() => {
       store.dispatch(alarmReceived(alarm('a1', 'active', '2026-10-13T04:00:00.000Z')));
-      store.dispatch(alarmReceived(alarm('a2', 'acknowledged', '2026-10-13T05:00:00.000Z', 'tank-b2')));
+      store.dispatch(alarmReceived(alarm('a2', 'acknowledged', '2026-10-13T05:00:00.000Z', 'sector-c')));
     });
     const items = within(screen.getByLabelText('열린 알람')).getAllByRole('listitem');
     expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent('섹터 B2 · a2 메시지');
+    expect(items[0]).toHaveTextContent('섹터 C · a2 메시지');
     expect(items[0]).toHaveTextContent('확인함');
     expect(items[1]).toHaveTextContent('발생 중');
     expect(screen.getByRole('button', { name: '열린 알람 2건' })).toBeInTheDocument();
@@ -70,12 +70,12 @@ describe('AlarmsPage: 열린 알람', () => {
     vi.mocked(api.sendCommand).mockResolvedValue({ idempotencyKey: 'k', accepted: { commandId: 'cmd-1', status: 'accepted' } });
     const { store } = page({ me: OPERATOR });
     act(() => {
-      store.dispatch(alarmReceived(alarm('a1', 'active', '2026-10-13T04:00:00.000Z', 'tank-a2')));
+      store.dispatch(alarmReceived(alarm('a1', 'active', '2026-10-13T04:00:00.000Z', 'sector-a')));
       store.dispatch(alarmReceived(alarm('a2', 'acknowledged', '2026-10-13T05:00:00.000Z')));
     });
     expect(screen.getAllByRole('button', { name: '알람 확인' })).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: '알람 확인' }));
-    expect(vi.mocked(api.sendCommand).mock.calls[0]![0]).toBe('tank-a2');
+    expect(vi.mocked(api.sendCommand).mock.calls[0]![0]).toBe('sector-a');
     expect(vi.mocked(api.sendCommand).mock.calls[0]![1]).toEqual({ type: 'ack_alarm', alarmId: 'a1' });
   });
 
@@ -91,9 +91,9 @@ describe('AlarmsPage: 열린 알람', () => {
   it('알람을 누르면 해당 기기 페이지로 이동한다', async () => {
     const { store } = page();
     act(() => {
-      store.dispatch(alarmReceived(alarm('a1', 'active', '2026-10-13T04:00:00.000Z', 'tank-a2')));
+      store.dispatch(alarmReceived(alarm('a1', 'active', '2026-10-13T04:00:00.000Z', 'sector-a')));
     });
-    await userEvent.click(screen.getByRole('link', { name: /섹터 A2/ }));
+    await userEvent.click(screen.getByRole('link', { name: /섹터 A/ }));
     expect(screen.getByText('탱크 페이지')).toBeInTheDocument();
   });
 
@@ -113,7 +113,7 @@ describe('AlarmsPage: 최근 7일 이력', () => {
     await userEvent.click(screen.getByRole('button', { name: '알람 이력' }));
     const items = await within(screen.getByLabelText('알람 이력')).findAllByRole('listitem');
     expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent('섹터 A1 · al-2 메시지');
+    expect(items[0]).toHaveTextContent('섹터 A · al-2 메시지');
     expect(items[0]).toHaveTextContent('발생 중');
     expect(items[1]).toHaveTextContent('압축기 · al-1 메시지');
     expect(items[1]).toHaveTextContent('해제됨');

@@ -19,7 +19,7 @@ interface Row {
 
 const TODAY = new Date(2026, 9, 15, 9, 0).toISOString();
 const YESTERDAY = new Date(2026, 9, 14, 9, 0).toISOString();
-const row = (id: string, ts: string, plate: string): Row => ({ id, ts, plate, note: '섹터 A1' });
+const row = (id: string, ts: string, plate: string): Row => ({ id, ts, plate, note: '섹터 A' });
 
 /** 서버처럼 기간 [from, to)와 검색어 q를 함께 적용해 나눠 주는 가짜 load (공유 검색 규칙을 그대로 쓴다) */
 function searchLoad(all: Row[]) {
@@ -55,7 +55,7 @@ describe('검색 규칙 (서버와 같은 규칙)', () => {
     expect(matchesSearch('12가3456', ['12가 3456'])).toBe(true);
     expect(matchesSearch('12가 3456', ['12가3456'])).toBe(true);
     expect(matchesSearch(' 가 34 ', ['12가 3456'])).toBe(true);
-    expect(matchesSearch('TANK-A1', ['tank-a1'])).toBe(true);
+    expect(matchesSearch('SECTOR-A', ['sector-a'])).toBe(true);
     expect(matchesSearch('12가3457', ['12가 3456'])).toBe(false);
     expect(matchesSearch('', ['아무거나'])).toBe(true);
     expect(matchesSearch(undefined, [null])).toBe(true);
@@ -63,8 +63,12 @@ describe('검색 규칙 (서버와 같은 규칙)', () => {
   });
 
   it('섹터는 코드·짧은 이름·화면 이름으로 모두 찾아진다', () => {
-    for (const q of ['tank-a1', 'a1', '섹터 A1', '섹터a1']) expect(matchesSearch(q, sectorSearchTerms('tank-a1')), q).toBe(true);
-    expect(matchesSearch('a2', sectorSearchTerms('tank-a1'))).toBe(false);
+    expect(sectorSearchTerms('sector-a')).toEqual(['sector-a', 'A', '섹터 A']);
+    expect(sectorSearchTerms('sector-c')).toEqual(['sector-c', 'C', '섹터 C']);
+    for (const q of ['sector-a', 'A', 'a', '섹터 A', '섹터a']) expect(matchesSearch(q, sectorSearchTerms('sector-a')), q).toBe(true);
+    for (const q of ['sector-c', '섹터 C', '섹터c']) expect(matchesSearch(q, sectorSearchTerms('sector-c')), q).toBe(true);
+    expect(matchesSearch('섹터 C', sectorSearchTerms('sector-a'))).toBe(false);
+    expect(matchesSearch('sector-c', sectorSearchTerms('sector-a'))).toBe(false);
   });
 });
 

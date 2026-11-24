@@ -31,9 +31,9 @@ try {
  await command({type:'pause_batch',batchId},'rejected');
  // A paused current batch keeps the planned next batch editable.
  const nextId=state.next.batch.id;
- const mix=[{sectorId:'tank-a1',percent:40},{sectorId:'tank-a2',percent:30},{sectorId:'tank-b1',percent:20},{sectorId:'tank-b2',percent:10}];
+ const mix=[{sectorId:'sector-a',percent:60},{sectorId:'sector-c',percent:40}];
  await command({type:'set_batch_mix',batchId:nextId,mix});
- await command({type:'set_batch_mix',batchId:nextId,mix:[{sectorId:'tank-a1',percent:99}]},'rejected');
+ await command({type:'set_batch_mix',batchId:nextId,mix:[{sectorId:'sector-a',percent:99}]},'rejected');
  await command({type:'set_batch_pressure',batchId:nextId,targetPressureMpa:29});
  await command({type:'set_batch_pressure',batchId:nextId,targetPressureMpa:100},'rejected');
  await command({type:'resume_batch',batchId:nextId},'rejected');
@@ -62,14 +62,14 @@ try {
    await context.addInitScript(()=>localStorage.setItem('ecocycle.homeMode','dashboard'));
    const page=await context.newPage();await page.goto('http://localhost:15202/login');
    await page.getByLabel('아이디').fill('admin');await page.getByLabel('비밀번호').fill('1234');await page.getByRole('button',{name:'로그인'}).click();await page.waitForURL(u=>u.pathname==='/');
-   await go(page,'/records/batches');await page.getByLabel('A1 (%)',{exact:true}).waitFor();await pause(400);
+   await go(page,'/records/batches');await page.getByLabel('A (%)',{exact:true}).waitFor();await pause(400);
    const shot=async(name)=>{await audit(page,`${width}-${zoom}-${name}`,zoom);if(zoom===1)await page.screenshot({path:path.join(out,`${width}x${height}-${name}.png`)});};
    await shot('1-current');
    await page.getByRole('button',{name:'다음 배치',exact:true}).click();
-   await page.getByLabel('A1 (%)',{exact:true}).fill('10');
+   await page.getByLabel('A (%)',{exact:true}).fill('10');
    await page.getByRole('region',{name:'수동 제어',exact:true}).evaluate(el=>el.scrollIntoView({block:'start'}));await shot('2-mix-validation');
    assert.equal(await page.getByRole('button',{name:'배합 변경',exact:true}).isDisabled(),true);
-   await page.getByLabel('A1 (%)',{exact:true}).fill('40');
+   await page.getByLabel('A (%)',{exact:true}).fill('60');
    await page.getByRole('button',{name:'배합 변경',exact:true}).click();await shot('3-confirm');
    await page.getByRole('button',{name:'취소',exact:true}).click();
    await page.getByRole('region',{name:'배치·베일 사건 기록',exact:true}).first().evaluate(el=>el.scrollIntoView({block:'start'}));await pause(300);await shot('4-records');
