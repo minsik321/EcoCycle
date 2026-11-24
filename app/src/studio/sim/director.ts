@@ -8,7 +8,7 @@ import {
   QUEUE,
   RAIL,
   RAIL_FRAME,
-  ROAD_HOLD,
+  ROAD_PASS_BY,
   ROAD_TO_SCALE,
   SCALE,
   SCALE_CLEAR,
@@ -79,7 +79,8 @@ export type TruckPhase =
   | 'toLoad'
   | 'loading'
   | 'atScale2'
-  | 'leaving';
+  | 'leaving'
+  | 'passing';
 
 export interface TruckSim extends Mover {
   active: boolean;
@@ -152,6 +153,7 @@ const PATH_EAST_OUT = roundedPath(SCALE_EAST_OUT, 1.4);
 const PATH_TO_LOAD = roundedPath(SCALE_TO_HOLD, 1.7);
 const PATH_LOAD_TO_SCALE = roundedPath(HOLD_TO_SCALE, 1.6);
 const PATH_TO_QUEUE = roundedPath(SCALE_TO_QUEUE, 1.0);
+const PATH_PASS_BY = roundedPath(ROAD_PASS_BY, 1.7);
 /** 경로 위에서 사진의 한 점(px)에 가장 가까운 곳까지의 거리 */
 function distanceTo(path: Path, x: number, y: number): number {
   const [tx, tz] = sitePx(x, y);
@@ -338,12 +340,19 @@ export class Director {
       this.place(truck, QUEUE.x, QUEUE.z, QUEUE.heading);
       truck.phase = 'queued';
     } else if (this.scaleToken.take(truck.id)) {
-      // 계근대에 있어야 할 차: 계근대가 비어 있으면 그 위에, 아니면 도로 대기 자리에
+      // 계근대에 있어야 할 차: 계근대가 비어 있으면 그 위에
       this.place(truck, SCALE_STOP.x, SCALE_STOP.z, SCALE_STOP.heading);
       truck.phase = 'atScale';
+    } else if (this.spawnClear()) {
+      // 계근대가 차 있으면 도로에서부터 들어와 차례를 기다린다 (대기 자리에 다른 차가 있을 수 있어 바로 놓지 않는다)
+      this.place(truck, 0, 0, 0);
+      truck.phase = 'road';
+      truck.path = PATH_ROAD;
+      samplePath(PATH_ROAD, 0, truck);
     } else {
-      this.place(truck, ROAD_HOLD.x, ROAD_HOLD.z, ROAD_HOLD.heading);
-      truck.phase = 'roadHold';
+      // 도로 들머리도 막혀 있다: 다음 값에서 들여보낸다
+      truck.active = false;
+      truck.id = '';
     }
   }
 
@@ -543,7 +552,8 @@ export class Director {
 
   /** 기다리는 자리에 다른 트럭이 있거나 가는 중인가 */
   private queueBusy(self: TruckSim): boolean {
-    return this.trucks.some((t) => t !== self && t.active && (t.phase === 'toQueue' || t.phase === 'queued'));
+    // 기다리는 자리를 막 떠나는 차도 그 자리를 벗어나기 전까지는 쓰는 것으로 본다
+    return this.trucks.some((t) => t !== self && t.active && (t.phase === 'toQueue' || t.phase === 'queued' || Math.hypot(t.x - QUEUE.x, t.z - QUEUE.z) < TRUCK.length * 1.6));
   }
 
   private stepTrucks(dt: number): void {
@@ -562,7 +572,14 @@ export class Director {
           }
           break;
         case 'roadHold':
-          if (this.scaleToken.take(t.id)) {
+          if (!t.example && t.stage === 'departed') {
+            // 들어오기 전에 서버가 출차했다고 하면 입구로 들어오지 않고 도로를 따라 지나간다.
+            // 입구 앞 도로는 나가는 차가 들어서는 곳이라 계근대 차례를 잡고 지난다
+            if (this.scaleToken.take(t.id)) {
+              t.phase = 'passing';
+              follow(t, PATH_PASS_BY);
+            }
+          } else if (this.scaleToken.take(t.id)) {
             t.phase = 'toScale';
             follow(t, PATH_ROAD_TO_SCALE);
           }
@@ -578,8 +595,8 @@ export class Director {
           break;
         case 'atScale':
           t.weighT += dt;
-          // 인식되면 곧 마당 안쪽 길로 간다: 지게차가 새로 길을 건너지 않게 미리 알린다
-          if (t.example || t.stage !== 'arrived') this.yardToken.wanted = true;
+          // 인식되면 곧 마당 안쪽 길로 간다: 지게차가 새로 길을 건너지 않게 미리 알린다 (갈 자리가 없어 어차피 못 가는 차는 알리지 않는다)
+          if (t.example || (t.stage !== 'arrived' && (!t.bay || !this.tipBusy(t, t.bay) || !this.queueBusy(t)))) this.yardToken.wanted = true;
           if (t.example) {
             if (t.weighT >= WEIGH_SEC && this.yardToken.take(t.id)) {
               t.phase = 'toLoad';
@@ -697,6 +714,12 @@ export class Director {
             follow(t, PATH_EAST_OUT);
           }
           break;
+        case 'passing': {
+          const [, py] = worldToPx(t.x, t.z);
+          if (py > OUT_CLEAR_PX_Y) this.scaleToken.release(t.id);
+          if (advance(t, dt, TRUCK_SPEED * 1.15, TRUCK_ACCEL, this.truckBlocked(t))) this.finish(t);
+          break;
+        }
         case 'leaving': {
           // 나가는 길은 입구 안쪽에서 들어오는 차로·다시 재러 오는 길과 만난다: 그곳을 지나면 차례를 놓는다.
           // 동쪽으로 잰 트럭은 입구 북쪽 차로 아래로 내려서면(EAST_OUT_CLEAR_PX_Y) 되고, 서쪽으로 돌아 나가는 차는 도로에 올라야 한다
@@ -714,9 +737,10 @@ export class Director {
 
   /** 계근대·마당 차례를 함께 잡는다 (둘 다 비었을 때만) */
   private bothTokens(id: string): boolean {
-    if (!this.scaleToken.free(id) || !this.yardToken.free(id)) {
-      this.scaleToken.wanted = true;
-      this.yardToken.wanted = true;
+    if (!this.scaleToken.available(id) || !this.yardToken.available(id)) {
+      // 마당 차례만 모자랄 때 기다린다고 적는다 (계근대가 막혀 어차피 못 가는 차가 지게차를 굶기지 않게)
+      if (this.scaleToken.available(id)) this.yardToken.wanted = true;
+      if (this.yardToken.available(id)) this.scaleToken.wanted = true;
       return false;
     }
     this.scaleToken.take(id);

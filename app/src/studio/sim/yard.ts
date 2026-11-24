@@ -143,6 +143,8 @@ const FORK_TIP = 1.4;
 const LOAD_TIP = FORK_REACH + BALE.d / 2;
 const HALF_W = 0.43;
 const BODY_FRONT = 0.56;
+/** 지게차가 마당 차례를 이만큼 기다리면 다음 차례를 맡아 둔다(초). 평소에는 트럭이 먼저이고, 트럭이 끊이지 않을 때(느린 화면에서 서버 값이 빨리 흐를 때)만 쓰인다 */
+const TOKEN_PATIENCE_SEC = 60;
 /** 서로 비켜 가는 여유(폭 한쪽 m) */
 const CLEAR = 0.02;
 const TURN_R = 1.45;
@@ -987,6 +989,8 @@ export class Yard {
           done = true;
         } else {
           blocked = true;
+          // 트럭이 끊이지 않아 오래 기다렸으면 다음 차례를 맡아 둔다 (지금 쓰는 트럭이 놓으면 이 지게차가 간다)
+          if (f.blockedT > TOKEN_PATIENCE_SEC) this.token.reserve(who);
         }
         break;
       case 'clamp': {

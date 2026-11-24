@@ -377,8 +377,9 @@ export const YARD = {
   /**
    * 출하된 서버 베일을 북서 재고에 내려놓는 곳: 재고 동쪽 면(사진 338, 152px, 서쪽을 본다). 상차용 자리와 떨어져 있어
    * 상차 지게차가 재고 앞에 머무는 동안에도 출하 베일을 옮길 수 있다. 가로지르는 길의 둘째 점에서 갈라져 이 점들을 지난다
+   * (계근대 곁 대기 자리 QUEUE에 선 트럭과 한 차 폭 넘게 떨어지게: 그 트럭은 지게차가 비키기를 기다리지 않는다)
    */
-  drop: { via: [yardPx(340, 240), yardPx(340, 164)] as readonly P2[], x: yardPx(338, 152)[0], z: yardPx(338, 152)[1], heading: siteHeading(-1, 0) - YARD_A },
+  drop: { via: [yardPx(332, 238), yardPx(332, 164)] as readonly P2[], x: yardPx(338, 152)[0], z: yardPx(338, 152)[1], heading: siteHeading(-1, 0) - YARD_A },
   /** 길 동쪽 끝에서 북서 구역까지 가로지르는 길의 꺾이는 점(마당 좌표계): 남동 구역 서쪽 가장자리를 따라 북쪽으로, 레일·트럭 자리를 피한다. 첫 점은 트럭 길 밖의 대기점 */
   crossing: [yardPx(377, 352), yardPx(374, 300), yardPx(330, 262), yardPx(310, 238)] as readonly P2[],
 } as const;
@@ -434,6 +435,8 @@ export const ROAD_HOLD = spot(LANE_PX[3]![0], LANE_PX[3]![1], -18, 100);
 
 /** 도로(사진 위 끝, 북쪽) → 입구 북쪽 차로 → 계근대 (서쪽으로 서서 잰다). 서버의 "계중대 도착" 무렵 계근대에 닿게 사진 끝에서 들어온다 */
 export const TRUCK_IN: P2[] = pts([LANE_PX[1]!, LANE_PX[2]!, LANE_PX[3]!, [531, 270], [505, 270], [482, 248], [454, 247]]);
+/** 도로 대기 자리 → 입구에 들어가지 않고 도로를 따라 남쪽 밖으로 (들어오기 전에 출차 단계가 온 드문 차) */
+export const ROAD_PASS_BY: P2[] = pts(LANE_PX.slice(3));
 /** 도로 대기 자리 → 계근대 (TRUCK_IN의 뒷부분) */
 export const ROAD_TO_SCALE: P2[] = pts([LANE_PX[3]!, [531, 270], [505, 270], [482, 248], [454, 247]]);
 

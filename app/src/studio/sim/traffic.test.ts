@@ -61,4 +61,35 @@ describe('부지 차량 흐름 (시연 원본으로 20분)', () => {
     expect(d.yard.stats.loadedOut).toBeGreaterThanOrEqual(8);
     expect(seen.size).toBeGreaterThan(regular.length);
   });
+
+  it.each([2, 3, 4])('서버 값이 월드 시계보다 %s배 빨리 흘러도(느린 화면) 겹치거나 멈춰 버리지 않는다', (speed) => {
+    // 소프트웨어 그래픽처럼 그리기가 느리면 월드 시계(걸음 0.1초)가 실제 시각보다 느리게 흐르고 차량·베일이 더 촘촘히 온다
+    const d = new Director();
+    let real = 0;
+    let synced = -1;
+    let stuckSince = 0;
+    let lastStats = '';
+    while (d.t < 700) {
+      real += 0.1 * speed;
+      if (Math.floor(real) !== synced) {
+        synced = Math.floor(real);
+        const data = demoData(T0, synced);
+        d.sync({ devices: data.devices, vehicles: data.vehicles, batches: data.batches, bales: data.bales }, T0 + real * 1000);
+      }
+      d.step(0.1);
+      expect(d.truckOverlaps(), `t=${d.t.toFixed(1)} 트럭끼리 겹침`).toBe(0);
+      const a = d.yard.audit(d.trucks);
+      expect(a.forkOnTruck + a.forkOnFork + a.forkOnBale + a.baleOnBale, `t=${d.t.toFixed(1)} 지게차·베일 겹침`).toBe(0);
+      // 무언가는 계속 움직인다: 베일 적치·출하가 3분 넘게 그대로면 멈춰 버린 것이다
+      const stats = JSON.stringify(d.yard.stats);
+      if (stats !== lastStats) {
+        lastStats = stats;
+        stuckSince = d.t;
+      }
+      expect(d.t - stuckSince, `t=${d.t.toFixed(1)} 적치·출하가 멈춤`).toBeLessThan(180);
+    }
+    // 트럭이 끊이지 않으면 지게차는 1분 기다린 뒤 다음 차례를 맡아 둔다(yard.ts TOKEN_PATIENCE_SEC): 그보다 조금 더 기다릴 뿐 멈추지 않는다
+    expect(d.yard.maxBlockedSec).toBeLessThan(90);
+    expect(d.yard.stats.shipped).toBeGreaterThan(8);
+  });
 });
