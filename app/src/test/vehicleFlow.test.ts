@@ -192,13 +192,31 @@ it('지난 30일치 기록에 상차 차량이 섞이고, 그 baleIds의 베일�
   }
 });
 
-it('사건 이름이 차량 단계에 대응한다 (load.* → loading/loaded, weigh.out → weighing_out)', async () => {
+it('시뮬레이션의 차량 사건이 단계에 대응한다: 상차 시작 → 상차 완료 → 출차 계근 (load.* → loading/loaded, weigh.out → weighing_out)', async () => {
+  const { process, history, run } = await load({ everyInbound: [1, 1] });
   const { VEHICLE_EVENT_STAGES } = await import('@ecocycle/shared');
-  expect(VEHICLE_EVENT_STAGES).toMatchObject({
-    'unload.started': 'unloading',
-    'unload.completed': 'unloaded',
-    'load.started': 'loading',
-    'load.completed': 'loaded',
-    'weigh.out': 'weighing_out',
+  const events = new Map<string, Array<{ event: string; stage: Vehicle['stage'] }>>();
+  const stop = process.onVehicleEvent((event, vehicle) => {
+    events.set(vehicle.id, [...(events.get(vehicle.id) ?? []), { event, stage: vehicle.stage }]);
   });
+  run(15 * 60);
+  stop();
+  const departed = [...history().values()].map((list) => list.at(-1) as Vehicle).filter((v) => v.stage === 'departed');
+  const outbound = departed.filter((v) => v.kind === 'outbound');
+  const inbound = departed.filter((v) => v.kind === 'inbound');
+  expect(outbound.length).toBeGreaterThan(0);
+  expect(inbound.length).toBeGreaterThan(0);
+  for (const v of departed) {
+    const list = events.get(v.id) ?? [];
+    // 사건이 일어난 뒤 차량의 단계 = 그 사건 이름이 정한 단계
+    for (const { event, stage } of list) expect(stage).toBe(VEHICLE_EVENT_STAGES[event as keyof typeof VEHICLE_EVENT_STAGES]);
+    expect(list.map((e) => e.event)).toEqual(
+      v.kind === 'outbound'
+        ? ['vehicle.arrived', 'vehicle.identified', 'load.started', 'load.completed', 'weigh.out']
+        : ['vehicle.arrived', 'vehicle.identified', 'unload.started', 'unload.completed', 'weigh.out'],
+    );
+    // 사건마다 그 단계에 들어선 시각이 찍혔고, 마지막 사건(weigh.out) 뒤에야 출차한다
+    for (const { stage } of list) expect(v.stageTimes[stage]).toBeDefined();
+    expect(Date.parse(v.stageTimes.departed ?? '')).toBeGreaterThan(Date.parse(v.stageTimes.weighing_out ?? ''));
+  }
 });

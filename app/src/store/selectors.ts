@@ -76,5 +76,9 @@ export const selectIsCommandPending = (deviceId: DeviceId, type: CommandType) =>
 
 // --- 공정 흐름 ---
 
+/** 공정 흐름 최근 목록에 있는 베일의 실은 상차 차량 ID. 목록에 없거나 아직 싣지 않았으면 null */
+export const selectBaleVehicleId = (baleId: string) => (state: RootState): string | null =>
+  state.process.bales.find((b) => b.id === baleId)?.vehicleId ?? null;
+
 /** 회사 안 차량(출차하지 않은 입고·상차, 최근 것부터). 3D 홈 표·시트 "차량" 탭의 목록과 숫자 */
 export const selectOnSiteVehicles = createSelector([(state: RootState) => state.process.vehicles], (vehicles) => onSiteVehicles(vehicles));

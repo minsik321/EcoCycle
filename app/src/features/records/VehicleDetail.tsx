@@ -1,26 +1,15 @@
 import { Link } from 'react-router-dom';
-import type { VehicleRecord, VehicleStage } from '@ecocycle/shared';
+import type { VehicleRecord } from '@ecocycle/shared';
 import { VEHICLE_STAGES_BY_KIND } from '@ecocycle/shared';
 import { getVehicleRecord } from '../../api';
 import type { PopupTarget } from '../../components/records/recordPopup';
 import { formatLocalTime, formatWeightT } from '../../config/display';
 import { devicePagePath } from '../../config/navigation';
-import { SECTOR_LABEL, VEHICLE_KIND_LABEL, VEHICLE_STAGE_TEXT, VEHICLE_WEIGHT_TEXT } from '../../config/processDisplay';
+import { SECTOR_LABEL, VEHICLE_KIND_LABEL, VEHICLE_STAGE_ROW_TEXT, VEHICLE_STAGE_TEXT, VEHICLE_WEIGHT_TEXT } from '../../config/processDisplay';
 import { DetailRow, DetailSection, RecordFrame } from './RecordDetail';
 import { useRecord } from './useRecord';
 import { VehicleKindPill, VehicleStatusPill } from './VehicleRecords';
 
-/** 단계 시각 줄의 이름 (공정 흐름 문구와 같은 말을 쓰되 시각 줄이라 "…한 때"로 읽히게) */
-const STAGE_ROW: Record<VehicleStage, string> = {
-  arrived: '계중대 도착',
-  identified: '번호판 인식',
-  unloading: '하역 시작',
-  unloaded: '하역 완료',
-  loading: '상차 시작',
-  loaded: '상차 완료',
-  weighing_out: '출차 계근',
-  departed: '출차',
-};
 
 const weight = (value: number | null) => (value === null ? '–' : formatWeightT(value));
 const stamp = (iso: string | null | undefined) => (iso ? <time dateTime={iso}>{formatLocalTime(iso)}</time> : '–');
@@ -97,7 +86,7 @@ function Body({ record, onOpen }: { record: VehicleRecord; onOpen: (target: Popu
       <DetailSection title="단계별 시각">
         <dl>
           {stages.map((stage) => (
-            <DetailRow key={stage} label={STAGE_ROW[stage]}>
+            <DetailRow key={stage} label={VEHICLE_STAGE_ROW_TEXT[stage]}>
               {stamp(record.stageTimes[stage])}
             </DetailRow>
           ))}

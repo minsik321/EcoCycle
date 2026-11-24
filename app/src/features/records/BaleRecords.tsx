@@ -2,7 +2,7 @@ import type { BaleRecord, BaleStage } from '@ecocycle/shared';
 import { getRecords } from '../../api';
 import type { Column } from '../../components/common/DataTable';
 import { RecordList } from '../../components/records/RecordList';
-import { useOpenRecordPopup } from '../../components/records/recordPopup';
+import { PopupLink, useOpenRecordPopup } from '../../components/records/recordPopup';
 import { RECORD_SEARCH_HINT, formatPercent, formatPressureMpa } from '../../config/display';
 import { BALE_STAGE_TEXT, shortId } from '../../config/processDisplay';
 
@@ -13,12 +13,31 @@ export function BaleStagePill({ stage }: { stage: BaleStage }) {
   return <span className={`${pill} ${stage === 'shipped' ? 'bg-paper-deep text-ink-soft' : 'bg-accent-soft text-accent-strong'}`}>{BALE_STAGE_TEXT[stage]}</span>;
 }
 
+/**
+ * 실은 상차 차량 링크(차량 팝업으로 이어 연다). 없으면 "–". 줄 누르기(베일 팝업)와 겹치지 않게 누르기·Enter가 줄로 올라가지 않는다.
+ * 배치·베일 화면의 베일 줄도 같은 링크를 쓴다.
+ */
+export function LoadedVehicleLink({ vehicleId }: { vehicleId: string | null }) {
+  if (!vehicleId) return <span className="tabular-nums">–</span>;
+  return (
+    <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+      <PopupLink
+        target={{ kind: 'vehicle', id: vehicleId }}
+        aria-label={`실은 차량 ${vehicleId} 보기`}
+        className="inline-flex min-h-12 items-center font-semibold whitespace-nowrap text-accent-strong tabular-nums underline-offset-2 active:underline"
+      >
+        {shortId(vehicleId)} →
+      </PopupLink>
+    </span>
+  );
+}
+
 const COLUMNS: readonly Column<BaleRecord>[] = [
   { key: 'id', header: '베일', cell: (r) => <span className="font-semibold tabular-nums">{r.id}</span> },
   { key: 'batch', header: '배치', cell: (r) => <span title={r.batchId}>{shortId(r.batchId)}</span> },
   { key: 'pressure', header: '압력', align: 'right', cell: (r) => <span className="tabular-nums">{formatPressureMpa(r.pressureMpa)}</span> },
   { key: 'moisture', header: '평균 수분', align: 'right', hideOnNarrow: 'xl', cell: (r) => <span className="tabular-nums">{formatPercent(r.avgMoisturePercent)}</span> },
-  { key: 'vehicle', header: '실은 차량', cell: (r) => (r.vehicleId ? <span className="tabular-nums" title={r.vehicleId}>{shortId(r.vehicleId)}</span> : '–') },
+  { key: 'vehicle', header: '실은 차량', cell: (r) => <LoadedVehicleLink vehicleId={r.vehicleId} /> },
   { key: 'stage', header: '상태', cell: (r) => <BaleStagePill stage={r.stage} /> },
 ];
 
@@ -40,7 +59,7 @@ export function BaleRecords() {
       detail={(r) => (
         <span className="tabular-nums">
           배치 {shortId(r.batchId)} · {formatPressureMpa(r.pressureMpa)} · 수분 {formatPercent(r.avgMoisturePercent)}
-          {r.vehicleId ? ` · 차량 ${shortId(r.vehicleId)}` : ''}
+          {` · 차량 ${r.vehicleId ? shortId(r.vehicleId) : '–'}`}
         </span>
       )}
       columns={COLUMNS}

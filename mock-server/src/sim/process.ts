@@ -1,6 +1,7 @@
 import type { BatchCommand, BatchControlState, BatchEvent, ControlledBatch, BaleDetail } from '@ecocycle/shared';
 import type { Bale, BaleRecord, Batch, BatchRecord, CompressorState, MixPart, ProcessState, RobotMode, TankId, TankState, Vehicle, VehicleRecord } from '@ecocycle/shared';
-import { TANK_IDS } from '@ecocycle/shared';
+import { TANK_IDS, VEHICLE_EVENT_STAGES } from '@ecocycle/shared';
+import type { VehicleEventName } from '@ecocycle/shared';
 import type { BuyerFixture, CompanyFixture, OutboundTruckFixture, TruckFixture } from '../fixtures/process';
 import {
   BATCH_TIMING_SEC,
@@ -304,13 +305,34 @@ function setVehicleStage(run: VehicleRun, stage: Vehicle['stage'], now: number):
   sendVehicle(v);
 }
 
+/**
+ * 차량 사건 (명세 6절 "공정 흐름"의 사건 이름: vehicle.arrived/identified, unload.started/completed, load.started/completed, weigh.out).
+ * 모의 서버에는 차량 사건을 쌓는 기록 저장소가 없고 명세에도 차량 사건 목록 API가 없다. 그래서 사건 이름을 단계 전이의 기준으로 쓴다:
+ * 전이는 사건 이름으로 일으키고 그 단계는 shared의 VEHICLE_EVENT_STAGES가 정한다. 출차(departed)에는 사건 이름이 없다.
+ * 듣는 쪽(onVehicleEvent, 테스트)은 사건 이름과 바뀐 차량을 받는다.
+ */
+type VehicleEventListener = (event: VehicleEventName, vehicle: Vehicle) => void;
+const vehicleEventListeners = new Set<VehicleEventListener>();
+export function onVehicleEvent(listener: VehicleEventListener): () => void {
+  vehicleEventListeners.add(listener);
+  return () => vehicleEventListeners.delete(listener);
+}
+function notifyVehicleEvent(event: VehicleEventName, vehicle: Vehicle): void {
+  for (const listener of vehicleEventListeners) listener(event, structuredClone(vehicle));
+}
+/** 사건 하나로 차량을 그 사건의 단계로 옮긴다 */
+function applyVehicleEvent(run: VehicleRun, event: VehicleEventName, now: number): void {
+  setVehicleStage(run, VEHICLE_EVENT_STAGES[event], now);
+  notifyVehicleEvent(event, run.vehicle);
+}
+
 function newVehicle(kind: Vehicle['kind'], now: number): Vehicle {
   vehicleSeq += 1;
   lastSpawnAt = now;
   return {
     id: `veh-${siteDate(now)}-${pad(vehicleSeq, 3)}`,
     kind,
-    stage: 'arrived',
+    stage: VEHICLE_EVENT_STAGES['vehicle.arrived'],
     plate: null,
     companyName: null,
     sectorId: null,
@@ -341,6 +363,7 @@ function spawnInbound(now: number): void {
   inboundSinceOutbound += 1;
   activeRuns.push(run);
   sendVehicle(run.vehicle);
+  notifyVehicleEvent('vehicle.arrived', run.vehicle);
 }
 
 /** 상차 차량 한 대를 들인다: 들어올 때 공차를 잰다 */
@@ -358,6 +381,7 @@ function spawnOutbound(now: number): void {
   outboundAfter = rollOutboundAfter();
   activeRuns.push(run);
   sendVehicle(run.vehicle);
+  notifyVehicleEvent('vehicle.arrived', run.vehicle);
 }
 
 /** 계근대가 비어 있으면 차량 한 대를 들인다. 입고 3~4대마다 상차 한 대(상차 차량은 한 번에 한 대) */
@@ -406,7 +430,7 @@ function tickLoading(run: VehicleRun, outbound: NonNullable<VehicleRun['outbound
   }
   const full = v.baleIds.length >= outbound.truck.maxBales;
   const waitedTooLong = (now - outbound.lastLoadAt) / 1000 >= OUTBOUND_TIMING_SEC.maxWait;
-  if (full || waitedTooLong) setVehicleStage(run, 'loaded', now);
+  if (full || waitedTooLong) applyVehicleEvent(run, 'load.completed', now);
 }
 
 function tickVehicles(now: number): void {
@@ -414,17 +438,17 @@ function tickVehicles(now: number): void {
     const waitedSec = (now - run.stageAt) / 1000;
     switch (run.vehicle.stage) {
       case 'arrived':
-        if (waitedSec >= VEHICLE_TIMING_SEC.identify) setVehicleStage(run, 'identified', now);
+        if (waitedSec >= VEHICLE_TIMING_SEC.identify) applyVehicleEvent(run, 'vehicle.identified', now);
         break;
       case 'identified':
-        if (run.inbound && waitedSec >= VEHICLE_TIMING_SEC.toSector) setVehicleStage(run, 'unloading', now);
-        if (run.outbound && waitedSec >= OUTBOUND_TIMING_SEC.toBay) setVehicleStage(run, 'loading', now);
+        if (run.inbound && waitedSec >= VEHICLE_TIMING_SEC.toSector) applyVehicleEvent(run, 'unload.started', now);
+        if (run.outbound && waitedSec >= OUTBOUND_TIMING_SEC.toBay) applyVehicleEvent(run, 'load.started', now);
         break;
       case 'unloading':
         if (!run.inbound) break;
         // 쏟는 동안 섹터 더미가 조금씩 자란다
         addToTank(run.inbound.company.sectorId, fillGainPercent(run.inbound.weight.netT) / VEHICLE_TIMING_SEC.unload);
-        if (waitedSec >= VEHICLE_TIMING_SEC.unload) setVehicleStage(run, 'unloaded', now);
+        if (waitedSec >= VEHICLE_TIMING_SEC.unload) applyVehicleEvent(run, 'unload.completed', now);
         break;
       case 'loading':
         if (run.outbound) tickLoading(run, run.outbound, now);
@@ -432,9 +456,10 @@ function tickVehicles(now: number): void {
       case 'unloaded':
       case 'loaded':
         // 바로 출차하지 않는다: 계근대가 비면 돌아가 다시 잰다
-        if (waitedSec >= VEHICLE_TIMING_SEC.afterWork && !scaleBusy(run)) setVehicleStage(run, 'weighing_out', now);
+        if (waitedSec >= VEHICLE_TIMING_SEC.afterWork && !scaleBusy(run)) applyVehicleEvent(run, 'weigh.out', now);
         break;
       case 'weighing_out':
+        // 출차에는 사건 이름이 없다 (명세 6절: weigh.out → weighing_out, 출차 departed)
         if (waitedSec >= VEHICLE_TIMING_SEC.weighOut) setVehicleStage(run, 'departed', now);
         break;
       case 'departed':

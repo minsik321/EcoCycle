@@ -13,10 +13,11 @@ import { PinBadge } from './PinBadge';
 import type { MixPart } from '@ecocycle/shared';
 import { RECORD_SEARCH_HINT, formatLocalTime } from '../../config/display';
 import { useAppSelector } from '../../store/hooks';
-import { selectRecentCommands } from '../../store/selectors';
+import { selectBaleVehicleId, selectRecentCommands } from '../../store/selectors';
 import { CONTROL_TEXT } from '../../config/controls';
 import { BatchControls } from './BatchControls';
 import { useBatchControl } from './useBatchControl';
+import { LoadedVehicleLink } from './BaleRecords';
 import { BackToRecords, DetailRow } from './RecordDetail';
 
 // 사건 줄을 누르면 그 사건의 베일(베일 생산) 또는 배치 팝업이 바로 뜬다 (따로 된 "사건 상세" 없음)
@@ -38,6 +39,17 @@ function MixBars({ label, parts, unavailable, tone }: { label: string; parts: re
     </div>
   );
 }
+/** 현재 배치의 베일 한 줄: 베일 팝업 링크와 실은 차량(공정 흐름의 서버 값, 출하되면 차량 팝업 링크, 아니면 "–") */
+function BaleRow({ id }: { id: string }) {
+  const vehicleId = useAppSelector(selectBaleVehicleId(id));
+  return (
+    <li className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 border-b border-line last:border-b-0">
+      <PopupLink className="flex min-h-12 min-w-0 items-center truncate text-accent-strong" target={{ kind: 'bale', id }}>{id} →</PopupLink>
+      <span className="flex min-h-12 items-center gap-2 text-sm"><span className="whitespace-nowrap text-ink-soft">실은 차량</span><LoadedVehicleLink vehicleId={vehicleId} /></span>
+    </li>
+  );
+}
+
 export function BatchBalePage() {
   const { data, error, offline } = useBatchControl();
   const { lastReceivedAt } = useDeviceLive();
@@ -61,7 +73,7 @@ export function BatchBalePage() {
         <dl className="mt-3"><DetailRow label="평균 수분">{show(current.batch.avgMoisturePercent)}%</DetailRow><DetailRow label="목표 압력">{show(current.batch.targetPressureMpa)} MPa</DetailRow><DetailRow label="현재 압력">{show(current.currentPressureMpa)} MPa</DetailRow><DetailRow label="진행률">{show(current.progressPercent)}%</DetailRow></dl>
         <div role="progressbar" aria-label="배치 진행률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={unavailable?0:current.progressPercent} className="mt-2 h-2 rounded-full bg-paper-deep"><div className="h-2 rounded-full bg-accent" style={{width:`${unavailable?0:current.progressPercent}%`}}/></div>
         <p className="mt-3 text-sm font-semibold">생산 베일 {show(current.baleIds.length)}개</p>
-        {!unavailable && (current.baleIds.length?current.baleIds.map(id=><PopupLink className="flex min-h-12 items-center text-accent-strong" key={id} target={{kind:'bale',id}}>{id} →</PopupLink>):<p className="mt-1 text-sm text-ink-soft">아직 생산된 베일이 없습니다.</p>)}
+        {!unavailable && (current.baleIds.length?<ul aria-label="생산 베일">{current.baleIds.map(id=><BaleRow key={id} id={id} />)}</ul>:<p className="mt-1 text-sm text-ink-soft">아직 생산된 베일이 없습니다.</p>)}
       </>:<p className="text-sm text-ink-soft">진행 중인 배치가 없습니다.</p>}
     </Card>
     <div className="flex flex-wrap gap-2" aria-label="제어 대상"><Button variant={target==='current'?'primary':'secondary'} onClick={()=>setTarget('current')}>현재 배치</Button><Button variant={target==='next'?'primary':'secondary'} onClick={()=>setTarget('next')}>다음 배치</Button></div>

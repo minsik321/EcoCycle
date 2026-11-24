@@ -26,6 +26,18 @@ export const VEHICLE_STAGE_TEXT: Record<VehicleStage, string> = {
   departed: '출차',
 };
 
+/** 공정 기록 차량 팝업의 단계 시각 줄 이름 (공정 흐름 문구와 같은 말을 쓰되 시각 줄이라 "…한 때"로 읽히게) */
+export const VEHICLE_STAGE_ROW_TEXT: Record<VehicleStage, string> = {
+  arrived: '계중대 도착',
+  identified: '번호판 인식',
+  unloading: '하역 시작',
+  unloaded: '하역 완료',
+  loading: '상차 시작',
+  loaded: '상차 완료',
+  weighing_out: '출차 계근',
+  departed: '출차',
+};
+
 /** 차량 종류 이름 ("입고"·"상차"). 서버 검색이 찾는 이름과 같다(`shared/search.ts`) */
 export const VEHICLE_KIND_LABEL: Record<VehicleKind, string> = VEHICLE_KIND_TEXT;
 

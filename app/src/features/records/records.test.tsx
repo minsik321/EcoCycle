@@ -623,13 +623,22 @@ describe('상차 차량 (kind: outbound)', () => {
     expect(within(popup()).queryByRole('button', { name: /^차량 .* 보기$/ })).not.toBeInTheDocument();
   });
 
-  it('베일 탭: 출하된 베일 줄에 실은 차량, 적치 중이면 비어 있다', async () => {
+  it('베일 탭: 출하된 베일 줄의 실은 차량은 차량 팝업 링크(줄의 베일 팝업은 열지 않음), 적치 중이면 "–"', async () => {
     app('/records?tab=bales');
     const table = await screen.findByRole('table', { name: '베일 기록' });
     expect(within(table).getByRole('columnheader', { name: '실은 차량' })).toBeInTheDocument();
-    const shipped = within(table).getByText(BALE_B).closest('tr') as HTMLElement;
-    expect(within(shipped).getByTitle(OUTBOUND_ID)).toHaveTextContent('#s001');
     const stacked = within(table).getByText(BALE_A).closest('tr') as HTMLElement;
-    expect(within(stacked).queryByTitle(OUTBOUND_ID)).not.toBeInTheDocument();
+    expect(within(stacked).queryByRole('link')).toBeNull();
+    expect(within(stacked).getAllByRole('cell').at(-2)).toHaveTextContent('–');
+    // 폰 목록: 차량이 없어도 항목은 "차량 –"로 남는다
+    const list = screen.getByRole('list', { name: '베일 기록' });
+    expect(within(list).getByRole('button', { name: new RegExp(BALE_A) })).toHaveTextContent('차량 –');
+    expect(within(list).getByRole('button', { name: new RegExp(BALE_B) })).toHaveTextContent('차량 #s001');
+    const shipped = within(table).getByText(BALE_B).closest('tr') as HTMLElement;
+    await userEvent.click(within(shipped).getByRole('link', { name: `실은 차량 ${OUTBOUND_ID} 보기` }));
+    expect(where()).toBe(`/records/vehicles/${OUTBOUND_ID}`);
+    expect(await within(popup()).findByText('82바 1047')).toBeInTheDocument();
+    expect(within(popup()).getByRole('heading', { name: '차량 기록' })).toBeInTheDocument();
   });
+
 });
