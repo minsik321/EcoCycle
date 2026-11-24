@@ -7,11 +7,11 @@ export const YARD_FLOW = {
   forkliftCount: 2 as 1 | 2,
   /** 남동 칸 줄의 열 수, 북서 칸 줄의 열 수, 쌓는 높이(단). 베일은 두 개씩(저울에서 잰 한 쌍) 쌓는다 */
   seColumns: 7,
-  nwColumns: 7,
+  nwColumns: 6,
   levels: 4,
   /** 처음 장면을 열 때 이미 쌓여 있는 재고(서버 베일이 아닌 바탕 재고)의 비율: 남동 열, 북서 열 */
   seStartColumns: 3,
-  nwStartColumns: 4,
+  nwStartColumns: 6,
   /** 남동에 빈 열이 이만큼보다 적으면 가장 오래된 줄을 북서로 옮긴다 */
   seFreeColumnsMin: 2,
   /** 지게차 속도·가속·회전·포크 오르내림 (m/s, m/s², rad/s, m/s) */

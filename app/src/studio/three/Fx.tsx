@@ -198,13 +198,12 @@ export function Routes({ director, keys }: { director: Director; keys: MutableRe
 
 /** 고른 대상을 감싸는 가는 선 상자 (참고 화면 06·10). 차량은 방향을 따라 돈다 */
 const BOX_SIZE: Record<string, [number, number, number]> = {
-  veh: [3.2, 1.95, 1.45],
-  example: [3.2, 1.95, 1.45],
-  forklift: [1.55, 1.85, 1.0],
-  bale: [1.1, 0.8, 0.9],
+  veh: [4.4, 3.0, 1.95],
+  forklift: [1.8, 2.15, 1.15],
+  bale: [1.1, 0.8, 1.05],
   'dev:robot-1': [2.4, 3.6, 2.4],
   'dev:conveyor-z': [4.8, 2.7, 1.4],
-  'dev:compressor-1': [2.3, 2.1, 3.8],
+  'dev:compressor-1': [2.0, 2.4, 8.4],
   dev: [5.2, 2.1, 5.2],
 };
 
@@ -240,6 +239,25 @@ export function SelectionBox({ director, focusKey }: { director: Director; focus
 export type PinElements = Record<string, HTMLElement | null>;
 
 /** HTML 핀의 위치를 매 프레임 화면 좌표로 써 넣는다 (대상이 없으면 숨긴다) */
+/**
+ * 번호판 인식 장면의 핀: 계근대 위 차의 번호판(서버 값, 인식 전이면 "인식 중…")과 입차·출차 계근을 적는다.
+ * 패널 조각은 3D 장면의 어느 차가 계근대에 섰는지 모르므로 핀을 옮기는 이곳에서 글자만 바꾼다 (값은 Director가 서버 값에서 받은 것)
+ */
+function writePlate(el: HTMLElement, director: Director): void {
+  const s = director.plateScan;
+  const text = s.plate ?? '인식 중…';
+  const kind = s.out ? '출차 계근' : '입차 계근';
+  const plate = el.querySelector<HTMLElement>('[data-plate]');
+  const label = el.querySelector<HTMLElement>('[data-plate-kind]');
+  if (plate && plate.textContent !== text) plate.textContent = text;
+  if (label && label.textContent !== kind) label.textContent = kind;
+  const done = s.plate ? 'true' : 'false';
+  if (el.dataset.recognized !== done) {
+    el.dataset.recognized = done;
+    el.setAttribute('aria-label', `${kind} 번호판 ${s.plate ?? '인식 중'}`);
+  }
+}
+
 export function PinLayer({ director, pins }: { director: Director; pins: MutableRefObject<PinElements> }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
@@ -274,6 +292,7 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
       const x = (v.x * 0.5 + 0.5) * size.width;
       const y = (-v.y * 0.5 + 0.5) * size.height;
       el.style.visibility = 'visible';
+      if (key === 'plate:scan') writePlate(el, director);
       el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -100%)`;
       el.style.zIndex = String(Math.round((1 - v.z) * 100000));
     }

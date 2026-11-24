@@ -11,19 +11,39 @@ import type { P2 } from '../sim/paths';
 import { C } from '../theme';
 import { Kit, MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { useClockWaker } from '../three/motion';
-import { BALER, GATE, PILES, PILE_MAX_H, RAIL, RAIL_FRAME, RAIL_LEN, RAIL_SLOPE, SITE, centroid, railAt, railY } from './layout';
+import { BALER, PILES, PLATE_CAMERA, PILE_MAX_H, PLATEAU, RAIL, RAIL_FRAME, RAIL_LEN, RAIL_SLOPE, SITE, TIP, YARD_FRAME, centroid, railAt, railY, sitePx } from './layout';
+import { buildFloor, disposeFloor } from '../three/floorTexture';
 import { bakeGroundShadow, disposeBaked } from '../three/bakedShadow';
 import { buildWorld, edgeDistance, inside } from './buildWorld';
 
-// 월드의 고정물과, 기기 값에 따라 움직이는 부분(벨트·램·더미·차단기).
+// 월드의 고정물과, 기기 값에 따라 움직이는 부분(벨트·램·더미). 입구에는 차단봉이 없다(차가 그대로 지난다).
 
 const HIT = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 /** 압축기 건물의 파란 지붕을 걷는 카메라 거리 (부지 전체에서는 사진처럼 덮여 보이고, 구역 거리부터는 안이 보인다) */
 const ROOF_HIDE_DIST = 75;
 
+/** 마당 바닥 얼룩: 계근대 앞·트럭 길·쏟는 자리·배출구 앞 (월드 x, z, 반지름, 진하기) */
+const STAINS: ReadonlyArray<readonly [number, number, number, number]> = [
+  ...([
+    [400, 258, 1.6, 0.2],
+    [360, 298, 2.0, 0.16],
+    [318, 300, 1.8, 0.14],
+    [288, 270, 1.4, 0.12],
+    [440, 300, 1.4, 0.16],
+    [212, 486, 1.2, 0.22],
+    [330, 258, 1.2, 0.1],
+    [372, 330, 1.6, 0.12],
+  ] as const).map(([x, y, r, a]) => [...sitePx(x, y), r, a] as const),
+  ...Object.values(TIP).map((s) => [s.x, s.z, 1.6, 0.2] as const),
+];
+
 /** 고정물. 카메라 쪽을 향한 압축기 건물 벽은 숨겨 안이 보이게 한다. baked면 미리 구운 바닥 그림자를 얹는다 (low 단계) */
 export function World({ baked = false }: { baked?: boolean }) {
   const world = useMemo(buildWorld, []);
+  const floor = useMemo(() => buildFloor({ outline: PLATEAU, axis: YARD_FRAME.rotY, stains: STAINS, y: 0.004 }), []);
+  useEffect(() => () => {
+    if (floor) disposeFloor(floor);
+  }, [floor]);
   const shadow = useMemo(() => (baked ? bakeGroundShadow(world.footprints, { minX: SITE.minX - 4, maxX: SITE.maxX + 4, minZ: SITE.minZ - 4, maxZ: SITE.maxZ + 4 }) : null), [baked, world]);
   useEffect(() => () => {
     if (shadow) disposeBaked(shadow);
@@ -48,6 +68,7 @@ export function World({ baked = false }: { baked?: boolean }) {
   return (
     <>
       <primitive object={world.base} />
+      {floor && <primitive object={floor} />}
       {shadow && <primitive object={shadow} />}
       <primitive object={world.roof} />
       {world.walls.map((w) => (
@@ -59,7 +80,7 @@ export function World({ baked = false }: { baked?: boolean }) {
 
 // ── 섹터의 노천 파지 더미 ─────────────────────────────────────────────
 
-const PER_PILE = 380;
+const PER_PILE = 560;
 const LAYERS = 8;
 const PILE_TONES: Record<SectorGrade, string[]> = {
   // 등급은 서버 값이다. 화면은 등급에 따라 색 섞임만 달리한다
@@ -334,41 +355,52 @@ export function BalerParts({ director, status }: { director: Director; status: D
   );
 }
 
-// ── 입구 차단기 ───────────────────────────────────────────────────────
+// ── 번호판 인식 장면 ──────────────────────────────────────────────────
 
-/** 입구 차단기 둘: 북쪽 기둥에서 들어오는 차로를, 남쪽 기둥에서 나가는 차로를 막는다 (트럭이 다가오면 든다) */
-export function GateArms({ director }: { director: Director }) {
-  const inArm = useRef<Group>(null);
-  const outArm = useRef<Group>(null);
-  const span = Math.hypot(GATE.south[0] - GATE.north[0], GATE.south[1] - GATE.north[1]);
-  // 팔은 로컬 +z로 뻗는다: 북쪽 기둥에서 남쪽 기둥 쪽으로
-  const along = Math.atan2(GATE.south[0] - GATE.north[0], GATE.south[1] - GATE.north[1]);
-  const arm = useMemo(() => {
-    const k = new Kit('gloss');
-    const len = span / 2 - 0.3;
-    k.box(C.white, [0.07, 0.09, len], [0, -0.045, len / 2 + 0.1], { r: 0.03 });
-    for (let i = 0; i < Math.floor(len / 0.36) - 1; i += 1) k.box(C.yellow, [0.075, 0.095, 0.16], [0, -0.0475, 0.36 + i * 0.36], { r: 0.03 });
-    k.box(C.dark, [0.2, 0.26, 0.26], [0, -0.13, 0], { r: 0.06, mat: 'clay' });
-    return k.build('gate-arm');
-  }, [span]);
-  const arm2 = useMemo(() => arm.clone(), [arm]);
-  useEffect(() => () => disposeTree(arm), [arm]);
+const SCAN_BEAM = new MeshBasicMaterial({ color: '#8fd0ff', transparent: true, opacity: 0.28, depthWrite: false, toneMapped: false });
+const SCAN_SPOT = new MeshBasicMaterial({ color: '#bfe6ff', transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false });
+
+/**
+ * 계근대 위에 선 차의 번호판을 카메라 기둥이 비추는 빛줄기와 번호판 위 밝은 테 (입차·출차 계근 때마다).
+ * 번호판 글자는 서버 값만 패널 쪽 표시(핀)에 적는다. 움직임은 월드 시계(director.t)를 따른다(끊기면 멈춘다)
+ */
+export function PlateScanFx({ director }: { director: Director }) {
+  const beam = useRef<Mesh>(null);
+  const spot = useRef<Mesh>(null);
+  const head = useMemo(() => {
+    const [x, z] = PLATE_CAMERA.at;
+    const h = PLATE_CAMERA.heading;
+    return new Vector3(x + Math.cos(h) * 0.8, 2.5, z - Math.sin(h) * 0.8);
+  }, []);
+  const tmp = useMemo(() => ({ to: new Vector3(), mid: new Vector3(), up: new Vector3(0, 1, 0), q: new Quaternion(), d: new Vector3() }), []);
   useFrame(() => {
-    if (inArm.current) inArm.current.rotation.x = -director.gateIn * 1.4;
-    if (outArm.current) outArm.current.rotation.x = -director.gateOut * 1.4;
+    const s = director.plateScan;
+    const show = s.active && s.t > 0.2;
+    if (beam.current) beam.current.visible = show;
+    if (spot.current) spot.current.visible = show;
+    if (!show || !beam.current || !spot.current) return;
+    tmp.to.set(s.x, 0.55, s.z);
+    tmp.d.subVectors(tmp.to, head);
+    const len = tmp.d.length();
+    tmp.mid.addVectors(head, tmp.to).multiplyScalar(0.5);
+    beam.current.position.copy(tmp.mid);
+    tmp.q.setFromUnitVectors(tmp.up, tmp.d.normalize());
+    beam.current.quaternion.copy(tmp.q);
+    // 인식 전에는 빛줄기가 훑고(깜빡임), 서버가 번호판을 주면 고정된다
+    const sweep = s.plate ? 1 : 0.6 + 0.4 * Math.sin(director.t * 9);
+    beam.current.scale.set(sweep, len, sweep);
+    spot.current.position.copy(tmp.to);
+    spot.current.lookAt(head);
+    (spot.current.material as MeshBasicMaterial).opacity = s.plate ? 0.7 : 0.3 + 0.3 * Math.abs(Math.sin(director.t * 6));
   });
   return (
     <>
-      <group position={[GATE.north[0], 1.0, GATE.north[1]]} rotation-y={along}>
-        <group ref={inArm}>
-          <primitive object={arm} />
-        </group>
-      </group>
-      <group position={[GATE.south[0], 1.0, GATE.south[1]]} rotation-y={along + Math.PI}>
-        <group ref={outArm}>
-          <primitive object={arm2} />
-        </group>
-      </group>
+      <mesh ref={beam} material={SCAN_BEAM} visible={false}>
+        <cylinderGeometry args={[0.32, 0.04, 1, 16, 1, true]} />
+      </mesh>
+      <mesh ref={spot} material={SCAN_SPOT.clone()} visible={false}>
+        <planeGeometry args={[0.7, 0.32]} />
+      </mesh>
     </>
   );
 }
@@ -398,7 +430,7 @@ const RAIL_MID = (RAIL.startU + RAIL.endU) / 2;
 const HITS: Hit[] = [
   ...TANK_IDS.map(pileHit),
   { id: 'conveyor-z', size: [RAIL.endU - RAIL.startU, 1.4, RAIL.width + 0.3], at: railAtY(RAIL_MID, 0, railY(RAIL_MID) - 0.3), rotY: RAIL_FRAME.heading },
-  { id: 'compressor-1', size: [2.1, 2.0, BALER.maxZ - BALER.chuteEndZ], at: railAtY(BALER.x, -(BALER.maxZ + BALER.chuteEndZ) / 2, 1.0), rotY: RAIL_FRAME.heading },
+  { id: 'compressor-1', size: [2.1, 2.2, BALER.backZ - BALER.outletZ], at: railAtY(BALER.x, -(BALER.backZ + BALER.outletZ) / 2, 1.1), rotY: RAIL_FRAME.heading },
 ];
 
 export function DeviceHits({ onSelect }: { onSelect: (key: string) => void }) {

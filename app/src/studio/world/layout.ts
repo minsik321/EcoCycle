@@ -505,13 +505,13 @@ export function yardPx(x: number, y: number): P2 {
 const railYard = (u: number, w: number): P2 => [-(u - YARD_U0) * SITE_SCALE, (w - YARD_W0) * SITE_SCALE];
 
 const PITCH_X = BALE.w + BALE_GAP;
-const SLOT_GAP = 2.43;
+const SLOT_GAP = 2.75;
 
 /** 남동 구역의 칸 열(x): 길(z 0)은 구역 안쪽 가장자리를 따르고, 칸은 길 앞(+z) 한 줄 */
 const SE_XS = Array.from({ length: YARD_FLOW.seColumns }, (_, i) => 3.1 + i * PITCH_X);
 /** 북서 구역의 길·칸 줄: 구역의 남동 면(마당 쪽)을 따라 길(z −13.5)을 두고, 칸은 길 뒤(−z, 북서 쪽) 한 줄 */
 const NW_LANE_Z = -13.47;
-const NW_XS = Array.from({ length: YARD_FLOW.nwColumns }, (_, i) => 11.0 + i * PITCH_X);
+const NW_XS = Array.from({ length: YARD_FLOW.nwColumns }, (_, i) => 12.2 + i * PITCH_X);
 
 /** 배출구 받침대: 남동 벽(w 66px)에서 마당 쪽으로 베일 세 개 길이. 새 베일이 나오면 앞 베일이 밀려 한 칸씩 나간다 */
 const STAND_X = railYard(80, 0)[0];
@@ -553,7 +553,7 @@ export const YARD = {
   laneStart: STAND_X - 0.6,
   laneEnd: SE_XS[SE_XS.length - 1]! + 1.2,
   /** 북서 길의 동쪽 끝 (가로지르는 길이 닿는 곳) */
-  nwLaneEnd: NW_XS[NW_XS.length - 1]! + 1.2,
+  nwLaneEnd: NW_XS[NW_XS.length - 1]! + 0.8,
   stand: STAND,
   scale: BALE_SCALE,
   /** 지게차 대기 자리 (남동 길 뒤 −z, 받침대·저울 동쪽): 길에서 도는 원이 닿지 않는 곳 */
@@ -562,7 +562,7 @@ export const YARD = {
     [1.7, -2.75],
   ] as readonly P2[],
   /** 남동 길 동쪽 끝 → 북서 길 동쪽 끝: 꺾이는 점 (사진 px로 잡아 옮긴다). 상차 자리·쏟는 자리·대기 자리 트럭을 피한다 */
-  crossing: [yardPx(338, 398), yardPx(334, 330), yardPx(331, 262)] as readonly P2[],
+  crossing: [yardPx(340, 400), yardPx(328, 296), yardPx(316, 250)] as readonly P2[],
 } as const;
 
 /** 마당 좌표 → 월드 (그리는 쪽) */
@@ -635,12 +635,19 @@ const RAMP_IN_PX: P2[] = [
   [500, 306],
   [470, 305],
   [440, 302],
-  [410, 285],
-  [392, 262],
+  [412, 288],
+  [400, 266],
+  [390, 253],
   [372, 250],
 ];
-/** 도로(사진 위 끝, 북쪽) → 도로 대기 자리 */
-export const TRUCK_IN: P2[] = pts([LANE_PX[0]!, LANE_PX[1]!, LANE_PX[2]!, LANE_PX[3]!]);
+/** 도로 차로를 사진 위(북쪽) 밖으로 더 늘인 점: 막 들어오는 차가 여러 대면 이 길 위에 차례로 줄 선다 */
+const LANE_OFF: P2 = [LANE_PX[0]![0] - ROAD_PX[0]![0], LANE_PX[0]![1] - ROAD_PX[0]![1]];
+const FAR_PX: P2[] = [
+  [650 + LANE_OFF[0], -330 + LANE_OFF[1]],
+  [630 + LANE_OFF[0], -210 + LANE_OFF[1]],
+];
+/** 도로(사진 위 끝 밖, 북쪽) → 도로 대기 자리 */
+export const TRUCK_IN: P2[] = pts([...FAR_PX, LANE_PX[0]!, LANE_PX[1]!, LANE_PX[2]!, LANE_PX[3]!]);
 /** 도로 대기 자리 → 경사로로 올라 → 계근대 서쪽 끝 앞(서쪽을 봄) */
 export const ROAD_TO_SCALE: P2[] = pts([LANE_PX[3]!, ...RAMP_IN_PX]);
 /** 도로 대기 자리 → 입구에 들어가지 않고 도로를 따라 남쪽 밖으로 (들어오기 전에 출차 단계가 온 드문 차) */
@@ -746,10 +753,12 @@ export const OUT_CLEAR_PX_Y = 352;
 
 /** 상차 차량에 베일을 놓는 자리: 적재함 위 (트럭 기준 앞뒤 거리, 단) */
 export const LOAD_SLOTS: ReadonlyArray<readonly [number, number]> = [
-  [-1.55, 0],
-  [-0.55, 0],
-  [-1.55, 1],
-  [-0.55, 1],
+  [-1.5, 0],
+  [-0.52, 0],
+  [-1.5, 1],
+  [-0.52, 1],
+  [-1.5, 2],
+  [-0.52, 2],
 ];
 /** 상차 차량의 적재함 바닥 높이 */
 export const LOAD_BED_Y = 0.85;

@@ -486,28 +486,15 @@ export function Detail({ data, disconnected, selection, onSelect, deviceActions,
     );
   }
 
-  if (kind === 'example') {
-    // 상차 차량: 서버 값이 없는 3D 연출이다. 번호판·회사·무게를 지어내지 않는다
-    return (
-      <aside className={shell} aria-label="상차 차량 상세 (예시)">
-        <DetailHead icon="truck" eyebrow="예시" title="상차 차량" onClose={close} />
-        <div className="st-detail-status">
-          <span className="st-pill st-pill-kraft">예시</span>
-        </div>
-        <p className="st-muted">출하 흐름을 보여 주는 예시 연출입니다. 서버 값이 아니며 번호판·회사·무게를 표시하지 않습니다. 입구로 들어와 빈 차를 재고, 남동 적치 구역 곁에서 지게차가 북서 고정 재고의 베일을 실은 뒤 다시 재고 나갑니다.</p>
-      </aside>
-    );
-  }
-
   if (kind === 'forklift') {
     return (
       <aside className={shell} aria-label="지게차 상세">
         <DetailHead icon="forklift" eyebrow="베일 적치" title="지게차" onClose={close} />
-        <p className="st-muted">지게차의 움직임은 베일의 단계(적치 → 출하)를 화면에 옮긴 연출입니다. 적치 베일은 남동 구역 칸에 쌓고, 출하된 베일은 북서 고정 재고(예시)로 옮깁니다. 지게차 위치는 서버가 보내는 값이 아닙니다.</p>
+        <p className="st-muted">지게차의 움직임은 베일의 단계(적치 → 출하)를 화면에 옮긴 연출입니다. 새 베일은 저울에서 두 개씩 재어 남동 구역에 쌓고, 남동이 차면 오래된 줄부터 북서로 옮기며, 상차할 때는 북서에서 하나씩 꺼내 싣습니다. 지게차 위치는 서버가 보내는 값이 아닙니다.</p>
         <Rows
           rows={[
             ['지게차', `${YARD_FLOW.forkliftCount}대`],
-            ['적치 칸', `${YARD_CAPACITY}칸 (${YARD_FLOW.columns}열 × ${YARD_FLOW.levels}단)`],
+            ['적치 칸', `${YARD_CAPACITY}칸 (남동 ${YARD_FLOW.seColumns}열 · 북서 ${YARD_FLOW.nwColumns}열 × ${YARD_FLOW.levels}단)`],
             ['적치 베일', `${data.bales.filter((b) => b.stage === 'created').length}개`],
           ]}
         />
@@ -1227,20 +1214,14 @@ export function Pins({ data, disconnected, selection, onSelect, pins, yardFull =
             </button>
           );
         })}
-      {/* 서버 값이 없는 3D 연출: "예시"만 적는다 (번호판·회사·무게를 지어내지 않는다) */}
-      <button key="example:loader" {...pinProps('example:loader', '상차 차량 예시')} className="st-pin st-pin-vehicle st-pin-example">
+      {/* 번호판 인식 장면: 계근대 위 차를 카메라 기둥이 비출 때만 보인다. 글자는 서버 번호판(인식 전 "인식 중…"), 입력 칸 없음 */}
+      <span key="plate:scan" ref={bind('plate:scan')} className="st-pin st-pin-vehicle st-pin-plate st-pin-label" role="status" aria-label="번호판 인식" style={{ visibility: 'hidden' }}>
         <span className="st-pin-card">
           <span className="st-pin-text">
-            <small>상차 차량</small>
-            <strong>예시</strong>
-          </span>
-        </span>
-      </button>
-      <span key="stock:nw" ref={bind('stock:nw')} className="st-pin st-pin-example st-pin-label" role="note" aria-label="북서 고정 재고 예시" style={{ visibility: 'hidden' }}>
-        <span className="st-pin-card">
-          <span className="st-pin-text">
-            <small>고정 재고</small>
-            <strong>예시</strong>
+            <small data-plate-kind>입차 계근</small>
+            <strong className="st-plate" data-plate>
+              인식 중…
+            </strong>
           </span>
         </span>
       </span>

@@ -7,7 +7,8 @@ import { C, UNKNOWN_STRIPE, companyStripe } from '../theme';
 import { MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { blobShadow } from '../three/bakedShadow';
 import type { Director } from '../sim/director';
-import { YARD_FRAME } from '../world/layout';
+import { FORKLIFT_SCALE, TRUCK, YARD_FRAME, groundY } from '../world/layout';
+import type { TruckModel } from './build';
 import { buildBale, buildForklift, buildTruck, buildWorker } from './build';
 
 // 스스로 움직이는 것들을 그린다. 위치·자세는 모두 Director가 정하고 여기서는 옮겨 적기만 한다.
@@ -29,8 +30,21 @@ const stop = (e: ThreeEvent<MouseEvent>, fn: () => void) => {
   fn();
 };
 
+/** 트럭 칸마다 덤프(입고)와 윙바디(상차) 모형을 하나씩 두고, 서버 kind에 맞는 쪽만 보인다. 모형은 TRUCK.scale배로 그린다 */
+interface TruckPair {
+  dump: TruckModel;
+  wing: TruckModel;
+}
+
 export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
-  const models = useMemo(() => director.trucks.map((t, i) => buildTruck(i, t.example)), [director]);
+  const pairs = useMemo<TruckPair[]>(() => director.trucks.map((_, i) => ({ dump: buildTruck(i, 'dump'), wing: buildTruck(i, 'wing') })), [director]);
+  const models = useMemo(() => pairs.flatMap((p) => [p.dump, p.wing]), [pairs]);
+  useEffect(() => {
+    for (const m of models) {
+      m.root.scale.setScalar(TRUCK.scale);
+      m.root.rotation.order = 'YZX';
+    }
+  }, [models]);
   useEffect(() => {
     if (!blobs) return;
     const added = models.map((m) => {
@@ -63,12 +77,22 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
   useFrame(() => {
     const mesh = pour.current;
     director.trucks.forEach((sim, i) => {
-      const model = models[i]!;
+      const pair = pairs[i]!;
+      const model = sim.outbound ? pair.wing : pair.dump;
+      (sim.outbound ? pair.dump : pair.wing).root.visible = false;
       model.root.visible = sim.active;
       if (sim.active) {
-        model.root.position.set(sim.x, GROUND_Y, sim.z);
-        model.root.rotation.y = sim.heading;
-        model.stripe.color.set(sim.example ? UNKNOWN_STRIPE : companyStripe(sim.company));
+        // 경사로·비탈 도로: 앞뒤 바퀴 자리의 바닥 높이로 차체를 기울인다
+        const fx = Math.cos(sim.heading) * 1.45;
+        const fz = -Math.sin(sim.heading) * 1.45;
+        const yf = groundY(sim.x + fx, sim.z + fz);
+        const yb = groundY(sim.x - fx, sim.z - fz);
+        model.root.position.set(sim.x, GROUND_Y + (yf + yb) / 2, sim.z);
+        model.root.rotation.set(0, sim.heading, Math.atan2(yf - yb, 2.9));
+        model.stripe.color.set(sim.company ? companyStripe(sim.company) : UNKNOWN_STRIPE);
+        model.wings.forEach((w, side) => {
+          w.rotation.x = (side === 0 ? 1 : -1) * sim.wing * 1.25;
+        });
         const angle = sim.bedTilt * BED_MAX;
         model.bed.rotation.z = angle;
         model.gate.rotation.z = -angle * 1.3;
@@ -91,10 +115,10 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
         }
         const u = (sim.pourT * 0.9 + j / POUR_PER_TRUCK) % 1;
         const side = ((j * 37) % 17) / 17 - 0.5;
-        const back = 1.5 + u * 0.95;
-        tmp.p.set(sim.x - fx * back - fz * side * 0.85, 0.95 - u * u * 0.75 + Math.sin(j * 2.1) * 0.05, sim.z - fz * back + fx * side * 0.85);
+        const back = (1.5 + u * 0.95) * TRUCK.scale;
+        tmp.p.set(sim.x - fx * back - fz * side * 1.15, (0.95 - u * u * 0.75 + Math.sin(j * 2.1) * 0.05) * TRUCK.scale, sim.z - fz * back + fx * side * 1.15);
         tmp.q.setFromAxisAngle(tmp.axis, u * 7 + j);
-        const scale = 0.7 + ((j * 13) % 7) / 10;
+        const scale = (0.7 + ((j * 13) % 7) / 10) * TRUCK.scale;
         tmp.s.setScalar(scale * Math.min(1, u * 8) * Math.min(1, (1 - u) * 5));
         mesh.setMatrixAt(index, tmp.m.compose(tmp.p, tmp.q, tmp.s));
       }
@@ -104,14 +128,14 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
 
   return (
     <>
-      {models.map((model, i) => (
+      {models.map((model, k) => (
         <primitive
-          key={i}
+          key={k}
           object={model.root}
           onClick={(e: ThreeEvent<MouseEvent>) =>
             stop(e, () => {
-              const t = director.trucks[i];
-              if (t?.active) onSelect(t.example ? 'example:loader' : `veh:${t.id}`);
+              const t = director.trucks[Math.floor(k / 2)];
+              if (t?.active) onSelect(`veh:${t.id}`);
             })
           }
         />
@@ -123,7 +147,11 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
 
 export function Forklifts({ director, onSelect, blobs = false }: ActorProps) {
   // 지게차는 1~2대(설정). 한 대마다 모형 하나
-  const models = useMemo(() => director.forklifts.map(() => buildForklift()), [director]);
+  const models = useMemo(() => {
+    const list = director.forklifts.map(() => buildForklift());
+    for (const m of list) m.root.scale.setScalar(FORKLIFT_SCALE);
+    return list;
+  }, [director]);
   useEffect(() => () => models.forEach((m) => disposeTree(m.root)), [models]);
   useEffect(() => {
     if (!blobs) return;
@@ -140,7 +168,8 @@ export function Forklifts({ director, onSelect, blobs = false }: ActorProps) {
       const model = models[i]!;
       model.root.position.set(sim.x, GROUND_Y, sim.z);
       model.root.rotation.y = sim.heading;
-      model.carriage.position.y = sim.fork + 0.02;
+      // 포크 높이는 월드 값(sim.fork): 모형은 FORKLIFT_SCALE배로 그리므로 모형 좌표로 나눈다
+      model.carriage.position.y = (sim.fork + 0.02) / FORKLIFT_SCALE;
       model.jaws.forEach((jaw, side) => {
         jaw.position.z = (side === 0 ? -1 : 1) * (0.415 - sim.clamp * 0.025);
       });
@@ -200,7 +229,7 @@ export function Bales({ director, onSelect }: ActorProps) {
 
   const pick = (e: ThreeEvent<MouseEvent>) => {
     const sim = e.instanceId === undefined ? undefined : director.bales[e.instanceId];
-    // 상차 차량에 실린 예시 베일(아이디 없음)은 고르지 않는다
+    // 이름 없는 재고·상차 차량에 실린 베일(아이디 없음)은 고르지 않는다
     if (sim?.active && sim.id) stop(e, () => onSelect(`bale:${sim.id}`));
   };
 
