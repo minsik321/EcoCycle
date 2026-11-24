@@ -5,7 +5,7 @@ import type { PerspectiveCamera } from 'three';
 import type { Director } from '../sim/director';
 import { useWaker } from './motion';
 import { angleDelta } from '../sim/paths';
-import { DEFAULT_VIEW, SITE, TIER_DISTANCE, WIDE_VIEW, closeDistance, tierOf } from '../world/layout';
+import { DEFAULT_VIEW, SITE, TIER_DISTANCE, WIDE_VIEW, closeDistance, siteHeading, sitePx, tierOf } from '../world/layout';
 import type { ViewPreset, ViewTier } from '../world/layout';
 
 // 스튜디오 카메라. 거리는 세 단계(wide 부지 전체 / mid 한 구역 / close 대상 하나)이고 그 사이를 부드럽게 미끄러져 간다.
@@ -55,7 +55,14 @@ const FOCUS_POLAR = 52;
 /** 프리셋 거리는 이 가로세로 비(패널을 뺀 빈 영역)에 맞춘 값이다. 더 좁은 화면에서는 그만큼 물러난다 */
 const REFERENCE_ASPECT = (1440 - 320) / 900;
 
-const fromPreset = (p: ViewPreset): View => ({ x: p.target[0], y: p.target[1], z: p.target[2], dist: p.distance, az: p.azimuth, pol: p.polar });
+/** 사진처럼 남쪽에서 북쪽을 보는 카메라 방위각(도): 프리셋의 azimuth는 이 값에서 잰다 */
+const SOUTH_AZ = (siteHeading(0, 1) * 180) / Math.PI;
+
+/** 프리셋(사진 좌표) → 카메라 목표(월드). 사진 → 월드 변환은 world/layout의 sitePx 하나만 쓴다 */
+const fromPreset = (p: ViewPreset): View => {
+  const [x, z] = sitePx(p.at[0], p.at[1]);
+  return { x, y: p.height, z, dist: p.distance, az: SOUTH_AZ + p.azimuth, pol: p.polar };
+};
 
 export function Rig({ director, focusKey, api, inset }: RigProps) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
@@ -229,7 +236,7 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
   return null;
 }
 
-/** 카메라가 바닥에서 어느 쪽에 있는지 (본관 벽을 숨길 때 쓴다) */
+/** 카메라가 바닥에서 어느 쪽에 있는지 (압축기 건물의 카메라 쪽 벽을 숨길 때 쓴다) */
 export function cameraSide(camera: { position: { x: number; z: number } }, out: { x: number; z: number }): void {
   const len = Math.hypot(camera.position.x, camera.position.z) || 1;
   out.x = camera.position.x / len;

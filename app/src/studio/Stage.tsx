@@ -54,7 +54,7 @@ export interface StageProps {
 }
 
 const SUN: [number, number, number] = [-22, 38, -19];
-const SHADOW = 30;
+const SHADOW = 40;
 
 /**
  * 박자 맞추기: 정해진 간격(단계의 프레임 상한)마다 월드 시계를 돌리고, 무엇이 움직였거나 깨우개가 부르면 한 장 그린다.
@@ -154,7 +154,7 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
         // 후처리가 없으면 톤 매핑은 렌더러가 한다 (후처리가 있으면 ToneMapping 효과가 한다)
         if (!profile.post) gl.toneMapping = NeutralToneMapping;
       }}
-      camera={{ fov: 20, near: 2, far: 420, position: [60, 60, -60] }}
+      camera={{ fov: 20, near: 2, far: 520, position: [60, 60, -60] }}
       onPointerMissed={() => onSelect(null)}
       // 후처리가 없으면(low, 터치 기기) 연결 끊김의 회색 화면을 캔버스 필터로 낸다
       style={{ touchAction: 'none', filter: !profile.post && frozen ? 'grayscale(0.92) brightness(0.98)' : undefined }}
@@ -162,7 +162,7 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
       <MotionContext.Provider value={motion}>
         <color attach="background" args={[C.bg]} />
         {/* 먼 곳은 바탕색으로 옅어진다: 밝고 살짝 뿌연 공기 (부지 안의 밝기 단계는 지우지 않게 멀리서 시작) */}
-        <fog attach="fog" args={[C.bg, 110, 260]} />
+        <fog attach="fog" args={[C.bg, 170, 380]} />
         <EnvLight intensity={0.36} />
         <hemisphereLight args={['#ffffff', '#efe3d2', 0.6]} />
         {/* 해는 첫 스튜디오 시안처럼 따뜻하고 분명하게: 부드럽지만 또렷한 그림자 + 주변 차폐로 형태를 잡는다 */}

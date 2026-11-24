@@ -22,7 +22,8 @@ import { Pace } from './sim/pace';
 import { STUDIO_PROFILES, deviceClass, studioTier } from './quality';
 import type { RecordLink, StudioData } from './types';
 import { EMPTY_DATA } from './types';
-import { APRON, AREAS, BALE_REST, DEFAULT_VIEW, SCALE, TIER_DISTANCE, TRUCK, VIEWS, WIDE_VIEW, YARD, bayCenterZ, closeDistance, tierOf } from './world/layout';
+import { AREAS, BALE_REST, DEFAULT_VIEW, HOLD, SCALE_STOP, SCALE_STOP_EAST, TIER_DISTANCE, TIP, TOP_VIEW, VIEWS, WIDE_VIEW, YARD, closeDistance, tierOf, worldToPx, worldToYard } from './world/layout';
+import { LOADER_ID } from './sim/director';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { TopBar } from '../components/layout/TopBar';
@@ -91,25 +92,27 @@ beforeEach(() => {
 });
 
 describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
-  it('트럭은 받은 단계만큼만 나아간다: 계중대 → 배정 섹터 → 하역 → 출차 대기 → 출차', () => {
+  it('트럭은 받은 단계만큼만 나아간다: 입구 → 계근대(인식까지 기다림) → 배정 더미 앞 → 하역 → 다시 계근 → 같은 입구로 출차', () => {
     const d = new Director();
     d.sync(input({ vehicles: [vehicle('v1', 'arrived')] }), T0);
     const truck = d.trucks[0]!;
     expect(truck.active).toBe(true);
-    expect(truck.x).toBeGreaterThan(SCALE.stopX + 5); // 정문 밖에서 들어온다
+    // 동쪽 도로의 북쪽(사진 위 끝)에서 들어온다
+    expect(worldToPx(truck.x, truck.z)[1]).toBeLessThan(10);
 
-    run(d, 12);
+    run(d, 14);
     expect(truck.phase).toBe('atScale');
-    expect(truck.x).toBeCloseTo(SCALE.stopX, 1);
-    // 서버가 인식(배정 섹터)을 알려 주기 전에는 계중대에서 기다린다
+    expect(truck.x).toBeCloseTo(SCALE_STOP.x, 1);
+    expect(truck.z).toBeCloseTo(SCALE_STOP.z, 1);
+    // 서버가 인식(배정 섹터)을 알려 주기 전에는 계근대에서 기다린다
     run(d, 10);
     expect(truck.phase).toBe('atScale');
 
-    d.sync(input({ vehicles: [vehicle('v1', 'identified', 'sector-c', T0 + 22_000)] }), T0 + 22_000);
+    d.sync(input({ vehicles: [vehicle('v1', 'identified', 'sector-c', T0 + 24_000)] }), T0 + 24_000);
     run(d, 25);
-    expect(truck.phase).toBe('atBay');
-    expect(truck.x).toBeCloseTo(TRUCK.parkX, 1);
-    expect(truck.z).toBeCloseTo(bayCenterZ('sector-c'), 1);
+    expect(truck.phase).toBe('atTip');
+    expect(truck.x).toBeCloseTo(TIP['sector-c'].x, 1);
+    expect(truck.z).toBeCloseTo(TIP['sector-c'].z, 1);
     expect(truck.bedTilt).toBe(0); // 하역 단계가 오기 전에는 적재함을 들지 않는다
 
     d.sync(input({ vehicles: [vehicle('v1', 'unloading', 'sector-c', T0 + 50_000)] }), T0 + 50_000);
@@ -117,13 +120,22 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     expect(truck.bedTilt).toBeCloseTo(1, 2);
     expect(truck.load).toBeLessThan(1);
 
+    // 하역이 끝나면 계근대로 돌아가 다시 재고(동쪽을 본다), 출차 단계가 올 때까지 그 위에서 기다린다
     d.sync(input({ vehicles: [vehicle('v1', 'unloaded', 'sector-c', T0 + 60_000)] }), T0 + 60_000);
-    run(d, 14);
-    expect(truck.phase).toBe('atExit');
-    expect(truck.x).toBeCloseTo(APRON.exitX, 1);
-
-    d.sync(input({ vehicles: [vehicle('v1', 'departed', 'sector-c', T0 + 80_000)] }), T0 + 80_000);
     run(d, 20);
+    expect(truck.phase).toBe('atScale2');
+    expect(truck.x).toBeCloseTo(SCALE_STOP_EAST.x, 1);
+    expect(truck.z).toBeCloseTo(SCALE_STOP_EAST.z, 1);
+
+    d.sync(input({ vehicles: [vehicle('v1', 'departed', 'sector-c', T0 + 90_000)] }), T0 + 90_000);
+    // 같은 입구(계근대와 남동 구역 사이)를 지나 남쪽 도로로 나간다
+    let throughGate = false;
+    run(d, 25, () => {
+      if (!truck.active) return;
+      const [x, y] = worldToPx(truck.x, truck.z);
+      if (x > 505 && x < 530 && y > 262 && y < 340) throughGate = true;
+    });
+    expect(throughGate).toBe(true);
     expect(truck.active).toBe(false);
   });
 
@@ -132,30 +144,27 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     d.sync(input({ vehicles: [vehicle('v1', 'unloading', 'sector-a', T0 - 60_000), vehicle('v0', 'departed', 'sector-a', T0 - 300_000)] }), T0);
     const active = d.trucks.filter((t) => t.active);
     expect(active).toHaveLength(1);
-    expect(active[0]!.phase).toBe('atBay');
-    expect(active[0]!.z).toBeCloseTo(bayCenterZ('sector-a'), 3);
+    expect(active[0]!.phase).toBe('atTip');
+    expect(active[0]!.x).toBeCloseTo(TIP['sector-a'].x, 3);
+    expect(active[0]!.z).toBeCloseTo(TIP['sector-a'].z, 3);
     expect(active[0]!.bedTilt).toBe(1);
   });
 
-  it('두 트럭이 같은 마당을 써도 서로 비켜 가서 겹치지 않는다', () => {
+  it('같은 섹터로 가는 두 트럭은 더미 앞을 번갈아 쓰고, 겹치지 않는다', () => {
     const d = new Director();
-    let minGap = Infinity;
-    const watch = () => {
-      const [a, b] = d.trucks;
-      if (a!.active && b!.active) minGap = Math.min(minGap, Math.hypot(a!.x - b!.x, a!.z - b!.z));
-    };
-    // 첫 차는 하역을 마치고 나가려 하고, 둘째 차는 그 옆 칸으로 들어온다
+    let overlaps = 0;
+    // 첫 차는 하역을 마치고 다시 재러 가려 하고, 둘째 차는 같은 섹터로 배정되어 계근대에 있다
     d.sync(input({ vehicles: [vehicle('v1', 'unloaded', 'sector-a', T0 - 20_000), vehicle('v2', 'identified', 'sector-a', T0 - 30_000)] }), T0);
-    run(d, 40, watch);
+    run(d, 40, () => void (overlaps += d.truckOverlaps()));
     d.sync(input({ vehicles: [vehicle('v1', 'departed', 'sector-a', T0 + 40_000), vehicle('v2', 'unloading', 'sector-a', T0 + 40_000)] }), T0 + 40_000);
-    run(d, 30, watch);
+    run(d, 40, () => void (overlaps += d.truckOverlaps()));
 
-    expect(d.trucks[1]!.phase).toBe('atBay'); // 막혀서 멈춘 채로 끝나지 않는다
+    expect(d.trucks[1]!.phase).toBe('atTip'); // 막혀서 멈춘 채로 끝나지 않는다
     expect(d.trucks[0]!.active).toBe(false);
-    expect(minGap).toBeGreaterThan(TRUCK.width + 0.3);
+    expect(overlaps).toBe(0);
   });
 
-  it('베일은 배출 → 지게차 적치 → (출하 단계가 오면) 지게차가 싣고 화면 밖으로 나간다', () => {
+  it('베일은 배출 → 지게차가 남동 칸에 적치 → (출하 단계가 오면) 북서 재고로 옮겨 사라진다', () => {
     const d = new Director();
     d.sync(input({ bales: [bale('BL-1', 'created')] }), T0);
     run(d, 0.1);
@@ -164,7 +173,11 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
 
     run(d, 4);
     expect(sim.state === 'chute' || sim.state === 'carried').toBe(true);
-    if (sim.state === 'chute') expect(sim.z).toBeCloseTo(BALE_REST[2], 2);
+    const rest = worldToYard(BALE_REST[0], BALE_REST[2], { x: 0, z: 0 });
+    if (sim.state === 'chute') {
+      expect(sim.x).toBeCloseTo(rest.x, 2);
+      expect(sim.z).toBeCloseTo(rest.z, 2);
+    }
 
     run(d, 30);
     expect(sim.state).toBe('stack');
@@ -174,11 +187,42 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     expect(sim.state).toBe('stack');
 
     d.sync(input({ bales: [{ ...bale('BL-1', 'shipped'), stageTimes: { created: iso(T0), shipped: iso(T0 + 60_000) } }] }), T0 + 60_000);
-    run(d, 40);
+    // 마당을 가로질러 북서 재고까지 간다 (상차 차량 "예시"가 지나가는 동안 기다릴 수 있다)
+    run(d, 120);
     expect(sim.active).toBe(false);
+    expect(d.yard.stats.shipped).toBe(1);
     // 다시 받아도 되살리지 않는다
     d.sync(input({ bales: [{ ...bale('BL-1', 'shipped') }] }), T0 + 120_000);
-    expect(d.bales.some((b) => b.active)).toBe(false);
+    expect(d.bales.some((b) => b.active && b.id)).toBe(false);
+  });
+
+  it('상차 차량("예시")은 계근 → 남동 구역 곁 상차 자리 → 북서 재고의 베일을 실음 → 다시 계근 → 출차하고, 서버 값이 아니다', () => {
+    const d = new Director();
+    const loader = d.loaderTruck;
+    let parkedAt: [number, number] | null = null;
+    let weighed = 0;
+    let maxLoaded = 0;
+    let overlaps = 0;
+    let last = '';
+    for (let i = 0; i < 30 * 400 && !(weighed >= 2 && !loader.active); i += 1) {
+      d.step(1 / 30);
+      overlaps += d.truckOverlaps();
+      if (loader.phase === 'loading' && !parkedAt) parkedAt = [loader.x, loader.z];
+      if (loader.phase !== last && (loader.phase === 'atScale' || loader.phase === 'atScale2')) weighed += 1;
+      last = loader.phase;
+      maxLoaded = Math.max(maxLoaded, d.bales.filter((b) => b.active && b.state === 'loaded').length);
+    }
+    expect(loader.example).toBe(true);
+    expect(loader.id === '' || loader.id === LOADER_ID).toBe(true);
+    expect(parkedAt![0]).toBeCloseTo(HOLD.x, 1);
+    expect(parkedAt![1]).toBeCloseTo(HOLD.z, 1);
+    expect(weighed).toBe(2);
+    expect(maxLoaded).toBe(4);
+    expect(loader.active).toBe(false);
+    expect(overlaps).toBe(0);
+    // 실린 베일은 서버 베일이 아니다 (아이디 없음) 그리고 차가 나가면 사라진다
+    expect(d.bales.some((b) => b.active && b.state === 'loaded')).toBe(false);
+    expect(d.yard.stats.loadedOut).toBe(4);
   });
 
   it('섹터 더미는 서버 적재율을 따라가고, 압축 연출은 압축 중인 배치와 압축기 가동이 함께일 때만 돈다', () => {
@@ -444,7 +488,7 @@ describe('참고 화면에 맞춘 화면 구성', () => {
   );
 
   it('카메라 거리는 세 단계다: 부지 전체(wide) > 구역(mid, 기본) > 대상(close)', () => {
-    expect(VIEWS.filter((v) => v.tier === 'wide')).toEqual([WIDE_VIEW]);
+    expect(VIEWS.filter((v) => v.tier === 'wide')).toEqual([WIDE_VIEW, TOP_VIEW]);
     expect(AREAS.every((v) => v.tier === 'mid')).toBe(true);
     expect(DEFAULT_VIEW.tier).toBe('mid');
     expect(tierOf(WIDE_VIEW.distance)).toBe('wide');
@@ -464,6 +508,23 @@ describe('참고 화면에 맞춘 화면 구성', () => {
     expect(stage.last?.routeKeys.current).toEqual(['veh:v1']);
     expect(pin).toHaveAttribute('aria-pressed', 'true');
     expect(within(pin).getByText(/12가 3456/)).toBeInTheDocument();
+  });
+
+  it('상차 차량과 북서 고정 재고는 "예시"라고만 적고, 번호판·회사·무게 같은 숫자를 지어내지 않는다', async () => {
+    const user = userEvent.setup();
+    render(view({ data: input({ vehicles: [vehicle('v1', 'identified', 'sector-a')] }) }));
+    // 핀은 장면이 자리를 정하기 전에는 숨겨져 있어 이름표로 찾는다
+    const loaderPin = screen.getByLabelText('상차 차량 예시');
+    expect(loaderPin).toHaveTextContent('예시');
+    expect(loaderPin.textContent).not.toMatch(/\d/);
+    const stockPin = screen.getByLabelText('북서 고정 재고 예시');
+    expect(stockPin).toHaveTextContent('예시');
+    expect(stockPin.textContent).not.toMatch(/\d/);
+    await user.click(loaderPin);
+    const panel = screen.getByRole('complementary', { name: '상차 차량 상세 (예시)' });
+    expect(within(panel).getAllByText('예시').length).toBeGreaterThan(0);
+    expect(panel.textContent).not.toMatch(/\d/);
+    expect(panel.textContent).not.toMatch(/번호판 [가-힣0-9]|t|kg/);
   });
 
   it('상세 패널은 4~5줄만 바로 보이고 나머지는 "자세히" 안에 있다', async () => {

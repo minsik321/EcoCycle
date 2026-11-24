@@ -1293,6 +1293,15 @@ button.st-now:hover {
   display: none !important;
 }
 
+/* 서버 값이 없는 예시(상차 차량·북서 고정 재고): 점선 테두리로 실제 값과 구별한다. 고정 재고는 누르지 않는 이름표 */
+.st-pin-example .st-pin-card {
+  outline: 1.5px dashed rgba(47, 107, 255, 0.55);
+  outline-offset: -3px;
+}
+.st-pin-label {
+  pointer-events: none;
+}
+
 /* 멀리서 볼 때: 섹터 핀은 고리만, 나머지는 작게 */
 .st-pins[data-zoom='far'] .st-pin-sector:not([aria-pressed='true']) .st-pin-text {
   display: none;

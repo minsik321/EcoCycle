@@ -50,6 +50,12 @@ export const C = {
   greenDeep: '#6abd68',
   greenLight: '#b4e3a0',
   trunk: '#c9b29a',
+  /** 북서쪽 숲: 숲 바닥과 짙은 수관 */
+  forestFloor: '#93c886',
+  forest: '#5aa85c',
+  /** 압축기 건물의 파란 지붕 (사진의 파란 지붕): 본동, 옆동·골판 줄 */
+  roofBlue: '#4f8fe0',
+  roofBlueDeep: '#2f6fc4',
   skin: '#f0c4a0',
   /** 작업자 조끼도 안전 노랑 */
   vest: '#ffc31f',

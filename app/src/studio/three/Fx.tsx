@@ -94,7 +94,7 @@ export function SelectionRing({ director, focusKey }: { director: Director; focu
   useClockWaker(director, () => focusKey !== null);
   useFrame(() => {
     const found = focusKey !== null && director.anchor(focusKey, anchor, 'focus');
-    const base = focusKey?.startsWith('dev:tank') ? 1.55 : focusKey?.startsWith('dev:compressor') ? 1.9 : focusKey?.startsWith('dev:conveyor') ? 1.7 : focusKey?.startsWith('bale') ? 0.8 : focusKey?.startsWith('forklift') ? 1.0 : 1.7;
+    const base = focusKey?.startsWith('dev:sector') ? 2.6 : focusKey?.startsWith('dev:compressor') ? 1.9 : focusKey?.startsWith('dev:conveyor') ? 1.7 : focusKey?.startsWith('bale') ? 0.8 : focusKey?.startsWith('forklift') ? 1.0 : 1.7;
     rings.current.forEach((ring, i) => {
       if (!ring) return;
       ring.visible = found;
@@ -199,12 +199,13 @@ export function Routes({ director, keys }: { director: Director; keys: MutableRe
 /** 고른 대상을 감싸는 가는 선 상자 (참고 화면 06·10). 차량은 방향을 따라 돈다 */
 const BOX_SIZE: Record<string, [number, number, number]> = {
   veh: [3.2, 1.95, 1.45],
+  example: [3.2, 1.95, 1.45],
   forklift: [1.55, 1.85, 1.0],
   bale: [1.1, 0.8, 0.9],
   'dev:robot-1': [2.4, 3.6, 2.4],
-  'dev:conveyor-z': [8.1, 1.1, 1.4],
-  'dev:compressor-1': [2.3, 2.1, 5.4],
-  dev: [3.7, 2.1, 1.6],
+  'dev:conveyor-z': [4.8, 2.7, 1.4],
+  'dev:compressor-1': [2.3, 2.1, 3.8],
+  dev: [5.2, 2.1, 5.2],
 };
 
 export function SelectionBox({ director, focusKey }: { director: Director; focusKey: string | null }) {
