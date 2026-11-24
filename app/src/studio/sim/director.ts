@@ -115,6 +115,8 @@ export interface TruckSim extends Mover {
   wing: number;
   /** 계근대 위에서 머문 시간(초) */
   weighT: number;
+  /** 계근대 위에서 번호판(서버 값)이 보인 시간(초): 인식 장면을 잠깐 보여 준 뒤에 내려간다 */
+  plateT: number;
   /** 다시 재러 가는 길에서 마당 안쪽 길을 벗어나는 거리 (마당 차례를 놓는 곳) */
   clearS: number;
   /** 바닥 높이 (도로·경사로) */
@@ -168,6 +170,8 @@ const TILT_RATE = 0.42;
 const UNLOAD_SEC = 6.5;
 /** 계근대에서 무게를 재는 동안 서 있는 최소 시간(초, 연출) */
 const WEIGH_SEC = 1.6;
+/** 번호판 인식 장면: 인식된 번호판을 계근대 위에서 보여 주는 시간(초, 연출) */
+const PLATE_SHOW_SEC = 1.4;
 
 const TRUCK_POOL = 8;
 const LUMP_POOL = 12;
@@ -274,7 +278,7 @@ export class Director {
 
   constructor() {
     for (let i = 0; i < TRUCK_POOL; i += 1) {
-      this.trucks.push({ ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: i, company: null, plate: null, outbound: false, want: 0, wing: 0, weighT: 0, clearS: 0, y: 0 });
+      this.trucks.push({ ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: i, company: null, plate: null, outbound: false, want: 0, wing: 0, weighT: 0, plateT: 0, clearS: 0, y: 0 });
     }
     for (let i = 0; i < LUMP_POOL; i += 1) this.lumps.push({ active: false, u: 0, drop: 0, seed: i });
     this.yard.events.onEject = () => {
@@ -527,7 +531,8 @@ export class Director {
   private truckBlocked(a: TruckSim): boolean {
     const half = TRUCK.length / 2 + 0.12;
     const hw = TRUCK.width / 2 + 0.1;
-    const look = 0.7 + a.speed * 0.45;
+    // 멈추는 데 드는 거리(advance의 감속 2.2배 가속)만큼 더 살핀다
+    const look = 0.8 + (a.speed * a.speed) / (2 * TRUCK_ACCEL * 2.2);
     const p = this.ahead(a, this.probeA, look);
     for (const b of this.trucks) {
       if (b === a || !b.active) continue;
@@ -536,7 +541,7 @@ export class Director {
       // 지금 이미 겹쳐 있으면(처음 놓일 때 등) 벗어나는 쪽은 막지 않는다
       if (rectsOverlap(a, b, half, hw) && !this.closer(p, a, b)) continue;
       // 서로 막고 있으면 먼저 온 쪽이 간다
-      const mutual = b.path !== null && rectsOverlap(this.ahead(b, this.probeB, 0.7 + b.speed * 0.45), a, half, hw);
+      const mutual = b.path !== null && rectsOverlap(this.ahead(b, this.probeB, 0.8 + (b.speed * b.speed) / (2 * TRUCK_ACCEL * 2.2)), a, half, hw);
       if (mutual && a.seq < b.seq) continue;
       return true;
     }
@@ -650,12 +655,14 @@ export class Director {
             t.phase = 'atScale';
             t.path = null;
             t.weighT = 0;
+            t.plateT = 0;
           }
           break;
         case 'atScale':
           t.weighT += dt;
+          if (t.plate) t.plateT += dt;
           if (t.stage !== 'arrived' && (!t.bay || !this.tipBusy(t, t.bay) || !this.queueBusy(t))) this.yardToken.wanted = true;
-          if (t.weighT < WEIGH_SEC) break;
+          if (t.weighT < WEIGH_SEC || (t.plate !== null && t.plateT < PLATE_SHOW_SEC)) break;
           if (t.outbound) {
             if (t.stage !== 'arrived' && !this.holdBusy(t) && this.yardToken.take(t.id)) {
               t.phase = 'toLoad';

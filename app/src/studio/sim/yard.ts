@@ -249,6 +249,8 @@ export class Yard {
   maxBlockedSec = 0;
   /** 저울에 잰 쌍, 남동에 쌓은 수, 북서로 옮긴 수, 북서에서 빠진(출하) 수, 이름표를 바꾼 수, 상차 차량에 실은 수 (시험·점검용) */
   readonly stats = { weighed: 0, stored: 0, transferred: 0, shipped: 0, swaps: 0, loadedOut: 0 };
+  /** 북서로 옮긴 남동 열의 나이(쌓기 시작한 순서): 오래된 줄부터 옮기는지 시험이 본다 (최근 40개) */
+  readonly transferAges: number[] = [];
   events: YardEvents = {};
   /** 마당 좌표계가 월드에서 돈 각도 (그리는 쪽·선택 상자가 더한다) */
   readonly frameRotY = YARD_FRAME.rotY;
@@ -367,7 +369,8 @@ export class Yard {
       bale.id = '';
       return;
     }
-    if (bale.state === 'stack' && !isSe(bale.slot)) {
+    // (지게차가 베일을 놓으러 오는 열에서는 빼지 않는다: 그 아래가 비면 놓을 베일이 공중에 뜬다)
+    if (bale.state === 'stack' && !isSe(bale.slot) && !this.columnReserved(false, colOf(bale.slot))) {
       const top = this.topOf(false, colOf(bale.slot));
       if (top && top !== bale && top.owner === 0) {
         // 깔린 베일: 맨 위 베일과 이름표를 바꿔 달고 맨 위를 뺀다
@@ -515,18 +518,16 @@ export class Yard {
   private pickColumn(se: boolean, n: number): number {
     const cols = se ? SE_COLS : NW_COLS;
     const age = se ? this.seAge : this.nwAge;
-    let best = -1;
-    let bestAge = -1;
+    // 가장 최근에 쌓기 시작한 열에만 이어 쌓는다 (반쯤 옮긴 오래된 줄에 새 베일을 얹지 않는다)
+    let newest = -1;
+    let newestAge = -1;
     for (let c = 0; c < cols; c += 1) {
-      const f = this.filled(se, c);
-      if (f === 0 || f + n > LEVELS) continue;
-      if (this.columnBusy(se, c)) continue;
-      if (age[c]! > bestAge) {
-        best = c;
-        bestAge = age[c]!;
+      if (this.filled(se, c) > 0 && age[c]! > newestAge) {
+        newest = c;
+        newestAge = age[c]!;
       }
     }
-    if (best >= 0) return best;
+    if (newest >= 0 && this.filled(se, newest) + n <= LEVELS && !this.columnBusy(se, newest)) return newest;
     for (let c = 0; c < cols; c += 1) if (this.filled(se, c) === 0 && !this.columnBusy(se, c)) return c;
     return -1;
   }
@@ -993,6 +994,9 @@ export class Yard {
 
   /** 남동의 오래된 열 맨 위 n개(한 쌍) → 북서 칸 */
   private startTransfer(f: ForkliftSim, src: number, dst: number, n: number): void {
+    // 다른 비어 있지 않은 열 중 가장 오래된 것보다 새 열을 옮기면 안 된다 (시험이 본다)
+    this.transferAges.push(this.seAge[src]! - Math.min(...this.seAge.filter((_, c) => this.count(true, c) > 0 && !this.columnReserved(true, c))));
+    if (this.transferAges.length > 40) this.transferAges.shift();
     const have = this.count(true, src);
     const lift: BaleSim[] = [];
     for (let l = have - n; l < have; l += 1) lift.push(this.slotBale[seSlot(src, l)]!);
