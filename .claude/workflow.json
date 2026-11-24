@@ -30,7 +30,25 @@
       "Do not edit docs/. Put needed doc/decision changes in the PR body under '문서 수정 필요'.",
       "Commit titles: <type>(<area>): <Korean summary>, e.g. fix(robot): 수동 투입을 배치 배합에 반영. Code identifiers in English, comments in Korean.",
       "No GitHub Actions CI: run the local verify commands and paste totals in the PR body. Browser checks (test:integration, app/scripts/*.mjs) need local Chromium; run them alone, not in parallel. If Windows reserves port 4099 use INTEGRATION_PORT=4399.",
-      "Do not decide open questions (docs/questions.md); proceed with the prototype assumptions in docs/dashboard-spec.md."
+      "Do not decide open questions (docs/questions.md); proceed with the prototype assumptions in docs/dashboard-spec.md.",
+      "Loop speed (workflow.json \"loop\"): in intermediate rounds run typecheck/test plus ONLY the browser checks whose paths match the files changed in that round (loop.browserChecks), with the short env (loop.intermediateEnv); run the full verify set and every matching browser check with full durations only in the final round before reporting. Do not skip browser checks; scope them."
+    ]
+  },
+  "loop": {
+    "limits": { "sameFailure": 3, "totalRounds": 4 },
+    "review": [
+      "Round 1 review must list EVERY problem it can find against all criteria at once (not one area per round).",
+      "S3 polish items (wording, a few px, colour shade) do not trigger a new round: record them and the implementer fixes them together with the next required fix or in the final round.",
+      "Later reviews check only the failed criteria plus a regression pass on the files changed since the last review, using the screenshots the implementer already produced."
+    ],
+    "designFirst": "For phases whose result is mostly layout/visual (3D scene, page layout): before the full implementation, the implementer produces one sketch (coordinates drawing or a single screenshot) and the reviewer (or the user, if the phase prompt says so) approves it; then build.",
+    "intermediateEnv": { "YARD_SOAK_MIN": "2" },
+    "browserChecks": [
+      { "paths": ["app/src/studio/**", "app/src/config/yard.ts"], "scripts": ["node app/scripts/yardSoak.mjs", "node app/scripts/topBar.mjs"], "finalOnly": ["npm run poster"] },
+      { "paths": ["app/src/components/layout/**", "app/src/features/home/**", "app/src/styles/**"], "scripts": ["node app/scripts/topBar.mjs", "node app/scripts/floatingBar.mjs"] },
+      { "paths": ["app/src/components/controls/**", "app/src/features/robot/**", "app/src/studio/overlay/**"], "scripts": ["node app/scripts/robotControls.mjs"] },
+      { "paths": ["app/src/components/records/**", "app/src/features/records/**", "app/src/features/alarms/**", "app/src/features/history/**"], "scripts": ["node app/scripts/recordSearch.mjs", "node app/scripts/recordPopups.mjs"] },
+      { "paths": ["app/src/features/tank/**", "app/src/features/home/**", "app/src/features/devices/**", "app/src/features/design/**"], "scripts": ["node app/scripts/uiPolish.mjs", "node app/scripts/layoutPages.mjs"] }
     ]
   },
   "parallel": { "maxPhases": 3 },
