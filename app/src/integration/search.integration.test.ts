@@ -44,7 +44,8 @@ describe('기록 검색 (실제 모의 서버)', () => {
       const found = await records<UnloadRecord>('/devices/sector-a/unloads/records', q);
       expect(found.items.some((r) => r.id === all.items[0]!.id), q).toBe(true);
       expect(found.items.every((r) => normalizeSearch(r.plate).includes(normalizeSearch(q)) || normalizeSearch(r.companyName).includes(normalizeSearch(q)))).toBe(true);
-      expect(found.total).toBe(found.items.length);
+      // 섹터가 두 곳이라 한 섹터의 30일 하역이 한 쪽(100줄)을 넘을 수 있다
+      expect(found.items.length).toBe(Math.min(found.total, 100));
     }
   });
 
@@ -114,9 +115,12 @@ describe('기록 검색 (실제 모의 서버)', () => {
   it('집기 기록은 섹터와 배치 ID로 찾는다', async () => {
     const picks = await records<PickRecord>('/robots/robot-1/picks/records');
     expect(picks.items.length).toBeGreaterThan(0);
-    const b2 = await records<PickRecord>('/robots/robot-1/picks/records', 'b2');
-    expect(b2.items.length).toBeGreaterThan(0);
-    expect(b2.items.every((r) => r.sectorId === 'sector-c')).toBe(true);
+    // 화면 이름("섹터 C", 공백 무시)과 코드로 찾는다. 짧은 이름 한 글자("C")는 부분 일치라 코드 "sector-a"의 c에도 걸린다
+    for (const [q, id] of [['섹터C', 'sector-c'], ['섹터 A', 'sector-a'], ['sector-c', 'sector-c']] as const) {
+      const found = await records<PickRecord>('/robots/robot-1/picks/records', q);
+      expect(found.items.length, q).toBeGreaterThan(0);
+      expect(found.items.every((r) => r.sectorId === id), q).toBe(true);
+    }
   });
 
   it('사건 기록은 사건 종류·수행자·배치 ID로 찾는다', async () => {
