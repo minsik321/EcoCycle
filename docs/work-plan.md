@@ -22,6 +22,8 @@
 | 단계 ID | 목표 | 영역 | 선행 | 기준 문서 | 상태 |
 | --- | --- | --- | --- | --- | --- |
 | S2a | 3D 월드 재작업 마무리 ("살아있는 3D 월드" 범위) | 3D 홈, 설정 | - | 명세 3절 "3D 홈과 대시보드 홈", `app/src/studio/CLAUDE.md`, decisions 2026-10-13 "홈 3D 재설계" | 진행 중 |
+| S2c | 섹터 2곳(`sector-a`·`sector-c`) 계약 변경: 명세(메인 AI) → `shared` → 모의 서버 → 2D 화면·설정·테스트·점검 스크립트. 3D는 컴파일만 맞춤 | 계약, 모의 서버, 데이터층, 설정(`config/yard.ts` 제외), 2D 화면, 점검 스크립트, 3D 홈(컴파일 맞춤만) | - | decisions 2026-11-24 "실제 부지 배치와 섹터 2곳", 명세 1·3·6절 | 진행 중 |
+| S2d | 3D 홈을 실제 부지 배치로 재구성(사무실·계근대·입구·도로·숲·압축기 건물·경사 레일·적치 구역 2곳·상차 차량 예시) | 3D 홈, `config/yard.ts` | S2c | 같은 결정, `app/src/studio/CLAUDE.md`, 명세 3절 "3D 홈과 대시보드 홈" | 대기 |
 | A1 | Capacitor 안드로이드 빌드 (`build:android`: app 빌드 → `cap sync android`) | 빌드·배포 | - | 명세 4절 "기술 구성", decisions "배포 방식", `docs/deployment.md` | 대기 |
 | S2b | 실제 태블릿 측정: 30fps 안정, 30분 이상 끊김·발열 없음 | 3D 홈 (실기기, 사용자 참여) | S2a | 명세 5절 2단계 완료 기준 | 대기 |
 | S3a | 실서버 계약 맞춤: 명세 → `shared` → mock-server | 계약, 모의 서버 | 서버 담당 답변 (`questions.md` B) | 명세 6절, `docs/questions.md` | 보류 |
