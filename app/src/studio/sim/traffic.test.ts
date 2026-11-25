@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { onSiteVehicles } from '../../config/processDisplay';
 import { demoData } from '../demo/demoData';
 import { PLATEAU_PX, RAMP_PX, SCALE, inside, sitePx, worldToPx } from '../world/layout';
+import type { Vehicle } from '@ecocycle/shared';
 import { Director } from './director';
 
 // 부지 전체의 차량 흐름을 오래 돌려 본다 (시연 원본: 입고 차량과 상차 차량 모두 서버 값 모양). 월드 시계 20Hz.
@@ -43,18 +44,20 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
     let maxStill = 0;
     const still = new Map<string, number>();
     while (t < 1800) {
+      // 출차(departed)한 차는 sync에서 바로 빠지므로, sync 전의 트럭으로 끝난 차를 찾는다
+      const before = new Set(d.trucks.filter((x) => x.active).map((x) => x.id));
       if (t >= next) {
         const data = demoData(T0, Math.floor(t));
         vehicles = data.vehicles;
         d.sync({ devices: data.devices, vehicles: data.vehicles, batches: data.batches, bales: data.bales }, T0 + t * 1000);
         next += 1;
-        // 5초마다 표의 "차량 N"(회사 안 차량)과 장면 트럭 대수를 견준다 (yardSoak도 같은 점검을 한다)
-        if (next % 5 === 0 && onSiteVehicles(vehicles).length !== d.truckCount()) countMismatch += 1;
       }
-      const before = new Set(d.trucks.filter((x) => x.active).map((x) => x.id));
+
       d.step(DT);
       t += DT;
       expect(d.truckOverlaps(), `t=${t.toFixed(1)} 트럭끼리 겹침`).toBe(0);
+      // 매 걸음 표의 "차량 N"(회사 안 차량)과 장면에 보이는(active) 트럭 대수가 같다 (yardSoak도 같은 점검을 한다)
+      if (onSiteVehicles(vehicles).length !== d.trucks.filter((x) => x.active).length) countMismatch += 1;
       const a = d.yard.audit(d.trucks);
       expect(a.forkOnTruck + a.forkOnFork + a.forkOnBale + a.baleOnBale, `t=${t.toFixed(1)} 지게차·베일 겹침`).toBe(0);
       for (const truck of d.trucks) {
@@ -98,10 +101,14 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
     expect(inbound.length).toBeGreaterThanOrEqual(15);
     expect(out.length).toBeGreaterThanOrEqual(3);
     // 계근 동선: 입차는 후진으로 올라 계근(atScale), 출차는 앞으로 올라 계근(atScale2) 뒤 후진으로 내려온다
-    for (const id of done) {
+    // 대부분의 차는 출차 계근까지 마치고 나갔다 (장면이 서버 단계보다 늦어 출차 계근 전에 출차 단계가 온 드문 차는 그 자리에서 빠진다)
+    const weighedOut = done.filter((id) => phases.get(id)!.includes('atScale2'));
+    expect(weighedOut.length).toBeGreaterThanOrEqual(Math.floor(done.length * 0.8));
+    for (const id of weighedOut) {
       const list = phases.get(id)!;
       expect(list.indexOf('reverseIn'), `${id} ${list.join('>')}`).toBe(list.indexOf('atScale') - 1);
-      expect(list.indexOf('reverseOut'), `${id} ${list.join('>')}`).toBe(list.indexOf('atScale2') + 1);
+      // (출차 계근 중에 출차 단계가 오면 계근대에서 바로 빠진다)
+      if (list.includes('reverseOut')) expect(list.indexOf('reverseOut'), `${id} ${list.join('>')}`).toBe(list.indexOf('atScale2') + 1);
       expect(list.indexOf('atScale2')).toBeGreaterThan(list.indexOf('atScale'));
     }
     // 입고 트럭 대부분은 하역 단계에 더미에 닿아 쏟았다 (늦게 닿은 차는 쏟지 않는다: 서버 단계를 앞질러 지어내지 않는다)
@@ -110,6 +117,39 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
     expect(out.every((id) => phases.get(id)!.includes('loading'))).toBe(true);
     expect(d.yard.stats.loadedOut).toBeGreaterThanOrEqual(4);
     expect(maxStill).toBeLessThan(40);
+  });
+
+  it('회사 안 차량이 9대를 넘어도(12대) 모두 그리고, 단계가 무엇이든(도착·인식·하역·상차·출차 계근) 빠짐없이 놓으며, 출차하면 바로 빠진다', () => {
+    const d = new Director();
+    const iso = (ms: number) => new Date(ms).toISOString();
+    const stages = ['arrived', 'identified', 'unloading', 'unloaded', 'weighing_out', 'loading'] as const;
+    const vehicles: Vehicle[] = Array.from({ length: 12 }, (_, i) => {
+      const stage = stages[i % stages.length]!;
+      const outbound = stage === 'loading';
+      return {
+        id: `v${i}`,
+        kind: outbound ? 'outbound' : 'inbound',
+        baleIds: [],
+        stage,
+        plate: stage === 'arrived' ? null : `1${i}가 0000`,
+        companyName: stage === 'arrived' ? null : '회사',
+        sectorId: stage === 'arrived' || outbound ? null : i % 2 ? 'sector-a' : 'sector-c',
+        stageTimes: { arrived: iso(T0 - 120_000), [stage]: iso(T0 - 60_000) },
+        updatedAt: iso(T0 - 60_000),
+      };
+    });
+    d.sync({ devices: {}, vehicles, batches: [], bales: [] }, T0);
+    expect(d.truckCount()).toBe(12);
+    expect(new Set(d.trucks.filter((x) => x.active).map((x) => x.id)).size).toBe(12);
+    for (let i = 0; i < 20 * 120; i += 1) {
+      d.step(DT);
+      expect(d.truckCount()).toBe(12);
+      expect(d.truckOverlaps(), `t=${(i * DT).toFixed(1)} 트럭끼리 겹침`).toBe(0);
+    }
+    d.sync({ devices: {}, vehicles: vehicles.map((v, i) => (i < 5 ? { ...v, stage: 'departed' as const } : v)), batches: [], bales: [] }, T0 + 120_000);
+    expect(d.truckCount()).toBe(7);
+    d.sync({ devices: {}, vehicles: [], batches: [], bales: [] }, T0 + 121_000);
+    expect(d.truckCount()).toBe(0);
   });
 
   it.each([2, 3])('서버 값이 월드 시계보다 %s배 빨리 흘러도(느린 화면) 겹치거나 멈춰 버리지 않는다', (speed) => {

@@ -27,7 +27,7 @@ const BUYERS: Array<{ name: string; plate: string }> = [
   { name: '예시판지', plate: '64사 5512' },
 ];
 
-const VEHICLE_EVERY = 70;
+const VEHICLE_EVERY = 80;
 /** 입고: 하역 뒤 바로 나가지 않고 출차 계근(weighing_out)을 거친다 */
 const VEHICLE_STEPS: Array<[Vehicle['stage'], number]> = [
   ['arrived', 0],
@@ -35,20 +35,20 @@ const VEHICLE_STEPS: Array<[Vehicle['stage'], number]> = [
   ['unloading', 32],
   ['unloaded', 42],
   ['weighing_out', 48],
-  ['departed', 62],
+  ['departed', 80],
 ];
 /** 상차 차량: 네 번째 차마다. 상차 자리에서 LOAD_EACH초마다 적치 베일 하나를 싣는다(최대 LOAD_MAX) */
 const OUTBOUND_EVERY = 4;
 const LOAD_START = 34;
-const LOAD_EACH = 9;
+const LOAD_EACH = 14;
 const LOAD_MAX = 4;
 const OUTBOUND_STEPS: Array<[Vehicle['stage'], number]> = [
   ['arrived', 0],
   ['identified', 6],
   ['loading', LOAD_START],
   ['loaded', LOAD_START + LOAD_EACH * LOAD_MAX],
-  ['weighing_out', LOAD_START + LOAD_EACH * LOAD_MAX + 6],
-  ['departed', LOAD_START + LOAD_EACH * LOAD_MAX + 18],
+  ['weighing_out', LOAD_START + LOAD_EACH * LOAD_MAX + 16],
+  ['departed', LOAD_START + LOAD_EACH * LOAD_MAX + 56],
 ];
 const isOutbound = (n: number): boolean => ((n % OUTBOUND_EVERY) + OUTBOUND_EVERY) % OUTBOUND_EVERY === OUTBOUND_EVERY - 1;
 const BATCH_EVERY = 52;

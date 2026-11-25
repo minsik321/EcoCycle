@@ -38,7 +38,7 @@ try {
   const page = await browser.newPage({ viewport: SOAK_VIEW, deviceScaleFactor: 1 });
   await page.goto(`http://localhost:${PORT}/scene-demo?tier=standard&yardprobe=1`);
   await page.waitForFunction(() => typeof window.__yardAudit === 'function', null, { timeout: 180_000 });
-  const r = { samples: 0, maxStacked: 0, maxActive: 0, maxWaiting: 0, countMismatch: 0, problems: [], last: null };
+  const r = { samples: 0, maxStacked: 0, maxActive: 0, maxWaiting: 0, countMismatch: 0, countSamples: 0, problems: [], last: null };
   // 월드 시계(초)가 목표에 이를 때까지 돈다
   const goal = MINUTES * 60;
   const deadline = Date.now() + goal * 1000 * 6;
@@ -56,7 +56,14 @@ try {
     const bad = a.baleOnBale + a.forkOnBale + a.forkOnFork + a.forkOnTruck + a.truckOnTruck + a.slotErrors.length;
     if (bad > 0) r.problems.push(`t=${a.t.toFixed(0)}s 겹침/정합 ${JSON.stringify(a)}`);
     if (a.active > a.slots) r.problems.push(`t=${a.t.toFixed(0)}s 베일 ${a.active}개가 칸 ${a.slots}을 넘음`);
-    if (a.trucksOnSite !== a.vehiclesOnSite) r.countMismatch += 1;
+    // 표의 "차량 N"과 장면에 보이는 트럭 대수: 장면이 표와 같은 서버 값을 받은 표본(countStable)에서는 한 번도 어긋나면 안 된다
+    if (a.countStable) {
+      r.countSamples += 1;
+      if (a.trucksOnSite !== a.vehiclesOnSite) {
+        r.countMismatch += 1;
+        r.problems.push(`t=${a.t.toFixed(0)}s 표의 차량 ${a.vehiclesOnSite}대 ≠ 장면 트럭 ${a.trucksOnSite}대`);
+      }
+    }
     if (a.t >= goal) break;
     if (Date.now() > deadline) {
       r.problems.push(`월드 시계가 너무 느리다: ${a.t.toFixed(0)}초 / ${goal}초`);
@@ -76,8 +83,7 @@ try {
   await page.waitForFunction(() => typeof window.__yardAudit === 'function', null, { timeout: 60_000 });
   r.last = await page.evaluate(() => window.__yardAudit());
   await page.close();
-  // 표의 "차량 N"과 장면 트럭 대수: 서버 값이 바뀐 바로 그 순간(1초 안)만 어긋날 수 있어 표본의 5% 이하만 허용한다
-  if (r.countMismatch > Math.max(1, r.samples * 0.05)) r.problems.push(`표의 차량 수와 장면 트럭 대수가 ${r.countMismatch}/${r.samples}번 어긋남`);
+  if (r.countSamples < r.samples * 0.9) r.problems.push(`차량 수를 견줄 수 있는 표본이 ${r.countSamples}/${r.samples}뿐이다`);
   exitCode = r.problems.length === 0 ? 0 : 1;
   console.log(`표본 ${r.samples}개, 트럭 대수 어긋남 ${r.countMismatch}번, 월드 시계 ${r.last.t.toFixed(0)}초, 최대 적치 ${r.maxStacked}, 최대 장면 베일 ${r.maxActive}, 최대 대기 ${r.maxWaiting}, 출하 ${r.last.shipped}, 입고 ${r.last.stored}, 칸 ${r.last.slotsUsed}/${r.last.slots}, 막힘 최대 ${r.last.maxBlockedSec.toFixed(1)}초`);
   if (r.problems.length > 0) console.error(r.problems.slice(0, 5).join('\n'));

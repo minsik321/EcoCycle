@@ -312,8 +312,6 @@ export const FOREST: readonly P2[] = pts([
 
 /** 사무실("태화리싸이클링" 자리): 짙은 회색 골판 2층, 사진 축에 맞춘 상자 (415~500, 100~210)px */
 export const OFFICE = { center: sitePx(457.5, 155), w: 85 * SITE_SCALE, d: 110 * SITE_SCALE, height: 4.6 } as const;
-/** 사무실 서쪽에 세워 둔 트레일러 (소품): 위성사진에서 잰 대형 화물차(운전석 앞 (392, 81) → 적재함 뒤 (378, 171)px, 91px) */
-export const TRAILER = { center: sitePx(385, 126), heading: siteHeading(14, -90), length: 91 * SITE_SCALE } as const;
 /** 사무실 남서 모서리 곁의 흰 창고 (사진 px 446~462, 212~226) */
 export const SHED = { center: sitePx(454, 219), w: 16 * SITE_SCALE, d: 14 * SITE_SCALE } as const;
 
@@ -643,6 +641,7 @@ const RAMP_IN_PX: P2[] = [
 /** 도로 차로를 사진 위(북쪽) 밖으로 더 늘인 점: 막 들어오는 차가 여러 대면 이 길 위에 차례로 줄 선다 */
 const LANE_OFF: P2 = [LANE_PX[0]![0] - ROAD_PX[0]![0], LANE_PX[0]![1] - ROAD_PX[0]![1]];
 const FAR_PX: P2[] = [
+  [840 + LANE_OFF[0], -1500 + LANE_OFF[1]],
   [650 + LANE_OFF[0], -330 + LANE_OFF[1]],
   [630 + LANE_OFF[0], -210 + LANE_OFF[1]],
 ];
@@ -650,8 +649,6 @@ const FAR_PX: P2[] = [
 export const TRUCK_IN: P2[] = pts([...FAR_PX, LANE_PX[0]!, LANE_PX[1]!, LANE_PX[2]!, LANE_PX[3]!]);
 /** 도로 대기 자리 → 경사로로 올라 → 계근대 서쪽 끝 앞(서쪽을 봄) */
 export const ROAD_TO_SCALE: P2[] = pts([LANE_PX[3]!, ...RAMP_IN_PX]);
-/** 도로 대기 자리 → 입구에 들어가지 않고 도로를 따라 남쪽 밖으로 (들어오기 전에 출차 단계가 온 드문 차) */
-export const ROAD_PASS_BY: P2[] = pts(LANE_PX.slice(3));
 /** 계근대 서쪽 끝 앞 → 후진으로 계근대 위 (입차 계근) */
 export const SCALE_REVERSE_IN: P2[] = pts([
   [372, 250],
@@ -664,8 +661,14 @@ export const SCALE_REVERSE_OUT: P2[] = pts([
   [410, 248],
   [380, 250],
 ]);
-/** 계근대 서쪽에 내려온 곳(동쪽을 봄) → 경사로로 내려가 → 도로(남쪽 밖) */
-export const SCALE_TO_OUT: P2[] = pts([[380, 250], [420, 268], [460, 300], [486, 308], [500, 310], [516, 318], LANE_PX[5]!, LANE_PX[6]!, LANE_PX[7]!, LANE_PX[8]!, LANE_PX[9]!, LANE_PX[10]!]);
+/** 계근대 서쪽에 내려온 곳(동쪽을 봄) → 경사로 위 출차 대기 자리(동쪽, 도로를 봄). 서버가 출차를 주면 여기서 회사 밖으로 빠진다 */
+export const SCALE_TO_EXIT: P2[] = pts([
+  [380, 250],
+  [420, 268],
+  [458, 300],
+  [478, 306],
+]);
+export const EXIT_HOLD = spot(478, 306, 1, 0);
 
 /** 계근대(서쪽을 봄) → 앞으로 내려가 → 더미 앞에서 후진할 자리 */
 const TO_TIP_PX: Record<TankId, readonly P2[]> = {
@@ -748,8 +751,6 @@ export const HOLD_TO_SCALE: P2[] = pts([
 export const SCALE_WEST_PX: P2 = [424, 247];
 /** 마당 안쪽 길(트럭이 다니는 곳)에서 계근대 쪽 끝을 벗어났다고 보는 거리: 계근대 가운데에서 이만큼 서쪽 */
 export const SCALE_CLEAR = 5.6;
-/** 나가는 차가 경사로를 내려가 도로에 올랐다고 보는 자리(사진 y px) */
-export const OUT_CLEAR_PX_Y = 352;
 
 /** 상차 차량에 베일을 놓는 자리: 적재함 위 (트럭 기준 앞뒤 거리, 단) */
 export const LOAD_SLOTS: ReadonlyArray<readonly [number, number]> = [

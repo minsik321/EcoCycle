@@ -29,7 +29,6 @@ import {
   SITE_CENTER,
   SITE_ROT_Y,
   SITE_SCALE,
-  TRAILER,
   WALL_PX,
   WATER_TANK,
   YARD,
@@ -52,8 +51,8 @@ export { inside } from './layout';
 //  - 사무실: 짙은 회색 골판 2층, 서쪽 1층 차양·큰 창, 동쪽 실외기, 남서 모서리 흰 창고, 소화기 (approach·weighbridge·from-gate-inside)
 //  - 압축기 건물: 회색 벽 + 파란 지붕의 긴 공장, 지붕 위 파란 물탱크 (entrance)
 //  - 북·남 높은 녹색 그물망, 남동 회색 철판 울타리 (from-upper-road), 도로변 전봇대·전선, 숲 쪽 높은 철 기둥
-//  - 베일: 같은 방향·같은 간격의 블록 줄 4~5단 (북서 재고, 남동 북동 날개, 북쪽 숲 경계 줄)
-//  - 부지 둘레 낮은 숲 언덕과 먼 산 능선. 주차 차량·이웃 건물은 넣지 않는다(사무실 곁 트레일러 하나만)
+//  - 베일: 같은 방향·같은 간격의 블록 줄 4~5단 (북서 재고, 남동 긴 변의 벽, 북쪽 숲 경계 줄)
+//  - 부지 둘레 낮은 숲 언덕과 먼 산 능선. 주차 차량·세워 둔 화물차·이웃 건물은 넣지 않는다(장면의 차량은 모두 서버 값)
 // 압축기 건물 본동의 벽은 방향별로 따로 만들어 카메라 쪽 벽을 숨기고(안이 들여다보이는 "인형의 집" 방식), 파란 지붕은 가까이 오면 걷는다.
 
 export interface Wall {
@@ -501,22 +500,6 @@ function office(k: Kit): void {
   });
 }
 
-/** 사무실 서쪽에 세워 둔 대형 화물차 (소품, 위성사진 실측 91px): 빨간 운전석 + 흰 적재함 */
-function trailer(k: Kit): void {
-  const len = TRAILER.length;
-  k.at([TRAILER.center[0], TOP, TRAILER.center[1]], TRAILER.heading, () => {
-    const box = len - 1.5;
-    k.box(C.white, [box, 2.0, 1.75], [-0.75, 0.62, 0], { r: 0.06 });
-    edgeX(k, -len / 2, len / 2 - 1.5, 2.64, 0.88, C.steel);
-    k.box(C.red, [1.35, 1.6, 1.7], [len / 2 - 0.68, 0.42, 0], { r: 0.16, mat: 'gloss' });
-    k.box(C.glass, [0.05, 0.6, 1.4], [len / 2 - 0.01, 1.3, 0], { r: 0.02, mat: 'glass' });
-    k.box(C.dark, [len - 0.4, 0.2, 0.9], [0, 0.32, 0], { r: 0.03 });
-    for (const x of [-len / 2 + 0.7, -len / 2 + 1.6, len / 2 - 2.3, len / 2 - 0.7]) {
-      for (const z of [-0.78, 0.78]) k.cyl(C.rubber, 0.42, 0.3, [x, 0.42, z], { axis: 'z', seg: 14 });
-    }
-  });
-}
-
 // ── 계근대·번호판 카메라 ──────────────────────────────────────────────
 
 function weighbridge(k: Kit): void {
@@ -923,7 +906,6 @@ export function buildWorld(): World {
   forest(k);
   hills(k);
   office(k);
-  trailer(k);
   weighbridge(k);
   pileKerbs(k);
   debris(k);

@@ -22,7 +22,7 @@ import { Pace } from './sim/pace';
 import { STUDIO_PROFILES, deviceClass, studioTier } from './quality';
 import type { RecordLink, StudioData } from './types';
 import { EMPTY_DATA } from './types';
-import { AREAS, DEFAULT_VIEW, HOLD, SCALE_STOP, SCALE_STOP_EAST, TIER_DISTANCE, TIP, TOP_VIEW, VIEWS, WIDE_VIEW, YARD, closeDistance, tierOf, worldToPx } from './world/layout';
+import { AREAS, DEFAULT_VIEW, EXIT_HOLD, HOLD, SCALE_STOP, SCALE_STOP_EAST, TIER_DISTANCE, TIP, TOP_VIEW, VIEWS, WIDE_VIEW, YARD, closeDistance, tierOf, worldToPx } from './world/layout';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { TopBar } from '../components/layout/TopBar';
@@ -142,29 +142,30 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     expect(truck.phase).toBe('atTip');
     expect(truck.bedTilt).toBeLessThan(0.02);
 
-    // 출차 계근: 앞으로 계근대에 올라 동쪽을 보고 다시 잰다 (번호판 인식 장면), 출차 단계가 올 때까지 계근대에 선다
+    // 출차 계근: 앞으로 계근대에 올라 동쪽을 보고 다시 잰다 (번호판 인식 장면 "출차 계근")
     d.sync(input({ vehicles: [vehicle('v1', 'weighing_out', 'sector-c', T0 + 80_000)] }), T0 + 80_000);
-    run(d, 30, note);
-    expect(truck.phase).toBe('atScale2');
-    expect(truck.x).toBeCloseTo(SCALE_STOP_EAST.x, 1);
-    expect(truck.z).toBeCloseTo(SCALE_STOP_EAST.z, 1);
-    expect(Math.cos(truck.heading - SCALE_STOP_EAST.heading)).toBeGreaterThan(0.99);
-    expect(d.plateScan.active && d.plateScan.out).toBe(true);
-    run(d, 10);
-    expect(truck.phase).toBe('atScale2');
-
-    // 출차: 후진으로 서쪽에 내려와 같은 경사로로 남쪽 도로에 나간다
-    d.sync(input({ vehicles: [vehicle('v1', 'departed', 'sector-c', T0 + 120_000)] }), T0 + 120_000);
-    let throughRamp = false;
+    let weighed: { x: number; z: number; heading: number } | null = null;
+    let scanOut = false;
     run(d, 40, () => {
       note();
-      if (!truck.active) return;
-      const [x, y] = worldToPx(truck.x, truck.z);
-      if (x > 484 && x < 512 && y > 283 && y < 331) throughRamp = true;
+      if (truck.phase === 'atScale2' && !weighed) weighed = { x: truck.x, z: truck.z, heading: truck.heading };
+      if (truck.phase === 'atScale2' && d.plateScan.active && d.plateScan.out) scanOut = true;
     });
-    expect(throughRamp).toBe(true);
-    expect(truck.active).toBe(false);
+    expect(weighed!.x).toBeCloseTo(SCALE_STOP_EAST.x, 1);
+    expect(weighed!.z).toBeCloseTo(SCALE_STOP_EAST.z, 1);
+    expect(Math.cos(weighed!.heading - SCALE_STOP_EAST.heading)).toBeGreaterThan(0.99);
+    expect(scanOut).toBe(true);
+    // 잰 뒤 후진으로 서쪽에 내려와 경사로 위 출차 대기 자리에서 도로 쪽(동쪽)을 보고 출차를 기다린다 (아직 회사 안)
+    expect(truck.phase).toBe('exitHold');
+    expect(truck.active).toBe(true);
+    expect(truck.x).toBeCloseTo(EXIT_HOLD.x, 1);
+    expect(truck.z).toBeCloseTo(EXIT_HOLD.z, 1);
     expect(phases.filter((p) => p === 'reverseIn' || p === 'reverseOut')).toEqual(['reverseIn', 'reverseOut']);
+
+    // 출차(departed): 회사 밖이다. 같은 입구(경사로)에 서 있던 차가 바로 장면에서 빠진다 (장면 트럭 대수 = 회사 안 차량 수)
+    d.sync(input({ vehicles: [vehicle('v1', 'departed', 'sector-c', T0 + 120_000)] }), T0 + 120_000);
+    expect(truck.active).toBe(false);
+    expect(d.truckCount()).toBe(0);
   });
 
   it('처음 본 차량이 이미 하역 중이면 들어오는 장면을 지어내지 않고 그 자리에 놓는다. 출차한 차량은 만들지 않는다', () => {
@@ -253,10 +254,13 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     expect(d.bales.filter((b) => b.active && b.state === 'loaded')).toHaveLength(3);
     expect(d.yard.audit().nwStacked).toBe(nw0 - 3);
     d.sync(input({ vehicles: [out('weighing_out', ids, T0 + 200_000)], bales: shipped(ids, T0 + 80_000) }), T0 + 200_000);
-    run(d, 40);
-    expect(truck.phase).toBe('atScale2');
+    const seen: string[] = [];
+    run(d, 60, () => {
+      if (seen[seen.length - 1] !== truck.phase) seen.push(truck.phase);
+    });
+    expect(seen).toContain('atScale2');
+    expect(truck.phase).toBe('exitHold');
     d.sync(input({ vehicles: [out('departed', ids, T0 + 260_000)], bales: shipped(ids, T0 + 80_000) }), T0 + 260_000);
-    run(d, 40);
     expect(truck.active).toBe(false);
     // 실린 베일은 차가 나가면 사라진다
     expect(d.bales.some((b) => b.active && b.state === 'loaded')).toBe(false);

@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Color, Matrix4, Quaternion, Vector3 } from 'three';
 import type { InstancedMesh, Mesh } from 'three';
 import { C, UNKNOWN_STRIPE, companyStripe } from '../theme';
@@ -36,15 +36,42 @@ interface TruckPair {
   wing: TruckModel;
 }
 
+/** 처음 마련하는 쏟아지는 파지 칸(트럭 수). 트럭이 더 많으면 그 트럭의 쏟는 연출만 생략한다 */
+const POUR_TRUCKS = 16;
+
+function makePair(i: number): TruckPair {
+  const pair = { dump: buildTruck(i, 'dump'), wing: buildTruck(i, 'wing') };
+  for (const m of [pair.dump, pair.wing]) {
+    m.root.scale.setScalar(TRUCK.scale);
+    m.root.rotation.order = 'YZX';
+    m.root.userData.truckIndex = i;
+    m.root.visible = false;
+  }
+  return pair;
+}
+
 export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
-  const pairs = useMemo<TruckPair[]>(() => director.trucks.map((_, i) => ({ dump: buildTruck(i, 'dump'), wing: buildTruck(i, 'wing') })), [director]);
-  const models = useMemo(() => pairs.flatMap((p) => [p.dump, p.wing]), [pairs]);
+  // 트럭 칸은 서버의 회사 안 차량 수만큼 늘어난다(Director.trucks): 모자라면 이 자리에서 모형을 더 만든다 (상한 없음)
+  const [count, setCount] = useState(director.trucks.length);
+  const pairsRef = useRef<TruckPair[]>([]);
+  const pairs = useMemo(() => {
+    const list = pairsRef.current;
+    while (list.length < count) list.push(makePair(list.length));
+    return list.slice(0, count);
+  }, [count]);
   useEffect(() => {
-    for (const m of models) {
-      m.root.scale.setScalar(TRUCK.scale);
-      m.root.rotation.order = 'YZX';
-    }
-  }, [models]);
+    const list = pairsRef.current;
+    return () => {
+      list.forEach((p) =>
+        [p.dump, p.wing].forEach((m) => {
+          disposeTree(m.root);
+          m.stripe.dispose();
+        }),
+      );
+      list.length = 0;
+    };
+  }, []);
+  const models = useMemo(() => pairs.flatMap((p) => [p.dump, p.wing]), [pairs]);
   useEffect(() => {
     if (!blobs) return;
     const added = models.map((m) => {
@@ -65,19 +92,15 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
       for (let i = 0; i < mesh.count; i += 1) mesh.setColorAt(i, tmp.color.set(tones[i % tones.length]!));
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
-    return () => {
-      models.forEach((m) => {
-        disposeTree(m.root);
-        m.stripe.dispose();
-      });
-      geometry.dispose();
-    };
-  }, [models, geometry, tmp]);
+    return () => geometry.dispose();
+  }, [geometry, tmp]);
 
   useFrame(() => {
+    if (director.trucks.length > count) setCount(director.trucks.length);
     const mesh = pour.current;
     director.trucks.forEach((sim, i) => {
-      const pair = pairs[i]!;
+      const pair = pairs[i];
+      if (!pair) return;
       const model = sim.outbound ? pair.wing : pair.dump;
       (sim.outbound ? pair.dump : pair.wing).root.visible = false;
       model.root.visible = sim.active;
@@ -102,7 +125,7 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
         for (const w of model.wheels) w.rotation.z = -sim.wheel;
         model.beacon.visible = sim.speed > 0.05 && Math.sin(director.t * 9) > 0;
       }
-      if (!mesh) return;
+      if (!mesh || i >= POUR_TRUCKS) return;
       // 쏟아지는 파지: 꼬리에서 뒤로 미끄러져 떨어진다
       const fx = Math.cos(sim.heading);
       const fz = -Math.sin(sim.heading);
@@ -134,13 +157,13 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
           object={model.root}
           onClick={(e: ThreeEvent<MouseEvent>) =>
             stop(e, () => {
-              const t = director.trucks[Math.floor(k / 2)];
+              const t = director.trucks[model.root.userData.truckIndex as number];
               if (t?.active) onSelect(`veh:${t.id}`);
             })
           }
         />
       ))}
-      <instancedMesh ref={pour} args={[geometry, MAT.clay, director.trucks.length * POUR_PER_TRUCK]} castShadow frustumCulled={false} />
+      <instancedMesh ref={pour} args={[geometry, MAT.clay, POUR_TRUCKS * POUR_PER_TRUCK]} castShadow frustumCulled={false} />
     </>
   );
 }

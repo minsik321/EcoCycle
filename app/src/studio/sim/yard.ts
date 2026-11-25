@@ -169,6 +169,10 @@ const CLEAR = 0.02;
 const TURN_R = 1.45 * FS;
 /** 상차 차량 곁에서 지게차 가운데가 차 가운데 선에서 떨어진 거리 */
 const LOAD_SIDE = TRUCK.width / 2 + BODY_FRONT + 0.08;
+/** 상차 차량 적재함에 쌓는 단 수 (LOAD_SLOTS의 가장 높은 단 + 1) */
+/** 마당 차례 없이 쌓아도 되는 북서 열 (이 열부터 동쪽) */
+const NW_FREE_FROM = 2;
+const LOAD_LEVELS = Math.max(...LOAD_SLOTS.map((s) => s[1])) + 1;
 
 const isSe = (s: number): boolean => s < SE_SLOTS;
 const colOf = (s: number): number => (isSe(s) ? s % SE_COLS : (s - SE_SLOTS) % NW_COLS);
@@ -1019,6 +1023,9 @@ export class Yard {
     this.seGo(f, legs, cur, YARD.laneEnd, YARD.laneZ, 0, LOW_FORK + 0.1);
     legs.push({ kind: 'lane', take: false });
     this.crossToNw(legs, cur);
+    // 북서 길의 동쪽 칸들은 트럭 길에서 떨어져 있다: 그 칸으로 갈 때는 마당 차례를 놓아 트럭(출차 계근 등)이 그동안 움직이게 하고,
+    // 돌아갈 때 다시 잡는다. 서쪽 끝 칸(쏟는 자리 A로 가는 트럭 곁)은 차례를 쥔 채 쌓는다
+    if (dst >= NW_FREE_FROM) legs.push({ kind: 'token', take: false });
     const toY = dstLevel * BALE.h + 0.03;
     // 북서 길에서 칸 쪽으로 돌기 전에 이웃 열보다 높이 들어 둔다 (돌 때 든 베일이 옆 줄 위를 지난다)
     this.nwGo(legs, cur, YARD.nwXs[dst]!, NW_POCKET_Z, LEVELS * BALE.h + 0.05, toY);
@@ -1044,6 +1051,7 @@ export class Yard {
    */
   private startLoad(f: ForkliftSim, slot: number): void {
     const lo = this.loader;
+    const loaderId = lo.id;
     const h = lo.heading;
     // 지게차는 차의 서쪽 곁(마당 쪽)에서 싣는다
     const side = h - Math.PI / 2;
@@ -1088,24 +1096,33 @@ export class Yard {
           const approach: P2 = [bx + sxw * (LOAD_SIDE + 1.6), bz + szw * (LOAD_SIDE + 1.6)];
           const forkY = LOAD_BED_Y + level * BALE.h + 0.03;
           this.nwLaneTo(more, at, YARD.nwLaneEnd);
+          // 적재함에 이미 실린 베일 위로 지나가도록 차 곁에 가기 전에 높이 든다 (놓을 자리 바로 위에서 내린다)
+          more.push({ kind: 'fork', height: LOAD_BED_Y + LOAD_LEVELS * BALE.h + 0.12 });
           let from: P2 = [at.x, at.z];
           for (const p of [YARD.crossing[2]!, approach]) {
             more.push({ kind: 'turn', heading: headingTo(from[0], from[1], p[0], p[1]) }, { kind: 'drive', to: p, reverse: false });
             from = p;
           }
           more.push(
-            { kind: 'fork', height: forkY + 0.12 },
             { kind: 'turn', heading: face },
             { kind: 'drive', to: spot, reverse: false },
             { kind: 'fork', height: forkY },
             {
               kind: 'call',
               fn: () => {
+                f.carrying = null;
+                // 싣는 사이 그 차가 떠났다(서버 출차): 실을 차가 없으니 이 베일은 그 차에 실려 나간 것으로 보고 뺀다 (북서에서 이미 빠졌다)
+                if (!this.loader.present || this.loader.id !== loaderId) {
+                  b.active = false;
+                  b.state = 'gone';
+                  b.owner = 0;
+                  b.id = '';
+                  return;
+                }
                 b.state = 'loaded';
                 b.owner = 0;
                 b.load = slot;
                 this.stats.loadedOut += 1;
-                f.carrying = null;
               },
             },
             { kind: 'clamp', closed: false },
@@ -1195,6 +1212,7 @@ export class Yard {
     legs.push({ kind: 'drive', to: [cur.x, YARD.nwLaneZ], reverse: true }, { kind: 'fork', height: LOW_FORK });
     cur.z = YARD.nwLaneZ;
     this.nwLaneTo(legs, cur, YARD.nwLaneEnd);
+    legs.push({ kind: 'token', take: true });
     this.backToCrossing(legs, cur);
     this.homeFromCrossing(f, legs, cur);
   }

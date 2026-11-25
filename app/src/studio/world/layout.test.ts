@@ -28,13 +28,13 @@ import {
   SCALE_STOP,
   SCALE_STOP_EAST,
   SCALE_TO_HOLD,
-  SCALE_TO_OUT,
+  SCALE_TO_EXIT,
+  EXIT_HOLD,
   SCALE_TO_QUEUE,
   SITE_ANCHORS,
   SITE_SCALE,
   SHED,
   TIP,
-  TRAILER,
   TRUCK,
   TRUCK_IN,
   YARD,
@@ -109,7 +109,6 @@ const box = (cx: number, cz: number, w: number, d: number, rot: number): P2[] =>
 };
 const HOUSE = [BALER_HOUSE.main, BALER_HOUSE.annex].map((h) => [railPx(h.u0, h.w0), railPx(h.u0, h.w1), railPx(h.u1, h.w1), railPx(h.u1, h.w0)]);
 const OFFICE_POLY = box(OFFICE.center[0], OFFICE.center[1], OFFICE.w, OFFICE.d, siteHeading(1, 0));
-const TRAILER_POLY = box(TRAILER.center[0], TRAILER.center[1], TRAILER.length, 1.8, TRAILER.heading);
 const SHED_POLY = box(SHED.center[0], SHED.center[1], SHED.w, SHED.d, siteHeading(1, 0));
 const FIXED: Record<string, readonly P2[]> = {
   '섹터 A 더미': PILES['sector-a'],
@@ -119,7 +118,6 @@ const FIXED: Record<string, readonly P2[]> = {
   '압축기 본동': HOUSE[0]!,
   '압축기 옆동': HOUSE[1]!,
   사무실: OFFICE_POLY,
-  트레일러: TRAILER_POLY,
   '흰 창고': SHED_POLY,
 };
 
@@ -260,7 +258,7 @@ describe('섹터 더미·레일은 로봇 관절 값에서 나온 자리에 맞�
 });
 
 describe('트럭 자리·경로 (1.4배 트럭의 외곽선 기준)', () => {
-  const SPOTS: Record<string, Pose> = { '쏟는 자리 A': TIP['sector-a'], '쏟는 자리 C': TIP['sector-c'], '대기 자리': QUEUE, '상차 자리': HOLD, 계근대: SCALE_STOP };
+  const SPOTS: Record<string, Pose> = { '쏟는 자리 A': TIP['sector-a'], '쏟는 자리 C': TIP['sector-c'], '대기 자리': QUEUE, '상차 자리': HOLD, 계근대: SCALE_STOP, '출차 대기': EXIT_HOLD };
 
   it('서 있는 자리(쏟는 자리 둘·대기·상차·계근대)는 서로, 그리고 더미·적치 구역·건물·사무실·트레일러와 겹치지 않는다', () => {
     const names = Object.keys(SPOTS);
@@ -291,7 +289,7 @@ describe('트럭 자리·경로 (1.4배 트럭의 외곽선 기준)', () => {
     ['더미 A → 계근대(출차 계근)', truckTipToScale('sector-a'), false, ['쏟는 자리 A', '계근대']],
     ['더미 C → 계근대(출차 계근)', truckTipToScale('sector-c'), false, ['쏟는 자리 C', '계근대']],
     ['후진으로 계근대에서 내려옴', SCALE_REVERSE_OUT, true, ['계근대']],
-    ['경사로로 출차', SCALE_TO_OUT, false, ['계근대']],
+    ['계근대 → 경사로 위 출차 대기', SCALE_TO_EXIT, false, ['계근대', '출차 대기']],
     ['계근대 → 상차 자리', SCALE_TO_HOLD, false, ['계근대', '상차 자리']],
     ['상차 자리에서 후진', HOLD_REVERSE, true, ['상차 자리']],
     ['상차 뒤 계근대로', HOLD_TO_SCALE, false, ['상차 자리', '계근대']],
@@ -304,10 +302,11 @@ describe('트럭 자리·경로 (1.4배 트럭의 외곽선 기준)', () => {
   });
 
   it('쏟는 자리·상차 자리에 선 차는 다른 길을 막지 않는다 (마당 차례로 나누지 않는 길: 도로 → 계근대, 계근대 오르내림, 출차)', () => {
-    const free = PATHS.filter(([name]) => ['도로 → 경사로 → 계근대 서쪽', '후진으로 계근대에 오름', '후진으로 계근대에서 내려옴', '경사로로 출차'].includes(name));
+    const free = PATHS.filter(([name]) => ['도로 → 경사로 → 계근대 서쪽', '후진으로 계근대에 오름', '후진으로 계근대에서 내려옴', '계근대 → 경사로 위 출차 대기'].includes(name));
     for (const [name, points, reverse, skip] of free) {
       for (const p of sweep(points, reverse)) {
-        for (const [spot, pose] of parkedExcept([...skip, '대기 자리'])) expect(rectsHit(p, pose), `${name} × ${spot}`).toBe(false);
+        // (출차 대기 자리의 차는 계근대 차례를 쥐고 있어 들어오는 차와 함께 있지 않다)
+        for (const [spot, pose] of parkedExcept([...skip, '대기 자리', '출차 대기'])) expect(rectsHit(p, pose), `${name} × ${spot}`).toBe(false);
       }
     }
   });
@@ -325,7 +324,7 @@ describe('트럭 자리·경로 (1.4배 트럭의 외곽선 기준)', () => {
   it('차가 드나드는 곳은 입구 경사로 하나다: 도로와 마당 사이를 넘는 곳은 모두 경사로 안이다', () => {
     const ramp = RAMP_PX.map(([x, y]) => sitePx(x, y));
     const ins = (p: P2) => inside(worldToPx(p[0], p[1]), PLATEAU_PX);
-    for (const points of [TRUCK_IN, ROAD_TO_SCALE, SCALE_TO_OUT]) {
+    for (const points of [TRUCK_IN, ROAD_TO_SCALE, SCALE_TO_EXIT]) {
       const poses = sweep(points);
       for (let i = 1; i < poses.length; i += 1) {
         const a: P2 = [poses[i - 1]!.x, poses[i - 1]!.z];
