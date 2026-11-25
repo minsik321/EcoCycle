@@ -21,6 +21,8 @@ import { buildWorld, edgeDistance, inside } from './buildWorld';
 const HIT = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 /** 압축기 건물의 파란 지붕을 걷는 카메라 거리 (부지 전체에서는 사진처럼 덮여 보이고, 구역 거리부터는 안이 보인다) */
 const ROOF_HIDE_DIST = 75;
+/** 카메라가 이보다 낮으면 땅에서 보는 화면으로 본다(m). 구역(mid)·대상(close) 보기는 이보다 높다 */
+const GROUND_VIEW_Y = 10;
 
 /** 마당 바닥 얼룩: 계근대 앞·트럭 길·쏟는 자리·배출구 앞 (월드 x, z, 반지름, 진하기) */
 const STAINS: ReadonlyArray<readonly [number, number, number, number]> = [
@@ -63,8 +65,10 @@ export function World({ baked = false }: { baked?: boolean }) {
     const dx = camera.position.x - cx;
     const dz = camera.position.z - cz;
     const len = Math.hypot(dx, dz) || 1;
-    for (const wall of world.walls) wall.group.visible = (wall.nx * dx + wall.nz * dz) / len < 0.18;
-    world.roof.visible = Math.hypot(dx, camera.position.y, dz) > ROOF_HIDE_DIST;
+    // 사람 눈높이(사진 방향 화면 등)에서는 건물을 밖에서 본 그대로 둔다: 벽·지붕(물탱크)을 걷지 않는다
+    const ground = camera.position.y < GROUND_VIEW_Y;
+    for (const wall of world.walls) wall.group.visible = ground || (wall.nx * dx + wall.nz * dz) / len < 0.18;
+    world.roof.visible = ground || Math.hypot(dx, camera.position.y, dz) > ROOF_HIDE_DIST;
   });
   return (
     <>

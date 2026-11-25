@@ -103,8 +103,12 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
       const pair = pairs[i];
       if (!pair) return;
       const model = sim.outbound ? pair.wing : pair.dump;
-      (sim.outbound ? pair.dump : pair.wing).root.visible = false;
+      // 보이지 않는 모형은 장면 그래프의 행렬 갱신도 건너뛴다 (트럭 칸마다 모형이 둘이라 숨은 쪽이 매 장 부담이 된다)
+      const other = (sim.outbound ? pair.dump : pair.wing).root;
+      other.visible = false;
+      other.matrixWorldAutoUpdate = false;
       model.root.visible = sim.active;
+      model.root.matrixWorldAutoUpdate = sim.active;
       if (sim.active) {
         // 경사로·비탈 도로: 앞뒤 바퀴 자리의 바닥 높이로 차체를 기울인다
         const fx = Math.cos(sim.heading) * 1.45;

@@ -32,8 +32,19 @@ import type { CycleStep } from './text';
 // 모양은 참고 화면(docs/reference/)을 따른다: 얇은 상단 바 하나, 작고 가는 글씨, 카드마다 강조 숫자 하나,
 // 상세 패널은 4~5줄 + "자세히", 왼쪽 아래 둥근 단계 아이콘 줄, 오른쪽 아래 탭 표.
 
-const time = (iso: string | null | undefined) => (iso ? formatLocalTime(iso).slice(-8) : '–');
-const hhmm = (iso: string | null | undefined) => (iso ? formatLocalTime(iso).slice(-8, -3) : '–');
+/** 현지 시각 글자는 같은 시각이면 다시 만들지 않는다 (Intl 포맷터를 매번 새로 만들어 느린 화면에서 패널 갱신이 길어졌다) */
+const LOCAL_TIME = new Map<string, string>();
+const localTime = (iso: string): string => {
+  let s = LOCAL_TIME.get(iso);
+  if (s === undefined) {
+    if (LOCAL_TIME.size > 400) LOCAL_TIME.clear();
+    s = formatLocalTime(iso);
+    LOCAL_TIME.set(iso, s);
+  }
+  return s;
+};
+const time = (iso: string | null | undefined) => (iso ? localTime(iso).slice(-8) : '–');
+const hhmm = (iso: string | null | undefined) => (iso ? localTime(iso).slice(-8, -3) : '–');
 
 export interface PanelCommon {
   data: StudioData;
@@ -156,7 +167,7 @@ export function DisconnectBanner({ lastReceivedAt }: { lastReceivedAt: string | 
       <div>
         <strong>연결 끊김</strong>
         <span>
-          모든 움직임을 멈췄습니다 · 마지막 수신 <time dateTime={lastReceivedAt ?? undefined}>{lastReceivedAt ? formatLocalTime(lastReceivedAt) : '없음'}</time>
+          모든 움직임을 멈췄습니다 · 마지막 수신 <time dateTime={lastReceivedAt ?? undefined}>{lastReceivedAt ? localTime(lastReceivedAt) : '없음'}</time>
         </span>
       </div>
     </div>

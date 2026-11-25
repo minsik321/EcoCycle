@@ -54,14 +54,14 @@ export const VIEWS: readonly ViewPreset[] = [WIDE_VIEW, TOP_VIEW, ...AREAS];
  */
 export const PHOTO_VIEWS: Record<string, ViewPreset> = {
   // 사람 눈높이(천정각 90도: 수평으로 봄, 눈높이 = height)에서 넓은 화각으로. azimuth는 보는 곳에서 카메라 쪽 방위(0 남, 90 동, 180 북)
-  // 입구 남동 도로(535,345 근처)에서 서쪽: 오른쪽 계근대 단 옹벽, 경사로, 남동 베일, 그 뒤 파란 지붕 공장·물탱크, 더미, 먼 능선
-  entrance: { key: 'photo-entrance', label: '입구에서', hint: 'entrance.png', tier: 'mid', at: [286, 323], height: 0.3, distance: 18, azimuth: 85, polar: 90, fov: 66 },
+  // 입구 남동 도로(535,345 근처) 조금 높은 눈(약 6m)에서 서쪽 압축기 건물 쪽으로: 오른쪽 계근대 단 옹벽, 경사로, 남동 베일, 그 뒤 파란 지붕 공장·물탱크, 더미, 먼 능선
+  entrance: { key: 'photo-entrance', label: '입구에서', hint: 'entrance.png', tier: 'mid', at: [170, 440], height: 2.5, distance: 27, azimuth: 104, polar: 82, fov: 50 },
   // 경사로 위(480,330 근처)에서 서쪽 (트럭이 지나는 자리라 차가 함께 찍힐 수 있다): 왼쪽 남동 베일 벽, 가운데 줄눈 마당과 멀리 북서 베일·숲 (사무실은 사진보다 오른쪽이라 화면 밖: 사무실은 weighbridge·approach·entrance에서 본다)
   gate: { key: 'photo-gate', label: '입구 안에서 서쪽', hint: 'from-gate-inside.png', tier: 'mid', at: [231, 352], height: 1.6, distance: 18, azimuth: 95, polar: 90, fov: 66 },
   // 계근대 단 남동 모서리 아래 도로(580,370 근처)에서 북서: 옹벽·난간, 노란 테두리 계근대, 사무실 남쪽 면, 왼쪽 베일
   weighbridge: { key: 'photo-weighbridge', label: '계근대 쪽', hint: 'weighbridge.png', tier: 'mid', at: [440, 232], height: 0.6, distance: 14, azimuth: 45, polar: 90, fov: 50 },
   // 사무실 북동쪽 도로(570,40 근처)에서 남쪽: 낮은 도로, 오른쪽 옹벽 위 2층 사무실 동쪽 면과 실외기, 전봇대·전선
-  approach: { key: 'photo-approach', label: '북동 도로에서', hint: 'approach.png', tier: 'mid', at: [552, 300], height: -0.2, distance: 19, azimuth: 176, polar: 90, fov: 58 },
+  approach: { key: 'photo-approach', label: '북동 도로에서', hint: 'approach.png', tier: 'mid', at: [552, 300], height: 0.6, distance: 19, azimuth: 176, polar: 88, fov: 58 },
   // 남동 바깥 도로(475,470 근처)에서 북서: 회색 철판 울타리 + 높은 녹색 그물망, 그 뒤 베일 벽, 오른쪽 멀리 사무실
   upperRoad: { key: 'photo-upper-road', label: '남동 도로에서', hint: 'from-upper-road.png', tier: 'mid', at: [334, 329], height: 2.0, distance: 16, azimuth: 45, polar: 90, fov: 64 },
 };

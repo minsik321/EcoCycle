@@ -250,7 +250,10 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
     const p = c.pol * DEG;
     // 세로 화면에서는 위아래가 남으므로 구역(mid)은 다 물러나지 않는다(최대 1.3배). 부지 전체(wide)는 좁은 폰에서도 부지가 다 들어오게 끝까지 물러난다
     const wideness = Math.min(1, Math.max(0, (c.dist - TIER_DISTANCE.mid) / (TIER_DISTANCE.wide - TIER_DISTANCE.mid)));
-    const fit = Math.min(1.3 + wideness * 1.7, Math.max(1, REFERENCE_ASPECT / Math.max(0.3, (size.width - insetRef.current.right) / Math.max(1, size.height))));
+    const ratio = REFERENCE_ASPECT / Math.max(0.3, (size.width - insetRef.current.right) / Math.max(1, size.height));
+    // (부지는 비스듬히 보면 기준 화면이 가정한 것보다 옆으로 넓다: 좁은 화면의 wide는 조금 더 물러나 서쪽 끝(압축기 건물)까지 담는다)
+    const narrow = Math.min(1, Math.max(0, (ratio - 1) / 1.5));
+    const fit = Math.min(1.3 + wideness * 2.3, Math.max(1, ratio) * (1 + 0.24 * wideness * narrow));
     const dist = c.dist * fit;
     // 패널에 가려지지 않게 보는 점을 화면에서 왼쪽·위로 민다
     const upp = (2 * dist * Math.tan((camera.fov * DEG) / 2)) / Math.max(1, size.height);

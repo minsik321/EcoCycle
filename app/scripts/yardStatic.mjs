@@ -103,7 +103,10 @@ async function shots(page, prefix, width, height) {
   for (const key of [...PHOTO, ...(width >= 1200 ? PHOTO_WIDE_ONLY : [])]) {
     if (!want(`photo-${key}`)) continue;
     await view(page, key);
+    // 사진 방향 화면은 건물·지형을 사진과 견주는 화면이라 핀(상태 알약)을 잠깐 가린다
+    await page.evaluate(() => document.querySelectorAll('.st-pins').forEach((el) => (el.style.opacity = '0')));
     await page.screenshot({ path: path.join(out, `${prefix}-photo-${key}-${size}.png`) });
+    await page.evaluate(() => document.querySelectorAll('.st-pins').forEach((el) => (el.style.opacity = '')));
     console.log(`✓ ${prefix} photo ${key} ${size}`);
   }
 }

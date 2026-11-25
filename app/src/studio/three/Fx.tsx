@@ -270,6 +270,10 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
   const gl = useThree((s) => s.gl);
   // 패널 밑으로 들어간 핀은 반쯤 가려진 채 보이지 않게 숨긴다 (지역 전환 판·지표 카드·상세·표와 핀이 겹쳐 보이지 않게)
   const covers = useRef<{ at: number; rects: Array<[number, number, number, number]> }>({ at: -Infinity, rects: [] });
+  // 핀 크기(px)는 패널 자리와 함께 가끔만 잰다 (매 장 읽으면 배치를 다시 계산하게 된다)
+  const sizes = useRef(new Map<string, [number, number]>());
+  const placed = useMemo(() => [] as Array<{ key: string; el: HTMLElement; x: number; y: number; z: number; rank: number }>, []);
+  const boxes = useMemo(() => [] as Array<[number, number, number, number]>, []);
   const v = useMemo(() => new Vector3(), []);
   const anchor = useMemo(() => ({ x: 0, y: 0, z: 0 }), []);
   const zoom = useRef('');
@@ -289,6 +293,10 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
             .filter((r) => r.width > 0 && r.height > 0)
             .map((r) => [r.left - base.left, r.top - base.top, r.right - base.left, r.bottom - base.top] as [number, number, number, number])
         : [];
+      for (const key in pins.current) {
+        const el = pins.current[key];
+        if (el && el.offsetWidth > 0) sizes.current.set(key, [el.offsetWidth, el.offsetHeight]);
+      }
     }
     if (level !== zoom.current) {
       const first = Object.values(pins.current).find((el) => el);
@@ -316,11 +324,27 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
         el.style.visibility = 'hidden';
         continue;
       }
-      el.style.visibility = 'visible';
-      if (key === 'plate:scan') writePlate(el, director);
-      el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -100%)`;
-      el.style.zIndex = String(Math.round((1 - v.z) * 100000));
+      // 고른 핀 → 번호판 인식 → 가까운 핀 순으로 자리를 준다
+      const rank = el.getAttribute('aria-pressed') === 'true' ? 0 : key === 'plate:scan' ? 1 : 2;
+      placed.push({ key, el, x, y, z: v.z, rank });
     }
+    // 핀끼리 겹치면 뒤 차례의 핀을 숨긴다 (겹친 알약이 서로 가려 읽히지 않게)
+    placed.sort((a, b) => a.rank - b.rank || a.z - b.z);
+    boxes.length = 0;
+    for (const p of placed) {
+      const [w, h] = sizes.current.get(p.key) ?? [PIN_HALF_W * 2, PIN_H];
+      const box: [number, number, number, number] = [p.x - w / 2, p.y - h, p.x + w / 2, p.y];
+      if (p.rank > 0 && boxes.some(([l, tp, r, b]) => box[0] < r - 2 && box[2] > l + 2 && box[1] < b - 2 && box[3] > tp + 2)) {
+        p.el.style.visibility = 'hidden';
+        continue;
+      }
+      boxes.push(box);
+      p.el.style.visibility = 'visible';
+      if (p.key === 'plate:scan') writePlate(p.el, director);
+      p.el.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0) translate(-50%, -100%)`;
+      p.el.style.zIndex = String(Math.round((1 - p.z) * 100000));
+    }
+    placed.length = 0;
   });
   return null;
 }

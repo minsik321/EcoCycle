@@ -239,6 +239,33 @@ export function demoData(startMs: number, tSec: number): StudioData {
 }
 
 /** 1초에 한 번 예시 상태를 새로 만든다. 끊김을 흉내 내는 동안에는 값이 멈춘다 */
+/** 측정용 고정 데이터를 넣어 두는 세션 저장소 키 (주소에 ?snapshot이 있을 때만 읽는다) */
+export const DEMO_SNAPSHOT_KEY = 'ecocycle.demoSnapshot';
+
+/**
+ * 측정용(`/scene-demo?snapshot`): 측정 스크립트가 세션 저장소에 넣은 고정 데이터(같은 차량·베일·배치)를 쓴다.
+ * 서로 다른 코드(예: 기준 브랜치와 지금)를 같은 부하로 견줄 때만 쓴다. 화면 값은 여전히 "예시 데이터"다
+ */
+function snapshotFromSession(): StudioData | null {
+  if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('snapshot')) return null;
+  const raw = sessionStorage.getItem(DEMO_SNAPSHOT_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as StudioData;
+  } catch {
+    return null;
+  }
+}
+
+const resend = (s: StudioData): StudioData => ({
+  ...s,
+  devices: { ...s.devices },
+  vehicles: s.vehicles.map((v) => ({ ...v })),
+  batches: s.batches.map((b) => ({ ...b })),
+  bales: s.bales.map((b) => ({ ...b })),
+  alarms: [...s.alarms],
+});
+
 export function useDemoData(disconnected: boolean): { data: StudioData; startMs: number; lastReceivedAt: string } {
   const startMs = useRef(Date.now()).current;
   const [tick, setTick] = useState(0);
@@ -251,6 +278,8 @@ export function useDemoData(disconnected: boolean): { data: StudioData; startMs:
     }, 1000);
     return () => clearInterval(timer);
   }, [disconnected, startMs]);
-  const data = useMemo(() => demoData(startMs, tick), [startMs, tick]);
+  const snapshot = useRef(snapshotFromSession()).current;
+  // (고정 데이터도 매초 새로 받은 것처럼 새 배열로 준다: 서버가 다시 보낸 값과 같은 일을 시킨다)
+  const data = useMemo(() => (snapshot ? resend(snapshot) : demoData(startMs, tick)), [snapshot, startMs, tick]);
   return { data, startMs, lastReceivedAt };
 }

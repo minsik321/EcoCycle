@@ -417,14 +417,15 @@ function hills(k: Kit): void {
       forestTree(k, tx, top, tz, 1.4 + rnd() * 0.8, i + j);
     }
   }
-  // 먼 산 능선: 낮고 길게 겹친 둔덕 두 줄 (뒤쪽은 옅게)
+  // 먼 산 능선: 낮고 길게 겹친 둔덕 두 줄 (뒤쪽은 옅게). 꼭대기가 땅보다 peak m 위라 사람 눈높이에서도 숲 위로 보인다
   for (let i = 0; i < 18; i += 1) {
     const a = (i / 18) * Math.PI * 2;
-    for (const [r, tone, h] of [
-      [120, C.ridge, 16],
-      [170, C.ridgeFar, 24],
+    for (const [r, tone, peak] of [
+      [120, C.ridge, 9],
+      [170, C.ridgeFar, 16],
     ] as const) {
-      k.ball(tone, 34, [cx + Math.cos(a) * r, LOW - 34 + h * (0.6 + rnd() * 0.4), cz - Math.sin(a) * r], { scale: [1.6, 0.55, 1], seg: LITE ? 8 : 12, rot: [0, -a, 0] });
+      const top = LOW + peak * (0.7 + rnd() * 0.5);
+      k.ball(tone, 34, [cx + Math.cos(a) * r, top - 34 * 0.55, cz - Math.sin(a) * r], { scale: [1.6, 0.55, 1], seg: LITE ? 8 : 12, rot: [0, -a, 0] });
     }
   }
 }
