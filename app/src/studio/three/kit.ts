@@ -220,5 +220,7 @@ export function disposeTree(root: Object3D): void {
 
 /** 인스턴스로 많이 그릴 조각용 지오메트리 (흰 꼭짓점 색 → 인스턴스 색이 그대로 보인다) */
 export function chunkGeometry(w: number, h: number, d: number, r: number, seg = 1): BufferGeometry {
+  // 둥글림이 없으면 보통 상자 (면 12개)
+  if (seg === 0 || r <= 0) return paint(new BoxGeometry(w, h, d), '#ffffff');
   return paint(new RoundedBoxGeometry(w, h, d, seg, r), '#ffffff');
 }

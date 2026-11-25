@@ -39,7 +39,8 @@ const STAINS: ReadonlyArray<readonly [number, number, number, number]> = [
 
 /** 고정물. 카메라 쪽을 향한 압축기 건물 벽은 숨겨 안이 보이게 한다. baked면 미리 구운 바닥 그림자를 얹는다 (low 단계) */
 export function World({ baked = false }: { baked?: boolean }) {
-  const world = useMemo(buildWorld, []);
+  // low(baked)는 같은 배치를 가볍게 (나무·언덕·능선·베일 띠·파지 조각)
+  const world = useMemo(() => buildWorld(baked), [baked]);
   const floor = useMemo(() => buildFloor({ outline: PLATEAU, axis: YARD_FRAME.rotY, stains: STAINS, y: 0.004 }), []);
   useEffect(() => () => {
     if (floor) disposeFloor(floor);
@@ -146,9 +147,10 @@ function pileFloor(id: TankId): BufferGeometry {
   return mesh.geometry;
 }
 
-export function Piles({ director, grades }: { director: Director; grades: Partial<Record<TankId, SectorGrade>> }) {
+export function Piles({ director, grades, lite = false }: { director: Director; grades: Partial<Record<TankId, SectorGrade>>; lite?: boolean }) {
   const ref = useRef<InstancedMesh>(null);
-  const geometry = useMemo(() => chunkGeometry(0.46, 0.26, 0.36, 0.06), []);
+  // low(lite): 모서리를 둥글리지 않은 상자 조각 (조각 하나 12면, 둥근 조각은 108면이라 더미 둘에 십만 개 넘게 든다)
+  const geometry = useMemo(() => (lite ? chunkGeometry(0.46, 0.26, 0.36, 0, 0) : chunkGeometry(0.46, 0.26, 0.36, 0.06)), [lite]);
   const chunks = useMemo(() => TANK_IDS.map((id, i) => pileChunks(id, 11 + i * 101)), []);
   const floors = useMemo(() => TANK_IDS.map((id) => ({ geometry: pileFloor(id), material: new MeshStandardMaterial({ color: NO_GRADE, roughness: 0.85, vertexColors: true }) })), []);
   const shown = useRef<number[]>(TANK_IDS.map(() => -1));

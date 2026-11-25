@@ -185,7 +185,7 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
         <Rig director={director} focusKey={selection} api={rig} inset={inset} />
 
         <World baked={baked} />
-        <Piles director={director} grades={grades} />
+        <Piles director={director} grades={grades} lite={baked} />
         <Belt director={director} />
         <BalerParts director={director} status={frozen ? 'offline' : balerStatus} />
         <PlateScanFx director={director} />

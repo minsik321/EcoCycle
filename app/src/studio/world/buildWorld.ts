@@ -358,6 +358,9 @@ function poles(k: Kit): void {
 // ── 숲·언덕·능선 ──────────────────────────────────────────────────────
 
 /** 숲 나무: 줄기 + 둥근 수관 둘 */
+/** low 단계(가볍게): 나무·언덕·능선의 둥근 면을 거칠게, 숲을 성기게, 베일 띠·파지 조각을 줄인다. buildWorld가 정한다 */
+let LITE = false;
+
 function forestTree(k: Kit, x: number, y: number, z: number, s: number, v: number): void {
   const tones = [C.green, C.greenDeep, C.greenLight, C.forest];
   const a = tones[v % tones.length]!;
@@ -366,9 +369,9 @@ function forestTree(k: Kit, x: number, y: number, z: number, s: number, v: numbe
     [x, y, z],
     v * 1.7,
     () => {
-      k.cyl(C.trunk, [0.08, 0.11], 0.7, [0, 0, 0], { seg: 5 });
-      k.ball(a, 0.78, [0, 1.25, 0], { scale: [1, 0.9, 1], seg: 7 });
-      k.ball(b, 0.52, [0.36, 1.72, 0.14], { seg: 6 });
+      k.cyl(C.trunk, [0.08, 0.11], 0.7, [0, 0, 0], { seg: LITE ? 4 : 5 });
+      k.ball(a, 0.78, [0, 1.25, 0], { scale: [1, 0.9, 1], seg: LITE ? 5 : 7 });
+      if (!LITE) k.ball(b, 0.52, [0.36, 1.72, 0.14], { seg: 6 });
     },
     s,
   );
@@ -377,7 +380,7 @@ function forestTree(k: Kit, x: number, y: number, z: number, s: number, v: numbe
 function forest(k: Kit): void {
   const rnd = random(4021);
   const avoid = [BALE_AREAS.nw, ...HOUSE_POLYS];
-  const step = 1.8;
+  const step = LITE ? 2.3 : 1.8;
   let n = 0;
   const xs = FOREST.map((p) => p[0]);
   const zs = FOREST.map((p) => p[1]);
@@ -386,7 +389,7 @@ function forest(k: Kit): void {
       const p: P2 = [x + (rnd() - 0.5) * step * 0.8, z + (rnd() - 0.5) * step * 0.8];
       if (!inside(p, FOREST) || edgeDistance(p, FOREST) < 0.6) continue;
       if (avoid.some((poly) => inside(p, poly) || edgeDistance(p, poly) < 1.4)) continue;
-      forestTree(k, p[0], TOP, p[1], 0.95 + rnd() * 0.65, n);
+      forestTree(k, p[0], TOP, p[1], (0.95 + rnd() * 0.65) * (LITE ? 1.15 : 1), n);
       n += 1;
     }
   }
@@ -404,9 +407,9 @@ function hills(k: Kit): void {
     const x = cx + Math.cos(a) * r;
     const z = cz - Math.sin(a) * r;
     const size = 9 + rnd() * 6;
-    k.ball(i % 2 ? C.hill : C.hillDark, size, [x, LOW - size * 0.62, z], { scale: [1.5, 0.75, 1.2], seg: 14 });
+    k.ball(i % 2 ? C.hill : C.hillDark, size, [x, LOW - size * 0.62, z], { scale: [1.5, 0.75, 1.2], seg: LITE ? 9 : 14 });
     // 언덕 위 나무 몇 그루
-    for (let j = 0; j < 5; j += 1) {
+    for (let j = 0; j < (LITE ? 2 : 5); j += 1) {
       const tx = x + (rnd() - 0.5) * size * 1.6;
       const tz = z + (rnd() - 0.5) * size * 1.2;
       const d = Math.hypot(tx - x, tz - z) / size;
@@ -421,7 +424,7 @@ function hills(k: Kit): void {
       [120, C.ridge, 16],
       [170, C.ridgeFar, 24],
     ] as const) {
-      k.ball(tone, 34, [cx + Math.cos(a) * r, LOW - 34 + h * (0.6 + rnd() * 0.4), cz - Math.sin(a) * r], { scale: [1.6, 0.55, 1], seg: 12, rot: [0, -a, 0] });
+      k.ball(tone, 34, [cx + Math.cos(a) * r, LOW - 34 + h * (0.6 + rnd() * 0.4), cz - Math.sin(a) * r], { scale: [1.6, 0.55, 1], seg: LITE ? 8 : 12, rot: [0, -a, 0] });
     }
   }
 }
@@ -760,7 +763,7 @@ function standAndScale(k: Kit): void {
 function staticBale(k: Kit, x: number, y: number, z: number, rot: number, tone: string): void {
   k.at([x, y, z], rot, () => {
     k.box(tone, [BALE.d, BALE.h - 0.01, BALE.w], [0, 0, 0], { r: 0 });
-    for (const dx of [-0.28, 0.28]) k.box(C.dark, [0.026, BALE.h + 0.004, BALE.w + 0.012], [dx, -0.005, 0], { r: 0 });
+    if (!LITE) for (const dx of [-0.28, 0.28]) k.box(C.dark, [0.026, BALE.h + 0.004, BALE.w + 0.012], [dx, -0.005, 0], { r: 0 });
   });
 }
 
@@ -826,7 +829,7 @@ function debris(k: Kit): void {
   let placed = 0;
   for (const sign of [-1, 1]) {
     const pile = sign < 0 ? PILES['sector-a'] : PILES['sector-c'];
-    for (let i = 0; i < 520 && placed < 900; i += 1) {
+    for (let i = 0; i < (LITE ? 260 : 520) && placed < 900; i += 1) {
       const u = -52 + rnd() * 74;
       const w = 6 + rnd() * 92;
       const [px, py] = railToPhoto(u, sign * w);
@@ -859,7 +862,9 @@ function utilities(k: Kit): void {
   }
 }
 
-export function buildWorld(): World {
+/** 고정물 전체. lite(low 단계)는 같은 배치를 더 적은 삼각형으로 그린다 (나무·언덕·능선·베일 띠·파지 조각) */
+export function buildWorld(lite = false): World {
+  LITE = lite;
   const footprints: Footprint[] = [];
   const k = new Kit();
   k.footprints = footprints;

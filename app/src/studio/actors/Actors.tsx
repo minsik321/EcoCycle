@@ -36,8 +36,8 @@ interface TruckPair {
   wing: TruckModel;
 }
 
-/** 처음 마련하는 쏟아지는 파지 칸(트럭 수). 트럭이 더 많으면 그 트럭의 쏟는 연출만 생략한다 */
-const POUR_TRUCKS = 16;
+/** 쏟아지는 파지 칸(동시에 쏟는 트럭 수). 쏟는 자리는 더미 앞 둘뿐이라 넉넉히 넷: 쏟는 트럭에만 차례로 준다 */
+const POUR_SLOTS = 4;
 
 function makePair(i: number): TruckPair {
   const pair = { dump: buildTruck(i, 'dump'), wing: buildTruck(i, 'wing') };
@@ -98,6 +98,7 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
   useFrame(() => {
     if (director.trucks.length > count) setCount(director.trucks.length);
     const mesh = pour.current;
+    let slot = 0;
     director.trucks.forEach((sim, i) => {
       const pair = pairs[i];
       if (!pair) return;
@@ -125,17 +126,13 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
         for (const w of model.wheels) w.rotation.z = -sim.wheel;
         model.beacon.visible = sim.speed > 0.05 && Math.sin(director.t * 9) > 0;
       }
-      if (!mesh || i >= POUR_TRUCKS) return;
+      if (!mesh || !sim.active || !sim.pouring || slot >= POUR_SLOTS) return;
       // 쏟아지는 파지: 꼬리에서 뒤로 미끄러져 떨어진다
+      const base = slot * POUR_PER_TRUCK;
+      slot += 1;
       const fx = Math.cos(sim.heading);
       const fz = -Math.sin(sim.heading);
       for (let j = 0; j < POUR_PER_TRUCK; j += 1) {
-        const index = i * POUR_PER_TRUCK + j;
-        if (!sim.active || !sim.pouring) {
-          tmp.m.makeScale(0, 0, 0);
-          mesh.setMatrixAt(index, tmp.m);
-          continue;
-        }
         const u = (sim.pourT * 0.9 + j / POUR_PER_TRUCK) % 1;
         const side = ((j * 37) % 17) / 17 - 0.5;
         const back = (1.5 + u * 0.95) * TRUCK.scale;
@@ -143,9 +140,14 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
         tmp.q.setFromAxisAngle(tmp.axis, u * 7 + j);
         const scale = (0.7 + ((j * 13) % 7) / 10) * TRUCK.scale;
         tmp.s.setScalar(scale * Math.min(1, u * 8) * Math.min(1, (1 - u) * 5));
-        mesh.setMatrixAt(index, tmp.m.compose(tmp.p, tmp.q, tmp.s));
+        mesh.setMatrixAt(base + j, tmp.m.compose(tmp.p, tmp.q, tmp.s));
       }
     });
+    if (mesh) {
+      // 쓰지 않은 칸은 지운다
+      tmp.m.makeScale(0, 0, 0);
+      for (let k = slot * POUR_PER_TRUCK; k < POUR_SLOTS * POUR_PER_TRUCK; k += 1) mesh.setMatrixAt(k, tmp.m);
+    }
     if (mesh) mesh.instanceMatrix.needsUpdate = true;
   });
 
@@ -163,7 +165,7 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
           }
         />
       ))}
-      <instancedMesh ref={pour} args={[geometry, MAT.clay, POUR_TRUCKS * POUR_PER_TRUCK]} castShadow frustumCulled={false} />
+      <instancedMesh ref={pour} args={[geometry, MAT.clay, POUR_SLOTS * POUR_PER_TRUCK]} castShadow frustumCulled={false} />
     </>
   );
 }
