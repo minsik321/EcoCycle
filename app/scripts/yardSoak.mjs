@@ -46,7 +46,12 @@ try {
     await page.waitForTimeout(SAMPLE_MS);
     // 장면이 다시 만들어지는 짧은 동안(화질 단계 바뀜 등)에는 점검 함수가 잠깐 없다
     await page.waitForFunction(() => typeof window.__yardAudit === 'function', null, { timeout: 60_000 });
-    const a = await page.evaluate(() => window.__yardAudit());
+    let a = await page.evaluate(() => window.__yardAudit());
+    // 표가 새 서버 값을 그렸지만 장면에 아직 넘기지 않은 순간(React가 그린 뒤 효과를 부르기 전)이면 잠깐 뒤 다시 읽는다
+    for (let i = 0; i < 10 && !a.countStable; i += 1) {
+      await page.waitForTimeout(250);
+      a = await page.evaluate(() => window.__yardAudit());
+    }
     if (r.samples % 12 === 0) console.log(`  월드 시계 ${a.t.toFixed(0)}초 남동 ${a.seStacked} 북서 ${a.nwStacked} 대기 ${a.waiting} 적치 ${a.stored} 옮김 ${a.transferred} 출하 ${a.shipped} 상차 ${a.loadedOut} 트럭 ${a.trucksOnSite}/${a.vehiclesOnSite}`);
     r.samples += 1;
     r.last = a;
@@ -83,7 +88,7 @@ try {
   await page.waitForFunction(() => typeof window.__yardAudit === 'function', null, { timeout: 60_000 });
   r.last = await page.evaluate(() => window.__yardAudit());
   await page.close();
-  if (r.countSamples < r.samples * 0.9) r.problems.push(`차량 수를 견줄 수 있는 표본이 ${r.countSamples}/${r.samples}뿐이다`);
+  if (r.countSamples < r.samples * 0.95) r.problems.push(`차량 수를 견줄 수 있는 표본이 ${r.countSamples}/${r.samples}뿐이다`);
   exitCode = r.problems.length === 0 ? 0 : 1;
   console.log(`표본 ${r.samples}개, 트럭 대수 어긋남 ${r.countMismatch}번, 월드 시계 ${r.last.t.toFixed(0)}초, 최대 적치 ${r.maxStacked}, 최대 장면 베일 ${r.maxActive}, 최대 대기 ${r.maxWaiting}, 출하 ${r.last.shipped}, 입고 ${r.last.stored}, 칸 ${r.last.slotsUsed}/${r.last.slots}, 막힘 최대 ${r.last.maxBlockedSec.toFixed(1)}초`);
   if (r.problems.length > 0) console.error(r.problems.slice(0, 5).join('\n'));

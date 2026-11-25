@@ -71,6 +71,10 @@ const fromPreset = (p: ViewPreset): View => {
   return { x, y: p.height, z, dist: p.distance, az: SOUTH_AZ + p.azimuth, pol: p.polar, fov: p.fov ?? BASE_FOV };
 };
 
+/** 안개 기본 범위 (Stage의 fog와 같다) */
+const FOG_NEAR = 170;
+const FOG_FAR = 380;
+
 /** 카메라가 목표에 닿았다고 보는 오차 */
 const SETTLED = 0.003;
 const viewError = (g: View, c: View): number =>
@@ -80,6 +84,7 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
+  const scene = useThree((s) => s.scene);
   const size = useThree((s) => s.size);
   const home = useRef<ViewPreset>(DEFAULT_VIEW);
   const goal = useRef<View>(fromPreset(DEFAULT_VIEW));
@@ -257,6 +262,12 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
     const tz = c.z - Math.cos(a) * shiftRight - Math.sin(a) * shiftDown;
     camera.position.set(tx + Math.sin(p) * Math.cos(a) * dist, c.y + Math.cos(p) * dist, tz - Math.sin(p) * Math.sin(a) * dist);
     camera.lookAt(tx, c.y, tz);
+    // 안개는 카메라 거리를 따라간다: 좁은 화면에서 부지 전체·위에서 보기로 멀리 물러나도 부지는 또렷하고 먼 언덕·능선만 흐려진다
+    const fog = scene.fog as { near: number; far: number } | null;
+    if (fog) {
+      fog.near = Math.max(FOG_NEAR, dist + 30);
+      fog.far = Math.max(FOG_FAR, dist + 240);
+    }
   });
 
   return null;

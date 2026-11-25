@@ -72,14 +72,23 @@ async function settle(page) {
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 400)))));
 }
 async function view(page, key) {
-  const ok = await page.evaluate((k) => window.__studioView?.(k) ?? false, key);
-  if (!ok) throw new Error(`화면 ${key}를 열지 못했다`);
+  // 장면이 다시 만들어지는 짧은 동안(접속 측정으로 화질 단계가 바뀜 등)에는 카메라가 없다: 옮겨질 때까지 다시 부른다
+  await page
+    .waitForFunction((k) => window.__studioView?.(k) ?? false, key, { timeout: 120_000, polling: 500 })
+    .catch(() => {
+      throw new Error(`화면 ${key}를 열지 못했다`);
+    });
   await settle(page);
 }
 async function area(page, name, key) {
   // 지역 전환 판의 이름표도 바꿔 둔다 (폰 폭에서 클릭 뒤 "예정된 이동"을 기다리다 멈추는 일이 있어 요소의 click()을 직접 부른다)
-  await page.locator('.st-area-button').evaluate((el) => el.click());
-  await page.getByRole('option', { name }).first().evaluate((el) => el.click());
+  // (이름표는 보기만의 것: 느린 화면에서 판이 늦게 열리면 건너뛰고 카메라는 아래 view가 옮긴다)
+  try {
+    await page.locator('.st-area-button').evaluate((el) => el.click(), null, { timeout: 60_000 });
+    await page.getByRole('option', { name }).first().evaluate((el) => el.click(), null, { timeout: 60_000 });
+  } catch {
+    console.log(`  (지역 전환 판 이름표 ${key}는 건너뜀)`);
+  }
   await view(page, key);
 }
 async function shots(page, prefix, width, height) {

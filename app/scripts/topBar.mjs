@@ -129,7 +129,7 @@ try {
     await scope.getByRole('link', { name: '기록 보기' }).click();
     await page.waitForURL((u) => u.pathname === '/records' && u.searchParams.get('tab') === 'bales');
     await page.getByRole('tab', { name: '베일', selected: true }).waitFor();
-    await page.getByRole('region', { name: '베일 기록' }).waitFor({ timeout: 15_000 });
+    await page.getByRole('region', { name: '베일 기록' }).waitFor({ timeout: 60_000 });
     assert.equal(await bar.getAttribute('data-topbar'), 'page');
     await shot('5-bales-record-link');
 

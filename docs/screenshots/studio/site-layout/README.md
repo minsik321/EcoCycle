@@ -2,24 +2,27 @@
 
 위성사진(위가 북쪽)과 현장 사진 6장을 `app/src/studio/world/layout.ts`의 `sitePx` 하나(1px = 0.072)로 옮긴 3D 홈. 사진 파일 자체는 저장소에 넣지 않는다.
 찍은 방법: Chromium(SwiftShader), 배율 1, `node app/scripts/yardStatic.mjs`. 시연 화면은 `/scene-demo?tier=standard`(예시 데이터, 입고·상차 차량 모두 서버 모양),
-실제 홈은 모의 서버 + `admin` 로그인 + 3D 홈(화질은 접속 측정값). 사진 방향 화면은 `world/views.ts`의 `PHOTO_VIEWS`(지역 전환 목록에는 없다).
+실제 홈은 모의 서버 + `admin` 로그인 + 3D 홈(화질은 접속 측정값). 카메라는 점검 함수 `window.__studioView(key)`로 미끄러지지 않고 바로 옮기고,
+`window.__cameraError()`가 0에 가까운 채 0.6초 머문 뒤(목표에 닿음) 화면을 두 번 더 그리고 찍는다(정해진 시간만 기다리지 않는다).
+사진 방향 화면(`world/views.ts`의 `PHOTO_VIEWS`, 지역 전환 목록에는 없다)은 현장 사진처럼 **사람 눈높이에서 수평으로, 넓은 화각(세로 50~66도)**으로 본다.
+화면의 트럭·지게차는 그 순간의 서버 값(시연 원본·모의 서버)이라 사진 방향 화면에도 함께 찍힐 수 있다.
 
 ## S2e 화면 (지금 장면)
 
-| 파일 | 화면 | 크기 | 보는 곳 |
-| --- | --- | --- | --- |
-| `demo-top-*.png`, `live-top-*.png` | 시연·실제 홈 | 390×844·820×1180·1440×900 | **위에서 보기**: 사진처럼 북쪽이 위 (`overall.png`·`site-marked.png`와 견준다) |
-| `demo-wide-*.png`, `live-wide-*.png` | 〃 | 〃 | 부지 전체 (둘레 숲 언덕·먼 산 능선, 도로, 옹벽) |
-| `demo-default-*.png`, `live-default-*.png` | 〃 | 〃 | 기본 구역 "섹터·로봇": 레일 축에 대칭인 큰 더미 A·C, 흩어진 파지 조각, 줄눈 바닥 |
-| `demo-photo-gate-*.png`, `live-photo-gate-*.png` | 〃 | 〃 | **입구에서 서쪽** (`from-gate-inside.png`): 남동 베일 벽, 줄눈 마당, 멀리 숲 아래 북서 베일, 오른쪽 사무실 차양 |
-| `demo-photo-weighbridge-*.png`, `live-photo-weighbridge-*.png` | 〃 | 〃 | **계근대 쪽** (`weighbridge.png`): 옹벽·쇠 난간 위 단, 노란 테두리 계근대, 짙은 회색 골판 사무실, 흰 창고, 쇠 기둥·콘 |
-| `demo-photo-upperRoad-*.png`, `live-photo-upperRoad-*.png` | 〃 | 〃 | **남동 도로에서** (`from-upper-road.png`): 회색 철판 울타리 + 높은 녹색 그물망, 그 뒤 베일, 멀리 사무실 |
-| `demo-photo-entrance-1440x900.png`, `live-photo-entrance-1440x900.png` | 〃 | 1440×900 | **입구 남쪽 도로에서 서북서** (`entrance.png`): 도로에서 마당으로 오르는 경사로, 오른쪽 계근대 단 옹벽, 베일, 파란 지붕 공장 |
-| `demo-photo-approach-1440x900.png`, `live-photo-approach-1440x900.png` | 〃 | 1440×900 | **북동 도로에서 남쪽** (`approach.png`): 낮은 도로, 옹벽 위 2층 사무실과 동쪽 실외기, 전봇대·전선 |
-| `demo-inbound-1440x900.png`, `live-inbound-1440x900.png` | 〃 | 1440×900 | 입구·계근대 (경사로, 번호판 인식 카메라 기둥) |
-| `demo-baler-1440x900.png`, `live-baler-1440x900.png` | 〃 | 1440×900 | 압축기·레일 (가로형 압축기, 배출 받침대, 베일 저울) |
-| `demo-bales-1440x900.png`, `live-bales-1440x900.png` | 〃 | 1440×900 | 베일 적치 (남동 칸 줄·북동 날개 벽, 북서 재고, 상차 자리의 윙바디, 지게차) |
-| `yard/` | `node app/scripts/yardSoak.mjs` 결과 | 1440×900, 390×844 | 오래 돌린 뒤 베일 적치 구역 |
+| 파일 | 크기 | 보는 곳 |
+| --- | --- | --- |
+| `demo-top-*.png`, `live-top-*.png` | 390×844·820×1180·1440×900 | **위에서 보기**: 바로 위에서, 사진처럼 북쪽이 위 (`overall.png`·`site-marked.png`와 견준다) |
+| `demo-wide-*.png`, `live-wide-*.png` | 〃 | **부지 전체**: 숲·언덕, 도로, 옹벽, 사무실, 압축기 건물까지 (폰·세로 태블릿은 부지가 다 들어오게 더 물러난다) |
+| `demo-default-*.png`, `live-default-*.png` | 〃 | 기본 구역 "섹터·로봇": 레일 축에 대칭인 큰 더미 A·C, 흩어진 파지 조각, 줄눈 바닥 |
+| `demo-photo-gate-*.png`, `live-photo-gate-*.png` | 〃 | **경사로 위 입구에서 서쪽** (`from-gate-inside.png`): 왼쪽 남동 베일 벽, 줄눈 마당, 로봇·더미·압축기 건물, 오른쪽 멀리 북서 베일과 숲. 사진의 사무실은 이 화각보다 오른쪽이라 화면 밖(사무실은 아래 세 화면) |
+| `demo-photo-weighbridge-*.png`, `live-photo-weighbridge-*.png` | 〃 | **계근대 단 남동 아래 도로에서 북서** (`weighbridge.png`): 블록 옹벽·쇠 난간, 노란 테두리 계근대·콘, 사무실 남쪽 면, 왼쪽 베일 |
+| `demo-photo-upperRoad-*.png`, `live-photo-upperRoad-*.png` | 〃 | **남동 바깥 도로에서 북서** (`from-upper-road.png`): 회색 철판 울타리 + 높은 녹색 그물망, 그 뒤 베일 벽, 오른쪽 계근대 단·사무실 |
+| `demo-photo-entrance-1440x900.png`, `live-photo-entrance-1440x900.png` | 1440×900 | **입구 남동 도로에서 서쪽** (`entrance.png`): 앞 경사로, 왼쪽 남동 베일, 가운데 로봇·더미와 파란 지붕 압축기 건물(물탱크), 오른쪽 계근대 단 옹벽·난간과 사무실 |
+| `demo-photo-approach-1440x900.png`, `live-photo-approach-1440x900.png` | 1440×900 | **북동 낮은 도로에서 남쪽** (`approach.png`): 남쪽으로 오르는 도로, 전봇대·전선, 오른쪽 옹벽 위 사무실 동쪽 면과 실외기 |
+| `demo-inbound-1440x900.png`, `live-inbound-1440x900.png` | 1440×900 | 입구·계근대 (경사로, 번호판 인식 카메라 기둥) |
+| `demo-baler-1440x900.png`, `live-baler-1440x900.png` | 1440×900 | 압축기·레일: 가로형 압축기, 남동 벽 배출구 뒤 금속 받침대(베일이 밀려 나옴)와 베일 저울, 경사 레일 |
+| `demo-bales-1440x900.png`, `live-bales-1440x900.png` | 1440×900 | 베일 적치: 울타리를 따라 이어진 남동 벽(칸 줄 + 뒤 한 줄, 4~5단), 북서 재고, 상차 자리의 윙바디, 지게차 |
+| `yard/` | 1440×900, 390×844 | `node app/scripts/yardSoak.mjs` 결과: 오래 돌린 뒤 베일 적치 구역 |
 
 ## S2e 시안 (본 구현 전)
 
