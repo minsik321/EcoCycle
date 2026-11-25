@@ -4,7 +4,11 @@ import { C } from '../theme';
 import { Kit } from '../three/kit';
 import type { Footprint, Vec3 } from '../three/kit';
 import type { P2 } from '../sim/paths';
+import type { StaticBaleCell } from './layout';
 import {
+  edgeDistance,
+  staticBaleCells,
+  yardPoint,
   BALE,
   BALE_AREAS,
   BALE_GAP,
@@ -155,19 +159,7 @@ function random(seed0: number): () => number {
   };
 }
 
-/** 점과 다각형 테두리의 거리 */
-export function edgeDistance(p: P2, poly: readonly P2[]): number {
-  let best = Infinity;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
-    const a = poly[j]!;
-    const b = poly[i]!;
-    const dx = b[0] - a[0];
-    const dz = b[1] - a[1];
-    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1)));
-    best = Math.min(best, Math.hypot(p[0] - a[0] - dx * t, p[1] - a[1] - dz * t));
-  }
-  return best;
-}
+export { edgeDistance };
 
 const pyOf = (p: P2): number => worldToPx(p[0], p[1])[1];
 const roadAt = (p: P2): number => roadY(pyOf(p)) - 0.02;
@@ -776,46 +768,18 @@ const TONES = [C.kraft, C.kraftLight, C.paperGrey, C.kraftDark, C.kraftLight, C.
 const tone = (n: number): string => TONES[((n % TONES.length) + TONES.length) % TONES.length]!;
 
 /** 마당 좌표의 격자(같은 방향·간격)로 다각형 안을 채운다. keep(x, z)이 false면 비운다. 블록(4열)마다 4단 또는 5단 */
-function baleBlocks(k: Kit, poly: readonly P2[], keep: (x: number, z: number) => boolean, seed: number): number {
+/** 바탕 베일 칸(layout의 staticBaleCells)을 층마다 쌓는다 */
+function baleBlocks(k: Kit, cells: readonly StaticBaleCell[], seed: number): void {
   const rnd = random(seed);
-  const px = BALE.w + BALE_GAP;
-  const pz = BALE.d + BALE_GAP;
-  let n = 0;
-  const cos = Math.cos(YARD_FRAME.rotY);
-  const sin = Math.sin(YARD_FRAME.rotY);
-  const toWorld = (x: number, z: number): P2 => [YARD_FRAME.x + x * cos + z * sin, YARD_FRAME.z - x * sin + z * cos];
-  for (let i = -30; i < 40; i += 1) {
-    for (let j = -40; j < 30; j += 1) {
-      const x = 3.1 + i * px;
-      const z = YARD.slotZ + j * pz;
-      if (!keep(x, z)) continue;
-      const corners = [
-        [x - BALE.w / 2, z - BALE.d / 2],
-        [x + BALE.w / 2, z - BALE.d / 2],
-        [x - BALE.w / 2, z + BALE.d / 2],
-        [x + BALE.w / 2, z + BALE.d / 2],
-      ].map(([a, b]) => toWorld(a!, b!));
-      if (!corners.every((c) => inside(c, poly) && edgeDistance(c, poly) > 0.12)) continue;
-      const [wx, wz] = toWorld(x, z);
-      // 4열 블록마다 높이 하나 (가장자리 블록은 한 단 낮게)
-      const block = Math.floor(i / 4) * 7 + Math.floor(j / 3);
-      const edge = Math.min(...corners.map((c) => edgeDistance(c, poly)));
-      const levels = (edge < 0.9 ? 3 : 4) + ((block * 2654435761) >>> 0) % 2;
-      for (let l = 0; l < levels; l += 1) staticBale(k, wx, TOP + 0.06 + l * BALE.h, wz, YARD_FRAME.rotY - Math.PI / 2, tone(i * 3 + j * 5 + l + Math.floor(rnd() * 2)));
-      n += 1;
-    }
+  for (const c of cells) {
+    const [wx, wz] = yardPoint(c.x, c.z);
+    for (let l = 0; l < c.levels; l += 1) staticBale(k, wx, TOP + 0.06 + l * BALE.h, wz, YARD_FRAME.rotY - Math.PI / 2, tone(c.i * 3 + c.j * 5 + l + Math.floor(rnd() * 2)));
   }
-  return n;
 }
 
 function bales(k: Kit): void {
-  // 북서: 칸 줄(지게차가 쓰는 곳, 길 앞) 뒤쪽을 모두 채운다
-  const nwBack = YARD.nwSlotZ - BALE.d / 2 - 0.1;
-  baleBlocks(k, BALE_AREAS.nw, (_x, z) => z + BALE.d / 2 < nwBack, 11);
-  // 남동: 지게차 길·칸 줄·가로지르는 길 밖을 모두 채운다 (북동 날개는 입구에서 보이는 높은 벽)
-  const lane = (x: number, z: number) => x > YARD.laneStart - 1.2 && x < YARD.laneEnd + 0.4 && z > -2.2 && z < YARD.slotZ + BALE.d / 2 + 0.05;
-  const exit = (x: number, z: number) => x > YARD.laneEnd - 1.6 && x < YARD.laneEnd + 2.6 && z < 1.2;
-  baleBlocks(k, BALE_AREAS.se, (x, z) => !lane(x, z) && !exit(x, z), 23);
+  baleBlocks(k, staticBaleCells('nw'), 11);
+  baleBlocks(k, staticBaleCells('se'), 23);
   // 북쪽 그물망 곁 숲 경계 줄 (3단)
   const [a, b] = NORTH_ROW_PX.map(([x, y]) => sitePx(x, y));
   const len = Math.hypot(b![0] - a![0], b![1] - a![1]);

@@ -10,7 +10,7 @@ export const YARD_FLOW = {
   nwColumns: 6,
   levels: 4,
   /** 처음 장면을 열 때 이미 쌓여 있는 재고(서버 베일이 아닌 바탕 재고)의 비율: 남동 열, 북서 열 */
-  seStartColumns: 3,
+  seStartColumns: 5,
   nwStartColumns: 6,
   /** 남동에 빈 열이 이만큼보다 적으면 가장 오래된 줄을 북서로 옮긴다 */
   seFreeColumnsMin: 2,

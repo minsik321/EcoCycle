@@ -258,9 +258,18 @@ function writePlate(el: HTMLElement, director: Director): void {
   }
 }
 
+/** 핀을 가리는 패널(유리 패널·상단 바)의 자리를 다시 재는 간격(ms). 패널은 자주 움직이지 않는다 */
+const COVER_EVERY_MS = 400;
+/** 핀 상자(가리키는 점 위로): 폭의 반, 높이 */
+const PIN_HALF_W = 46;
+const PIN_H = 44;
+
 export function PinLayer({ director, pins }: { director: Director; pins: MutableRefObject<PinElements> }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
+  const gl = useThree((s) => s.gl);
+  // 패널 밑으로 들어간 핀은 반쯤 가려진 채 보이지 않게 숨긴다 (지역 전환 판·지표 카드·상세·표와 핀이 겹쳐 보이지 않게)
+  const covers = useRef<{ at: number; rects: Array<[number, number, number, number]> }>({ at: -Infinity, rects: [] });
   const v = useMemo(() => new Vector3(), []);
   const anchor = useMemo(() => ({ x: 0, y: 0, z: 0 }), []);
   const zoom = useRef('');
@@ -269,6 +278,18 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
     const pxPerUnit = (size.height / (2 * Math.tan(((camera as PerspectiveCamera).fov * Math.PI) / 360))) / Math.max(1, camera.position.length());
     // 폰 폭에서는 섹터 핀 네 개가 붙어 겹치므로 늘 멀리 보는 모양(섹터는 적재율 고리만)
     const level = pxPerUnit < 36 || size.width < 600 ? 'far' : pxPerUnit < 60 ? 'mid' : 'near';
+    const now = performance.now();
+    if (now - covers.current.at > COVER_EVERY_MS) {
+      covers.current.at = now;
+      const root = gl.domElement.closest('.st-root');
+      const base = gl.domElement.getBoundingClientRect();
+      covers.current.rects = root
+        ? [...root.querySelectorAll<HTMLElement>('.st-glass, .st-topbar')]
+            .map((el) => el.getBoundingClientRect())
+            .filter((r) => r.width > 0 && r.height > 0)
+            .map((r) => [r.left - base.left, r.top - base.top, r.right - base.left, r.bottom - base.top] as [number, number, number, number])
+        : [];
+    }
     if (level !== zoom.current) {
       const first = Object.values(pins.current).find((el) => el);
       const holder = first?.parentElement;
@@ -291,6 +312,10 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
       }
       const x = (v.x * 0.5 + 0.5) * size.width;
       const y = (-v.y * 0.5 + 0.5) * size.height;
+      if (covers.current.rects.some(([l, tp, r, b]) => x + PIN_HALF_W > l && x - PIN_HALF_W < r && y > tp && y - PIN_H < b)) {
+        el.style.visibility = 'hidden';
+        continue;
+      }
       el.style.visibility = 'visible';
       if (key === 'plate:scan') writePlate(el, director);
       el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -100%)`;

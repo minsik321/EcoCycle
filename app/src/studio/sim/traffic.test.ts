@@ -59,7 +59,7 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
       // 매 걸음 표의 "차량 N"(회사 안 차량)과 장면에 보이는(active) 트럭 대수가 같다 (yardSoak도 같은 점검을 한다)
       if (onSiteVehicles(vehicles).length !== d.trucks.filter((x) => x.active).length) countMismatch += 1;
       const a = d.yard.audit(d.trucks);
-      expect(a.forkOnTruck + a.forkOnFork + a.forkOnBale + a.baleOnBale, `t=${t.toFixed(1)} 지게차·베일 겹침`).toBe(0);
+      expect(a.forkOnTruck + a.forkOnFork + a.forkOnBale + a.baleOnBale + a.forkOnWall, `t=${t.toFixed(1)} 지게차·베일 겹침`).toBe(0);
       for (const truck of d.trucks) {
         if (!truck.active) continue;
         const list = phases.get(truck.id) ?? [];
@@ -168,7 +168,7 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
       d.step(0.1);
       expect(d.truckOverlaps(), `t=${d.t.toFixed(1)} 트럭끼리 겹침`).toBe(0);
       const a = d.yard.audit(d.trucks);
-      expect(a.forkOnTruck + a.forkOnFork + a.forkOnBale + a.baleOnBale, `t=${d.t.toFixed(1)} 지게차·베일 겹침`).toBe(0);
+      expect(a.forkOnTruck + a.forkOnFork + a.forkOnBale + a.baleOnBale + a.forkOnWall, `t=${d.t.toFixed(1)} 지게차·베일 겹침`).toBe(0);
       // 무언가는 계속 움직인다: 적치·트럭 출입이 3분 넘게 그대로면 멈춰 버린 것이다
       const key = JSON.stringify(d.yard.stats) + d.trucks.map((x) => (x.active ? x.id + x.phase : '')).join();
       if (key !== lastKey) {

@@ -51,6 +51,7 @@ import {
   truckToTip,
   worldToPx,
   yardToWorld,
+  staticBaleCells,
 } from './layout';
 
 // 위성사진 → 월드 변환(sitePx)은 닮음 변환 하나다: 로봇이 원점, 레일 방향이 θc, 같은 배율, 뒤집지 않음.
@@ -373,7 +374,7 @@ describe('베일 칸·받침대·저울·지게차 길 (마당 좌표계)', () =
   });
 
   it('칸 앞 자리의 지게차는 길에 걸치지 않는다 (칸·길 사이 거리)', () => {
-    expect(YARD.slotZ - FORK_REACH - 0.62 * 1.15).toBeGreaterThan(0.6);
+    expect(YARD.slotZ - YARD.laneZ - FORK_REACH - 0.62 * 1.15).toBeGreaterThan(0.6);
     expect(YARD.nwLaneZ - YARD.nwSlotZ - FORK_REACH - 0.62 * 1.15).toBeGreaterThan(0.6);
   });
 });
@@ -398,5 +399,18 @@ describe('카메라가 보는 점은 부지 밖으로 나가지 않는다 (clamp
     clampToSite(ix, iz, out);
     expect(out.x).toBeCloseTo(ix, 9);
     expect(out.z).toBeCloseTo(iz, 9);
+  });
+});
+
+describe('남동 베일 벽 (바탕 베일 + 칸 줄)', () => {
+  it('울타리 쪽 긴 변을 따라 끊기지 않고 이어지며 4~5단이다', () => {
+    const se = staticBaleCells('se');
+    expect(se.every((c) => c.levels >= 4 && c.levels <= 5)).toBe(true);
+    // 칸 줄 뒤(울타리 쪽) 한 줄: 칸 줄 7열 모두 뒤가 채워져 있다
+    for (const x of YARD.seXs) expect(se.some((c) => Math.abs(c.x - x) < 0.01 && c.z > YARD.slotZ + 0.5), `칸 x=${x.toFixed(2)} 뒤`).toBe(true);
+    // 칸 줄 서쪽 끝 너머도 같은 줄로 이어진다
+    expect(se.some((c) => c.x < YARD.seXs[0]! - 0.5 && Math.abs(c.z - YARD.slotZ) < 0.01)).toBe(true);
+    // 벽은 지게차 길(칸 줄 앞)을 막지 않는다
+    expect(se.every((c) => !(c.x > YARD.laneStart && c.x < YARD.laneEnd && c.z < YARD.slotZ - 0.5 && c.z > YARD.laneZ - 2))).toBe(true);
   });
 });

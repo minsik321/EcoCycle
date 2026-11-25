@@ -53,7 +53,7 @@ try {
     r.maxStacked = Math.max(r.maxStacked, a.stacked);
     r.maxActive = Math.max(r.maxActive, a.active);
     r.maxWaiting = Math.max(r.maxWaiting, a.waiting);
-    const bad = a.baleOnBale + a.forkOnBale + a.forkOnFork + a.forkOnTruck + a.truckOnTruck + a.slotErrors.length;
+    const bad = a.baleOnBale + a.forkOnBale + a.forkOnFork + a.forkOnWall + a.forkOnTruck + a.truckOnTruck + a.slotErrors.length;
     if (bad > 0) r.problems.push(`t=${a.t.toFixed(0)}s 겹침/정합 ${JSON.stringify(a)}`);
     if (a.active > a.slots) r.problems.push(`t=${a.t.toFixed(0)}s 베일 ${a.active}개가 칸 ${a.slots}을 넘음`);
     // 표의 "차량 N"과 장면에 보이는 트럭 대수: 장면이 표와 같은 서버 값을 받은 표본(countStable)에서는 한 번도 어긋나면 안 된다

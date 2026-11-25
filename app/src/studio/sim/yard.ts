@@ -1,6 +1,6 @@
 import type { Bale } from '@ecocycle/shared';
 import { YARD_FLOW } from '../../config/yard';
-import { BALE, FORKLIFT_SCALE, FORK_REACH, LOAD_BED_Y, LOAD_SLOTS, TRUCK, YARD, YARD_FRAME, worldToYard, yardToWorld } from '../world/layout';
+import { BALE, FORKLIFT_SCALE, FORK_REACH, LOAD_BED_Y, LOAD_SLOTS, TRUCK, YARD, YARD_FRAME, staticBaleCells, worldToYard, yardToWorld } from '../world/layout';
 import { FRESH_MS, advance, follow, mover } from './mover';
 import type { Mover } from './mover';
 import { angleDelta, headingTo } from './paths';
@@ -127,6 +127,8 @@ export interface YardAudit {
   slotErrors: string[];
   baleOnBale: number;
   forkOnBale: number;
+  /** 지게차 본체·든 베일이 바탕 베일 벽(남동·북서 고정 재고)에 닿은 수 */
+  forkOnWall: number;
   forkOnFork: number;
   forkOnTruck: number;
   maxBlockedSec: number;
@@ -244,6 +246,8 @@ const { stand: STAND, scale: SCALE } = YARD;
 const STAND_POCKET: P2 = [STAND.x, STAND.slots[0]! + FORK_REACH];
 const SCALE_POCKET: P2 = [SCALE.x, SCALE.z + FORK_REACH];
 const SE_POCKET_Z = YARD.slotZ - FORK_REACH;
+/** 바탕 베일 칸 (마당 좌표, 겹침 점검용) */
+const WALL_CELLS = [...staticBaleCells('se'), ...staticBaleCells('nw')];
 const NW_POCKET_Z = YARD.nwSlotZ + FORK_REACH;
 
 export class Yard {
@@ -1392,6 +1396,7 @@ export class Yard {
       slotErrors: [],
       baleOnBale: 0,
       forkOnBale: 0,
+      forkOnWall: 0,
       forkOnFork: 0,
       forkOnTruck: 0,
       maxBlockedSec: this.maxBlockedSec,
@@ -1437,6 +1442,20 @@ export class Yard {
       }
     }
     for (const f of this.forklifts) {
+      // 바탕 베일 벽: 본체, 그리고 벽 높이보다 낮게 든 베일
+      setBox(a, f.x, f.z, f.heading, FORK_BACK, BODY_FRONT, HALF_W);
+      for (const w of WALL_CELLS) {
+        if (Math.abs(w.x - f.x) > 4 || Math.abs(w.z - f.z) > 4) continue;
+        setBox(c, w.x, w.z, 0, -BALE.w / 2, BALE.w / 2, BALE.d / 2);
+        if (boxesOverlap(a, c)) out.forkOnWall += 1;
+        for (const b of [f.carrying, f.carrying2]) {
+          if (!b || b.y > w.levels * BALE.h + 0.1) continue;
+          setBox(c, b.x, b.z, b.rot, -BALE.d / 2, BALE.d / 2, BALE.w / 2);
+          const d = newBox();
+          setBox(d, w.x, w.z, 0, -BALE.w / 2, BALE.w / 2, BALE.d / 2);
+          if (boxesOverlap(c, d)) out.forkOnWall += 1;
+        }
+      }
       setBox(a, f.x, f.z, f.heading, FORK_BACK, BODY_FRONT, HALF_W);
       for (const b of live) {
         // 지게차보다 높이 든 베일(포크 위)은 본체와 겹치지 않는다

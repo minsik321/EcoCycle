@@ -5,7 +5,7 @@ import { Stage } from './Stage';
 import type { StageProps } from './Stage';
 import { Director } from './sim/director';
 import type { StudioData } from './types';
-import { PHOTO_VIEWS } from './world/views';
+import { PHOTO_VIEWS, VIEWS } from './world/views';
 import { onSiteVehicles } from './overlay/text';
 
 // 3D 장면 조각: three.js와 무대·연출 감독은 모두 여기서부터 불러온다.
@@ -48,18 +48,22 @@ export default function StudioScene({ data, robotModel, onYardFull, ...stage }: 
   useEffect(() => {
     // (실제 홈은 로그인 뒤 주소가 바뀌므로 점검 스크립트가 세션 저장소에 'ecocycle.yardprobe'를 넣어 켠다)
     if (!new URLSearchParams(window.location.search).has('yardprobe') && sessionStorage.getItem('ecocycle.yardprobe') !== '1') return;
-    const probe = window as unknown as { __yardAudit?: () => unknown; __studioView?: (key: string) => boolean };
+    const probe = window as unknown as { __yardAudit?: () => unknown; __studioView?: (key: string) => boolean; __cameraError?: () => number };
     probe.__yardAudit = () => ({ t: director.t, ...director.yard.audit(director.trucks), truckOnTruck: director.truckOverlaps(), trucksOnSite: director.truckCount(), vehiclesOnSite: onSiteVehicles(latest.current.vehicles).length, countStable: synced.current === latest.current.vehicles, ...director.yard.stats });
     // 사진과 같은 방향의 화면으로 카메라를 옮긴다 (점검 스크립트의 스크린샷용, world/views의 PHOTO_VIEWS)
+    // 지역 보기(VIEWS의 key: site·top·process·inbound·baler·bales)도 같은 함수로 옮긴다. 미끄러지지 않고 바로 옮긴다(느린 화면에서도 목표에 닿은 화면을 찍게)
     probe.__studioView = (key) => {
-      const preset = PHOTO_VIEWS[key];
+      const preset = PHOTO_VIEWS[key] ?? VIEWS.find((v) => v.key === key);
       if (!preset || !rig.current) return false;
-      rig.current.view(preset);
+      rig.current.jump(preset);
       return true;
     };
+    // 카메라가 목표에서 떨어진 정도 (점검 스크립트는 이 값이 0에 가까워질 때까지 기다린 뒤 찍는다)
+    probe.__cameraError = () => rig.current?.error() ?? Infinity;
     return () => {
       delete probe.__yardAudit;
       delete probe.__studioView;
+      delete probe.__cameraError;
     };
   }, [director, rig]);
 

@@ -153,7 +153,7 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
         // 후처리가 없으면 톤 매핑은 렌더러가 한다 (후처리가 있으면 ToneMapping 효과가 한다)
         if (!profile.post) gl.toneMapping = NeutralToneMapping;
       }}
-      camera={{ fov: 20, near: 2, far: 520, position: [60, 60, -60] }}
+      camera={{ fov: 20, near: 2, far: 900, position: [60, 60, -60] }}
       onPointerMissed={() => onSelect(null)}
       // 후처리가 없으면(low, 터치 기기) 연결 끊김의 회색 화면을 캔버스 필터로 낸다
       style={{ touchAction: 'none', filter: !profile.post && frozen ? 'grayscale(0.92) brightness(0.98)' : undefined }}

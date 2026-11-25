@@ -443,10 +443,10 @@ export const BALE_AREA_PX = {
     [392, 330],
     [447, 368],
     [440, 402],
-    [420, 436],
-    [395, 455],
-    [300, 535],
-    [285, 540],
+    [421, 441],
+    [396, 461],
+    [300, 541],
+    [284, 546],
     [250, 495],
     [246, 480],
     [325, 410],
@@ -504,6 +504,8 @@ const railYard = (u: number, w: number): P2 => [-(u - YARD_U0) * SITE_SCALE, (w 
 
 const PITCH_X = BALE.w + BALE_GAP;
 const SLOT_GAP = 2.75;
+/** 남동 지게차 길: 칸 줄을 마당 쪽으로 당겨 칸 줄 뒤(울타리 쪽)에 바탕 베일 한 줄이 더 들어가게 한다 (남동 벽이 두 줄 깊이) */
+const SE_LANE_Z = -0.6;
 
 /** 남동 구역의 칸 열(x): 길(z 0)은 구역 안쪽 가장자리를 따르고, 칸은 길 앞(+z) 한 줄 */
 const SE_XS = Array.from({ length: YARD_FLOW.seColumns }, (_, i) => 3.1 + i * PITCH_X);
@@ -539,8 +541,8 @@ const BALE_SCALE = { x: BALE_SCALE_POS[0], z: BALE_SCALE_POS[1], y: 0.16, size: 
  *  - 가로지르는 길(crossing): 남동 길 동쪽 끝 → 마당 가운데(트럭 길) → 북서 길 동쪽 끝. 트럭과 같은 마당 차례를 잡고 지난다
  */
 export const YARD = {
-  laneZ: 0,
-  slotZ: SLOT_GAP,
+  laneZ: SE_LANE_Z,
+  slotZ: SE_LANE_Z + SLOT_GAP,
   seXs: SE_XS as readonly number[],
   nwLaneZ: NW_LANE_Z,
   nwSlotZ: NW_LANE_Z - SLOT_GAP,
@@ -556,12 +558,81 @@ export const YARD = {
   scale: BALE_SCALE,
   /** 지게차 대기 자리 (남동 길 뒤 −z, 받침대·저울 동쪽): 길에서 도는 원이 닿지 않는 곳 */
   homes: [
-    [0.25, -2.75],
-    [1.7, -2.75],
+    [0.25, SE_LANE_Z - 2.75],
+    [1.7, SE_LANE_Z - 2.75],
   ] as readonly P2[],
   /** 남동 길 동쪽 끝 → 북서 길 동쪽 끝: 꺾이는 점 (사진 px로 잡아 옮긴다). 상차 자리·쏟는 자리·대기 자리 트럭을 피한다 */
   crossing: [yardPx(340, 400), yardPx(328, 296), yardPx(316, 250)] as readonly P2[],
 } as const;
+
+/** 점과 다각형 테두리의 거리 */
+export function edgeDistance(p: P2, poly: readonly P2[]): number {
+  let best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i, i += 1) {
+    const a = poly[j]!;
+    const b = poly[i]!;
+    const dx = b[0] - a[0];
+    const dz = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / (dx * dx + dz * dz || 1)));
+    best = Math.min(best, Math.hypot(p[0] - a[0] - dx * t, p[1] - a[1] - dz * t));
+  }
+  return best;
+}
+
+/** 바탕 베일(서버 베일이 아닌 고정 재고) 한 칸: 마당 좌표의 가운데, 단 수 */
+export interface StaticBaleCell {
+  x: number;
+  z: number;
+  levels: number;
+  i: number;
+  j: number;
+}
+
+/**
+ * 바탕 베일 칸: 칸 줄과 같은 간격·방향의 격자로 구역을 채운다.
+ *  - 북서: 칸 줄(지게차가 쓰는 곳, 길 앞) 뒤쪽을 모두 (가장자리는 한 단 낮게, 3~5단)
+ *  - 남동: 울타리를 따라 이어진 4~5단 벽. 칸 줄 7열 뒤 한 줄과 칸 줄 양 끝을 채우고, 지게차 길(칸 줄 앞)·칸 줄 7열·가로지르는 길로 나가는 곳만 비운다
+ * 지게차가 이 칸에 닿지 않는지는 yard의 audit(forkOnWall)가 본다
+ */
+export function staticBaleCells(area: 'nw' | 'se'): StaticBaleCell[] {
+  const poly = BALE_AREAS[area];
+  const keep =
+    area === 'nw'
+      ? (_x: number, z: number) => z + BALE.d / 2 < YARD.nwSlotZ - BALE.d / 2 - 0.1
+      : (x: number, z: number) => {
+          const corridor = x > YARD.laneStart - 1.2 && x < YARD.laneEnd + 0.4 && z > YARD.laneZ - 2.2 && z < YARD.slotZ - BALE.d / 2 - 0.05;
+          const slots = x > YARD.seXs[0]! - BALE.w && x < YARD.seXs[YARD.seXs.length - 1]! + BALE.w && Math.abs(z - YARD.slotZ) < BALE.d;
+          const exit = x > YARD.laneEnd - 1.6 && x < YARD.laneEnd + 2.6 && z < YARD.laneZ + 1.2;
+          return !corridor && !slots && !exit;
+        };
+  const out: StaticBaleCell[] = [];
+  const px = BALE.w + BALE_GAP;
+  const pz = BALE.d + BALE_GAP;
+  const w = { x: 0, z: 0 };
+  for (let i = -30; i < 40; i += 1) {
+    for (let j = -40; j < 30; j += 1) {
+      const x = 3.1 + i * px;
+      const z = YARD.slotZ + j * pz;
+      if (!keep(x, z)) continue;
+      const corners: P2[] = [
+        [x - BALE.w / 2, z - BALE.d / 2],
+        [x + BALE.w / 2, z - BALE.d / 2],
+        [x - BALE.w / 2, z + BALE.d / 2],
+        [x + BALE.w / 2, z + BALE.d / 2],
+      ].map(([a, b]) => {
+        yardToWorld(a!, b!, w);
+        return [w.x, w.z] as P2;
+      });
+      if (!corners.every((c) => inside(c, poly) && edgeDistance(c, poly) > 0.12)) continue;
+      // 4열 블록마다 높이 하나. 북서는 가장자리 블록을 한 단 낮게, 남동 벽은 고르게 4~5단
+      const block = Math.floor(i / 4) * 7 + Math.floor(j / 3);
+      const edge = Math.min(...corners.map((c) => edgeDistance(c, poly)));
+      const levels = (area === 'se' || edge >= 0.9 ? 4 : 3) + (((block * 2654435761) >>> 0) % 2);
+      out.push({ x, z, levels, i, j });
+    }
+  }
+  return out;
+}
 
 /** 마당 좌표 → 월드 (그리는 쪽) */
 export function yardPoint(x: number, z: number): P2 {

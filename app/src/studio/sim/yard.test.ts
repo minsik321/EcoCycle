@@ -56,6 +56,7 @@ interface RunResult {
 function check(a: YardAudit, t: number): void {
   expect(a.baleOnBale, `t=${t.toFixed(1)} 베일끼리 겹침`).toBe(0);
   expect(a.forkOnBale, `t=${t.toFixed(1)} 지게차와 베일이 겹침`).toBe(0);
+  expect(a.forkOnWall, `t=${t.toFixed(1)} 지게차·든 베일이 바탕 베일 벽에 닿음`).toBe(0);
   expect(a.forkOnFork, `t=${t.toFixed(1)} 지게차끼리 겹침`).toBe(0);
   expect(a.forkOnTruck, `t=${t.toFixed(1)} 지게차와 트럭이 겹침`).toBe(0);
   expect(a.slotErrors, `t=${t.toFixed(1)} 칸 정합`).toEqual([]);
