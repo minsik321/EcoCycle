@@ -63,6 +63,28 @@ async function load(options: { everyInbound?: [number, number]; emptyYard?: bool
 
 const stagesOf = (list: Vehicle[]) => list.map((v) => v.stage).filter((stage, i, all) => all[i - 1] !== stage);
 
+it('번호판·회사는 계근대에서 인식(identified)한 뒤에만 오고, 도착(arrived) 때는 null이다 (S2l)', async () => {
+  const { fixtures, history, run } = await load({ everyInbound: [1, 1] });
+  run(10 * 60);
+  const lists = [...history().values()];
+  expect(lists.length).toBeGreaterThan(1);
+  for (const list of lists) {
+    for (const v of list.filter((x) => x.stage === 'arrived')) {
+      expect(v.plate).toBeNull();
+      expect(v.companyName).toBeNull();
+      expect(v.sectorId).toBeNull();
+    }
+    const identified = list.find((x) => x.stage === 'identified');
+    if (!identified) continue;
+    expect(identified.plate).not.toBeNull();
+    expect(identified.companyName).not.toBeNull();
+    const waitSec = (Date.parse(identified.stageTimes.identified ?? '') - Date.parse(identified.stageTimes.arrived ?? '')) / 1000;
+    // 3D에서 입구 → 계근대까지 실제 축척으로 약 15초 + 읽는 장면 (app/src/studio/sim/plate.test.ts가 장면 시간과 견준다)
+    expect(waitSec).toBeGreaterThanOrEqual(fixtures.VEHICLE_TIMING_SEC.identify);
+    expect(fixtures.VEHICLE_TIMING_SEC.identify).toBeGreaterThanOrEqual(16);
+  }
+});
+
 it('하역·상차가 끝나면 출차 계근(weighing_out, 24초)을 거쳐서만 출차한다', async () => {
   const { fixtures, history, run } = await load({ everyInbound: [1, 1] });
   expect(fixtures.VEHICLE_TIMING_SEC.weighOut).toBe(24);

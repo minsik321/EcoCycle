@@ -1,5 +1,5 @@
 import type { Bale, Batch, Vehicle } from '@ecocycle/shared';
-import { BALE_STAGE_TEXT, VEHICLE_KIND_LABEL, VEHICLE_STAGE_TEXT, shortId } from '../../../config/processDisplay';
+import { BALE_STAGE_TEXT, VEHICLE_KIND_LABEL, VEHICLE_STAGE_TEXT, plateText, shortId } from '../../../config/processDisplay';
 
 // 대시보드가 store 값에서 고르는 것. 값을 만들지 않고 서버가 준 목록에서 고르기·정렬만 한다.
 
@@ -39,7 +39,7 @@ export function recentActivity(vehicles: readonly Vehicle[], bales: readonly Bal
       key: `veh:${v.id}`,
       kind: 'vehicle' as const,
       id: v.id,
-      title: v.plate ?? '번호판 인식 전',
+      title: plateText(v),
       sub: v.companyName ? `${VEHICLE_KIND_LABEL[v.kind]} · ${v.companyName}` : VEHICLE_KIND_LABEL[v.kind],
       stage: VEHICLE_STAGE_TEXT[v.stage],
       at: v.updatedAt,

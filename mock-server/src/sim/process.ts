@@ -708,7 +708,8 @@ export const baleRecords = (): BaleRecord[] =>
 /** 시작할 때 표가 비어 있지 않게 지나간 예시 기록을 채워 둔다 (입고 차량 4대와 배치 4개. 베일을 싣는 상차 차량은 seedOutbound가 정한다) */
 function seedRecent(): void {
   const now = Date.now();
-  const weighOutAt = 31_000 + VEHICLE_TIMING_SEC.afterWork * 1000;
+  const unloadedAt = (VEHICLE_TIMING_SEC.identify + VEHICLE_TIMING_SEC.toSector + VEHICLE_TIMING_SEC.unload) * 1000;
+  const weighOutAt = unloadedAt + VEHICLE_TIMING_SEC.afterWork * 1000;
   const departAt = weighOutAt + VEHICLE_TIMING_SEC.weighOut * 1000;
   for (let i = 4; i >= 1; i -= 1) {
     const at = now - i * 9 * 60_000;
@@ -723,7 +724,7 @@ function seedRecent(): void {
       sectorId: company.sectorId,
       plate: truck.plate,
       companyName: company.name,
-      unloadedAt: iso(at + 31_000),
+      unloadedAt: iso(at + unloadedAt),
       ...weight,
       fillBeforePercent: round1(Math.max(0, fillAfter - fillGainPercent(weight.netT))),
       fillAfterPercent: fillAfter,
@@ -738,9 +739,9 @@ function seedRecent(): void {
       baleIds: [],
       stageTimes: {
         arrived: iso(at),
-        identified: iso(at + 6_000),
-        unloading: iso(at + 22_000),
-        unloaded: iso(at + 31_000),
+        identified: iso(at + VEHICLE_TIMING_SEC.identify * 1000),
+        unloading: iso(at + (VEHICLE_TIMING_SEC.identify + VEHICLE_TIMING_SEC.toSector) * 1000),
+        unloaded: iso(at + unloadedAt),
         weighing_out: iso(at + weighOutAt),
         departed: iso(at + departAt),
       },

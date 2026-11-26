@@ -28,10 +28,10 @@ const BUYERS: Array<{ name: string; plate: string }> = [
 ];
 
 const VEHICLE_EVERY = 80;
-/** 입고: 하역 뒤 바로 나가지 않고 출차 계근(weighing_out)을 거친다 */
+/** 입고: 하역 뒤 바로 나가지 않고 출차 계근(weighing_out)을 거친다. 인식은 차가 입구 → 계근대(약 15초)에 올라 읽은 뒤 (S2l) */
 const VEHICLE_STEPS: Array<[Vehicle['stage'], number]> = [
   ['arrived', 0],
-  ['identified', 6],
+  ['identified', 17],
   ['unloading', 32],
   ['unloaded', 42],
   ['weighing_out', 48],
@@ -44,7 +44,7 @@ const LOAD_EACH = 14;
 const LOAD_MAX = 4;
 const OUTBOUND_STEPS: Array<[Vehicle['stage'], number]> = [
   ['arrived', 0],
-  ['identified', 6],
+  ['identified', 17],
   ['loading', LOAD_START],
   ['loaded', LOAD_START + LOAD_EACH * LOAD_MAX],
   ['weighing_out', LOAD_START + LOAD_EACH * LOAD_MAX + 16],

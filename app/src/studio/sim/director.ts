@@ -104,10 +104,13 @@ export interface TruckSim extends Mover {
   pouring: boolean;
   pourT: number;
   variant: number;
-  /** 서버가 번호판으로 정한 회사 이름 (인식 전 null). 트럭 띠 색에만 쓴다 */
+  /** 장면에 보이는 회사 이름: 서버 값이되 계근대에 서서 읽기 전에는 null (revealIdentity). 트럭 띠 색에만 쓴다 */
   company: string | null;
-  /** 서버가 인식한 번호판 (인식 전 null). 번호판 인식 장면에 그대로 적는다 */
+  /** 장면에 보이는 번호판: 서버 값이되 계근대에 서서 읽기 전에는 null (revealIdentity). 번호판 인식 장면에 그대로 적는다 */
   plate: string | null;
+  /** 서버가 준 번호판·회사 (인식 전 null). 도로·경사로에 있는 동안에는 보이지 않게 들고만 있는다 */
+  serverPlate: string | null;
+  serverCompany: string | null;
   /** 상차 차량(윙바디, 서버 kind outbound): 베일을 실으러 온다 */
   outbound: boolean;
   /** 서버가 이 차에 실었다고 한 베일 수 (baleIds) */
@@ -177,6 +180,10 @@ const UNLOAD_SEC = 6.5;
 const WEIGH_SEC = 2.0;
 /** 번호판 인식 장면: 인식된 번호판을 계근대 위에서 보여 주는 시간(초, 연출). 1.4초는 너무 짧아 보이지 않았다 (S2i #4) */
 export const PLATE_SHOW_SEC = 3.2;
+/** 계근대에 선 뒤 번호판을 읽는 데 걸리는 최소 시간(초, 연출): 서버 값이 먼저 와 있어도 이만큼은 "인식 중"을 보인다 */
+export const PLATE_READ_SEC = 1.0;
+/** 계근대에 오르기 전(도로·경사로·후진 중): 번호판·회사를 보이지 않는다 (S2l) */
+const BEFORE_SCALE: ReadonlySet<TruckPhase> = new Set<TruckPhase>(['road', 'roadHold', 'toScale', 'reverseIn']);
 
 /** 처음 만들어 두는 트럭 칸 수. 회사 안 차량이 더 많으면 늘린다(상한 없음: 서버의 회사 안 차량은 모두 그린다) */
 const TRUCK_POOL = 8;
@@ -304,7 +311,7 @@ export class Director {
   }
 
   private addTruckSlot(): TruckSim {
-    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, outbound: false, want: 0, wing: 0, weighT: 0, plateT: 0, clearS: 0, y: 0, leaving: false, stuckT: 0 };
+    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, serverPlate: null, serverCompany: null, outbound: false, want: 0, wing: 0, weighT: 0, plateT: 0, clearS: 0, y: 0, leaving: false, stuckT: 0 };
     this.trucks.push(t);
     return t;
   }
@@ -351,8 +358,9 @@ export class Director {
       if (truck) {
         truck.stage = v.stage;
         truck.bay = v.sectorId;
-        truck.company = v.companyName;
-        truck.plate = v.plate;
+        truck.serverCompany = v.companyName;
+        truck.serverPlate = v.plate;
+        this.revealIdentity(truck);
         truck.want = v.baleIds.length;
       } else {
         this.spawnTruck(v, nowMs);
@@ -375,8 +383,8 @@ export class Director {
     truck.seq = this.seq;
     truck.stage = v.stage;
     truck.bay = v.sectorId;
-    truck.company = v.companyName;
-    truck.plate = v.plate;
+    truck.serverCompany = v.companyName;
+    truck.serverPlate = v.plate;
     truck.outbound = v.kind === 'outbound';
     truck.want = v.baleIds.length;
     truck.bedTilt = 0;
@@ -414,6 +422,18 @@ export class Director {
       // 계근대가 차 있으면 도로에서부터 들어와 차례를 기다린다 (서버의 회사 안 차량은 빠짐없이 장면에 둔다)
       this.fromRoad(truck);
     }
+    this.revealIdentity(truck);
+  }
+
+  /**
+   * 번호판·회사는 계근대에서 인식한다(명세 "계근대(arrived, 번호판 인식 장면, identified까지 대기)"):
+   * 도로·경사로에 있는 동안, 그리고 계근대에 막 선 뒤 PLATE_READ_SEC 동안은 서버 값이 와 있어도 보이지 않는다.
+   * 한 번 보인 번호판은 그 뒤 다시 감추지 않는다.
+   */
+  private revealIdentity(t: TruckSim): void {
+    const hidden = BEFORE_SCALE.has(t.phase) || (t.phase === 'atScale' && t.plate === null && t.weighT < PLATE_READ_SEC);
+    t.plate = hidden ? null : t.serverPlate;
+    t.company = hidden ? null : t.serverCompany;
   }
 
   /** 도로(북쪽 밖)에서 들어온다: 이미 도로 위에 줄 선 차가 있으면 그 뒤에 선다 */
@@ -539,7 +559,7 @@ export class Director {
    */
   motionKey(): number {
     let k = this.beltOffset * 1.7 + this.ram * 3.1 + this.hopper * 2.3;
-    if (this.plateScan.active) k += Math.min(this.plateScan.t, 3) * 4.9;
+    if (this.plateScan.active) k += Math.min(this.plateScan.t, 3) * 4.9 + (this.plateScan.plate ? 7.7 : 0);
     for (const id of TANK_IDS) k += this.fill[id] * 0.013;
     this.trucks.forEach((t, i) => {
       if (t.active) k += (t.x * 1.3 + t.z * 2.9 + t.heading * 4.1 + t.bedTilt * 6.7 + t.load * 8.3 + (t.pouring ? t.pourT : 0)) * (i + 1);
@@ -700,6 +720,7 @@ export class Director {
           break;
         case 'atScale':
           t.weighT += dt;
+          this.revealIdentity(t);
           if (t.plate) t.plateT += dt;
           if (t.stage !== 'arrived' && (!t.bay || !this.tipBusy(t, t.bay) || !this.queueBusy(t))) this.yardToken.wanted = true;
           if (t.weighT < WEIGH_SEC || (t.plate !== null && t.plateT < PLATE_SHOW_SEC)) break;

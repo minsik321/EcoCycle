@@ -5,7 +5,7 @@ import { getVehicleRecord } from '../../api';
 import type { PopupTarget } from '../../components/records/recordPopup';
 import { formatLocalTime, formatWeightT } from '../../config/display';
 import { devicePagePath } from '../../config/navigation';
-import { SECTOR_LABEL, VEHICLE_KIND_LABEL, VEHICLE_STAGE_ROW_TEXT, VEHICLE_STAGE_TEXT, VEHICLE_WEIGHT_TEXT } from '../../config/processDisplay';
+import { SECTOR_LABEL, VEHICLE_KIND_LABEL, VEHICLE_STAGE_ROW_TEXT, VEHICLE_STAGE_TEXT, VEHICLE_WEIGHT_TEXT, plateText } from '../../config/processDisplay';
 import { DetailRow, DetailSection, RecordFrame } from './RecordDetail';
 import { useRecord } from './useRecord';
 import { VehicleKindPill, VehicleStatusPill } from './VehicleRecords';
@@ -48,7 +48,7 @@ function Body({ record, onOpen }: { record: VehicleRecord; onOpen: (target: Popu
   return (
     <>
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <p className="truncate text-lg font-bold text-ink">{record.plate ?? '번호판 인식 중'}</p>
+        <p className="truncate text-lg font-bold text-ink">{plateText(record)}</p>
         <span className="flex shrink-0 items-center gap-1.5">
           <VehicleKindPill kind={record.kind} />
           <VehicleStatusPill status={record.status} />
