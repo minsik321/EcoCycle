@@ -100,8 +100,8 @@ describe('베일 적치: 받침대 → 저울 → 남동 → 북서', () => {
     const r = run(feed, 1200, d);
     expect(r.maxWaiting).toBeLessThanOrEqual(1);
     expect(r.fullSeconds).toBe(0);
-    // 남동은 처음부터 쌓여 있고 비어 사라지지 않는다
-    expect(r.minSe).toBeGreaterThanOrEqual(YARD_FLOW.seStartColumns * YARD_FLOW.levels);
+    // 남동은 처음부터 쌓여 있고 비어 사라지지 않는다 (S2j: 상차가 한 대 20개라 출하가 많아 북서로 옮기는 줄이 늘어, 옮기는 한 쌍만큼 잠깐 처음보다 낮을 수 있다)
+    expect(r.minSe).toBeGreaterThanOrEqual(YARD_FLOW.seStartColumns * YARD_FLOW.levels - 2);
     expect(r.mismatchSeconds).toBe(0);
     expect(r.badRot).toBe(0);
     expect(r.maxOnStand).toBeLessThanOrEqual(3);

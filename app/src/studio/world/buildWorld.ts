@@ -13,9 +13,13 @@ import {
   BALE_AREAS,
   BALE_GAP,
   BALER,
+  BALER_TUNNEL,
   BALER_HOUSE,
   FENCE_PX,
-  FOREST,
+  FORESTS,
+  LAMP_PX,
+  POLE_PX,
+  worldToYard,
   NET_PX,
   NORTH_ROW_PX,
   OFFICE,
@@ -218,8 +222,10 @@ function ground(k: Kit): void {
   }
 
   // 숲 바닥: 짙은 녹지 (가장자리는 한 단 옅게)
-  k.flat(C.lawnEdge, FOREST, TOP + 0.01, 0.04);
-  k.flat(C.forestFloor, FOREST, TOP + 0.02, 0.05);
+  for (const f of FORESTS) {
+    k.flat(C.lawnEdge, f, TOP + 0.01, 0.04);
+    k.flat(C.forestFloor, f, TOP + 0.02, 0.05);
+  }
 
   // 베일 적치 구역 두 곳: 한 단 어두운 바닥 + 노랑 테두리(사진의 노랑 표시)
   for (const poly of [BALE_AREAS.nw, BALE_AREAS.se]) {
@@ -304,17 +310,8 @@ function boundaries(k: Kit): void {
 
 /** 도로변 전봇대·전선, 숲 쪽 높은 철 기둥 */
 function poles(k: Kit): void {
-  const spots: P2[] = (
-    [
-      [580, 26],
-      [560, 140],
-      [541, 244],
-      [524, 356],
-      [486, 452],
-      [414, 510],
-      [334, 580],
-    ] as const
-  ).map(([x, y]) => sitePx(x, y));
+  // 도로 동쪽 가장자리 밖 (차로 위에 두지 않는다, `POLE_PX`)
+  const spots: P2[] = POLE_PX.map(([x, y]) => sitePx(x, y));
   const tops: Vec3[] = [];
   for (const p of spots) {
     const base = roadY(pyOf(p)) - 0.05;
@@ -382,15 +379,17 @@ function forest(k: Kit): void {
   const avoid = [BALE_AREAS.nw, ...HOUSE_POLYS];
   const step = LITE ? 2.3 : 1.8;
   let n = 0;
-  const xs = FOREST.map((p) => p[0]);
-  const zs = FOREST.map((p) => p[1]);
-  for (let x = Math.min(...xs); x <= Math.max(...xs); x += step) {
-    for (let z = Math.min(...zs); z <= Math.max(...zs); z += step) {
-      const p: P2 = [x + (rnd() - 0.5) * step * 0.8, z + (rnd() - 0.5) * step * 0.8];
-      if (!inside(p, FOREST) || edgeDistance(p, FOREST) < 0.6) continue;
-      if (avoid.some((poly) => inside(p, poly) || edgeDistance(p, poly) < 1.4)) continue;
-      forestTree(k, p[0], TOP, p[1], (0.95 + rnd() * 0.65) * (LITE ? 1.15 : 1), n);
-      n += 1;
+  for (const zone of FORESTS) {
+    const xs = zone.map((p) => p[0]);
+    const zs = zone.map((p) => p[1]);
+    for (let x = Math.min(...xs); x <= Math.max(...xs); x += step) {
+      for (let z = Math.min(...zs); z <= Math.max(...zs); z += step) {
+        const p: P2 = [x + (rnd() - 0.5) * step * 0.8, z + (rnd() - 0.5) * step * 0.8];
+        if (!inside(p, zone) || edgeDistance(p, zone) < 0.6) continue;
+        if (avoid.some((poly) => inside(p, poly) || edgeDistance(p, poly) < 1.4)) continue;
+        forestTree(k, p[0], TOP, p[1], (0.95 + rnd() * 0.65) * (LITE ? 1.15 : 1), n);
+        n += 1;
+      }
     }
   }
 }
@@ -612,10 +611,12 @@ function baler(k: Kit): void {
   // 압출 통로: 압축실 앞에서 배출구까지 낮고 긴 터널 (위 덮개 + 양옆 벽, 앞쪽에 띠 틀)
   const tz0 = minZ;
   const tz1 = outletZ + 0.25;
-  for (const dx of [-1, 1]) k.box(C.blue, [t, 0.95, tz0 - tz1], [x + dx * (halfX - t / 2), y0, mid(tz0, tz1)], { r: 0.04, mat: 'gloss' });
-  k.box(C.blue, [halfX * 2, 0.1, tz0 - tz1], [x, y0 + 0.88, mid(tz0, tz1)], { r: 0.04, mat: 'gloss' });
-  k.box(C.dark, [halfX * 2 - 0.2, 0.06, tz0 - tz1], [x, y0 + 0.4, mid(tz0, tz1)], { r: 0.01 });
-  for (let z = tz0 - 0.4; z > tz1; z -= 0.6) k.box(C.blueDeep, [halfX * 2 + 0.08, 1.02, 0.08], [x, y0 - 0.02, z], { r: 0.02, mat: 'gloss' });
+  // 통로 높이는 베일(BALER_TUNNEL): 안쪽 바닥이 받침대 윗면, 지붕이 베일 위 (S2k)
+  const roof = BALER_TUNNEL.roofY - y0;
+  for (const dx of [-1, 1]) k.box(C.blue, [t, roof + 0.1, tz0 - tz1], [x + dx * (halfX - t / 2), y0, mid(tz0, tz1)], { r: 0.04, mat: 'gloss' });
+  k.box(C.blue, [halfX * 2, 0.1, tz0 - tz1], [x, y0 + roof, mid(tz0, tz1)], { r: 0.04, mat: 'gloss' });
+  k.box(C.dark, [halfX * 2 - 0.2, 0.06, tz0 - tz1], [x, BALER_TUNNEL.floorY - 0.06, mid(tz0, tz1)], { r: 0.01 });
+  for (let z = tz0 - 0.4; z > tz1; z -= 0.6) k.box(C.blueDeep, [halfX * 2 + 0.08, roof + 0.17, 0.08], [x, y0 - 0.02, z], { r: 0.02, mat: 'gloss' });
   // 결속부: 파랑 문형 틀과 끈 타래 (통로 위)
   const sz = mid(strapZ, minZ);
   for (const dx of [-1, 1]) k.box(C.blue, [0.14, 1.6, 0.5], [x + dx * (halfX + 0.05), y0, sz], { r: 0.06, mat: 'gloss', seg: 3 });
@@ -625,7 +626,7 @@ function baler(k: Kit): void {
     k.cyl(C.steel, 0.05, 0.14, [x + dx, y0 + 1.87, sz], { axis: 'x' });
   }
   // 배출구 테두리 (노랑)
-  k.box(C.yellow, [halfX * 2 + 0.3, 0.08, 0.07], [x, y0 + 0.95, outletZ + 0.2], { r: 0.02 });
+  k.box(C.yellow, [halfX * 2 + 0.3, 0.08, 0.07], [x, y0 + roof + 0.07, outletZ + 0.2], { r: 0.02 });
 }
 
 /** 본동 벽 네 장 (레일 좌표계 로컬). 벽마다 따로 조립해 카메라 쪽 벽을 숨길 수 있게 한다. 회색 벽 + 파랑 지붕선 */
@@ -823,7 +824,15 @@ function pileKerbs(k: Kit): void {
   }
 }
 
-/** 흩어진 파지 조각: 더미 둘레 띠, 배출구·받침대 앞 (합친 메시 하나) */
+const yardTmp = { x: 0, z: 0 };
+/** 남동 지게차 길·받침대·저울·지게차 대기 자리 근처인가 (마당 좌표) */
+function nearYardLane(p: P2): boolean {
+  const { x, z } = worldToYard(p[0], p[1], yardTmp);
+  if (YARD.homes.some(([hx, hz]) => Math.hypot(x - hx, z - hz) < 3.2)) return true;
+  return x > YARD.stand.x - 2.5 && x < YARD.laneEnd + 1 && z > YARD.laneZ - 5 && z < YARD.laneZ + 1.5;
+}
+
+/** 흩어진 파지 조각: 섹터 더미 둘레 띠 (합친 메시 하나). 지게차 자리·새 베일이 나오는 받침대 쪽에는 두지 않는다 */
 function debris(k: Kit): void {
   const rnd = random(731);
   const tones = [C.paper, C.kraftLight, C.paperGrey, C.kraft, C.white];
@@ -838,26 +847,18 @@ function debris(k: Kit): void {
       if (inside(p, pile)) continue;
       // 레일 밑·건물 안·저울 쪽은 비운다
       if (w < 9 || u > 22) continue;
+      // 지게차 대기 자리·받침대 앞 길·건물 뒤 숲은 비운다 (S2h #9)
+      if (nearYardLane(p) || FORESTS.some((f) => inside(p, f))) continue;
       const s = 0.12 + rnd() * 0.18;
       k.box(tones[i % tones.length]!, [s * 1.4, 0.03, s], [p[0], TOP + 0.04, p[1]], { r: 0, rot: [0, rnd() * Math.PI, 0] });
       placed += 1;
     }
   }
-  for (let i = 0; i < 90; i += 1) {
-    const [px, py] = [200 + rnd() * 52, 470 + rnd() * 36];
-    const p = sitePx(px, py);
-    if (HOUSE_POLYS.some((h) => inside(p, h))) continue;
-    const s = 0.1 + rnd() * 0.15;
-    k.box(tones[i % tones.length]!, [s * 1.3, 0.03, s], [p[0], TOP + 0.04, p[1]], { r: 0, rot: [0, rnd() * Math.PI, 0] });
-  }
 }
 
 function utilities(k: Kit): void {
-  // 가로등 몇 개 (트럭·지게차 길을 피한 자리)
-  for (const [x, y, rot] of [
-    [404, 205, Math.PI / 2],
-    [236, 300, 0],
-  ] as const) {
+  // 마당 가로등 (트럭·지게차 길을 피한 자리, `LAMP_PX`)
+  for (const [x, y, rot] of LAMP_PX) {
     const [wx, wz] = sitePx(x, y);
     lamp(k, wx, wz, rot + SITE_ROT_Y);
   }

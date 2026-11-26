@@ -2,11 +2,33 @@ import { describe, expect, it } from 'vitest';
 import { TANK_IDS } from '@ecocycle/shared';
 import type { TankId } from '@ecocycle/shared';
 import { DEMO_CYCLE, TANK_BASE_DEG } from '../../config/robotCycle';
+import { REAL_SIZE_M } from '../../config/yard';
 import { roundedPath, samplePath } from '../sim/paths';
 import type { P2, Pose } from '../sim/paths';
 import {
+  CLAMP_SCALE,
+  CLAMP_SHIFT,
+  FORESTS,
+  LOAD_BED_REAR,
+  LOAD_BED_Y,
+  LOAD_ORDER,
+  LOAD_SLOTS,
+  LOAD_TRUCK,
+  M,
+  M_PER_UNIT,
+  PHOTO,
+  WORKER_SCALE,
+  FORKLIFT_SCALE,
+  EXIT_LEAVE,
+  LAMP_PX,
+  POLE_PX,
+  ROAD,
+  ROAD_HOLDS,
+  ROAD_PX,
   BALE,
+  BALER,
   BALER_HOUSE,
+  BALER_TUNNEL,
   BALE_AREAS,
   BALE_AREA_PX,
   FORK_REACH,
@@ -37,6 +59,7 @@ import {
   TIP,
   TRUCK,
   TRUCK_IN,
+  TRUCK_REVERSE_RADIUS,
   YARD,
   centroid,
   clampToSite,
@@ -162,11 +185,85 @@ describe('사진 → 월드 변환 (sitePx)', () => {
     expect(siteHeading(0, -1) - siteHeading(1, 0)).toBeCloseTo(Math.PI / 2, 9);
   });
 
-  it('크기 비율: 베일 줄 간격이 사진(13.3 × 13.8px)과 ±3% 안, 트럭(56px)은 계근대(67px) 안에 들어간다', () => {
-    expect((BALE.w + 0.06) / SITE_SCALE / 13.3).toBeCloseTo(1, 1);
-    expect(Math.abs((BALE.d + 0.06) / SITE_SCALE / 13.8 - 1)).toBeLessThan(0.03);
-    expect(TRUCK.length).toBeLessThan(SCALE.length);
-    expect(TRUCK.length / SITE_SCALE).toBeGreaterThan(52);
+  it('축척(S2k): 마당 포장 판(사진 안·두 숲 밖)의 넓이가 부지 총면적 4,007 m²이 되는 배율이 1단위 = 2 m (±2%)', () => {
+    let cells = 0;
+    const step = 2;
+    for (let x = 0; x < PHOTO.width; x += step) {
+      for (let y = 0; y < PHOTO.height; y += step) {
+        const p: P2 = [x + step / 2, y + step / 2];
+        if (!inside(p, PLATEAU_PX)) continue;
+        const w = sitePx(p[0], p[1]);
+        if (FORESTS.some((f) => inside(w, f))) continue;
+        cells += 1;
+      }
+    }
+    const areaM2 = cells * (step * SITE_SCALE * M_PER_UNIT) ** 2;
+    expect(Math.abs(areaM2 / REAL_SIZE_M.siteAreaM2 - 1)).toBeLessThan(0.02);
+    expect(M(2)).toBe(1);
+  });
+
+  it('크기 비율(S2k): 베일 1.1 × 1.1 × 1.5 m, 트럭 7.5 × 2.4 m는 한 차로 안·계근대 안, 작업자 1.75 m', () => {
+    expect(BALE.w * M_PER_UNIT).toBeCloseTo(1.1, 6);
+    expect(BALE.h * M_PER_UNIT).toBeCloseTo(1.1, 6);
+    expect(BALE.d * M_PER_UNIT).toBeCloseTo(1.5, 6);
+    expect(TRUCK.length * M_PER_UNIT).toBeCloseTo(7.5, 6);
+    expect(TRUCK.width * M_PER_UNIT).toBeCloseTo(2.4, 6);
+    expect(TRUCK.width).toBeLessThan(ROAD.width / 2);
+    expect(TRUCK.length).toBeLessThan(SCALE.length * 0.85);
+    // 트럭 길이는 베일 길이의 5배, 폭은 베일 폭의 2.2배 (실제 비율)
+    expect(TRUCK.length / BALE.d).toBeCloseTo(5, 6);
+    expect(1.01 * WORKER_SCALE * M_PER_UNIT).toBeCloseTo(1.75, 6);
+    // 상차 트럭(25톤 카고, S2j): 12 × 2.5 m, 적재함 10.1 × 2.35 m. 베일 20자리(5열 × 2줄 × 2단)가 모두 적재함 안에, 서로 겹치지 않게
+    expect(LOAD_TRUCK.length * M_PER_UNIT).toBeCloseTo(12, 6);
+    expect(LOAD_TRUCK.width * M_PER_UNIT).toBeCloseTo(2.5, 6);
+    expect(LOAD_SLOTS).toHaveLength(20);
+    expect(LOAD_ORDER).toHaveLength(20);
+    expect(new Set(LOAD_ORDER).size).toBe(20);
+    for (const slot of LOAD_SLOTS) {
+      expect(slot.along - BALE.d / 2).toBeGreaterThanOrEqual(LOAD_BED_REAR - 1e-9);
+      expect(slot.along + BALE.d / 2).toBeLessThanOrEqual(LOAD_BED_REAR + LOAD_TRUCK.bedLength + 1e-9);
+      expect(Math.abs(slot.across) + BALE.w / 2).toBeLessThanOrEqual(LOAD_TRUCK.bedWidth / 2 + 1e-9);
+      expect(slot.level).toBeLessThan(2);
+    }
+    // 2단 높이(바닥 1.3 m + 베일 2개)는 도로 높이 제한 4 m 안
+    expect((LOAD_BED_Y + 2 * BALE.h) * M_PER_UNIT).toBeLessThan(4);
+    // 위 단 베일은 모두 아래 단 베일 위에 놓인다 (싣는 차례에서 아래가 먼저)
+    LOAD_ORDER.forEach((idx, k) => {
+      const s = LOAD_SLOTS[idx]!;
+      if (s.level === 0) return;
+      const below = LOAD_SLOTS.findIndex((o) => o.level === 0 && o.along === s.along && o.across === s.across);
+      expect(LOAD_ORDER.indexOf(below)).toBeGreaterThanOrEqual(0);
+      expect(LOAD_ORDER.indexOf(below)).toBeLessThan(k);
+    });
+    // 열 사이 틈은 고르게 나눈 틈(약 0.52 m)의 절반, 앞판 쪽은 그 틈, 남는 길이는 뒤 (S2j 사용자 결정)
+    const cols = [...new Set(LOAD_SLOTS.map((o) => o.along))].sort((p, q) => p - q);
+    expect(cols).toHaveLength(5);
+    for (let i = 1; i < cols.length; i += 1) expect((cols[i]! - cols[i - 1]! - BALE.d) * M_PER_UNIT).toBeCloseTo(0.26, 2);
+    expect((LOAD_BED_REAR + LOAD_TRUCK.bedLength - cols[4]! - BALE.d / 2) * M_PER_UNIT).toBeCloseTo(0.52, 2);
+    expect((cols[0]! - BALE.d / 2 - LOAD_BED_REAR) * M_PER_UNIT).toBeCloseTo(1.04, 2);
+    // 아래 단 10개를 다 채운 뒤 위 단 10개 (위아래 단이 5개씩 같은 자리, S2j 사용자 결정)
+    expect(LOAD_ORDER.slice(0, 10).every((i) => LOAD_SLOTS[i]!.level === 0)).toBe(true);
+    expect(LOAD_ORDER.slice(10).every((i) => LOAD_SLOTS[i]!.level === 1)).toBe(true);
+  });
+
+  it('지게차(S2k): 몸체 폭 1.2 m(3톤급), 베일 클램프 판 사이는 베일 폭(1.1 m)보다 넓고 판 길이는 베일 길이의 0.65 이상', () => {
+    expect(0.78 * FORKLIFT_SCALE * M_PER_UNIT).toBeCloseTo(1.2, 6);
+    expect(0.86 * FORKLIFT_SCALE).toBeLessThan(TRUCK.width * 0.65);
+    expect(2 * 0.415 * CLAMP_SCALE - 0.025 * CLAMP_SCALE).toBeGreaterThan(BALE.w);
+    expect(0.76 * CLAMP_SCALE).toBeGreaterThan(BALE.d * 0.65);
+    // 클램프 틀이 줄인 마스트(모형 x 0.52) 바로 앞에 붙는다
+    expect(0.6 * CLAMP_SCALE - CLAMP_SHIFT).toBeCloseTo(0.6 * FORKLIFT_SCALE, 9);
+  });
+
+  it('압축기·받침대·저울은 같은 베일(REAL_SIZE_M) 크기에 맞는다: 통로는 베일 단면보다 조금 크고, 저울 판은 베일 한 장보다 조금 크다 (S2k)', () => {
+    const inner = BALER.halfX * 2 - 0.24;
+    expect(inner).toBeGreaterThan(BALE.w);
+    expect(inner).toBeLessThan(BALE.w * 1.3);
+    expect(BALER_TUNNEL.roofY - BALER_TUNNEL.floorY).toBeGreaterThan(BALE.h);
+    expect(BALER_TUNNEL.roofY - BALER_TUNNEL.floorY).toBeLessThan(BALE.h * 1.25);
+    expect(YARD.stand.y).toBe(BALER_TUNNEL.floorY);
+    expect(YARD.scale.size).toBeGreaterThan(BALE.d);
+    expect(YARD.scale.size).toBeLessThan(BALE.d * 1.5);
   });
 
   it('북서 베일 구역은 남동 구역보다 북쪽·서쪽, 사무실은 북동, 계근대는 사무실 바로 아래, 입구 경사로는 계근대와 남동 구역 사이', () => {
@@ -291,6 +388,7 @@ describe('트럭 자리·경로 (1.4배 트럭의 외곽선 기준)', () => {
     ['더미 C → 계근대(출차 계근)', truckTipToScale('sector-c'), false, ['쏟는 자리 C', '계근대']],
     ['후진으로 계근대에서 내려옴', SCALE_REVERSE_OUT, true, ['계근대']],
     ['계근대 → 경사로 위 출차 대기', SCALE_TO_EXIT, false, ['계근대', '출차 대기']],
+    ['출차 대기 → 경사로 → 도로 끝 (출차, S2i)', EXIT_LEAVE, false, ['출차 대기']],
     ['계근대 → 상차 자리', SCALE_TO_HOLD, false, ['계근대', '상차 자리']],
     ['상차 자리에서 후진', HOLD_REVERSE, true, ['상차 자리']],
     ['상차 뒤 계근대로', HOLD_TO_SCALE, false, ['상차 자리', '계근대']],
@@ -302,6 +400,31 @@ describe('트럭 자리·경로 (1.4배 트럭의 외곽선 기준)', () => {
     }
   });
 
+  it('하역 후진(S2k): 앞으로 선 방향 그대로 후진을 시작하고, 후진 중 방향은 1단위(2 m)마다 60° 넘게 바뀌지 않으며 끝은 쏟는 자리 방향', () => {
+    const headings = (points: readonly P2[], reverse: boolean, radius: number): number[] => {
+      const path = roundedPath(points, radius);
+      const out: number[] = [];
+      for (let s = 0; s <= path.total + 1e-9; s += 0.02) out.push(samplePath(path, s, { x: 0, z: 0, heading: 0 }, reverse).heading);
+      return out;
+    };
+    const turn = (a: number, b: number): number => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+    for (const id of TANK_IDS as readonly TankId[]) {
+      const back = headings(truckReverse(id), true, TRUCK_REVERSE_RADIUS);
+      for (const into of [truckToTip(id), truckQueueToTip(id)]) {
+        const fwd = headings(into, false, 1.3);
+        expect(Math.abs(turn(fwd[fwd.length - 1]!, back[0]!)) / DEG, id).toBeLessThan(2);
+      }
+      for (let i = 0; i + 50 < back.length; i += 1) {
+        let acc = 0;
+        for (let k = i; k < i + 50; k += 1) acc += turn(back[k]!, back[k + 1]!);
+        expect(Math.abs(acc) / DEG, `${id} @ ${(i * 0.02).toFixed(2)}`).toBeLessThan(60);
+      }
+      // 진행 방향이 한 구간 안에서 뒤집히지 않는다 (앞뒤로 오가지 않음)
+      for (let i = 1; i < back.length; i += 1) expect(Math.abs(turn(back[i - 1]!, back[i]!)) / DEG).toBeLessThan(10);
+      expect(Math.abs(turn(back[back.length - 1]!, TIP[id].heading)) / DEG).toBeLessThan(1);
+    }
+  });
+
   it('쏟는 자리·상차 자리에 선 차는 다른 길을 막지 않는다 (마당 차례로 나누지 않는 길: 도로 → 계근대, 계근대 오르내림, 출차)', () => {
     const free = PATHS.filter(([name]) => ['도로 → 경사로 → 계근대 서쪽', '후진으로 계근대에 오름', '후진으로 계근대에서 내려옴', '계근대 → 경사로 위 출차 대기'].includes(name));
     for (const [name, points, reverse, skip] of free) {
@@ -309,6 +432,31 @@ describe('트럭 자리·경로 (1.4배 트럭의 외곽선 기준)', () => {
         // (출차 대기 자리의 차는 계근대 차례를 쥐고 있어 들어오는 차와 함께 있지 않다)
         for (const [spot, pose] of parkedExcept([...skip, '대기 자리', '출차 대기'])) expect(rectsHit(p, pose), `${name} × ${spot}`).toBe(false);
       }
+    }
+  });
+
+  it('전봇대·마당 가로등은 어느 트럭 경로·도로 줄·서 있는 자리의 외곽선과도 0.5m 넘게 떨어져 있다 (S2h #15)', () => {
+    const lamps: Array<[string, P2]> = [
+      ...POLE_PX.map((p, i): [string, P2] => [`전봇대 ${i + 1}`, sitePx(p[0], p[1])]),
+      ...LAMP_PX.map(([x, y], i): [string, P2] => [`가로등 ${i + 1}`, sitePx(x, y)]),
+    ];
+    const poses: Pose[] = [...PATHS.flatMap(([, points, reverse]) => sweep(points, reverse)), ...sweep(TRUCK_IN), ...ROAD_HOLDS, ...Object.values(SPOTS)];
+    for (const [name, q] of lamps) {
+      for (const p of poses) expect(inRect(q, p, 0.5 + 0.13), `${name} @ ${worldToPx(p.x, p.z).map((v) => v.toFixed(0))}`).toBe(false);
+    }
+  });
+
+  it('전봇대는 도로 가장자리 밖(가운데 선에서 도로 반폭 + 0.4 넘게)이다', () => {
+    const line = ROAD_PX.map(([x, y]) => sitePx(x, y));
+    const toSeg = (q: P2, a: P2, b: P2): number => {
+      const ab = sub(b, a);
+      const t = Math.max(0, Math.min(1, dot(sub(q, a), ab) / dot(ab, ab)));
+      return Math.hypot(q[0] - a[0] - ab[0] * t, q[1] - a[1] - ab[1] * t);
+    };
+    for (const p of POLE_PX) {
+      const q = sitePx(p[0], p[1]);
+      const d = Math.min(...line.slice(1).map((b, i) => toSeg(q, line[i]!, b)));
+      expect(d).toBeGreaterThan(ROAD.width / 2 + 0.4);
     }
   });
 
@@ -374,8 +522,8 @@ describe('베일 칸·받침대·저울·지게차 길 (마당 좌표계)', () =
   });
 
   it('칸 앞 자리의 지게차는 길에 걸치지 않는다 (칸·길 사이 거리)', () => {
-    expect(YARD.slotZ - YARD.laneZ - FORK_REACH - 0.62 * 1.15).toBeGreaterThan(0.6);
-    expect(YARD.nwLaneZ - YARD.nwSlotZ - FORK_REACH - 0.62 * 1.15).toBeGreaterThan(0.6);
+    expect(YARD.slotZ - YARD.laneZ - FORK_REACH - 0.62 * FORKLIFT_SCALE).toBeGreaterThan(0.6);
+    expect(YARD.nwLaneZ - YARD.nwSlotZ - FORK_REACH - 0.62 * FORKLIFT_SCALE).toBeGreaterThan(0.6);
   });
 });
 

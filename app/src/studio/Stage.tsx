@@ -190,7 +190,7 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
         <BalerParts director={director} status={frozen ? 'offline' : balerStatus} />
         <PlateScanFx director={director} />
         <Robot spec={robotSpec} source={jointSource} frozen={frozen} director={director} onSelect={onSelect} />
-        <Trucks director={director} onSelect={onSelect} blobs={baked} />
+        <Trucks director={director} onSelect={onSelect} blobs={baked} lite={baked} />
         <Forklifts director={director} onSelect={onSelect} blobs={baked} />
         <Bales director={director} onSelect={onSelect} />
         <Workers director={director} />

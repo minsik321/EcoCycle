@@ -8,7 +8,7 @@ import {
   BUYERS,
   COMPANIES,
   MIX_RATIOS,
-  OUTBOUND_EVERY_INBOUND,
+  OUTBOUND_CALL,
   OUTBOUND_HISTORY,
   OUTBOUND_TIMING_SEC,
   PICKS_PER_BATCH,
@@ -267,13 +267,6 @@ function sendBale(bale: Bale): void {
 // 상차: arrived → identified → loading(적치 베일을 하나씩 실음) → loaded → weighing_out → departed
 // 하역·상차가 끝나도 바로 출차하지 않는다. 출차 계근은 계근대가 비어 있을 때 시작해 VEHICLE_TIMING_SEC.weighOut(24초) 걸린다.
 
-/** 입고 차량 몇 대가 더 들어오면 상차 차량이 오나 (3~4대마다 한 대). 처음에는 입고 한 대 뒤에 바로 온다 */
-let inboundSinceOutbound = OUTBOUND_EVERY_INBOUND[0] - 1;
-let outboundAfter = OUTBOUND_EVERY_INBOUND[0];
-
-const rollOutboundAfter = () =>
-  OUTBOUND_EVERY_INBOUND[0] + Math.floor(Math.random() * (OUTBOUND_EVERY_INBOUND[1] - OUTBOUND_EVERY_INBOUND[0] + 1));
-
 /** 계근대 위에 차량이 있다 (도착·인식 또는 출차 계근 중) */
 const scaleBusy = (except?: VehicleRun) =>
   activeRuns.some((r) => r !== except && (r.vehicle.stage === 'arrived' || r.vehicle.stage === 'identified' || r.vehicle.stage === 'weighing_out'));
@@ -360,7 +353,6 @@ function spawnInbound(now: number): void {
     measured: { grossT: weight.grossT, tareT: null, netT: null },
     stageAt: now,
   };
-  inboundSinceOutbound += 1;
   activeRuns.push(run);
   sendVehicle(run.vehicle);
   notifyVehicleEvent('vehicle.arrived', run.vehicle);
@@ -377,18 +369,16 @@ function spawnOutbound(now: number): void {
     measured: { grossT: null, tareT: weighEmpty(truck), netT: null },
     stageAt: now,
   };
-  inboundSinceOutbound = 0;
-  outboundAfter = rollOutboundAfter();
   activeRuns.push(run);
   sendVehicle(run.vehicle);
   notifyVehicleEvent('vehicle.arrived', run.vehicle);
 }
 
-/** 계근대가 비어 있으면 차량 한 대를 들인다. 입고 3~4대마다 상차 한 대(상차 차량은 한 번에 한 대) */
+/** 계근대가 비어 있으면 차량 한 대를 들인다. 적치 베일이 기준(OUTBOUND_CALL) 이상이면 상차 차량을 먼저(한 번에 한 대) */
 function spawnVehicle(now: number): void {
   if (now - lastSpawnAt < VEHICLE_TIMING_SEC.spawnGap * 1000) return;
   if (scaleBusy()) return;
-  if (inboundSinceOutbound >= outboundAfter && !activeRuns.some((r) => r.outbound)) spawnOutbound(now);
+  if (!activeRuns.some((r) => r.outbound) && yardBales().length >= OUTBOUND_CALL.callAtYardBales) spawnOutbound(now);
   else spawnInbound(now);
 }
 
@@ -708,7 +698,8 @@ export const baleRecords = (): BaleRecord[] =>
 /** 시작할 때 표가 비어 있지 않게 지나간 예시 기록을 채워 둔다 (입고 차량 4대와 배치 4개. 베일을 싣는 상차 차량은 seedOutbound가 정한다) */
 function seedRecent(): void {
   const now = Date.now();
-  const weighOutAt = 31_000 + VEHICLE_TIMING_SEC.afterWork * 1000;
+  const unloadedAt = (VEHICLE_TIMING_SEC.identify + VEHICLE_TIMING_SEC.toSector + VEHICLE_TIMING_SEC.unload) * 1000;
+  const weighOutAt = unloadedAt + VEHICLE_TIMING_SEC.afterWork * 1000;
   const departAt = weighOutAt + VEHICLE_TIMING_SEC.weighOut * 1000;
   for (let i = 4; i >= 1; i -= 1) {
     const at = now - i * 9 * 60_000;
@@ -723,7 +714,7 @@ function seedRecent(): void {
       sectorId: company.sectorId,
       plate: truck.plate,
       companyName: company.name,
-      unloadedAt: iso(at + 31_000),
+      unloadedAt: iso(at + unloadedAt),
       ...weight,
       fillBeforePercent: round1(Math.max(0, fillAfter - fillGainPercent(weight.netT))),
       fillAfterPercent: fillAfter,
@@ -738,9 +729,9 @@ function seedRecent(): void {
       baleIds: [],
       stageTimes: {
         arrived: iso(at),
-        identified: iso(at + 6_000),
-        unloading: iso(at + 22_000),
-        unloaded: iso(at + 31_000),
+        identified: iso(at + VEHICLE_TIMING_SEC.identify * 1000),
+        unloading: iso(at + (VEHICLE_TIMING_SEC.identify + VEHICLE_TIMING_SEC.toSector) * 1000),
+        unloaded: iso(at + unloadedAt),
         weighing_out: iso(at + weighOutAt),
         departed: iso(at + departAt),
       },

@@ -245,6 +245,15 @@ describe('공정 기록 화면', () => {
     expect(within(row).getByText('18.42 t')).toBeInTheDocument();
   });
 
+  it('번호판 인식 전(plate null) 차량은 번호판 칸에 "인식 전", 회사는 "–"를 적는다 (S2l: 번호판은 계근대에서 인식)', async () => {
+    const pending: VehicleRecord = { ...UNLOADING, id: 'veh-20261015-036', status: 'identified', plate: null, companyName: null, sectorId: null, stageTimes: { arrived: UNLOADING.arrivedAt } };
+    vi.mocked(api.getRecords).mockImplementation(async () => page([pending]) as never);
+    app('/records');
+    const table = await screen.findByRole('table', { name: '차량 기록' });
+    const row = within(table).getByText('인식 전').closest('tr') as HTMLElement;
+    expect(within(row).getAllByText('–').length).toBeGreaterThanOrEqual(1);
+  });
+
   it('배치 탭: 배합(섹터 %)·목표 → 실제 압력·결과·베일, 건너뛴 배치는 실제 압력과 베일이 "–"', async () => {
     app('/records?tab=batches');
     expect(screen.getByRole('tab', { name: '배치' })).toHaveAttribute('aria-selected', 'true');
