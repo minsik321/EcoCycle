@@ -89,8 +89,8 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
       }
       // 상차 자리를 떠나는 순간: 서버가 실었다고 한 수(최대 20)를 다 실었다
       if (out.phase === 'loadBack' && !left.some((x) => x.id === out.id)) left.push({ id: out.id, loaded: loaded.length, want: Math.min(out.want, LOAD_ORDER.length) });
-      // 출차해 나가는 동안에도 실린 베일은 차를 따라간다
-      if (out.leaving) expect(loaded.length).toBe(Math.min(out.want, LOAD_ORDER.length));
+      // 출차해 나가는 동안에도 실린 베일은 차를 따라간다 (서버가 departed를 먼저 보내도 상차 자리에서 마지막 베일을 마저 싣고 움직인다)
+      if (out.leaving && out.phase !== 'loading') expect(loaded.length, `t=${t.toFixed(1)} ${out.id} ${out.stage}`).toBe(Math.min(out.want, LOAD_ORDER.length));
     });
     expect(placements).toBeGreaterThanOrEqual(30);
     expect(checkedBales).toBeGreaterThan(1000);

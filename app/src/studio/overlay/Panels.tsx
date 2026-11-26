@@ -24,7 +24,7 @@ import { VIEWS } from '../world/views';
 import type { ViewPreset } from '../world/views';
 import { Icon } from './icons';
 import type { IconName } from './icons';
-import { BALE_STAGE_TEXT, BATCH_STAGE_TEXT, VEHICLE_STAGE_TEXT, cycleSteps, deviceLine, mixText, onSiteVehicles, shortId } from './text';
+import { BALE_STAGE_TEXT, BATCH_STAGE_TEXT, VEHICLE_KIND_LABEL, VEHICLE_STAGE_TEXT, cycleSteps, deviceLine, mixText, onSiteVehicles, plateText, shortId } from './text';
 import type { CycleStep } from './text';
 
 // 스튜디오의 유리 패널들. 3D 위에 떠 있고, 값은 받은 그대로 표시한다.
@@ -426,7 +426,7 @@ export function Detail({ data, disconnected, selection, onSelect, deviceActions,
     const vehicle = data.vehicles.find((v) => v.id === id);
     return (
       <aside className={shell} aria-label="차량 상세">
-        <DetailHead icon="truck" eyebrow="입고 차량" title={vehicle?.plate ?? '번호판 인식 중'} sub={vehicle?.companyName ?? undefined} onClose={close} />
+        <DetailHead icon="truck" eyebrow="입고 차량" title={vehicle ? plateText(vehicle) : '번호판 인식 전'} sub={vehicle?.companyName ?? undefined} onClose={close} />
         {vehicle ? (
           <div className={stale}>
             <div className="st-detail-status">
@@ -591,13 +591,13 @@ function NowCard({ data, disconnected, selection, onSelect }: PanelCommon) {
   const stale = disconnected ? ' st-stale' : '';
   if (picked) {
     return (
-      <button type="button" className={`st-now${stale}`} onClick={() => onSelect(`veh:${picked.id}`)} aria-label={`차량 ${picked.plate ?? '번호판 인식 중'} 보기`}>
+      <button type="button" className={`st-now${stale}`} onClick={() => onSelect(`veh:${picked.id}`)} aria-label={`차량 ${plateText(picked)} 보기`}>
         <span className="st-now-icon">
           <Icon name="truck" size={22} />
         </span>
         <span className="st-now-text">
-          <b>{picked.plate ?? '번호판 인식 중'}</b>
-          <small>{picked.companyName ?? '계중대'}</small>
+          <b>{plateText(picked)}</b>
+          <small>{picked.companyName ?? VEHICLE_KIND_LABEL[picked.kind]}</small>
           <span className="st-pill st-pill-blue">{VEHICLE_STAGE_TEXT[picked.stage]}</span>
           <small>
             {picked.sectorId ? `섹터 ${SECTOR_LABEL[picked.sectorId]} · ` : ''}
@@ -701,7 +701,7 @@ function TableBody({ tab, data, disconnected, selection, onSelect, openRecord }:
             {onSiteVehicles(data.vehicles).map((v) => (
               <tr key={v.id} {...row(`veh:${v.id}`, { kind: 'vehicle', id: v.id })}>
                 <td>
-                  <b className="st-cell-main">{v.plate ?? '인식 중'}</b>
+                  <b className="st-cell-main">{plateText(v, true)}</b>
                   <small className="st-cell-sub">{v.companyName ?? '–'}</small>
                 </td>
                 <td className="st-col-opt">{v.kind === 'outbound' ? '상차' : v.sectorId ? `섹터 ${SECTOR_LABEL[v.sectorId]}` : '계중대'}</td>
@@ -1196,11 +1196,11 @@ export function Pins({ data, disconnected, selection, onSelect, pins, yardFull =
         .map((v) => {
           const key = `veh:${v.id}`;
           return (
-            <button key={key} {...pinProps(key, `차량 ${v.plate ?? '번호판 인식 중'} ${VEHICLE_STAGE_TEXT[v.stage]}`)} className="st-pin st-pin-vehicle">
+            <button key={key} {...pinProps(key, `차량 ${plateText(v)} ${VEHICLE_STAGE_TEXT[v.stage]}`)} className="st-pin st-pin-vehicle">
               <span className="st-pin-card">
-                <span className="st-plate">{v.plate ?? '인식 중…'}</span>
+                <span className="st-plate">{plateText(v, true)}</span>
                 <span className="st-pin-text">
-                  <small>{v.companyName ?? '계중대'}</small>
+                  <small>{v.companyName ?? VEHICLE_KIND_LABEL[v.kind]}</small>
                   <strong>
                     {v.sectorId ? `${SECTOR_LABEL[v.sectorId]} · ` : ''}
                     {VEHICLE_STAGE_TEXT[v.stage]}

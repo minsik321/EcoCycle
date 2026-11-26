@@ -5,6 +5,7 @@ import { LAMP_PX, PHOTO, POLE_PX, SITE_ROT_Y, TRUCK, sitePx, worldToPx } from '.
 import type { P2 } from './paths';
 import { Director, PLATE_SHOW_SEC } from './director';
 import type { TruckPhase } from './director';
+import { VEHICLE_TIMING_SEC } from '../../../../mock-server/src/fixtures/process';
 
 // S2i 차량 동선 회귀 (사용자 수정 #4·#5·#6·#7·#8). 시연 원본과 모의 서버의 단계 시간(fixtures/process VEHICLE_TIMING_SEC) 둘 다로 돌린다.
 //  - 출차 계근 → 출차까지 한 걸음(0.05초) 사이에 자리(0.5m)·방향(0.25rad)이 튀지 않는다 (#6)
@@ -19,28 +20,32 @@ const DT = 0.05;
 const iso = (ms: number) => new Date(ms).toISOString();
 type Feed = (tSec: number) => ReturnType<typeof demoData>;
 
-/** 모의 서버의 입고 차량 단계 시간: 인식 6초, 섹터 앞 16초, 하역 9초, 출차 계근 시작 4초, 출차 계근 24초 */
+/** 모의 서버의 입고 차량 단계 시간(fixtures/process VEHICLE_TIMING_SEC): 인식 18초, 섹터 앞 16초, 하역 9초, 출차 계근 시작 4초, 출차 계근 24초 */
+const S = VEHICLE_TIMING_SEC;
 const MOCK_STEPS: Array<[Vehicle['stage'], number]> = [
   ['arrived', 0],
-  ['identified', 6],
-  ['unloading', 22],
-  ['unloaded', 31],
-  ['weighing_out', 35],
-  ['departed', 59],
+  ['identified', S.identify],
+  ['unloading', S.identify + S.toSector],
+  ['unloaded', S.identify + S.toSector + S.unload],
+  ['weighing_out', S.identify + S.toSector + S.unload + S.afterWork],
+  ['departed', S.identify + S.toSector + S.unload + S.afterWork + S.weighOut],
 ];
+/** 모의 서버처럼 앞 차가 계근대를 비운 뒤(spawnGap 넘게) 다음 차가 온다 */
+const MOCK_EVERY = Math.max(60, S.spawnGap, S.identify + S.toSector + 10);
+const DEPARTED_AT = MOCK_STEPS[MOCK_STEPS.length - 1]![1];
 const mockFeed: Feed = (tSec) => {
   const data = demoData(T0, Math.floor(tSec));
   const vehicles: Vehicle[] = [];
-  for (let n = 0; n * 60 <= tSec; n += 1) {
-    const age = tSec - n * 60;
+  for (let n = 0; n * MOCK_EVERY <= tSec; n += 1) {
+    const age = tSec - n * MOCK_EVERY;
     let stage: Vehicle['stage'] = 'arrived';
     const stageTimes: Vehicle['stageTimes'] = {};
     for (const [s, at] of MOCK_STEPS) {
       if (age < at) continue;
       stage = s;
-      stageTimes[s] = iso(T0 + (n * 60 + at) * 1000);
+      stageTimes[s] = iso(T0 + (n * MOCK_EVERY + at) * 1000);
     }
-    if (stage === 'departed' && age > 70) continue;
+    if (stage === 'departed' && age > DEPARTED_AT + 11) continue;
     const known = stage !== 'arrived';
     vehicles.push({ id: `m-${n}`, kind: 'inbound', baleIds: [], stage, plate: known ? `1${n % 10}가 3456` : null, companyName: known ? '예시' : null, sectorId: known ? (n % 2 ? 'sector-a' : 'sector-c') : null, stageTimes, updatedAt: iso(T0) });
   }

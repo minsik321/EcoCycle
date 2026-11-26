@@ -3,7 +3,7 @@ import { onSiteVehicles } from '../../config/processDisplay';
 import { demoData } from '../demo/demoData';
 import { PLATEAU_PX, RAMP_PX, SCALE, inside, sitePx, worldToPx } from '../world/layout';
 import type { Vehicle } from '@ecocycle/shared';
-import { Director } from './director';
+import { Director, PLATE_READ_SEC } from './director';
 
 // 부지 전체의 차량 흐름을 오래 돌려 본다 (시연 원본: 입고 차량과 상차 차량 모두 서버 값 모양). 월드 시계 20Hz.
 //  - 트럭·지게차·베일이 겹치지 않는다 (트럭은 1.4배 외곽선)
@@ -88,7 +88,12 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
       // 번호판 인식 장면은 서버 번호판만 적는다
       if (d.plateScan.active) {
         const v = vehicles.find((x) => x.id === d.plateScan.truckId);
-        expect(d.plateScan.plate).toBe(v?.plate ?? null);
+        // 서버 값 그대로. 다만 계근대에 막 선 뒤 PLATE_READ_SEC 동안은 읽는 중이라 비어 있다 (S2l)
+        if (d.plateScan.plate !== (v?.plate ?? null)) {
+          expect(d.plateScan.plate).toBeNull();
+          expect(d.plateScan.out).toBe(false);
+          expect(d.plateScan.t).toBeLessThanOrEqual(PLATE_READ_SEC + 0.11);
+        }
       }
       for (const id of before) if (!d.trucks.some((x) => x.active && x.id === id)) finished.add(id);
       for (const token of [d.scaleToken, d.yardToken]) {

@@ -38,6 +38,17 @@ export const VEHICLE_STAGE_ROW_TEXT: Record<VehicleStage, string> = {
   departed: '출차',
 };
 
+/**
+ * 번호판 인식 전(서버 plate null) 문구. 번호판은 계근대에서 인식하므로(명세 6절) 입구에 막 들어온 차는 번호판이 없다.
+ * 계근대 위 인식 장면의 "인식 중…"은 3D 장면 쪽 글이다(studio/overlay)
+ */
+export const PLATE_PENDING_TEXT = '번호판 인식 전';
+/** 좁은 칸(표의 번호판 칸, 핀)의 인식 전 문구 */
+export const PLATE_PENDING_SHORT = '인식 전';
+/** 번호판 또는 인식 전 문구 */
+export const plateText = (vehicle: { plate: string | null }, short = false): string =>
+  vehicle.plate ?? (short ? PLATE_PENDING_SHORT : PLATE_PENDING_TEXT);
+
 /** 차량 종류 이름 ("입고"·"상차"). 서버 검색이 찾는 이름과 같다(`shared/search.ts`) */
 export const VEHICLE_KIND_LABEL: Record<VehicleKind, string> = VEHICLE_KIND_TEXT;
 
