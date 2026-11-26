@@ -17,7 +17,10 @@ import type { Token } from './token';
 //  5. 서버가 출하(`shipped`)라 한 베일은 북서에서 빠진다: 북서에 있으면 그 베일(깔렸으면 맨 위 베일과 이름표를 바꿔 맨 위)을,
 //     아직 남동·받침대·저울에 있으면 그 베일은 이름 없는 재고가 되고 북서 맨 위 베일 하나가 빠진다(이름표를 넘겨 받는다).
 //  6. 상차 차량이 상차 자리에 서면 지게차가 북서 맨 위 베일을 하나씩 꺼내 적재함에 싣는다(LOAD_SLOTS만큼).
-//  - 처음 장면을 열 때 남동·북서에 이름 없는 재고(서버 베일이 아니다, 숫자·이름이 없다)가 쌓여 있다(seStartColumns, nwStartColumns).
+//  - 처음 장면을 열 때 남동·북서에 이름 없는 재고(숫자·이름이 없다)가 쌓여 있다(seStartColumns, nwStartColumns = YARD_SEED_BALES칸).
+//    처음 본 오래된 적치 베일(서버 created)은 이 재고에 하나씩 이름을 붙인다(오래된 것부터 북서 → 남동, S2q). 모의 서버는 이 칸 수만큼
+//    적치 베일을 가진 채 시작하므로 서버 베일 수 = 마당 베일 수다. 서버 베일이 오기 전(연결 전)이나 재고보다 적으면(시연, 실서버 초기)
+//    남는 칸은 이름 없는 재고로 둔다(지금까지와 같음), 재고보다 많으면 남는 베일은 남동 빈 칸에 놓는다.
 //  - 남동 길(laneZ)은 한 대씩만 쓴다(`laneHolder`): 받침대·저울·칸 앞 작업은 길을 잡은 채 한다. 대기 자리는 길 뒤(−z)라 길을 막지 않는다.
 //  - 트럭이 다니는 마당 가운데(가로지르는 길)와 북서 길은 마당 차례(`yardToken`, 트럭과 같은 것)를 잡은 하나만 간다.
 //    차례는 대기 자리에서 길을 잡기 전에 잡고, 돌아와 남동 길 동쪽 끝에 들어선 뒤에 놓는다.
@@ -381,7 +384,16 @@ export class Yard {
     for (const b of fresh) {
       this.seq += 1;
       const age = nowMs - Date.parse(b.stageTimes.created ?? b.updatedAt);
-      // 처음 본 대상이 이미 오래됐으면 지나간 장면을 지어내지 않고 있어야 할 곳(남동 칸)에 바로 놓는다
+      // 처음 본 대상이 이미 오래됐으면 지나간 장면을 지어내지 않고 있어야 할 곳에 바로 놓는다:
+      // 이름 없는 바탕 재고가 있으면 그 베일이 이 서버 베일이 된다(오래된 것부터 북서, S2q), 없으면 남동 빈 칸
+      if (age >= FRESH_MS && this.pending.length === 0) {
+        const stock = this.anonymousStock();
+        if (stock) {
+          stock.id = b.id;
+          stock.seq = this.seq;
+          continue;
+        }
+      }
       const slot = age >= FRESH_MS && this.pending.length === 0 ? this.nextSeSingle() : -1;
       const bale = slot >= 0 ? this.allocate() : null;
       if (bale) {
@@ -391,6 +403,25 @@ export class Yard {
         this.pending.push({ id: b.id, seq: this.seq });
       }
     }
+  }
+
+  /**
+   * 서버 베일에 맡길 이름 없는 재고 하나: 북서의 오래된 열부터, 그다음 남동의 오래된 열부터, 열 안에서는 아래 단부터.
+   * 칸에 쌓여 있고 지게차가 맡지 않은 것만. 없으면 null
+   */
+  private anonymousStock(): BaleSim | null {
+    for (const se of [false, true]) {
+      const cols = se ? SE_COLS : NW_COLS;
+      const age = se ? this.seAge : this.nwAge;
+      const order = Array.from({ length: cols }, (_, c) => c).sort((a, b) => age[a]! - age[b]!);
+      for (const c of order) {
+        for (let l = 0; l < LEVELS; l += 1) {
+          const b = this.slotBale[se ? seSlot(c, l) : nwSlot(c, l)];
+          if (b && b.active && !b.id && b.state === 'stack' && b.owner === 0) return b;
+        }
+      }
+    }
+    return null;
   }
 
   /** 이 출하 베일은 지금 상차 자리의 차에 실린다 (지게차가 북서에서 하나를 꺼내 싣는 것으로 보여 준다) */

@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Bale } from '@ecocycle/shared';
-import { YARD_CAPACITY, YARD_FLOW } from '../../config/yard';
+import { YARD_CAPACITY, YARD_FLOW, YARD_SEED_BALES } from '../../config/yard';
 import { demoData } from '../demo/demoData';
 import { YARD } from '../world/layout';
 import { Director } from './director';
+import { Yard } from './yard';
 import type { YardAudit } from './yard';
 
 // 베일 적치 흐름(docs/dashboard-spec.md 3절): 배출 → 받침대(새 베일이 앞 베일을 밀어냄) → 저울(두 개 겹쳐 한 번에) → 남동 칸(한 쌍씩)
@@ -150,6 +151,60 @@ describe('베일 적치: 받침대 → 저울 → 남동 → 북서', () => {
     expect(after.seStacked + after.onStand + after.onScale + after.carried).toBe(before.seStacked + before.onStand + before.onScale + before.carried);
     expect(after.active).toBe(before.active - 1);
     expect(d.bales.some((b) => b.active && b.id === targetId)).toBe(false);
+  });
+
+  it('처음 본 오래된 적치 베일은 바탕 재고에 이름을 붙인다: 재고 칸 수만큼이면 장면 베일 수 = 서버 적치 수, 오래된 것은 북서 (S2q)', () => {
+    /** 모의 서버 시작 상태 흉내: n개의 오래된 적치 베일(1분 간격, 가장 새 것도 FRESH_MS보다 오래됨) */
+    const seeded = (n: number): Bale[] =>
+      Array.from({ length: n }, (_, i) => ({
+        id: `BL-S${String(i).padStart(3, '0')}`,
+        batchId: `batch-${i}`,
+        stage: 'created' as const,
+        vehicleId: null,
+        stageTimes: { created: iso(T0 - (n - i) * 60_000) },
+        updatedAt: iso(T0 - (n - i) * 60_000),
+      }));
+    const stacked = (y: Yard) => y.bales.filter((b) => b.active && b.state === 'stack');
+    const nwFrom = YARD_FLOW.seColumns * YARD_FLOW.levels;
+
+    // 연결 전: 바탕 재고만(이름 없음)
+    const y = new Yard();
+    expect(stacked(y)).toHaveLength(YARD_SEED_BALES);
+    expect(stacked(y).every((b) => !b.id)).toBe(true);
+
+    // 재고 칸 수만큼 오면 모두 이름이 붙고 새 베일은 늘지 않는다
+    const list = seeded(YARD_SEED_BALES);
+    y.sync(list, T0);
+    expect(stacked(y)).toHaveLength(YARD_SEED_BALES);
+    expect(y.bales.filter((b) => b.active)).toHaveLength(YARD_SEED_BALES);
+    expect(new Set(stacked(y).map((b) => b.id))).toEqual(new Set(list.map((b) => b.id)));
+    expect(y.audit().active).toBe(YARD_SEED_BALES);
+    expect(y.audit().slotErrors).toEqual([]);
+    // 오래된 36개는 북서, 나머지는 남동
+    const nwIds = new Set(list.slice(0, YARD_FLOW.nwColumns * YARD_FLOW.levels).map((b) => b.id));
+    for (const b of stacked(y)) expect(b.slot >= nwFrom).toBe(nwIds.has(b.id));
+
+    // 서버가 오래된 20개를 출하하면 북서에서 20개가 빠지고 장면 베일 수가 서버 적치 수를 따른다
+    const after = list.map((b, i) => (i < 20 ? { ...b, stage: 'shipped' as const, stageTimes: { ...b.stageTimes, shipped: iso(T0 + 60_000) }, updatedAt: iso(T0 + 60_000) } : b));
+    const nwBefore = y.audit().nwStacked;
+    y.sync(after, T0 + 60_000);
+    expect(y.audit().active).toBe(YARD_SEED_BALES - 20);
+    expect(y.audit().nwStacked).toBe(nwBefore - 20);
+
+    // 재고보다 적으면 남는 칸은 이름 없는 재고로 남는다(시연·실서버 초기)
+    const few = new Yard();
+    few.sync(seeded(10), T0);
+    expect(stacked(few)).toHaveLength(YARD_SEED_BALES);
+    expect(stacked(few).filter((b) => b.id)).toHaveLength(10);
+    expect(stacked(few).filter((b) => b.id).every((b) => b.slot >= nwFrom)).toBe(true);
+
+    // 재고보다 많으면 남는 베일은 남동 빈 칸으로
+    const many = new Yard();
+    many.sync(seeded(YARD_SEED_BALES + 6), T0);
+    expect(stacked(many)).toHaveLength(YARD_SEED_BALES + 6);
+    expect(stacked(many).every((b) => b.id)).toBe(true);
+    expect(many.audit().slotErrors).toEqual([]);
+    expect(many.audit().baleOnBale).toBe(0);
   });
 
   it('지게차 한 대 설정으로도 시연 원본을 따라가고 겹침이 없다', async () => {

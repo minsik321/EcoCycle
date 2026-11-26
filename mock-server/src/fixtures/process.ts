@@ -83,14 +83,20 @@ export interface BuyerFixture {
 }
 
 /**
- * 상차 차량 부르기 (가정값 ⚠ 실서버는 서버 담당이 정한다, S2l 사용자 결정 2026-11-26).
- * 적치(마당, created) 베일이 `callAtYardBales`개 이상이면 상차 차량 한 대를 부른다(한 번에 한 대).
- * 한 대는 베일 `balesPerTruck`개를 싣는다(적치가 그보다 적으면 있는 만큼). 3D 마당 칸은 80칸(app/src/config/yard.ts YARD_CAPACITY)이라
- * 부르는 기준 + 상차 동안 새로 나오는 베일이 그 아래에 머물게 한다(app/src/test/vehicleFlow.test.ts가 장시간 돌려 본다).
+ * 상차 차량 부르기 (가정값 ⚠ B41 실서버는 서버 담당이 정한다, S2l 2026-11-26 → S2q 2026-11-27 사용자 결정 A안).
+ * - 시작할 때 적치(마당, created) 베일을 `seedYardBales`개 가진 채 시작한다: 3D 마당의 바탕 재고 칸 수
+ *   (app/src/config/yard.ts YARD_SEED_BALES = 북서 nwStartColumns 9열 × 4단 36 + 남동 seStartColumns 8열 × 4단 32 = 68).
+ *   3D는 이 서버 베일에 바탕 재고 칸을 하나씩 맡긴다(오래된 것부터 북서).
+ * - 적치 베일이 `callAboveYardBales`개(= 3D 북서 칸 수 nwColumns 9 × levels 4 = 36, YARD_CALL_ABOVE_BALES)를 넘으면,
+ *   곧 위쪽(북서) 줄이 가득 차면 상차 차량 한 대를 부른다(한 번에 한 대).
+ * - 한 대는 베일 `balesPerTruck`개를 싣는다(적치가 그보다 적으면 있는 만큼).
+ * 모의 서버는 app을 import할 수 없어 같은 값을 여기에도 적는다: 두 값이 같은지는 app/src/test/vehicleFlow.test.ts가 보고,
+ * 적치가 3D 마당 칸 80(YARD_CAPACITY)을 넘지 않는지도 같은 시험이 장시간 돌려 본다.
  */
 export const OUTBOUND_CALL = {
   balesPerTruck: 20,
-  callAtYardBales: 40,
+  callAboveYardBales: 36,
+  seedYardBales: 68,
 };
 
 const PER_TRUCK = OUTBOUND_CALL.balesPerTruck;
