@@ -235,6 +235,12 @@ describe('사진 → 월드 변환 (sitePx)', () => {
       expect(LOAD_ORDER.indexOf(below)).toBeGreaterThanOrEqual(0);
       expect(LOAD_ORDER.indexOf(below)).toBeLessThan(k);
     });
+    // 열 사이 틈은 고르게 나눈 틈(약 0.52 m)의 절반, 앞판 쪽은 그 틈, 남는 길이는 뒤 (S2j 사용자 결정)
+    const cols = [...new Set(LOAD_SLOTS.map((o) => o.along))].sort((p, q) => p - q);
+    expect(cols).toHaveLength(5);
+    for (let i = 1; i < cols.length; i += 1) expect((cols[i]! - cols[i - 1]! - BALE.d) * M_PER_UNIT).toBeCloseTo(0.26, 2);
+    expect((LOAD_BED_REAR + LOAD_TRUCK.bedLength - cols[4]! - BALE.d / 2) * M_PER_UNIT).toBeCloseTo(0.52, 2);
+    expect((cols[0]! - BALE.d / 2 - LOAD_BED_REAR) * M_PER_UNIT).toBeCloseTo(1.04, 2);
     // 아래 단 10개를 다 채운 뒤 위 단 10개 (위아래 단이 5개씩 같은 자리, S2j 사용자 결정)
     expect(LOAD_ORDER.slice(0, 10).every((i) => LOAD_SLOTS[i]!.level === 0)).toBe(true);
     expect(LOAD_ORDER.slice(10).every((i) => LOAD_SLOTS[i]!.level === 1)).toBe(true);
