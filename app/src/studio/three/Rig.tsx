@@ -4,6 +4,7 @@ import type { MutableRefObject } from 'react';
 import type { PerspectiveCamera } from 'three';
 import type { Director } from '../sim/director';
 import { useWaker } from './motion';
+import { frameView } from './framing';
 import { angleDelta } from '../sim/paths';
 import { DEFAULT_VIEW, TIER_DISTANCE, WIDE_VIEW, clampToSite, closeDistance, siteHeading, sitePx, tierOf } from '../world/layout';
 import type { ViewPreset, ViewTier } from '../world/layout';
@@ -59,9 +60,6 @@ const DRAG_GLIDE = 22;
 /** 대상을 볼 때의 천정각 */
 const FOCUS_POLAR = 52;
 
-/** 프리셋 거리는 이 가로세로 비(패널을 뺀 빈 영역)에 맞춘 값이다. 더 좁은 화면에서는 그만큼 물러난다 */
-const REFERENCE_ASPECT = (1440 - 320) / 900;
-
 /** 사진처럼 남쪽에서 북쪽을 보는 카메라 방위각(도): 프리셋의 azimuth는 이 값에서 잰다 */
 const SOUTH_AZ = (siteHeading(0, 1) * 180) / Math.PI;
 
@@ -70,77 +68,6 @@ const fromPreset = (p: ViewPreset): View => {
   const [x, z] = sitePx(p.at[0], p.at[1]);
   return { x, y: p.height, z, dist: p.distance, az: SOUTH_AZ + p.azimuth, pol: p.polar, fov: p.fov ?? BASE_FOV };
 };
-
-/**
- * 부지 전체(wide) 화면에 다 들어와야 하는 외곽 꼭짓점 (사진 px, 바닥 높이 0): 마당 포장 판(PLATEAU)의 서쪽·남쪽 끝과 남동 울타리,
- * 동쪽 옹벽·도로 가장자리, 북쪽 숲 가장자리. 사진 밖으로 나간 포장 판 서쪽 끝(x −60)까지 담는다
- */
-const OUTLINE: readonly (readonly [number, number])[] = ([
-  [-60, 318],
-  [-60, 680],
-  [200, 680],
-  [240, 600],
-  [300, 548],
-  [420, 446],
-  [470, 384],
-  [503, 334],
-  [514, 276],
-  [513, 200],
-  [498, 40],
-  [252, 0],
-  [0, 0],
-] as const).map(([x, y]) => sitePx(x, y));
-/** 외곽 꼭짓점이 패널 가장자리에서 떨어져야 하는 여백(px) */
-const OUTLINE_MARGIN = 10;
-
-/** 보는 점(tx, ty, tz)·거리·방위·천정각에서 외곽 꼭짓점이 모두 패널 밖 빈 화면 안에 투영되는가 */
-function outlineFits(
-  tx: number,
-  ty: number,
-  tz: number,
-  dist: number,
-  a: number,
-  p: number,
-  tanHalf: number,
-  width: number,
-  height: number,
-  ins: { right: number; bottom: number; top: number },
-): boolean {
-  // 카메라 → 보는 점 방향(f)과 화면 축(오른쪽 r, 위 u). lookAt(위 = +y)과 같다
-  const dx = Math.sin(p) * Math.cos(a);
-  const dy = Math.cos(p);
-  const dz = -Math.sin(p) * Math.sin(a);
-  const fx = -dx;
-  const fy = -dy;
-  const fz = -dz;
-  let rx = -fz;
-  let rz = fx;
-  const rl = Math.hypot(rx, rz) || 1;
-  rx /= rl;
-  rz /= rl;
-  const ux = -rz * fy;
-  const uy = rz * fx - rx * fz;
-  const uz = rx * fy;
-  const aspect = width / Math.max(1, height);
-  const cx = tx + dx * dist;
-  const cy = ty + dy * dist;
-  const cz = tz + dz * dist;
-  const left = -1 + (2 * OUTLINE_MARGIN) / width;
-  const right = 1 - (2 * (ins.right + OUTLINE_MARGIN)) / width;
-  const bottom = -1 + (2 * (ins.bottom + OUTLINE_MARGIN)) / height;
-  const top = 1 - (2 * (ins.top + OUTLINE_MARGIN)) / height;
-  for (const [x, z] of OUTLINE) {
-    const vx = x - cx;
-    const vy = -cy;
-    const vz = z - cz;
-    const depth = vx * fx + vy * fy + vz * fz;
-    if (depth <= 0.1) return false;
-    const sx = (vx * rx + vz * rz) / (depth * tanHalf * aspect);
-    const sy = (vx * ux + vy * uy + vz * uz) / (depth * tanHalf);
-    if (sx < left || sx > right || sy < bottom || sy > top) return false;
-  }
-  return true;
-}
 
 /** 안개 기본 범위 (Stage의 fog와 같다) */
 const FOG_NEAR = 170;
@@ -320,45 +247,8 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
 
     const a = c.az * DEG;
     const p = c.pol * DEG;
-    const ins = insetRef.current;
-    // 세로 화면에서는 위아래가 남으므로 구역(mid)은 다 물러나지 않는다(최대 1.3배)
-    const wideness = Math.min(1, Math.max(0, (c.dist - TIER_DISTANCE.mid) / (TIER_DISTANCE.wide - TIER_DISTANCE.mid)));
-    const ratio = REFERENCE_ASPECT / Math.max(0.3, (size.width - ins.right) / Math.max(1, size.height));
-    const fit = Math.min(1.3 + wideness * 2.3, Math.max(1, ratio));
-    // 거리 → 보는 점(패널에 가려지지 않게 화면에서 왼쪽·위로 민 점)
-    const tanHalf = Math.tan((camera.fov * DEG) / 2);
-    // (눈높이로 수평에 가깝게 보는 화면(사진 방향)은 위아래 밀기를 하지 않는다: 바닥 위로 밀면 카메라가 앞뒤로 몇 m씩 옮겨 간다)
-    const level = Math.min(1, Math.max(0, (84 - c.pol) / 14));
-    const aim = (dist: number): void => {
-      const upp = (2 * dist * tanHalf) / Math.max(1, size.height);
-      const shiftRight = (ins.right / 2) * upp;
-      const shiftDown = ((((ins.bottom - ins.top) / 2) * upp) / Math.max(0.3, Math.cos(p))) * level;
-      aimAt.x = c.x - Math.sin(a) * shiftRight + Math.cos(a) * shiftDown;
-      aimAt.z = c.z - Math.cos(a) * shiftRight - Math.sin(a) * shiftDown;
-    };
-    let dist = c.dist * fit;
-    // 부지 전체(wide, 비스듬히 볼 때)는 부지 외곽(포장 판의 서쪽·남쪽 끝, 옹벽, 숲 가장자리)이 패널 밖 빈 화면에 다 들어오는 거리까지 물러난다.
-    // 화면비·패널을 어림하지 않고 외곽 꼭짓점을 직접 투영해 잰다. 구역(mid)과 위에서 보기는 그대로다
-    const oblique = Math.min(1, Math.max(0, (c.pol - 10) / 10));
-    if (wideness > 0 && oblique > 0) {
-      const fits = (d: number): boolean => {
-        aim(d);
-        return outlineFits(aimAt.x, c.y, aimAt.z, d, a, p, tanHalf, size.width, size.height, ins);
-      };
-      if (!fits(dist)) {
-        let lo = dist;
-        let hi = dist * 2.5;
-        if (fits(hi)) {
-          for (let i = 0; i < 14; i += 1) {
-            const m = (lo + hi) / 2;
-            if (fits(m)) hi = m;
-            else lo = m;
-          }
-        }
-        dist += (hi - dist) * wideness * oblique;
-      }
-    }
-    aim(dist);
+    // 화면비·패널·부지 외곽에 맞춘 거리와 보는 점 (framing.ts, 단위 테스트로 고정)
+    const dist = frameView(c, camera.fov, size.width, size.height, insetRef.current, aimAt);
     const tx = aimAt.x;
     const tz = aimAt.z;
     camera.position.set(tx + Math.sin(p) * Math.cos(a) * dist, c.y + Math.cos(p) * dist, tz - Math.sin(p) * Math.sin(a) * dist);
