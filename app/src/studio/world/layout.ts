@@ -979,30 +979,28 @@ export const SCALE_CLEAR = 6.6;
 
 /**
  * 상차 차량(25톤 카고)의 베일 자리: 트럭 기준 (앞뒤 along, 옆 across(+는 트럭 로컬 +z), 단 level). 베일 1.5 m 쪽이 차 길이 방향,
- * 6열 × 2줄 × 2단 = 24자리 (S2j 사용자 결정). 적재함 10.1 × 2.35 m 안에 틈 0.1 m로 든다
+ * 5열 × 2줄 × 2단 = 20자리, 위아래 단이 같은 자리에 5개씩 맞게 (S2j 사용자 결정). 열은 적재함 길이 10.1 m를 다섯으로 나눈 가운데에 고르게 둔다
  */
 export interface LoadSlot {
   along: number;
   across: number;
   level: number;
 }
-const LOAD_COLS = 6;
-const LOAD_PITCH = BALE.d + BALE_GAP;
-const LOAD_ALONG0 = LOAD_BED_REAR + 0.1 + BALE.d / 2;
+const LOAD_COLS = 5;
+const LOAD_PITCH = LOAD_TRUCK.bedLength / LOAD_COLS;
+const LOAD_ALONG0 = LOAD_BED_REAR + LOAD_PITCH / 2;
 const LOAD_ACROSS = BALE.w / 2 + BALE_GAP / 2;
 export const LOAD_SLOTS: readonly LoadSlot[] = [0, 1].flatMap((level) =>
   [-1, 1].flatMap((side) => Array.from({ length: LOAD_COLS }, (_, i) => ({ along: LOAD_ALONG0 + i * LOAD_PITCH, across: side * LOAD_ACROSS, level }))),
 );
 /**
- * 싣는 차례(LOAD_SLOTS 번호, 20개): 서쪽 곁(트럭 로컬 −z, 북쪽을 보고 선 차의 서쪽)에서 가까운 줄 아래 단 6개 → 위 단 가운데 4개,
- * 이어서 차 앞을 돌아 동쪽 곁(+z)에서 같은 순서. 한쪽 곁 베일을 몰아 실어 돌아가는 것은 한 번뿐이다.
- * 서버가 실었다고 한 수(baleIds)가 이보다 적으면 앞에서부터 그만큼만 싣는다
+ * 싣는 차례(LOAD_SLOTS 번호, 20개): 아래 단을 다 채운 뒤 위 단 (S2j 사용자 결정).
+ * 서쪽 곁(트럭 로컬 −z, 북쪽을 보고 선 차의 서쪽) 아래 단 5개 → 차 앞을 돌아 동쪽 곁 아래 단 5개 → 그대로 동쪽 위 단 5개 → 다시 돌아 서쪽 위 단 5개.
+ * 돌아가는 것은 두 번뿐이다. 서버가 실었다고 한 수(baleIds)가 이보다 적으면 앞에서부터 그만큼만 싣는다
  */
 const slotIndex = (side: -1 | 1, level: number, col: number): number => level * 2 * LOAD_COLS + (side < 0 ? 0 : LOAD_COLS) + col;
-export const LOAD_ORDER: readonly number[] = ([-1, 1] as const).flatMap((side) => [
-  ...[0, 1, 2, 3, 4, 5].map((c) => slotIndex(side, 0, c)),
-  ...[1, 2, 3, 4].map((c) => slotIndex(side, 1, c)),
-]);
+const COLS = Array.from({ length: LOAD_COLS }, (_, c) => c);
+export const LOAD_ORDER: readonly number[] = ([[-1, 0], [1, 0], [1, 1], [-1, 1]] as const).flatMap(([side, level]) => COLS.map((c) => slotIndex(side, level, c)));
 /** 상차 차량의 적재함 바닥 높이 */
 export const LOAD_BED_Y = LOAD_TRUCK.deckY;
 

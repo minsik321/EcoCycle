@@ -213,10 +213,10 @@ describe('사진 → 월드 변환 (sitePx)', () => {
     // 트럭 길이는 베일 길이의 5배, 폭은 베일 폭의 2.2배 (실제 비율)
     expect(TRUCK.length / BALE.d).toBeCloseTo(5, 6);
     expect(1.01 * WORKER_SCALE * M_PER_UNIT).toBeCloseTo(1.75, 6);
-    // 상차 트럭(25톤 카고, S2j): 12 × 2.5 m, 적재함 10.1 × 2.35 m. 베일 24자리가 모두 적재함 안에, 서로 겹치지 않게
+    // 상차 트럭(25톤 카고, S2j): 12 × 2.5 m, 적재함 10.1 × 2.35 m. 베일 20자리(5열 × 2줄 × 2단)가 모두 적재함 안에, 서로 겹치지 않게
     expect(LOAD_TRUCK.length * M_PER_UNIT).toBeCloseTo(12, 6);
     expect(LOAD_TRUCK.width * M_PER_UNIT).toBeCloseTo(2.5, 6);
-    expect(LOAD_SLOTS).toHaveLength(24);
+    expect(LOAD_SLOTS).toHaveLength(20);
     expect(LOAD_ORDER).toHaveLength(20);
     expect(new Set(LOAD_ORDER).size).toBe(20);
     for (const slot of LOAD_SLOTS) {
@@ -235,6 +235,9 @@ describe('사진 → 월드 변환 (sitePx)', () => {
       expect(LOAD_ORDER.indexOf(below)).toBeGreaterThanOrEqual(0);
       expect(LOAD_ORDER.indexOf(below)).toBeLessThan(k);
     });
+    // 아래 단 10개를 다 채운 뒤 위 단 10개 (위아래 단이 5개씩 같은 자리, S2j 사용자 결정)
+    expect(LOAD_ORDER.slice(0, 10).every((i) => LOAD_SLOTS[i]!.level === 0)).toBe(true);
+    expect(LOAD_ORDER.slice(10).every((i) => LOAD_SLOTS[i]!.level === 1)).toBe(true);
   });
 
   it('지게차(S2k): 몸체 폭 1.2 m(3톤급), 베일 클램프 판 사이는 베일 폭(1.1 m)보다 넓고 판 길이는 베일 길이의 0.65 이상', () => {
