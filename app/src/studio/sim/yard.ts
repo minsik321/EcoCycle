@@ -600,6 +600,43 @@ export class Yard {
     return n;
   }
 
+  /**
+   * 상차를 그 자리에서 끝낸다 (상차 차가 출차 단계에서 오래 기다렸는데 싣는 지게차가 길에서 막혀 끝나지 않을 때, S2j).
+   * 든 베일·돌려 잡기 자리에 내려 둔 베일은 적재함의 다음 자리에 놓고(북서에서 이미 빠졌다), 지게차는 일을 내려놓아 대기 자리로 돌아간다.
+   * 이렇게 해야 앞 차가 떠나고, 앞 차를 기다리는 다음 차와 길을 막은 쪽이 다시 움직인다
+   */
+  abortLoad(): void {
+    for (const f of this.forklifts) {
+      if (f.task?.kind !== 'load') continue;
+      for (const b of this.bales) {
+        if (!b.active || b.owner !== f.id || (b.state !== 'carried' && b.state !== 'ground')) continue;
+        const i = this.loadedCount();
+        if (i < LOAD_ORDER.length && this.loader.present) {
+          b.state = 'loaded';
+          b.load = i;
+          this.loadClaimed[i] = true;
+          this.stats.loadedOut += 1;
+        } else {
+          b.active = false;
+          b.state = 'gone';
+          b.id = '';
+        }
+        b.owner = 0;
+      }
+      f.carrying = null;
+      f.carrying2 = null;
+      f.cross = false;
+      f.legs = [];
+      f.task = null;
+      f.path = null;
+      f.speed = 0;
+      f.forkGoal = null;
+      f.blockedT = 0;
+      f.idleT = 0;
+      this.token?.release(`forklift:${f.id}`);
+    }
+  }
+
   /** 상차 차량에 싣는 지게차가 있다 */
   loadingBusy(): boolean {
     return this.forklifts.some((f) => f.task?.kind === 'load');
