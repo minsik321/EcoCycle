@@ -98,8 +98,10 @@ export function outlineFits(
 /**
  * 실제 카메라 거리를 돌려주고 보는 점(패널에 가려지지 않게 화면에서 왼쪽·위로 민 점)을 out에 적는다.
  * - 구역(mid ≤ 44)·사진 방향·close: 화면비 맞춤만 (wideness 0)
- * - 위에서 보기(천정각 작음)·베일 적치(mid 52)처럼 외곽 맞춤을 쓰지 않는 화면: 53cac92 식 그대로
- *   (좁은 화면의 넓은 거리는 1 + 0.24 × wideness × narrow만큼 더 물러난다)
+ * - 베일 적치(mid 52): 53cac92 식 그대로 (좁은 화면의 넓은 거리는 1 + 0.24 × wideness × narrow만큼 더 물러난다)
+ * - 위에서 보기(천정각 작음): 53cac92 식으로 시작하고, 그 거리에서 부지 외곽이 패널에 가려질 때만 다 들어오는 거리까지 물러난다.
+ *   폰·태블릿(세로 빈 화면)은 53cac92 식 거리에서 이미 다 들어와 그대로이고, 오른쪽 상세 패널과 위·아래 패널이 함께 있는
+ *   데스크톱(가로 빈 화면이 낮다)만 물러난다 (S2g)
  * - 비스듬한 부지 전체(wide): 그 덧셈 없이 시작해 부지 외곽 꼭짓점이 빈 화면에 다 들어오는 거리까지 물러난다
  */
 export function frameView(c: FrameState, fovDeg: number, width: number, height: number, ins: FrameInset, out: { x: number; z: number }): number {
@@ -107,9 +109,10 @@ export function frameView(c: FrameState, fovDeg: number, width: number, height: 
   const p = c.pol * DEG;
   // 세로 화면에서는 위아래가 남으므로 구역(mid)은 다 물러나지 않는다(최대 1.3배)
   const wideness = Math.min(1, Math.max(0, (c.dist - TIER_DISTANCE.mid) / (TIER_DISTANCE.wide - TIER_DISTANCE.mid)));
-  // 외곽 맞춤의 몫: wide 단계 쪽 절반(mid·wide 중간 → wide)에서만 0 → 1, 비스듬히 볼 때만. 베일 적치(52)·위에서 보기(천정각 1)는 0
+  // 외곽 맞춤의 몫: wide 단계 쪽 절반(mid·wide 중간 → wide)에서만 0 → 1. 베일 적치(52)·구역은 0
   const half = (TIER_DISTANCE.wide + TIER_DISTANCE.mid) / 2;
   const outlineShare = Math.min(1, Math.max(0, (c.dist - half) / (TIER_DISTANCE.wide - half)));
+  // 53cac92 덧셈(boost)을 빼는 몫은 비스듬히 볼 때만: 위에서 보기(천정각 1)는 덧셈을 그대로 두고 외곽 맞춤은 모자랄 때만 더한다
   const oblique = Math.min(1, Math.max(0, (c.pol - 10) / 10));
   const outlineWeight = outlineShare * oblique;
   const ratio = REFERENCE_ASPECT / Math.max(0.3, (width - ins.right) / Math.max(1, height));
@@ -128,9 +131,9 @@ export function frameView(c: FrameState, fovDeg: number, width: number, height: 
     out.z = c.z - Math.cos(a) * shiftRight - Math.sin(a) * shiftDown;
   };
   let dist = c.dist * fit;
-  // 부지 전체(wide, 비스듬히 볼 때)는 부지 외곽(포장 판의 서쪽·남쪽 끝, 옹벽, 숲 가장자리)이 패널 밖 빈 화면에 다 들어오는 거리까지 물러난다.
-  // 화면비·패널을 어림하지 않고 외곽 꼭짓점을 직접 투영해 잰다
-  if (outlineWeight > 0) {
+  // 부지 전체(wide, 비스듬히 또는 위에서)는 부지 외곽(포장 판의 서쪽·남쪽 끝, 옹벽, 숲 가장자리)이 패널 밖 빈 화면에 다 들어오는 거리까지 물러난다.
+  // 화면비·패널을 어림하지 않고 외곽 꼭짓점을 직접 투영해 잰다. 이미 다 들어오면 거리를 바꾸지 않는다(물러나기만 한다)
+  if (outlineShare > 0) {
     const fits = (d: number): boolean => {
       aim(d);
       return outlineFits(out.x, c.y, out.z, d, a, p, tanHalf, width, height, ins);
@@ -145,7 +148,7 @@ export function frameView(c: FrameState, fovDeg: number, width: number, height: 
           else lo = m;
         }
       }
-      dist += (hi - dist) * outlineWeight;
+      dist += (hi - dist) * outlineShare;
     }
   }
   aim(dist);
