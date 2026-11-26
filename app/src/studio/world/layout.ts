@@ -979,7 +979,7 @@ export const SCALE_CLEAR = 6.6;
 
 /**
  * 상차 차량(25톤 카고)의 베일 자리: 트럭 기준 (앞뒤 along, 옆 across(+는 트럭 로컬 +z), 단 level). 베일 1.5 m 쪽이 차 길이 방향,
- * 5열 × 2줄 × 2단 = 20자리, 위아래 단이 같은 자리에 5개씩 맞게 (S2j 사용자 결정). 열은 적재함 길이 10.1 m를 다섯으로 나눈 가운데에 고르게 둔다
+ * 5열 × 2줄 × 2단 = 20자리, 위아래 단이 같은 자리에 5개씩 맞게 (S2j 사용자 결정). 열은 앞(운전석) 쪽으로 모으고 남는 길이는 뒤에 둔다
  */
 export interface LoadSlot {
   along: number;
@@ -987,8 +987,13 @@ export interface LoadSlot {
   level: number;
 }
 const LOAD_COLS = 5;
-const LOAD_PITCH = LOAD_TRUCK.bedLength / LOAD_COLS;
-const LOAD_ALONG0 = LOAD_BED_REAR + LOAD_PITCH / 2;
+/** 적재함을 다섯으로 고르게 나눴을 때의 열 사이 틈 (약 0.52 m) */
+const LOAD_EVEN_GAP = LOAD_TRUCK.bedLength / LOAD_COLS - BALE.d;
+/** 열 사이 틈은 그 절반, 맨 앞 열과 앞판 사이는 그 틈 그대로, 남는 길이는 모두 맨 뒤 열과 뒷판 사이 (S2j 사용자 결정) */
+export const LOAD_COL_GAP = LOAD_EVEN_GAP / 2;
+export const LOAD_FRONT_GAP = LOAD_EVEN_GAP;
+const LOAD_PITCH = BALE.d + LOAD_COL_GAP;
+const LOAD_ALONG0 = LOAD_BED_REAR + LOAD_TRUCK.bedLength - LOAD_FRONT_GAP - BALE.d / 2 - (LOAD_COLS - 1) * LOAD_PITCH;
 const LOAD_ACROSS = BALE.w / 2 + BALE_GAP / 2;
 export const LOAD_SLOTS: readonly LoadSlot[] = [0, 1].flatMap((level) =>
   [-1, 1].flatMap((side) => Array.from({ length: LOAD_COLS }, (_, i) => ({ along: LOAD_ALONG0 + i * LOAD_PITCH, across: side * LOAD_ACROSS, level }))),

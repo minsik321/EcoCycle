@@ -200,6 +200,8 @@ const WEIGH_SEC = 2.0;
 export const PLATE_SHOW_SEC = 3.2;
 /** 상차 자리에서 서버가 출차 계근을 준 뒤 마지막 베일을 기다리는 최대 시간(초). 넘으면 새로 싣지 않고 떠난다 */
 const LOAD_WAIT_SEC = 150;
+/** 그 뒤에도 싣는 지게차가 끝나지 않으면 상차를 그 자리에서 끝내기까지 더 기다리는 시간(초) */
+const LOAD_STUCK_SEC = 30;
 /** 계근대에 선 뒤 번호판을 읽는 데 걸리는 최소 시간(초, 연출): 서버 값이 먼저 와 있어도 이만큼은 "인식 중"을 보인다 */
 export const PLATE_READ_SEC = 1.0;
 /** 계근대에 오르기 전(도로·경사로·후진 중): 번호판·회사를 보이지 않는다 (S2l) */
@@ -757,7 +759,10 @@ export class Director {
           t.weighT += dt;
           this.revealIdentity(t);
           if (t.plate) t.plateT += dt;
-          if (t.stage !== 'arrived' && (!t.bay || !this.tipBusy(t, t.bay) || !this.queueBusy(t))) this.yardToken.wanted = true;
+          // 갈 수 있을 때만 마당 차례를 바란다. 상차 차량은 상차 자리가 비었을 때만: 앞 상차 차가 아직 서 있는데 바라면
+          // 지게차가 마지막 베일을 실으러 마당 차례를 잡지 못하고, 앞 차는 싣는 지게차를 기다려 떠나지 못해 서로 멈춘다 (S2j)
+          const canGo = t.outbound ? !this.holdBusy(t) : !t.bay || !this.tipBusy(t, t.bay) || !this.queueBusy(t);
+          if (t.stage !== 'arrived' && canGo) this.yardToken.wanted = true;
           if (t.weighT < WEIGH_SEC || (t.plate !== null && t.plateT < PLATE_SHOW_SEC)) break;
           if (t.outbound) {
             if (t.stage !== 'arrived' && !this.holdBusy(t) && this.yardToken.take(t.id)) {
@@ -860,6 +865,8 @@ export class Director {
           // 장면이 오래 못 따라가면(LOAD_WAIT_SEC) 새로 싣기를 멈추고, 들고 오던 베일만 놓은 뒤 떠난다 (덜 실은 만큼은 떠날 때 clearLoaded가 서버 수에 맞춘다)
           const leaveStage = t.stage === 'weighing_out' || t.stage === 'departed';
           if (leaveStage) t.leaveWaitT += dt;
+          // 싣는 지게차가 길에서 막혀 끝나지 않으면(다른 차·지게차가 비키지 않음) 더 기다리지 않고 그 자리에서 상차를 끝낸다: 서로 기다려 멈추지 않게 (S2j)
+          if (leaveStage && t.leaveWaitT >= LOAD_WAIT_SEC + LOAD_STUCK_SEC && this.yard.loadingBusy()) this.yard.abortLoad();
           const leave = leaveStage && !this.yard.loadingBusy() && (this.yard.loadingDone() || t.leaveWaitT >= LOAD_WAIT_SEC);
           // 오래 기다려도 다 못 실었으면(북서 재고가 비는 등) 남은 베일을 적재함에 바로 놓고 떠난다: 실린 수가 서버 값과 같게
           if (leave && !this.yard.loadingDone()) this.yard.preload(t.want);

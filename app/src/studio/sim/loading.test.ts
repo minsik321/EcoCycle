@@ -168,4 +168,51 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
     });
     expect(done).toBeGreaterThanOrEqual(3);
   });
+
+  it('싣는 지게차가 길에서 막혀 끝나지 않아도 상차 차는 출차 단계에서 오래 기다리지 않고 실은 채 떠난다 (서로 기다려 멈추지 않는다)', () => {
+    // 브라우저에서 본 일: 상차 차가 departed 뒤 14개에서 멈춰 떠나지 않았다 (싣는 지게차가 막혀 상차가 끝나지 않고, 차는 그 지게차를 기다렸다).
+    // 여기서는 싣는 지게차의 길을 계속 막아 같은 상태를 만든다
+    const d = new Director();
+    const yard = d.yard as unknown as { hits: (...a: unknown[]) => boolean };
+    const realHits = yard.hits.bind(d.yard);
+    let id = '';
+    let blockAt = -1;
+    let departAt = -1;
+    let left = -1;
+    let loadedAtLeave = -1;
+    let want = 0;
+    for (let i = 0; i * DT < 900; i += 1) {
+      const t = i * DT;
+      if (i % 20 === 0) {
+        const data = demoData(T0, Math.floor(t));
+        const out = data.vehicles.find((v) => v.kind === 'outbound' && (v.id === id || (!id && v.stage === 'loading')));
+        if (out && !id) id = out.id;
+        // 막힌 뒤 20초에 서버가 출차를 준다 (그 전에는 상차 중)
+        if (out && blockAt >= 0 && t >= blockAt + 20) {
+          out.stage = 'departed';
+          if (departAt < 0) departAt = t;
+        } else if (out) out.stage = 'loading';
+        d.sync({ devices: data.devices, vehicles: data.vehicles, batches: data.batches, bales: data.bales }, T0 + t * 1000);
+      }
+      // 싣는 지게차가 베일을 든 채 움직이기 시작하면 그 뒤로 길을 계속 막는다
+      if (blockAt < 0 && t > 60 && d.forklifts.some((f) => f.task?.kind === 'load' && f.carrying)) {
+        blockAt = t;
+        yard.hits = (f: unknown, ...rest: unknown[]) => ((f as ForkliftSim).task?.kind === 'load' ? true : realHits(f, ...rest));
+      }
+      d.step(DT);
+      const truck = d.trucks.find((x) => x.active && x.id === id);
+      if (truck && truck.phase === 'loading') want = Math.min(truck.want, LOAD_ORDER.length);
+      if (left < 0 && departAt >= 0 && truck && truck.phase !== 'loading') {
+        left = t;
+        loadedAtLeave = d.bales.filter((b) => b.active && b.state === 'loaded').length;
+      }
+    }
+    expect(blockAt).toBeGreaterThan(0);
+    expect(departAt).toBeGreaterThan(0);
+    expect(left, '상차 차가 떠나지 못했다').toBeGreaterThan(0);
+    // 출차 뒤 기다리는 시간(150초) + 막힌 상차를 끝내기까지(30초) + 옆판을 올리고 차례를 잡는 몇 초
+    expect(left - departAt).toBeLessThan(150 + 30 + 20);
+    // 떠날 때 서버가 실었다고 한 수만큼 실려 있다 (든 베일도 적재함에)
+    expect(loadedAtLeave).toBe(want);
+  });
 });
