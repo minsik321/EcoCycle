@@ -208,7 +208,7 @@ export const POLE_PX: readonly P2[] = [26, 140, 244, 356, 452, 510, 580].map((py
  * 섹터 A에 쏟는 트럭 안, [404, 205]가 대기 자리로 가는 트럭에 닿았다). 하나는 사무실 서쪽 벽 앞, 하나는 섹터 A 더미 북서
  */
 export const LAMP_PX: ReadonlyArray<readonly [number, number, number]> = [
-  [410, 198, Math.PI / 2],
+  [410, 190, Math.PI / 2],
   [172, 292, 0],
 ];
 

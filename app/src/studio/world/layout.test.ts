@@ -5,6 +5,14 @@ import { DEMO_CYCLE, TANK_BASE_DEG } from '../../config/robotCycle';
 import { roundedPath, samplePath } from '../sim/paths';
 import type { P2, Pose } from '../sim/paths';
 import {
+  CLAMP_SCALE,
+  CLAMP_SHIFT,
+  FORKLIFT_SCALE,
+  LAMP_PX,
+  POLE_PX,
+  ROAD,
+  ROAD_HOLDS,
+  ROAD_PX,
   BALE,
   BALER_HOUSE,
   BALE_AREAS,
@@ -162,11 +170,20 @@ describe('사진 → 월드 변환 (sitePx)', () => {
     expect(siteHeading(0, -1) - siteHeading(1, 0)).toBeCloseTo(Math.PI / 2, 9);
   });
 
-  it('크기 비율: 베일 줄 간격이 사진(13.3 × 13.8px)과 ±3% 안, 트럭(56px)은 계근대(67px) 안에 들어간다', () => {
+  it('크기 비율: 베일 줄 간격이 사진(13.3 × 13.8px)과 ±3% 안, 트럭은 한 차로 안·계근대의 0.6~0.75 (S2h: 부지에 맞춰 줄임)', () => {
     expect((BALE.w + 0.06) / SITE_SCALE / 13.3).toBeCloseTo(1, 1);
     expect(Math.abs((BALE.d + 0.06) / SITE_SCALE / 13.8 - 1)).toBeLessThan(0.03);
-    expect(TRUCK.length).toBeLessThan(SCALE.length);
-    expect(TRUCK.length / SITE_SCALE).toBeGreaterThan(52);
+    expect(TRUCK.width).toBeLessThan(ROAD.width / 2);
+    expect(TRUCK.length / SCALE.length).toBeGreaterThan(0.6);
+    expect(TRUCK.length / SCALE.length).toBeLessThan(0.75);
+  });
+
+  it('지게차: 몸체는 트럭 폭보다 좁고(0.9배 몸체 폭 0.77), 베일 클램프 판 사이는 베일 폭보다 넓고 판 길이는 베일 길이의 0.85 이상', () => {
+    expect(0.86 * FORKLIFT_SCALE).toBeLessThan(TRUCK.width * 0.65);
+    expect(2 * 0.415 * CLAMP_SCALE - 0.025 * CLAMP_SCALE).toBeGreaterThan(BALE.w);
+    expect(0.76 * CLAMP_SCALE).toBeGreaterThan(BALE.d * 0.85);
+    // 클램프 틀이 줄인 마스트(모형 x 0.52) 바로 앞에 붙는다
+    expect(0.6 * CLAMP_SCALE - CLAMP_SHIFT).toBeCloseTo(0.6 * FORKLIFT_SCALE, 9);
   });
 
   it('북서 베일 구역은 남동 구역보다 북쪽·서쪽, 사무실은 북동, 계근대는 사무실 바로 아래, 입구 경사로는 계근대와 남동 구역 사이', () => {
@@ -309,6 +326,31 @@ describe('트럭 자리·경로 (1.4배 트럭의 외곽선 기준)', () => {
         // (출차 대기 자리의 차는 계근대 차례를 쥐고 있어 들어오는 차와 함께 있지 않다)
         for (const [spot, pose] of parkedExcept([...skip, '대기 자리', '출차 대기'])) expect(rectsHit(p, pose), `${name} × ${spot}`).toBe(false);
       }
+    }
+  });
+
+  it('전봇대·마당 가로등은 어느 트럭 경로·도로 줄·서 있는 자리의 외곽선과도 0.5m 넘게 떨어져 있다 (S2h #15)', () => {
+    const lamps: Array<[string, P2]> = [
+      ...POLE_PX.map((p, i): [string, P2] => [`전봇대 ${i + 1}`, sitePx(p[0], p[1])]),
+      ...LAMP_PX.map(([x, y], i): [string, P2] => [`가로등 ${i + 1}`, sitePx(x, y)]),
+    ];
+    const poses: Pose[] = [...PATHS.flatMap(([, points, reverse]) => sweep(points, reverse)), ...sweep(TRUCK_IN), ...ROAD_HOLDS, ...Object.values(SPOTS)];
+    for (const [name, q] of lamps) {
+      for (const p of poses) expect(inRect(q, p, 0.5 + 0.13), `${name} @ ${worldToPx(p.x, p.z).map((v) => v.toFixed(0))}`).toBe(false);
+    }
+  });
+
+  it('전봇대는 도로 가장자리 밖(가운데 선에서 도로 반폭 + 0.4 넘게)이다', () => {
+    const line = ROAD_PX.map(([x, y]) => sitePx(x, y));
+    const toSeg = (q: P2, a: P2, b: P2): number => {
+      const ab = sub(b, a);
+      const t = Math.max(0, Math.min(1, dot(sub(q, a), ab) / dot(ab, ab)));
+      return Math.hypot(q[0] - a[0] - ab[0] * t, q[1] - a[1] - ab[1] * t);
+    };
+    for (const p of POLE_PX) {
+      const q = sitePx(p[0], p[1]);
+      const d = Math.min(...line.slice(1).map((b, i) => toSeg(q, line[i]!, b)));
+      expect(d).toBeGreaterThan(ROAD.width / 2 + 0.4);
     }
   });
 
