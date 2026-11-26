@@ -10,7 +10,7 @@ import { bale as baleParts } from '../world/props';
 
 const WHEEL_R = 0.26;
 
-function wheel(radius = WHEEL_R, width = 0.2): Group {
+export function wheel(radius = WHEEL_R, width = 0.2): Group {
   const k = new Kit('clay');
   k.cyl(C.rubber, radius, width, [0, 0, 0], { axis: 'z', seg: 22 });
   k.cyl(C.rubber, radius * 0.94, width + 0.03, [0, 0, 0], { axis: 'z', seg: 22 });
@@ -40,7 +40,7 @@ export interface TruckModel {
 }
 
 /** 흰 꼭짓점 색으로 조립한 띠에 트럭 전용 재질을 입힌다 (재질 색이 곧 띠 색) */
-function stripeGroup(k: Kit, material: MeshPhysicalMaterial): Group {
+export function stripeGroup(k: Kit, material: MeshPhysicalMaterial): Group {
   const group = k.build();
   group.traverse((o) => {
     const mesh = o as Mesh;

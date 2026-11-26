@@ -42,6 +42,8 @@ import type { Mover } from './mover';
 import { angleDelta, roundedPath, samplePath } from './paths';
 import type { P2, Path, Pose } from './paths';
 import { Token } from './token';
+import { grappleKey, grappleMidUnload, grappleSim, grappleStowed, inboundBody, resetGrapple, stepGrapple } from './grapple';
+import type { GrappleSim } from './grapple';
 import { Yard } from './yard';
 import type { BaleSim, ForkliftSim, LoaderState } from './yard';
 
@@ -132,6 +134,10 @@ export interface TruckSim extends Mover {
   leaving: boolean;
   /** 나가는 차가 길에서 막혀 서 있은 시간(초): 드물게 서로 막히면(하역 없이 출차한 차 등) 오래 기다리지 않고 뺀다 */
   stuckT: number;
+  /** 입고 집게차(S2m): 차량 ID로 정한 모양(덤프 1 : 집게차 2, sim/grapple의 inboundBody). 상차 차량은 늘 false */
+  grapple: boolean;
+  /** 집게차의 받침다리·크레인·집게 (덤프·상차 차량은 쓰지 않는다) */
+  crane: GrappleSim;
 }
 
 export type WorkerPose = 'walk' | 'stand' | 'tablet' | 'wave';
@@ -317,7 +323,7 @@ export class Director {
   }
 
   private addTruckSlot(): TruckSim {
-    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, serverPlate: null, serverCompany: null, outbound: false, want: 0, sides: 0, leaveWaitT: 0, weighT: 0, plateT: 0, clearS: 0, y: 0, leaving: false, stuckT: 0 };
+    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, serverPlate: null, serverCompany: null, outbound: false, want: 0, sides: 0, leaveWaitT: 0, weighT: 0, plateT: 0, clearS: 0, y: 0, leaving: false, stuckT: 0, grapple: false, crane: grappleSim() };
     this.trucks.push(t);
     return t;
   }
@@ -393,6 +399,8 @@ export class Director {
     truck.serverPlate = v.plate;
     truck.outbound = v.kind === 'outbound';
     truck.want = v.baleIds.length;
+    truck.grapple = !truck.outbound && inboundBody(v.id) === 'grapple';
+    resetGrapple(truck.crane);
     truck.bedTilt = 0;
     truck.load = 1;
     truck.pouring = false;
@@ -415,8 +423,10 @@ export class Director {
       const tip = TIP[v.sectorId];
       this.place(truck, tip.x, tip.z, tip.heading);
       truck.phase = 'atTip';
-      truck.bedTilt = v.stage === 'unloading' ? 1 : 0;
+      truck.bedTilt = v.stage === 'unloading' && !truck.grapple ? 1 : 0;
       truck.load = v.stage === 'unloading' ? 0.5 : 0;
+      if (truck.grapple && v.stage === 'unloading') grappleMidUnload(truck.crane);
+      else if (truck.grapple) resetGrapple(truck.crane, 0);
     } else if (v.sectorId && v.stage !== 'arrived' && this.tipBusy(truck, v.sectorId) && !this.queueBusy(truck)) {
       // 인식됐지만 배정 더미 앞이 차 있다: 기다리는 자리에
       this.place(truck, QUEUE.x, QUEUE.z, QUEUE.heading);
@@ -571,7 +581,7 @@ export class Director {
     if (this.plateScan.active) k += Math.min(this.plateScan.t, 3) * 4.9 + (this.plateScan.plate ? 7.7 : 0);
     for (const id of TANK_IDS) k += this.fill[id] * 0.013;
     this.trucks.forEach((t, i) => {
-      if (t.active) k += (t.x * 1.3 + t.z * 2.9 + t.heading * 4.1 + t.bedTilt * 6.7 + t.load * 8.3 + t.sides * 5.3 + (t.pouring ? t.pourT : 0)) * (i + 1);
+      if (t.active) k += (t.x * 1.3 + t.z * 2.9 + t.heading * 4.1 + t.bedTilt * 6.7 + t.load * 8.3 + t.sides * 5.3 + (t.pouring ? t.pourT : 0) + (t.grapple ? grappleKey(t.crane) : 0)) * (i + 1);
     });
     k += this.yard.motionKey();
     this.lumps.forEach((l, i) => {
@@ -792,16 +802,22 @@ export class Director {
           }
           break;
         case 'atTip': {
-          const want = t.stage === 'unloading' ? 1 : 0;
+          const want = t.stage === 'unloading' && !t.grapple ? 1 : 0;
           t.bedTilt += Math.max(-TILT_RATE * dt, Math.min(TILT_RATE * dt, want - t.bedTilt));
-          if (t.stage === 'unloading' && t.bedTilt > 0.55 && t.load > 0) {
+          if (t.grapple) {
+            // 집게차: 받침다리 → 크레인으로 여러 번 옮김 → 접기 (sim/grapple, 하역 단계 안에서 끝난다)
+            stepGrapple(t.crane, dt, t.stage);
+            t.load = t.crane.load;
+            t.pouring = t.crane.dropT < 0.6;
+            if (t.pouring) t.pourT = t.crane.dropT;
+          } else if (t.stage === 'unloading' && t.bedTilt > 0.55 && t.load > 0) {
             t.pouring = true;
             t.pourT += dt;
             t.load = Math.max(0, t.load - dt / UNLOAD_SEC);
           }
           if (t.stage === 'unloaded' || t.stage === 'weighing_out' || t.stage === 'departed') t.load = 0;
           // 출차 단계가 오면 다시 재러 간다. 마당 안쪽 길과 계근대를 함께 잡아야 떠난다
-          if ((t.stage === 'weighing_out' || t.stage === 'departed') && t.bedTilt < 0.02 && t.bay) {
+          if ((t.stage === 'weighing_out' || t.stage === 'departed') && t.bedTilt < 0.02 && (!t.grapple || grappleStowed(t.crane)) && t.bay) {
             t.bedTilt = 0;
             t.load = 0;
             if (this.bothTokens(t.id)) {

@@ -6,6 +6,7 @@ import type { StageProps } from './Stage';
 import { Director } from './sim/director';
 import type { StudioData } from './types';
 import { PHOTO_VIEWS, VIEWS } from './world/views';
+import { worldToPx } from './world/layout';
 import type { ViewPreset } from './world/views';
 import { onSiteVehicles } from './overlay/text';
 
@@ -63,7 +64,7 @@ export default function StudioScene({ data, robotModel, onYardFull, ...stage }: 
     // 트럭 단계와 번호판 인식 장면 (점검 스크립트가 출차 계근·출차·계근 장면을 기다려 찍는다, S2i)
     probe.__trucks = () => ({
       scan: { active: director.plateScan.active, out: director.plateScan.out, t: director.plateScan.t, plate: director.plateScan.plate },
-      trucks: director.trucks.filter((x) => x.active).map((x) => ({ id: x.id, phase: x.phase, stage: x.stage, outbound: x.outbound, leaving: x.leaving, s: x.s, x: x.x, z: x.z })),
+      trucks: director.trucks.filter((x) => x.active).map((x) => ({ id: x.id, phase: x.phase, stage: x.stage, outbound: x.outbound, leaving: x.leaving, s: x.s, x: x.x, z: x.z, px: worldToPx(x.x, x.z), heading: x.heading, grapple: x.grapple, crane: x.crane.mode, holding: x.crane.holding, grabs: x.crane.grabs, seg: x.crane.seg })),
       // 지게차가 하는 일과 든 베일 (상차·계근 장면을 기다려 찍는다, S2j)
       forklifts: director.forklifts.map((f) => ({ task: f.task?.kind ?? null, carrying: Boolean(f.carrying), cross: f.cross, wide: f.wide, fork: f.fork, clamp: f.clamp, legs: f.legs.length })),
       ground: director.bales.filter((b) => b.active && b.state === 'ground').length,
