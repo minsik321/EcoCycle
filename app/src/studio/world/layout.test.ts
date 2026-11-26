@@ -22,7 +22,9 @@ import {
   ROAD_HOLDS,
   ROAD_PX,
   BALE,
+  BALER,
   BALER_HOUSE,
+  BALER_TUNNEL,
   BALE_AREAS,
   BALE_AREA_PX,
   FORK_REACH,
@@ -221,6 +223,17 @@ describe('사진 → 월드 변환 (sitePx)', () => {
     expect(0.76 * CLAMP_SCALE).toBeGreaterThan(BALE.d * 0.65);
     // 클램프 틀이 줄인 마스트(모형 x 0.52) 바로 앞에 붙는다
     expect(0.6 * CLAMP_SCALE - CLAMP_SHIFT).toBeCloseTo(0.6 * FORKLIFT_SCALE, 9);
+  });
+
+  it('압축기·받침대·저울은 같은 베일(REAL_SIZE_M) 크기에 맞는다: 통로는 베일 단면보다 조금 크고, 저울 판은 베일 한 장보다 조금 크다 (S2k)', () => {
+    const inner = BALER.halfX * 2 - 0.24;
+    expect(inner).toBeGreaterThan(BALE.w);
+    expect(inner).toBeLessThan(BALE.w * 1.3);
+    expect(BALER_TUNNEL.roofY - BALER_TUNNEL.floorY).toBeGreaterThan(BALE.h);
+    expect(BALER_TUNNEL.roofY - BALER_TUNNEL.floorY).toBeLessThan(BALE.h * 1.25);
+    expect(YARD.stand.y).toBe(BALER_TUNNEL.floorY);
+    expect(YARD.scale.size).toBeGreaterThan(BALE.d);
+    expect(YARD.scale.size).toBeLessThan(BALE.d * 1.5);
   });
 
   it('북서 베일 구역은 남동 구역보다 북쪽·서쪽, 사무실은 북동, 계근대는 사무실 바로 아래, 입구 경사로는 계근대와 남동 구역 사이', () => {

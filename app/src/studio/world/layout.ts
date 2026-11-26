@@ -406,9 +406,14 @@ export const WATER_TANK = { u: 128, w: -30 } as const;
  * 뒤쪽(+z, w −45px)에 유압 실린더, 레일 끝 아래(z 0 근처)에 투입구·압축실, 앞쪽(−z)으로 긴 압출 통로와 결속부가 이어져
  * 남동 벽(w 66) 배출구에 닿는다. 롤러 없이 새 베일이 앞 베일을 밀어낸다.
  */
+/** 압축기가 내보내는 베일의 단면 폭(m → 월드). BALE보다 위에 놓인 압축기가 쓴다 */
+const BALE_SECTION_W = M(REAL_SIZE_M.bale.width);
+/** 압출 통로 안쪽 바닥 높이(받침대 윗면과 같다), 통로 지붕 높이: 베일 높이 + 틈 */
+export const BALER_TUNNEL = { floorY: 0.5, roofY: 0.5 + M(REAL_SIZE_M.bale.height) + 0.08 } as const;
 export const BALER = {
   x: 80 * SITE_SCALE,
-  halfX: 0.62,
+  /** 몸체 반폭: 압출 통로가 베일 단면(BALE.w)에 벽 두께·틈을 더한 폭이 되게 (S2k: 전에는 0.62로 베일보다 컸다) */
+  halfX: BALE_SECTION_W / 2 + 0.15,
   /** 몸체가 끝나는 곳 (뒤 +z) */
   backZ: 45 * SITE_SCALE,
   minZ: -0.75,
@@ -592,7 +597,7 @@ const STAND = {
   slots: [0, 1, 2].map((k) => STAND_OUTLET_Z + 0.05 + (2.5 - k) * STAND_PITCH) as readonly number[],
   pitch: STAND_PITCH,
   /** 받침대 윗면 높이 */
-  y: 0.5,
+  y: BALER_TUNNEL.floorY,
   /** 배출구 안쪽(결속부 끝): 새 베일이 여기서 나온다 */
   fromZ: STAND_OUTLET_Z - 0.55,
   outletZ: STAND_OUTLET_Z,
@@ -600,7 +605,7 @@ const STAND = {
 } as const;
 /** 베일 저울: 배출구 오른쪽(마당 쪽, 레일 좌표 u 58, w 83px). 베일 두 개를 위아래로 겹쳐 올려 한 번에 잰다 (무게 숫자 없음) */
 const BALE_SCALE_POS = railYard(58, 83);
-const BALE_SCALE = { x: BALE_SCALE_POS[0], z: BALE_SCALE_POS[1], y: 0.16, size: 1.3 } as const;
+const BALE_SCALE = { x: BALE_SCALE_POS[0], z: BALE_SCALE_POS[1], y: 0.16, size: BALE.d + 0.25 } as const;
 
 /**
  * 마당(마당 좌표계)의 자리와 길.

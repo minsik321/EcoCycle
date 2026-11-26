@@ -13,6 +13,7 @@ import {
   BALE_AREAS,
   BALE_GAP,
   BALER,
+  BALER_TUNNEL,
   BALER_HOUSE,
   FENCE_PX,
   FORESTS,
@@ -610,10 +611,12 @@ function baler(k: Kit): void {
   // 압출 통로: 압축실 앞에서 배출구까지 낮고 긴 터널 (위 덮개 + 양옆 벽, 앞쪽에 띠 틀)
   const tz0 = minZ;
   const tz1 = outletZ + 0.25;
-  for (const dx of [-1, 1]) k.box(C.blue, [t, 0.95, tz0 - tz1], [x + dx * (halfX - t / 2), y0, mid(tz0, tz1)], { r: 0.04, mat: 'gloss' });
-  k.box(C.blue, [halfX * 2, 0.1, tz0 - tz1], [x, y0 + 0.88, mid(tz0, tz1)], { r: 0.04, mat: 'gloss' });
-  k.box(C.dark, [halfX * 2 - 0.2, 0.06, tz0 - tz1], [x, y0 + 0.4, mid(tz0, tz1)], { r: 0.01 });
-  for (let z = tz0 - 0.4; z > tz1; z -= 0.6) k.box(C.blueDeep, [halfX * 2 + 0.08, 1.02, 0.08], [x, y0 - 0.02, z], { r: 0.02, mat: 'gloss' });
+  // 통로 높이는 베일(BALER_TUNNEL): 안쪽 바닥이 받침대 윗면, 지붕이 베일 위 (S2k)
+  const roof = BALER_TUNNEL.roofY - y0;
+  for (const dx of [-1, 1]) k.box(C.blue, [t, roof + 0.1, tz0 - tz1], [x + dx * (halfX - t / 2), y0, mid(tz0, tz1)], { r: 0.04, mat: 'gloss' });
+  k.box(C.blue, [halfX * 2, 0.1, tz0 - tz1], [x, y0 + roof, mid(tz0, tz1)], { r: 0.04, mat: 'gloss' });
+  k.box(C.dark, [halfX * 2 - 0.2, 0.06, tz0 - tz1], [x, BALER_TUNNEL.floorY - 0.06, mid(tz0, tz1)], { r: 0.01 });
+  for (let z = tz0 - 0.4; z > tz1; z -= 0.6) k.box(C.blueDeep, [halfX * 2 + 0.08, roof + 0.17, 0.08], [x, y0 - 0.02, z], { r: 0.02, mat: 'gloss' });
   // 결속부: 파랑 문형 틀과 끈 타래 (통로 위)
   const sz = mid(strapZ, minZ);
   for (const dx of [-1, 1]) k.box(C.blue, [0.14, 1.6, 0.5], [x + dx * (halfX + 0.05), y0, sz], { r: 0.06, mat: 'gloss', seg: 3 });
@@ -623,7 +626,7 @@ function baler(k: Kit): void {
     k.cyl(C.steel, 0.05, 0.14, [x + dx, y0 + 1.87, sz], { axis: 'x' });
   }
   // 배출구 테두리 (노랑)
-  k.box(C.yellow, [halfX * 2 + 0.3, 0.08, 0.07], [x, y0 + 0.95, outletZ + 0.2], { r: 0.02 });
+  k.box(C.yellow, [halfX * 2 + 0.3, 0.08, 0.07], [x, y0 + roof + 0.07, outletZ + 0.2], { r: 0.02 });
 }
 
 /** 본동 벽 네 장 (레일 좌표계 로컬). 벽마다 따로 조립해 카메라 쪽 벽을 숨길 수 있게 한다. 회색 벽 + 파랑 지붕선 */
