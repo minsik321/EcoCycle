@@ -4,6 +4,7 @@ import type { MutableRefObject } from 'react';
 import type { PerspectiveCamera } from 'three';
 import type { Director } from '../sim/director';
 import { useWaker } from './motion';
+import { frameView } from './framing';
 import { angleDelta } from '../sim/paths';
 import { DEFAULT_VIEW, TIER_DISTANCE, WIDE_VIEW, clampToSite, closeDistance, siteHeading, sitePx, tierOf } from '../world/layout';
 import type { ViewPreset, ViewTier } from '../world/layout';
@@ -15,6 +16,10 @@ import type { ViewPreset, ViewTier } from '../world/layout';
 
 export interface RigApi {
   view(preset: ViewPreset): void;
+  /** 미끄러지지 않고 바로 그 보기로 옮긴다 (점검 스크립트의 스크린샷용) */
+  jump(preset: ViewPreset): void;
+  /** 카메라가 목표에서 얼마나 떨어져 있는지 (0에 가까우면 멈춰 섰다. 깨우개와 같은 값) */
+  error(): number;
   /** 거리 단계를 한 칸 옮긴다 (+1 가까이, -1 멀리). 지역 프리셋이 바뀌면 그 프리셋을 돌려준다 */
   zoom(dir: 1 | -1): ViewPreset | null;
   /** 방위각을 돌린다 (도) */
@@ -39,9 +44,12 @@ interface View {
   dist: number;
   az: number;
   pol: number;
+  fov: number;
 }
 
 const DEG = Math.PI / 180;
+/** 기본 세로 화각(도). Stage의 카메라와 같다 */
+const BASE_FOV = 20;
 const MIN_DIST = 11;
 const MAX_DIST = 150;
 const MIN_POL = 24;
@@ -52,21 +60,29 @@ const DRAG_GLIDE = 22;
 /** 대상을 볼 때의 천정각 */
 const FOCUS_POLAR = 52;
 
-/** 프리셋 거리는 이 가로세로 비(패널을 뺀 빈 영역)에 맞춘 값이다. 더 좁은 화면에서는 그만큼 물러난다 */
-const REFERENCE_ASPECT = (1440 - 320) / 900;
-
 /** 사진처럼 남쪽에서 북쪽을 보는 카메라 방위각(도): 프리셋의 azimuth는 이 값에서 잰다 */
 const SOUTH_AZ = (siteHeading(0, 1) * 180) / Math.PI;
 
 /** 프리셋(사진 좌표) → 카메라 목표(월드). 사진 → 월드 변환은 world/layout의 sitePx 하나만 쓴다 */
 const fromPreset = (p: ViewPreset): View => {
   const [x, z] = sitePx(p.at[0], p.at[1]);
-  return { x, y: p.height, z, dist: p.distance, az: SOUTH_AZ + p.azimuth, pol: p.polar };
+  return { x, y: p.height, z, dist: p.distance, az: SOUTH_AZ + p.azimuth, pol: p.polar, fov: p.fov ?? BASE_FOV };
 };
+
+/** 안개 기본 범위 (Stage의 fog와 같다) */
+const FOG_NEAR = 170;
+const FOG_FAR = 380;
+
+/** 카메라가 목표에 닿았다고 보는 오차 */
+const SETTLED = 0.003;
+const viewError = (g: View, c: View): number =>
+  Math.abs(g.x - c.x) + Math.abs(g.y - c.y) + Math.abs(g.z - c.z) + Math.abs(g.dist - c.dist) * 0.2 + Math.abs(g.pol - c.pol) * 0.05 + Math.abs(angleDelta(c.az * DEG, g.az * DEG)) + Math.abs(g.fov - c.fov) * 0.05;
 
 export function Rig({ director, focusKey, api, inset }: RigProps) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const gl = useThree((s) => s.gl);
+  const invalidate = useThree((s) => s.invalidate);
+  const scene = useThree((s) => s.scene);
   const size = useThree((s) => s.size);
   const home = useRef<ViewPreset>(DEFAULT_VIEW);
   const goal = useRef<View>(fromPreset(DEFAULT_VIEW));
@@ -76,6 +92,7 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
   const anchor = useRef({ x: 0, y: 0, z: 0 });
   const insetRef = useRef(inset);
   insetRef.current = inset;
+  const aimAt = useRef({ x: 0, z: 0 }).current;
 
   useEffect(() => {
     api.current = {
@@ -104,11 +121,19 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
       rotate(deg) {
         goal.current.az += deg;
       },
+      jump(preset) {
+        this.view(preset);
+        cur.current = { ...goal.current };
+        invalidate();
+      },
+      error() {
+        return viewError(goal.current, cur.current);
+      },
     };
     return () => {
       api.current = null;
     };
-  }, [api]);
+  }, [api, invalidate]);
 
   useEffect(() => {
     if (!focusKey) {
@@ -119,6 +144,7 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
     follow.current = true;
     goal.current.dist = closeDistance(focusKey);
     goal.current.pol = FOCUS_POLAR;
+    goal.current.fov = BASE_FOV;
   }, [focusKey]);
 
   const touching = useRef(false);
@@ -196,11 +222,7 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
   }, [gl, camera]);
 
   // 필요할 때만 그리기: 카메라가 목표에 아직 닿지 않았으면 깨운다
-  useWaker(() => {
-    const g = goal.current;
-    const c = cur.current;
-    return Math.abs(g.x - c.x) + Math.abs(g.y - c.y) + Math.abs(g.z - c.z) + Math.abs(g.dist - c.dist) * 0.2 + Math.abs(g.pol - c.pol) * 0.05 + Math.abs(angleDelta(c.az * DEG, g.az * DEG)) > 0.003;
-  });
+  useWaker(() => viewError(goal.current, cur.current) > SETTLED);
 
   useFrame((_, delta) => {
     const g = goal.current;
@@ -217,20 +239,26 @@ export function Rig({ director, focusKey, api, inset }: RigProps) {
     c.dist += (g.dist - c.dist) * k;
     c.pol += (g.pol - c.pol) * k;
     c.az += (angleDelta(c.az * DEG, g.az * DEG) / DEG) * k;
+    c.fov += (g.fov - c.fov) * k;
+    if (Math.abs(camera.fov - c.fov) > 1e-3) {
+      camera.fov = c.fov;
+      camera.updateProjectionMatrix();
+    }
 
     const a = c.az * DEG;
     const p = c.pol * DEG;
-    // 세로 화면에서는 위아래가 남으므로 다 물러나지 않는다 (최대 1.3배)
-    const fit = Math.min(1.3, Math.max(1, REFERENCE_ASPECT / Math.max(0.3, (size.width - insetRef.current.right) / Math.max(1, size.height))));
-    const dist = c.dist * fit;
-    // 패널에 가려지지 않게 보는 점을 화면에서 왼쪽·위로 민다
-    const upp = (2 * dist * Math.tan((camera.fov * DEG) / 2)) / Math.max(1, size.height);
-    const shiftRight = (insetRef.current.right / 2) * upp;
-    const shiftDown = (((insetRef.current.bottom - insetRef.current.top) / 2) * upp) / Math.max(0.3, Math.cos(p));
-    const tx = c.x - Math.sin(a) * shiftRight + Math.cos(a) * shiftDown;
-    const tz = c.z - Math.cos(a) * shiftRight - Math.sin(a) * shiftDown;
+    // 화면비·패널·부지 외곽에 맞춘 거리와 보는 점 (framing.ts, 단위 테스트로 고정)
+    const dist = frameView(c, camera.fov, size.width, size.height, insetRef.current, aimAt);
+    const tx = aimAt.x;
+    const tz = aimAt.z;
     camera.position.set(tx + Math.sin(p) * Math.cos(a) * dist, c.y + Math.cos(p) * dist, tz - Math.sin(p) * Math.sin(a) * dist);
     camera.lookAt(tx, c.y, tz);
+    // 안개는 카메라 거리를 따라간다: 좁은 화면에서 부지 전체·위에서 보기로 멀리 물러나도 부지는 또렷하고 먼 언덕·능선만 흐려진다
+    const fog = scene.fog as { near: number; far: number } | null;
+    if (fog) {
+      fog.near = Math.max(FOG_NEAR, dist + 30);
+      fog.far = Math.max(FOG_FAR, dist + 240);
+    }
   });
 
   return null;

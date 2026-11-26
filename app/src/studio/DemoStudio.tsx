@@ -12,14 +12,18 @@ import { EMPTY_DATA } from './types';
 import { studioStats } from './three/stats';
 import { useStudioTier } from './useStudioTier';
 
-/** 측정용: 한 프레임에 그린 횟수와 삼각형 수를 1초마다 읽는다 */
-function useDrawStats(): { calls: number; triangles: number } {
+/** 측정용: 한 프레임에 그린 횟수와 삼각형 수를 1초마다 읽는다. 따로 된 작은 조각이라 1초마다 화면 전체를 다시 그리지 않는다 */
+function DrawStats() {
   const [stats, setStats] = useState({ calls: 0, triangles: 0 });
   useEffect(() => {
-    const timer = setInterval(() => setStats({ calls: studioStats.calls, triangles: studioStats.triangles }), 1000);
+    const timer = setInterval(() => setStats((prev) => (prev.calls === studioStats.calls && prev.triangles === studioStats.triangles ? prev : { calls: studioStats.calls, triangles: studioStats.triangles })), 1000);
     return () => clearInterval(timer);
   }, []);
-  return stats;
+  return (
+    <>
+      그리기 {stats.calls}회 · 삼각형 {Math.round(stats.triangles / 1000)}천
+    </>
+  );
 }
 
 const DEVICE_LABEL = { phone: '폰', tablet: '태블릿', desktop: '데스크톱' } as const;
@@ -37,7 +41,6 @@ function tierFromUrl(): QualityTier | null {
 export function DemoStudio({ tabs, disconnected, paused, onFailed }: { tabs?: ReactNode; disconnected: boolean; paused: boolean; onFailed: () => void }) {
   const { data, startMs, lastReceivedAt } = useDemoData(disconnected);
   const jointSource = useMemo(() => demoSource(startMs), [startMs]);
-  const draw = useDrawStats();
   const [probed, setProbed] = useState<QualityTier | null>(null);
   const [chosen, setChosen] = useState<QualityTier | null>(tierFromUrl);
   const [firstFrameMs, setFirstFrameMs] = useState<number | null>(null);
@@ -74,7 +77,7 @@ export function DemoStudio({ tabs, disconnected, paused, onFailed }: { tabs?: Re
       </span>
       <span className="st-fps" role="status" aria-label="그리기 측정" data-tier={tier} data-first-frame={firstFrameMs ?? undefined}>
         {DEVICE_LABEL[device]} · {TIER_LABEL[tier]}
-        {probed ? ` (측정 ${TIER_LABEL[probed]})` : ''} · 첫 화면 {firstFrameMs === null ? '–' : `${(firstFrameMs / 1000).toFixed(1)}초`} · 그리기 {draw.calls}회 · 삼각형 {Math.round(draw.triangles / 1000)}천
+        {probed ? ` (측정 ${TIER_LABEL[probed]})` : ''} · 첫 화면 {firstFrameMs === null ? '–' : `${(firstFrameMs / 1000).toFixed(1)}초`} · <DrawStats />
       </span>
     </>
   );

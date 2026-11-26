@@ -66,7 +66,7 @@ try {
       step.call(live, 0.05);
       seconds += 0.05;
       const a = live.yard.audit();
-      maxOverlap = Math.max(maxOverlap, a.baleOnBale + a.forkOnBale + a.forkOnFork);
+      maxOverlap = Math.max(maxOverlap, a.baleOnBale + a.forkOnBale + a.forkOnFork + (a.forkOnWall ?? 0));
     }
     return { seconds, maxOverlap, ...live.yard.audit() };
   });

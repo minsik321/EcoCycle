@@ -22,14 +22,35 @@ const MIXES: Array<[TankId, number, TankId, number]> = [
   ['sector-c', 30, 'sector-a', 70],
 ];
 
-const VEHICLE_EVERY = 40;
+const BUYERS: Array<{ name: string; plate: string }> = [
+  { name: '예시제지', plate: '82바 1047' },
+  { name: '예시판지', plate: '64사 5512' },
+];
+
+const VEHICLE_EVERY = 80;
+/** 입고: 하역 뒤 바로 나가지 않고 출차 계근(weighing_out)을 거친다 */
 const VEHICLE_STEPS: Array<[Vehicle['stage'], number]> = [
   ['arrived', 0],
   ['identified', 6],
-  ['unloading', 23],
-  ['unloaded', 32],
-  ['departed', 46],
+  ['unloading', 32],
+  ['unloaded', 42],
+  ['weighing_out', 48],
+  ['departed', 80],
 ];
+/** 상차 차량: 네 번째 차마다. 상차 자리에서 LOAD_EACH초마다 적치 베일 하나를 싣는다(최대 LOAD_MAX) */
+const OUTBOUND_EVERY = 4;
+const LOAD_START = 34;
+const LOAD_EACH = 14;
+const LOAD_MAX = 4;
+const OUTBOUND_STEPS: Array<[Vehicle['stage'], number]> = [
+  ['arrived', 0],
+  ['identified', 6],
+  ['loading', LOAD_START],
+  ['loaded', LOAD_START + LOAD_EACH * LOAD_MAX],
+  ['weighing_out', LOAD_START + LOAD_EACH * LOAD_MAX + 16],
+  ['departed', LOAD_START + LOAD_EACH * LOAD_MAX + 56],
+];
+const isOutbound = (n: number): boolean => ((n % OUTBOUND_EVERY) + OUTBOUND_EVERY) % OUTBOUND_EVERY === OUTBOUND_EVERY - 1;
 const BATCH_EVERY = 52;
 const BATCH_STEPS: Array<[Batch['stage'], number]> = [
   ['planned', 0],
@@ -37,24 +58,58 @@ const BATCH_STEPS: Array<[Batch['stage'], number]> = [
   ['compressing', 40],
   ['completed', 49],
 ];
-const SHIP_AFTER = 26;
 const KEEP = 12;
+const FIRST_BATCH = -4;
+
+/**
+ * 상차 일정: 상차 차량이 실은 베일 (시각만으로 정해진다). 상차 시각마다 그때 적치된(만들어진) 가장 오래된 베일을 하나 싣는다.
+ * 돌려주는 값: 베일 번호 → [차량 번호, 실은 시각(초)]
+ */
+function loadSchedule(tSec: number): Map<number, [number, number]> {
+  const out = new Map<number, [number, number]>();
+  let bale = FIRST_BATCH;
+  const lastVehicle = Math.floor((tSec - 2) / VEHICLE_EVERY);
+  for (let n = -3; n <= lastVehicle; n += 1) {
+    if (!isOutbound(n)) continue;
+    for (let i = 0; i < LOAD_MAX; i += 1) {
+      const at = 2 + n * VEHICLE_EVERY + LOAD_START + i * LOAD_EACH;
+      if (at > tSec) break;
+      if (bale * BATCH_EVERY + 49 <= at) {
+        out.set(bale, [n, at]);
+        bale += 1;
+      }
+    }
+  }
+  return out;
+}
 
 /** 시작 뒤 tSec초의 예시 상태 (시각만으로 정해진다) */
 export function demoData(startMs: number, tSec: number): StudioData {
   const now = startMs + tSec * 1000;
+
+  const schedule = loadSchedule(tSec);
+  const loadedBy = new Map<number, string[]>();
+  for (const [b, [n, at]] of schedule) {
+    if (at > tSec) continue;
+    const list = loadedBy.get(n) ?? [];
+    list.push(`ex-BL-${String(b + 500).padStart(4, '0')}`);
+    loadedBy.set(n, list);
+  }
+  const vehicleId = (n: number) => `ex-veh-${String(n + 100).padStart(3, '0')}`;
 
   const vehicles: Vehicle[] = [];
   const firstVehicle = Math.max(-3, Math.floor(tSec / VEHICLE_EVERY) - KEEP);
   for (let n = firstVehicle; ; n += 1) {
     const age = tSec - 2 - n * VEHICLE_EVERY;
     if (age < 0) break;
+    const outbound = isOutbound(n);
     const company = COMPANIES[((n % COMPANIES.length) + COMPANIES.length) % COMPANIES.length]!;
+    const buyer = BUYERS[((Math.floor(n / OUTBOUND_EVERY) % BUYERS.length) + BUYERS.length) % BUYERS.length]!;
     const born = now - age * 1000;
     const stageTimes: Vehicle['stageTimes'] = {};
     let stage: Vehicle['stage'] = 'arrived';
     let lastAt = 0;
-    for (const [name, at] of VEHICLE_STEPS) {
+    for (const [name, at] of outbound ? OUTBOUND_STEPS : VEHICLE_STEPS) {
       if (age >= at) {
         stage = name;
         lastAt = at;
@@ -63,14 +118,13 @@ export function demoData(startMs: number, tSec: number): StudioData {
     }
     const known = stage !== 'arrived';
     vehicles.push({
-      id: `ex-veh-${String(n + 100).padStart(3, '0')}`,
-      // S2f 임시 맞춤: 예시 원본은 입고 차량만 만든다(상차 차량은 장면의 "예시" 상차가 맡는다, S2e가 다시 정함)
-      kind: 'inbound',
-      baleIds: [],
+      id: vehicleId(n),
+      kind: outbound ? 'outbound' : 'inbound',
+      baleIds: outbound ? (loadedBy.get(n) ?? []) : [],
       stage,
-      plate: known ? company.plate : null,
-      companyName: known ? company.name : null,
-      sectorId: known ? company.sectorId : null,
+      plate: known ? (outbound ? buyer.plate : company.plate) : null,
+      companyName: known ? (outbound ? buyer.name : company.name) : null,
+      sectorId: known && !outbound ? company.sectorId : null,
       stageTimes,
       updatedAt: iso(born + lastAt * 1000),
     });
@@ -80,7 +134,7 @@ export function demoData(startMs: number, tSec: number): StudioData {
   const bales: Bale[] = [];
   let pressing: Batch | null = null;
   let pressAge = 0;
-  const firstBatch = Math.max(-4, Math.floor(tSec / BATCH_EVERY) - KEEP);
+  const firstBatch = Math.max(FIRST_BATCH, Math.floor(tSec / BATCH_EVERY) - KEEP);
   for (let n = firstBatch; ; n += 1) {
     const age = tSec - n * BATCH_EVERY;
     if (age < 0) break;
@@ -119,15 +173,16 @@ export function demoData(startMs: number, tSec: number): StudioData {
     }
     if (stage === 'completed') {
       const created = born + 49_000;
-      const shipped = age >= 49 + SHIP_AFTER;
+      // 출하는 상차 차량에 실린 때다 (상차 일정)
+      const load = schedule.get(n);
+      const shippedAt = load ? startMs + load[1] * 1000 : null;
       bales.push({
         id: `ex-BL-${seq}`,
         batchId: batch.id,
-        stage: shipped ? 'shipped' : 'created',
-        // S2f 임시 맞춤: 예시 원본에는 서버 상차 차량이 없어 실은 차량이 없다
-        vehicleId: null,
-        stageTimes: shipped ? { created: iso(created), shipped: iso(created + SHIP_AFTER * 1000) } : { created: iso(created) },
-        updatedAt: iso(shipped ? created + SHIP_AFTER * 1000 : created),
+        stage: shippedAt !== null ? 'shipped' : 'created',
+        vehicleId: load ? vehicleId(load[0]) : null,
+        stageTimes: shippedAt !== null ? { created: iso(created), shipped: iso(shippedAt) } : { created: iso(created) },
+        updatedAt: iso(shippedAt ?? created),
       });
     }
   }
@@ -184,6 +239,33 @@ export function demoData(startMs: number, tSec: number): StudioData {
 }
 
 /** 1초에 한 번 예시 상태를 새로 만든다. 끊김을 흉내 내는 동안에는 값이 멈춘다 */
+/** 측정용 고정 데이터를 넣어 두는 세션 저장소 키 (주소에 ?snapshot이 있을 때만 읽는다) */
+export const DEMO_SNAPSHOT_KEY = 'ecocycle.demoSnapshot';
+
+/**
+ * 측정용(`/scene-demo?snapshot`): 측정 스크립트가 세션 저장소에 넣은 고정 데이터(같은 차량·베일·배치)를 쓴다.
+ * 서로 다른 코드(예: 기준 브랜치와 지금)를 같은 부하로 견줄 때만 쓴다. 화면 값은 여전히 "예시 데이터"다
+ */
+function snapshotFromSession(): StudioData | null {
+  if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('snapshot')) return null;
+  const raw = sessionStorage.getItem(DEMO_SNAPSHOT_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as StudioData;
+  } catch {
+    return null;
+  }
+}
+
+const resend = (s: StudioData): StudioData => ({
+  ...s,
+  devices: { ...s.devices },
+  vehicles: s.vehicles.map((v) => ({ ...v })),
+  batches: s.batches.map((b) => ({ ...b })),
+  bales: s.bales.map((b) => ({ ...b })),
+  alarms: [...s.alarms],
+});
+
 export function useDemoData(disconnected: boolean): { data: StudioData; startMs: number; lastReceivedAt: string } {
   const startMs = useRef(Date.now()).current;
   const [tick, setTick] = useState(0);
@@ -196,6 +278,8 @@ export function useDemoData(disconnected: boolean): { data: StudioData; startMs:
     }, 1000);
     return () => clearInterval(timer);
   }, [disconnected, startMs]);
-  const data = useMemo(() => demoData(startMs, tick), [startMs, tick]);
+  const snapshot = useRef(snapshotFromSession()).current;
+  // (고정 데이터도 매초 새로 받은 것처럼 새 배열로 준다: 서버가 다시 보낸 값과 같은 일을 시킨다)
+  const data = useMemo(() => (snapshot ? resend(snapshot) : demoData(startMs, tick)), [snapshot, startMs, tick]);
   return { data, startMs, lastReceivedAt };
 }

@@ -20,7 +20,7 @@ import type { PinElements } from './three/Fx';
 import { Motion, MotionContext } from './three/motion';
 import { Rig } from './three/Rig';
 import type { RigApi } from './three/Rig';
-import { BalerParts, Belt, DeviceHits, GateArms, Piles, World } from './world/Dynamic';
+import { BalerParts, Belt, DeviceHits, PlateScanFx, Piles, World } from './world/Dynamic';
 
 // 스튜디오의 3D 무대. 데이터는 모두 props와 Director로 받는다 (store를 직접 읽지 않는다).
 // 화질 단계(quality.ts)마다 그리는 것이 다르다: high는 실시간 부드러운 그림자·N8AO·빛 번짐·얕은 심도,
@@ -153,7 +153,7 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
         // 후처리가 없으면 톤 매핑은 렌더러가 한다 (후처리가 있으면 ToneMapping 효과가 한다)
         if (!profile.post) gl.toneMapping = NeutralToneMapping;
       }}
-      camera={{ fov: 20, near: 2, far: 520, position: [60, 60, -60] }}
+      camera={{ fov: 20, near: 2, far: 900, position: [60, 60, -60] }}
       onPointerMissed={() => onSelect(null)}
       // 후처리가 없으면(low, 터치 기기) 연결 끊김의 회색 화면을 캔버스 필터로 낸다
       style={{ touchAction: 'none', filter: !profile.post && frozen ? 'grayscale(0.92) brightness(0.98)' : undefined }}
@@ -185,10 +185,10 @@ function StageImpl({ director, jointSource, robotSpec, tier, frozen, paused, sel
         <Rig director={director} focusKey={selection} api={rig} inset={inset} />
 
         <World baked={baked} />
-        <Piles director={director} grades={grades} />
+        <Piles director={director} grades={grades} lite={baked} />
         <Belt director={director} />
         <BalerParts director={director} status={frozen ? 'offline' : balerStatus} />
-        <GateArms director={director} />
+        <PlateScanFx director={director} />
         <Robot spec={robotSpec} source={jointSource} frozen={frozen} director={director} onSelect={onSelect} />
         <Trucks director={director} onSelect={onSelect} blobs={baked} />
         <Forklifts director={director} onSelect={onSelect} blobs={baked} />

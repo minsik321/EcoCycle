@@ -3,6 +3,7 @@ import {
   BufferGeometry,
   Color,
   CylinderGeometry,
+  DoubleSide,
   Euler,
   ExtrudeGeometry,
   Float32BufferAttribute,
@@ -26,7 +27,7 @@ import { C } from '../theme';
 // 스튜디오의 "찰흙 조립 도구". 둥근 모서리 상자·원통·공을 색과 함께 쌓고, 재질별로 메시 하나씩으로 합친다.
 // 색은 꼭짓점 색으로 넣어 재질은 종류별 하나만 쓴다 (그리는 횟수를 줄인다).
 
-export type MatKey = 'clay' | 'gloss' | 'metal' | 'glass' | 'glow';
+export type MatKey = 'clay' | 'gloss' | 'metal' | 'glass' | 'glow' | 'net';
 
 export const MAT: Record<MatKey, Material> = {
   /** 무광 찰흙: 건물·바닥·소품 */
@@ -37,6 +38,8 @@ export const MAT: Record<MatKey, Material> = {
   glass: new MeshPhysicalMaterial({ color: C.glass, roughness: 0.06, metalness: 0, transparent: true, opacity: 0.42, envMapIntensity: 1.6, depthWrite: false }),
   /** 스스로 빛나는 것(등·표시등). 색을 밝게 넣으면 빛 번짐이 생긴다 */
   glow: new MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
+  /** 높은 녹색 그물망: 비치는 녹색 (양면) */
+  net: new MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0, transparent: true, opacity: 0.55, side: DoubleSide, depthWrite: false }),
 };
 
 export type Vec3 = readonly [number, number, number];
@@ -91,7 +94,7 @@ export interface Footprint {
 export class Kit {
   /** 기록을 켜면(footprints 배열을 주면) 서 있는 조각마다 바닥 투영을 적는다 */
   footprints: Footprint[] | null = null;
-  private readonly parts: Record<MatKey, BufferGeometry[]> = { clay: [], gloss: [], metal: [], glass: [], glow: [] };
+  private readonly parts: Record<MatKey, BufferGeometry[]> = { clay: [], gloss: [], metal: [], glass: [], glow: [], net: [] };
   private readonly stack: Matrix4[] = [new Matrix4()];
   private readonly defaultMat: MatKey;
 
@@ -151,7 +154,7 @@ export class Kit {
 
   /** 공(scale로 눌러 타원체로). center는 중심 */
   ball(hex: string, radius: number, center: Vec3, o: PartOptions = {}): this {
-    this.add(new SphereGeometry(radius, o.seg ?? 16, Math.max(8, Math.round((o.seg ?? 16) * 0.7))), hex, center, 0, o);
+    this.add(new SphereGeometry(radius, o.seg ?? 16, Math.max(5, Math.round((o.seg ?? 16) * 0.7))), hex, center, 0, o);
     return this;
   }
 
@@ -172,6 +175,21 @@ export class Kit {
     return this;
   }
 
+  /**
+   * 삼각형 묶음: 월드(지금 자리 기준) 꼭짓점 세 개씩. 비탈 도로·옹벽 면·경사로처럼 높이가 바뀌는 면에 쓴다 (양면이 보이게 두 번 감지 않는다: 위를 보는 순서로 준다)
+   */
+  tris(hex: string, verts: readonly Vec3[], o: PartOptions = {}): this {
+    if (verts.length < 3) return this;
+    const g = new BufferGeometry();
+    g.setAttribute('position', new Float32BufferAttribute(verts.flatMap((v) => [v[0], v[1], v[2]]), 3));
+    g.computeVertexNormals();
+    const saved = this.footprints;
+    this.footprints = null;
+    this.add(g, hex, [0, 0, 0], 0, o);
+    this.footprints = saved;
+    return this;
+  }
+
   /** 재질별로 합친 메시들을 담은 그룹 */
   build(name?: string): Group {
     const group = new Group();
@@ -184,8 +202,8 @@ export class Kit {
       list.length = 0;
       if (!merged) return;
       const mesh = new Mesh(merged, MAT[key]);
-      mesh.castShadow = key !== 'glass' && key !== 'glow';
-      mesh.receiveShadow = key !== 'glow';
+      mesh.castShadow = key !== 'glass' && key !== 'glow' && key !== 'net';
+      mesh.receiveShadow = key !== 'glow' && key !== 'net';
       group.add(mesh);
     });
     return group;
@@ -202,5 +220,7 @@ export function disposeTree(root: Object3D): void {
 
 /** 인스턴스로 많이 그릴 조각용 지오메트리 (흰 꼭짓점 색 → 인스턴스 색이 그대로 보인다) */
 export function chunkGeometry(w: number, h: number, d: number, r: number, seg = 1): BufferGeometry {
+  // 둥글림이 없으면 보통 상자 (면 12개)
+  if (seg === 0 || r <= 0) return paint(new BoxGeometry(w, h, d), '#ffffff');
   return paint(new RoundedBoxGeometry(w, h, d, seg, r), '#ffffff');
 }

@@ -1293,11 +1293,7 @@ button.st-now:hover {
   display: none !important;
 }
 
-/* 서버 값이 없는 예시(상차 차량·북서 고정 재고): 점선 테두리로 실제 값과 구별한다. 고정 재고는 누르지 않는 이름표 */
-.st-pin-example .st-pin-card {
-  outline: 1.5px dashed rgba(47, 107, 255, 0.55);
-  outline-offset: -3px;
-}
+/* 누르지 않는 이름표 핀 (번호판 인식 장면) */
 .st-pin-label {
   pointer-events: none;
 }

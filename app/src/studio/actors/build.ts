@@ -29,6 +29,8 @@ export interface TruckModel {
   bed: Group;
   gate: Group;
   load: Group;
+  /** 윙바디의 양쪽 날개 (덤프는 빈 배열): 위 가운데 축에 매달려 열린다 */
+  wings: Group[];
   wheels: Group[];
   beacon: Group;
   /** 적재함이 도는 축의 위치 (트럭 좌표) */
@@ -52,9 +54,11 @@ const BED_PAINTS = [C.steelLight, C.blue, C.wall, C.blueSoft];
 const CAB_PAINT = C.yellow;
 
 /**
- * 트럭. flatbed면 상차 차량("예시"): 들리는 적재함 대신 낮은 평판(베일을 싣는다), 회색 운전석. 실린 베일은 Bales가 그린다
+ * 트럭(모형 크기, 장면에서는 TRUCK.scale배로 그린다). kind 'wing'이면 상차 차량(윙바디): 들리는 적재함 대신 낮은 바닥판과
+ * 양쪽 날개가 위로 열리는 짐칸, 흰 운전석. 실린 베일은 Bales가 그린다
  */
-export function buildTruck(variant: number, flatbed = false): TruckModel {
+export function buildTruck(variant: number, kind: 'dump' | 'wing' = 'dump'): TruckModel {
+  const flatbed = kind === 'wing';
   const root = new Group();
   const k = new Kit('gloss');
 
@@ -129,16 +133,35 @@ export function buildTruck(variant: number, flatbed = false): TruckModel {
       b.box(C.blue, [L, 0.1, 0.04], [L / 2, 0.1, dz], { r: 0.015 });
       for (const x of [0.15, L / 2, L - 0.15]) b.box(C.dark, [0.05, 0.36, 0.05], [x, 0.1, dz], { r: 0.015, mat: 'clay' });
     }
-    b.box(C.blue, [0.07, 0.62, 1.14], [L - 0.035, 0.1, 0], { r: 0.03 });
+    // 짐칸 앞벽·뒷문(닫힌 문짝) + 아래 프레임
+    const H = 1.52;
+    b.box(C.wall, [0.07, H, 1.14], [L - 0.035, 0.1, 0], { r: 0.03 });
+    b.box(C.steelLight, [0.06, H, 1.14], [0.03, 0.1, 0], { r: 0.02, mat: 'metal' });
     b.box(C.dark, [1.2, 0.1, 0.5], [L / 2, -0.08, 0], { r: 0.03, mat: 'clay' });
-    bed.add(b.build('truck-flatbed'));
+    // 가운데 등뼈(지붕 축)
+    b.box(C.steel, [L, 0.06, 0.08], [L / 2, 0.1 + H, 0], { r: 0.02, mat: 'metal' });
+    bedBand.box(C.white, [L - 0.2, 0.12, 0.03], [L / 2, 0.24, 0.6], { r: 0.01 });
+    bedBand.box(C.white, [L - 0.2, 0.12, 0.03], [L / 2, 0.24, -0.6], { r: 0.01 });
+    bed.add(b.build('truck-wing-box'));
     bed.add(stripeGroup(bedBand, stripe));
+    // 날개: 지붕 반쪽 + 옆벽. 지붕 가운데 축에서 x축으로 돈다
+    const wings = [-1, 1].map((side) => {
+      const wing = new Group();
+      wing.position.set(L / 2, 0.1 + H + 0.03, 0);
+      const w = new Kit('gloss');
+      w.box(C.wall, [L - 0.12, 0.05, 0.57], [0, 0, side * 0.285], { r: 0.015 });
+      w.box(C.wall, [L - 0.12, H - 0.12, 0.05], [0, -H + 0.12, side * 0.57], { r: 0.015 });
+      w.box(C.blue, [L - 0.12, 0.06, 0.06], [0, -0.03, side * 0.575], { r: 0.02 });
+      wing.add(w.build('truck-wing'));
+      bed.add(wing);
+      return wing;
+    });
     const gate = new Group();
     const load = new Group();
     load.visible = false;
     bed.add(gate, load);
     root.add(bed);
-    return { root, bed, gate, load, wheels, beacon, pivot, stripe };
+    return { root, bed, gate, load, wings, wheels, beacon, pivot, stripe };
   }
   b.box(paint, [L, 0.08, 1.14], [L / 2, 0, 0], { r: 0.03 });
   for (const dz of [-0.55, 0.55]) {
@@ -179,7 +202,7 @@ export function buildTruck(variant: number, flatbed = false): TruckModel {
   bed.add(load);
   root.add(bed);
 
-  return { root, bed, gate, load, wheels, beacon, pivot, stripe };
+  return { root, bed, gate, load, wings: [], wheels, beacon, pivot, stripe };
 }
 
 export interface ForkliftModel {
