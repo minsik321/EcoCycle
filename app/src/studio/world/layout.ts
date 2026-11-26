@@ -184,6 +184,34 @@ export const ROAD_PX: readonly P2[] = [
 ];
 export const ROAD = { line: pts(ROAD_PX), width: 2.6, lane: 0.62 } as const;
 
+/**
+ * 도로 가운데 선에서 옆으로 offset px 떨어진 점(사진 y px에서). offset > 0이면 동쪽(들판 쪽), < 0이면 서쪽(부지 쪽)
+ */
+export function roadSidePx(py: number, offset: number): P2 {
+  let i = 0;
+  while (i < ROAD_PX.length - 2 && ROAD_PX[i + 1]![1] < py) i += 1;
+  const a = ROAD_PX[i]!;
+  const b = ROAD_PX[i + 1]!;
+  const t = (py - a[1]) / (b[1] - a[1]);
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy) || 1;
+  return [a[0] + dx * t + (dy / len) * offset, py - (dx / len) * offset];
+}
+/** 전봇대가 도로 가운데 선에서 떨어진 거리(px): 도로 가장자리 밖 0.55 (S2h: 전에는 가운데 선 위였다) */
+export const POLE_OFFSET_PX = (ROAD.width / 2 + 0.55) / SITE_SCALE;
+/** 도로변 전봇대 자리(사진 px): 도로 동쪽(들판 쪽) 가장자리 밖. 차는 서쪽 차로·경사로로만 다닌다 */
+export const POLE_PX: readonly P2[] = [26, 140, 244, 356, 452, 510, 580].map((py) => roadSidePx(py, POLE_OFFSET_PX));
+
+/**
+ * 마당 가로등 둘(사진 px, 팔 방향 rad). 트럭이 지나는 길·서는 자리(외곽선)에서 0.6 넘게 떨어진 곳 (S2h: 전에는 [236, 300]이
+ * 섹터 A에 쏟는 트럭 안, [404, 205]가 대기 자리로 가는 트럭에 닿았다). 하나는 사무실 서쪽 벽 앞, 하나는 섹터 A 더미 북서
+ */
+export const LAMP_PX: ReadonlyArray<readonly [number, number, number]> = [
+  [410, 198, Math.PI / 2],
+  [172, 292, 0],
+];
+
 /** 도로 높이(사진 y px → 월드 높이): 북쪽이 가장 낮고 남쪽으로 오른다 (approach.png: 사무실 북동에서 남쪽이 오르막) */
 const ROAD_RISE: ReadonlyArray<readonly [number, number]> = [
   [-120, -1.9],
@@ -308,6 +336,24 @@ export const FOREST: readonly P2[] = pts([
   [-60, 318],
 ]);
 
+/**
+ * 압축기 건물 뒤(남서·서쪽): 건물과 남쪽 그물망 끝 사이 빈 포장 판을 숲으로 덮는다(사진에서는 이웃 땅이라 그리지 않는다).
+ * 건물 벽에서 8~13px 떨어진 선을 따른다. 바닥 높이는 마당과 같다(PLATEAU 안)
+ */
+export const FOREST_SW: readonly P2[] = pts([
+  [-60, 318],
+  [66, 300],
+  [-12, 378],
+  [40, 448],
+  [124, 542],
+  [196, 590],
+  [236, 606],
+  [200, 680],
+  [-60, 680],
+]);
+/** 숲 둘(북서, 압축기 건물 뒤) */
+export const FORESTS: readonly (readonly P2[])[] = [FOREST, FOREST_SW];
+
 // ── 건물: 사무실, 계근대 ──────────────────────────────────────────────
 
 /** 사무실("태화리싸이클링" 자리): 짙은 회색 골판 2층, 사진 축에 맞춘 상자 (415~500, 100~210)px */
@@ -383,10 +429,18 @@ export const BALE_GAP = 0.06;
 /** 베일이 배출구로 나오는 방향 (+w) */
 export const CHUTE_HEADING = RAIL_H + Math.PI / 2;
 
-/** 지게차 모형 배율(큰 베일을 든다) */
-export const FORKLIFT_SCALE = 1.15;
+/**
+ * 지게차 모형 배율(몸체). 2026-11-26 S2h: 부지(도로 폭·계근대·건물)에 비해 커서 1.15 → 0.9로 줄였다.
+ * 베일 클램프(마스트 앞 틀·양옆 판)는 베일 크기(0.9 × 0.95)에 맞춰야 하므로 몸체와 따로 CLAMP_SCALE배로 그린다
+ * (실제 베일 클램프도 판이 몸체보다 넓다). 클램프 틀은 줄인 마스트 앞에 붙도록 CLAMP_SHIFT만큼 뒤로 당긴다
+ */
+export const FORKLIFT_SCALE = 0.9;
+/** 베일 클램프 배율: 판 사이 0.955(베일 폭 0.9), 판 길이 0.87(베일 길이 0.95) */
+export const CLAMP_SCALE = 1.15;
+/** 클램프 틀(모형 x 0.6)이 몸체 배율과 클램프 배율의 차이로 앞으로 나가는 만큼을 당긴다 (월드 m) */
+export const CLAMP_SHIFT = 0.6 * (CLAMP_SCALE - FORKLIFT_SCALE);
 /** 지게차가 클램프로 베일을 드는 거리(지게차 중심 → 베일 중심) */
-export const FORK_REACH = 1.1 * FORKLIFT_SCALE;
+export const FORK_REACH = 1.1 * CLAMP_SCALE - CLAMP_SHIFT;
 
 // ── 섹터 더미 ─────────────────────────────────────────────────────────
 
@@ -642,8 +696,14 @@ export function yardPoint(x: number, z: number): P2 {
 
 // ── 트럭 자리·경로 (사진 px로 적고 옮긴다) ─────────────────────────────
 
-/** 트럭(덤프·윙바디) 크기: 모형을 1.4배로 키운 값 */
-export const TRUCK = { length: 4.06, width: 1.62, scale: 1.4 } as const;
+/** 트럭 모형(배율 1)의 길이·폭 */
+const TRUCK_MODEL = { length: 2.9, width: 1.157 } as const;
+const TRUCK_SCALE = 1.1;
+/**
+ * 트럭(덤프·윙바디) 크기: 모형을 TRUCK_SCALE배로 그린 값. 2026-11-26 S2h: 1.4배(4.06 × 1.62)는 두 차로 도로(2.6)를 거의 다 덮고
+ * 마당에 비해 커서 1.1배(3.19 × 1.27, 44 × 18px)로 줄였다: 한 차로(1.3)에 들어가고 계근대(4.82)의 2/3
+ */
+export const TRUCK = { length: TRUCK_MODEL.length * TRUCK_SCALE, width: TRUCK_MODEL.width * TRUCK_SCALE, scale: TRUCK_SCALE } as const;
 
 /** 도로 차로의 가운데 선: 남쪽으로 가는 차로(부지 쪽, 서쪽)를 따라간다 */
 function roadLanePx(offset: number): P2[] {
@@ -673,7 +733,8 @@ const spot = (x: number, y: number, dx: number, dy: number): Spot => {
 
 /** 레일의 반대 방향(사진 북동): 쏟는 트럭이 보는 방향 */
 const NE: P2 = [-PU[0], -PU[1]];
-const tipPx = (sign: 1 | -1): P2 => railToPhoto(-72, sign * 45);
+// 트럭 뒤(적재함 끝)가 더미 북동 면에 닿는 자리: 트럭을 줄여(S2h) 가운데를 −72 → −66px로 당겼다
+const tipPx = (sign: 1 | -1): P2 => railToPhoto(-66, sign * 45);
 const plus = (p: P2, d: P2, k: number): P2 => [p[0] + d[0] * k, p[1] + d[1] * k];
 
 /** 섹터 더미에 쏟는 자리: 더미 북동 면 바깥, 적재함 뒤가 더미 쪽(앞이 북동). A·C가 레일 축에 대칭이다 */

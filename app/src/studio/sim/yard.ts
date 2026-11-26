@@ -1,6 +1,6 @@
 import type { Bale } from '@ecocycle/shared';
 import { YARD_FLOW } from '../../config/yard';
-import { BALE, FORKLIFT_SCALE, FORK_REACH, LOAD_BED_Y, LOAD_SLOTS, TRUCK, YARD, YARD_FRAME, staticBaleCells, worldToYard, yardToWorld } from '../world/layout';
+import { BALE, CLAMP_SCALE, CLAMP_SHIFT, FORKLIFT_SCALE, FORK_REACH, LOAD_BED_Y, LOAD_SLOTS, TRUCK, YARD, YARD_FRAME, staticBaleCells, worldToYard, yardToWorld } from '../world/layout';
 import { FRESH_MS, advance, follow, mover } from './mover';
 import type { Mover } from './mover';
 import { angleDelta, headingTo } from './paths';
@@ -155,17 +155,18 @@ const LOW_FORK = 0.3;
 const IDLE_HOME_SEC = 0.4;
 
 const FS = FORKLIFT_SCALE;
-// 지게차 모양(자기 앞뒤 기준, 1.15배): 뒤, 포크 끝, 베일을 들면, 폭, 본체 앞(마스트)
+// 지게차 모양(자기 앞뒤 기준): 뒤, 포크 끝, 베일을 들면, 폭, 본체 앞(마스트). 몸체는 FS배, 클램프는 CS배(베일에 맞춤)를 CLAMP_SHIFT만큼 당긴 것
+const CS = CLAMP_SCALE;
 const FORK_BACK = -0.62 * FS;
-const FORK_TIP = 1.4 * FS;
+const FORK_TIP = 1.4 * CS - CLAMP_SHIFT;
 const LOAD_TIP = FORK_REACH + BALE.d / 2;
 const HALF_W = 0.43 * FS;
 const BODY_FRONT = 0.56 * FS;
-const JAW_OFFSET = 0.415 * FS;
-const JAW_X0 = 0.61 * FS;
-const JAW_X1 = 1.37 * FS;
-const JAW_H0 = 0.12 * FS;
-const JAW_H1 = 0.52 * FS;
+const JAW_OFFSET = 0.415 * CS;
+const JAW_X0 = 0.61 * CS - CLAMP_SHIFT;
+const JAW_X1 = 1.37 * CS - CLAMP_SHIFT;
+const JAW_H0 = 0.12 * CS;
+const JAW_H1 = 0.52 * CS;
 const TOKEN_PATIENCE_SEC = 60;
 const CLEAR = 0.02;
 const TURN_R = 1.45 * FS;
@@ -1470,7 +1471,7 @@ export class Yard {
         if (f.fork + JAW_H1 <= b.y + 0.03 || f.fork + JAW_H0 >= b.y + 0.03 + BALE.h) continue;
         setBox(c, b.x, b.z, b.rot, -BALE.d / 2, BALE.d / 2, BALE.w / 2);
         for (const sideK of [-1, 1]) {
-          const offset = sideK * (JAW_OFFSET - f.clamp * 0.025 * FS);
+          const offset = sideK * (JAW_OFFSET - f.clamp * 0.025 * CS);
           setBox(a, f.x + Math.sin(f.heading) * offset, f.z + Math.cos(f.heading) * offset, f.heading, JAW_X0, JAW_X1, 0.015);
           if (boxesOverlap(a, c)) out.forkOnBale += 1;
         }

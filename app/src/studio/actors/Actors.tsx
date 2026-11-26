@@ -7,7 +7,7 @@ import { C, UNKNOWN_STRIPE, companyStripe } from '../theme';
 import { MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { blobShadow } from '../three/bakedShadow';
 import type { Director } from '../sim/director';
-import { FORKLIFT_SCALE, TRUCK, YARD_FRAME, groundY } from '../world/layout';
+import { CLAMP_SCALE, CLAMP_SHIFT, FORKLIFT_SCALE, TRUCK, YARD_FRAME, groundY } from '../world/layout';
 import type { TruckModel } from './build';
 import { buildBale, buildForklift, buildTruck, buildWorker } from './build';
 
@@ -178,7 +178,12 @@ export function Forklifts({ director, onSelect, blobs = false }: ActorProps) {
   // 지게차는 1~2대(설정). 한 대마다 모형 하나
   const models = useMemo(() => {
     const list = director.forklifts.map(() => buildForklift());
-    for (const m of list) m.root.scale.setScalar(FORKLIFT_SCALE);
+    for (const m of list) {
+      m.root.scale.setScalar(FORKLIFT_SCALE);
+      // 클램프는 베일에 맞춘 크기(CLAMP_SCALE)로, 줄인 마스트 앞에 붙도록 뒤로 당긴다
+      m.carriage.scale.setScalar(CLAMP_SCALE / FORKLIFT_SCALE);
+      m.carriage.position.x = -CLAMP_SHIFT / FORKLIFT_SCALE;
+    }
     return list;
   }, [director]);
   useEffect(() => () => models.forEach((m) => disposeTree(m.root)), [models]);
