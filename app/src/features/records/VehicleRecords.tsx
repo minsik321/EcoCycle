@@ -4,7 +4,7 @@ import type { Column } from '../../components/common/DataTable';
 import { RecordList } from '../../components/records/RecordList';
 import { useOpenRecordPopup } from '../../components/records/recordPopup';
 import { RECORD_SEARCH_HINT, formatLocalTime, formatWeightT } from '../../config/display';
-import { SECTOR_LABEL, VEHICLE_KIND_LABEL, VEHICLE_RECORD_STATUS_TEXT, VEHICLE_WEIGHT_TEXT } from '../../config/processDisplay';
+import { SECTOR_LABEL, VEHICLE_KIND_LABEL, VEHICLE_RECORD_STATUS_TEXT, VEHICLE_WEIGHT_TEXT, plateText } from '../../config/processDisplay';
 
 const pill = 'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap';
 
@@ -26,7 +26,7 @@ const num = (text: string) => <span className="tabular-nums">{text}</span>;
 
 const COLUMNS: readonly Column<VehicleRecord>[] = [
   { key: 'out', header: '출차', hideOnNarrow: 'xl', cell: (r) => <span className="tabular-nums">{r.departedAt ? formatLocalTime(r.departedAt, false) : '–'}</span> },
-  { key: 'plate', header: '번호판', cell: (r) => <span className="font-semibold">{r.plate ?? '인식 중'}</span> },
+  { key: 'plate', header: '번호판', cell: (r) => <span className="font-semibold">{plateText(r, true)}</span> },
   { key: 'company', header: '회사', cell: (r) => r.companyName ?? '–' },
   { key: 'kind', header: '종류', cell: (r) => <VehicleKindPill kind={r.kind} /> },
   { key: 'sector', header: '섹터·베일', cell: (r) => targetCell(r) },
@@ -51,7 +51,7 @@ export function VehicleRecords() {
       load={(query, signal) => getRecords<VehicleRecord>('/vehicles/records', query, signal)}
       rowKey={(r) => r.id}
       time={(r) => r.arrivedAt}
-      title={(r) => `${r.plate ?? '번호판 인식 중'}${r.companyName ? ` · ${r.companyName}` : ''}`}
+      title={(r) => `${plateText(r)}${r.companyName ? ` · ${r.companyName}` : ''}`}
       detail={(r) => (
         <>
           {VEHICLE_KIND_LABEL[r.kind]} · {targetOf(r)} · {VEHICLE_RECORD_STATUS_TEXT[r.status]}

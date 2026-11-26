@@ -304,7 +304,7 @@ export function BalerParts({ director, status }: { director: Director; status: D
     r.box(C.yellowDeep, [BALER.halfX * 2 - 0.5, 0.1, 0.16], [0, 0.86, 0], { r: 0.03 });
     r.cyl(C.steelLight, 0.11, 1.5, [0, 0.56, 0.8], { axis: 'z', mat: 'metal' });
     const p = new Kit('clay');
-    p.box(C.kraft, [BALER.halfX * 2 - 0.36, 1, 1], [0, 0, 0], { r: 0.08, seg: 3 });
+    p.box(C.kraft, [BALER.halfX * 2 - 0.3, 1, 1], [0, 0, 0], { r: 0.08, seg: 3 });
     for (let i = 0; i < 9; i += 1) p.box(i % 2 ? C.paper : C.kraftLight, [0.3, 0.12, 0.22], [((i * 37) % 10) / 10 - 0.5, 0.96, ((i * 53) % 10) / 12 - 0.4], { r: 0.03, rot: [i, i * 2, i * 0.5] });
     const tower = new Kit('clay');
     tower.cyl(C.steelLight, 0.03, 0.9, [0, 0, 0], { seg: 10, mat: 'metal' });

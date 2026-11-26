@@ -3,7 +3,7 @@ import { onSiteVehicles } from '../../config/processDisplay';
 import { demoData } from '../demo/demoData';
 import { PLATEAU_PX, RAMP_PX, SCALE, inside, sitePx, worldToPx } from '../world/layout';
 import type { Vehicle } from '@ecocycle/shared';
-import { Director } from './director';
+import { Director, PLATE_READ_SEC } from './director';
 
 // 부지 전체의 차량 흐름을 오래 돌려 본다 (시연 원본: 입고 차량과 상차 차량 모두 서버 값 모양). 월드 시계 20Hz.
 //  - 트럭·지게차·베일이 겹치지 않는다 (트럭은 1.4배 외곽선)
@@ -57,7 +57,8 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
       t += DT;
       expect(d.truckOverlaps(), `t=${t.toFixed(1)} 트럭끼리 겹침`).toBe(0);
       // 매 걸음 표의 "차량 N"(회사 안 차량)과 장면에 보이는(active) 트럭 대수가 같다 (yardSoak도 같은 점검을 한다)
-      if (onSiteVehicles(vehicles).length !== d.trucks.filter((x) => x.active).length) countMismatch += 1;
+      // (출차해 도로로 달려 나가는 차는 회사 밖이라 세지 않는다: truckCount)
+      if (onSiteVehicles(vehicles).length !== d.truckCount()) countMismatch += 1;
       const a = d.yard.audit(d.trucks);
       expect(a.forkOnTruck + a.forkOnFork + a.forkOnBale + a.baleOnBale + a.forkOnWall, `t=${t.toFixed(1)} 지게차·베일 겹침`).toBe(0);
       for (const truck of d.trucks) {
@@ -87,7 +88,12 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
       // 번호판 인식 장면은 서버 번호판만 적는다
       if (d.plateScan.active) {
         const v = vehicles.find((x) => x.id === d.plateScan.truckId);
-        expect(d.plateScan.plate).toBe(v?.plate ?? null);
+        // 서버 값 그대로. 다만 계근대에 막 선 뒤 PLATE_READ_SEC 동안은 읽는 중이라 비어 있다 (S2l)
+        if (d.plateScan.plate !== (v?.plate ?? null)) {
+          expect(d.plateScan.plate).toBeNull();
+          expect(d.plateScan.out).toBe(false);
+          expect(d.plateScan.t).toBeLessThanOrEqual(PLATE_READ_SEC + 0.11);
+        }
       }
       for (const id of before) if (!d.trucks.some((x) => x.active && x.id === id)) finished.add(id);
       for (const token of [d.scaleToken, d.yardToken]) {
@@ -99,7 +105,8 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
     const inbound = done.filter((id) => !outbound.has(id));
     const out = done.filter((id) => outbound.has(id));
     expect(inbound.length).toBeGreaterThanOrEqual(15);
-    expect(out.length).toBeGreaterThanOrEqual(3);
+    // 상차 차량(25톤 카고, S2j)은 여덟 번째 차마다 오고 한 대에 약 9.5분(20개) 머문다: 30분에 한 대 넘게 다 돈다
+    expect(out.length).toBeGreaterThanOrEqual(1);
     // 계근 동선: 입차는 후진으로 올라 계근(atScale), 출차는 앞으로 올라 계근(atScale2) 뒤 후진으로 내려온다
     // 대부분의 차는 출차 계근까지 마치고 나갔다 (장면이 서버 단계보다 늦어 출차 계근 전에 출차 단계가 온 드문 차는 그 자리에서 빠진다)
     const weighedOut = done.filter((id) => phases.get(id)!.includes('atScale2'));
@@ -150,6 +157,12 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
     expect(d.truckCount()).toBe(7);
     d.sync({ devices: {}, vehicles: [], batches: [], bales: [] }, T0 + 121_000);
     expect(d.truckCount()).toBe(0);
+    // 출차한 차는 하던 동선을 마치고 도로로 나간 뒤 모두 빠진다 (막혀 남는 차가 없다)
+    for (let i = 0; i < 20 * 600 && d.leavingCount() > 0; i += 1) {
+      d.step(DT);
+      expect(d.truckOverlaps(), `t=${(i * DT).toFixed(1)} 나가는 트럭끼리 겹침`).toBe(0);
+    }
+    expect(d.leavingCount(), d.trucks.filter((x) => x.active).map((x) => `${x.id}:${x.phase}:${x.stage}:${x.waiting}`).join(" ")).toBe(0);
   });
 
   it.each([2, 3])('서버 값이 월드 시계보다 %s배 빨리 흘러도(느린 화면) 겹치거나 멈춰 버리지 않는다', (speed) => {

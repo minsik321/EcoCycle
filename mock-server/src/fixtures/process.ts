@@ -51,8 +51,12 @@ export const PRESSURE_PER_MOISTURE_MPA = 0.6;
 
 /** 단계별 머무는 시간(초). 화면 연출이 따라올 수 있을 만큼 여유를 둔다 */
 export const VEHICLE_TIMING_SEC = {
-  /** 계중대 도착 → 번호판 인식 */
-  identify: 6,
+  /**
+   * 입구 도착(arrived) → 계근대 번호판 인식(identified). 번호판·회사는 인식 전 null이다(명세 6절).
+   * 3D 홈에서 차가 도로 → 경사로 → 후진으로 계근대에 오르는 데 실제 축척(1단위 = 2 m)으로 약 15초,
+   * 계근대 위에서 읽는 장면 약 3초. 6초일 때는 차가 입구에 들어서자마자 번호판이 나왔다 (S2l)
+   */
+  identify: 18,
   /** 인식 → 섹터 앞 도착, 하역 시작 */
   toSector: 16,
   /** 하역(적재함 기울이기) */
@@ -65,7 +69,7 @@ export const VEHICLE_TIMING_SEC = {
   spawnGap: 35,
 };
 
-/** 상차 차량(윙바디) 한 대: 번호판, 등록 공차 t, 한 번에 싣는 베일 수 */
+/** 상차 차량(25톤 카고) 한 대: 번호판, 등록 공차 t, 한 번에 싣는 베일 수 */
 export interface OutboundTruckFixture {
   plate: string;
   tareT: number;
@@ -78,27 +82,40 @@ export interface BuyerFixture {
   trucks: OutboundTruckFixture[];
 }
 
+/**
+ * 상차 차량 부르기 (가정값 ⚠ 실서버는 서버 담당이 정한다, S2l 사용자 결정 2026-11-26).
+ * 적치(마당, created) 베일이 `callAtYardBales`개 이상이면 상차 차량 한 대를 부른다(한 번에 한 대).
+ * 한 대는 베일 `balesPerTruck`개를 싣는다(적치가 그보다 적으면 있는 만큼). 3D 마당 칸은 80칸(app/src/config/yard.ts YARD_CAPACITY)이라
+ * 부르는 기준 + 상차 동안 새로 나오는 베일이 그 아래에 머물게 한다(app/src/test/vehicleFlow.test.ts가 장시간 돌려 본다).
+ */
+export const OUTBOUND_CALL = {
+  balesPerTruck: 20,
+  callAtYardBales: 40,
+};
+
+const PER_TRUCK = OUTBOUND_CALL.balesPerTruck;
 export const BUYERS: BuyerFixture[] = [
-  { name: '대한판지', trucks: [{ plate: '82바 1047', tareT: 8.94, maxBales: 4 }, { plate: '71바 3390', tareT: 9.21, maxBales: 4 }] },
-  { name: '성원제지', trucks: [{ plate: '64사 5512', tareT: 10.38, maxBales: 5 }] },
-  { name: '한결포장', trucks: [{ plate: '38아 2276', tareT: 8.67, maxBales: 3 }, { plate: '95자 4801', tareT: 9.02, maxBales: 4 }] },
+  { name: '대한판지', trucks: [{ plate: '82바 1047', tareT: 8.94, maxBales: PER_TRUCK }, { plate: '71바 3390', tareT: 9.21, maxBales: PER_TRUCK }] },
+  { name: '성원제지', trucks: [{ plate: '64사 5512', tareT: 10.38, maxBales: PER_TRUCK }] },
+  { name: '한결포장', trucks: [{ plate: '38아 2276', tareT: 8.67, maxBales: PER_TRUCK }, { plate: '95자 4801', tareT: 9.02, maxBales: PER_TRUCK }] },
 ];
 
 /**
  * 상차 차량 흐름 (예시 규칙 ⚠ B41).
- * 입고 차량 3~4대가 들어올 때마다 상차 차량 한 대. 상차 자리에 서면 적치 베일(created)을 `loadEach`초마다 하나씩 싣는다.
+ * 적치 베일이 많으면 부른다(OUTBOUND_CALL). 상차 자리에 서면 적치 베일(created)을 `loadEach`초마다 하나씩 싣는다.
  * 실을 베일이 없으면 기다리고, 마지막으로 실은 때(또는 상차 시작)부터 `maxWait`초가 지나면 실은 만큼(0개도 가능)으로 상차를 마친다.
  */
 export const OUTBOUND_TIMING_SEC = {
   /** 인식 → 상차 자리 도착, 상차 시작 */
   toBay: 18,
-  /** 베일 하나 싣는 시간 */
-  loadEach: 8,
+  /**
+   * 베일 하나 싣는 시간(초). 3D 지게차는 베일마다 내려놓고 90도 돌아 다시 잡는다(S2j, 베일당 약 20~30초):
+   * 상차(loading) 단계는 실은 베일 수 × 이 값보다 짧지 않다(서버가 loaded를 먼저 보내 3D가 끊기지 않게)
+   */
+  loadEach: 30,
   /** 실을 베일을 기다리는 최대 시간 */
   maxWait: 60,
 };
-/** 입고 차량 몇 대마다 상차 차량 한 대 [최소, 최대] */
-export const OUTBOUND_EVERY_INBOUND: [number, number] = [3, 4];
 /** 베일 한 개 무게 범위 t (예시: 상차 차량 순중량 계산에만 쓴다, 베일에는 무게 필드가 없다) */
 export const BALE_WEIGHT_T: [number, number] = [0.85, 1.15];
 
@@ -120,7 +137,7 @@ export const RECENT_LIMIT = 20;
 export const UNLOAD_HISTORY = { seedDays: 30, perSectorPerDay: [6, 14] as [number, number], workHours: [7, 18] as [number, number], keepDays: 40 };
 
 /** 상차 기록 채우기: 상차 차량 한 대에 싣는 베일 수 범위, 마지막 베일 생산 뒤 상차 차량이 오기까지 분 범위 */
-export const OUTBOUND_HISTORY = { balesPerVehicle: [1, 3] as [number, number], arriveAfterMin: [5, 40] as [number, number] };
+export const OUTBOUND_HISTORY = { balesPerVehicle: [OUTBOUND_CALL.balesPerTruck, OUTBOUND_CALL.balesPerTruck] as [number, number], arriveAfterMin: [5, 40] as [number, number] };
 
 /** 배치 기록: 시작할 때 채워 둘 지난 날 수, 하루 배치 수 범위, 작업 시간(현장 시각), 건너뜀·일시정지됨 비율, 기억할 날 수 (차량 기록도 같은 기간을 기억한다) */
 export const BATCH_HISTORY = {

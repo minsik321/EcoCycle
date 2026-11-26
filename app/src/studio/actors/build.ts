@@ -2,7 +2,7 @@ import { Group, MeshPhysicalMaterial } from 'three';
 import type { Mesh } from 'three';
 import { C } from '../theme';
 import { Kit, MAT } from '../three/kit';
-import { BALE } from '../world/layout';
+import { BALE, LOAD_BED_REAR, LOAD_TRUCK } from '../world/layout';
 import { bale as baleParts } from '../world/props';
 
 // 움직이는 것들의 모형. 움직이는 마디(적재함·바퀴·포크·팔다리)마다 그룹을 따로 만들어 돌려준다.
@@ -10,7 +10,7 @@ import { bale as baleParts } from '../world/props';
 
 const WHEEL_R = 0.26;
 
-function wheel(radius = WHEEL_R, width = 0.2): Group {
+export function wheel(radius = WHEEL_R, width = 0.2): Group {
   const k = new Kit('clay');
   k.cyl(C.rubber, radius, width, [0, 0, 0], { axis: 'z', seg: 22 });
   k.cyl(C.rubber, radius * 0.94, width + 0.03, [0, 0, 0], { axis: 'z', seg: 22 });
@@ -29,8 +29,8 @@ export interface TruckModel {
   bed: Group;
   gate: Group;
   load: Group;
-  /** 윙바디의 양쪽 날개 (덤프는 빈 배열): 위 가운데 축에 매달려 열린다 */
-  wings: Group[];
+  /** 상차 차량(낮은 카고)의 양쪽 옆판 (덤프는 빈 배열): 바닥판 옆 아래 모서리에 매달려 바깥 아래로 내려간다 */
+  sides: Group[];
   wheels: Group[];
   beacon: Group;
   /** 적재함이 도는 축의 위치 (트럭 좌표) */
@@ -40,7 +40,7 @@ export interface TruckModel {
 }
 
 /** 흰 꼭짓점 색으로 조립한 띠에 트럭 전용 재질을 입힌다 (재질 색이 곧 띠 색) */
-function stripeGroup(k: Kit, material: MeshPhysicalMaterial): Group {
+export function stripeGroup(k: Kit, material: MeshPhysicalMaterial): Group {
   const group = k.build();
   group.traverse((o) => {
     const mesh = o as Mesh;
@@ -54,11 +54,10 @@ const BED_PAINTS = [C.steelLight, C.blue, C.wall, C.blueSoft];
 const CAB_PAINT = C.yellow;
 
 /**
- * 트럭(모형 크기, 장면에서는 TRUCK.scale배로 그린다). kind 'wing'이면 상차 차량(윙바디): 들리는 적재함 대신 낮은 바닥판과
- * 양쪽 날개가 위로 열리는 짐칸, 흰 운전석. 실린 베일은 Bales가 그린다
+ * 입고 트럭(덤프, 모형 크기: 장면에서는 축마다 TRUCK.sx·sy·sz배로 그린다): 들리는 적재함, 노랑 운전석.
+ * 상차 차량은 buildCargoTruck(25톤 카고)
  */
-export function buildTruck(variant: number, kind: 'dump' | 'wing' = 'dump'): TruckModel {
-  const flatbed = kind === 'wing';
+export function buildTruck(variant: number): TruckModel {
   const root = new Group();
   const k = new Kit('gloss');
 
@@ -73,8 +72,8 @@ export function buildTruck(variant: number, kind: 'dump' | 'wing' = 'dump'): Tru
   const stripe = (MAT.gloss as MeshPhysicalMaterial).clone();
   const band = new Kit('gloss');
 
-  // 운전석 (노랑, 상차 차량은 흰색) + 아래쪽 회사 띠
-  k.box(flatbed ? C.wall : CAB_PAINT, [0.92, 0.98, 1.12], [1.0, 0.38, 0], { r: 0.16, seg: 5 });
+  // 운전석 (노랑) + 아래쪽 회사 띠
+  k.box(CAB_PAINT, [0.92, 0.98, 1.12], [1.0, 0.38, 0], { r: 0.16, seg: 5 });
   band.box(C.white, [0.96, 0.2, 1.16], [1.0, 0.36, 0], { r: 0.08, seg: 3 });
   k.box(C.dark, [0.06, 0.4, 0.92], [1.44, 0.82, 0], { r: 0.03, mat: 'clay' });
   k.box(C.glass, [0.03, 0.34, 0.86], [1.468, 0.85, 0], { r: 0.015, mat: 'glass' });
@@ -126,43 +125,6 @@ export function buildTruck(variant: number, kind: 'dump' | 'wing' = 'dump'): Tru
   const b = new Kit('gloss');
   const bedBand = new Kit('gloss');
   const L = 1.9;
-  if (flatbed) {
-    // 평판: 바닥판(윗면이 LOAD_BED_Y) + 낮은 옆판 + 앞 가림판 + 기둥
-    b.box(C.steel, [L, 0.1, 1.14], [L / 2, 0, 0], { r: 0.025, mat: 'metal' });
-    for (const dz of [-0.56, 0.56]) {
-      b.box(C.blue, [L, 0.1, 0.04], [L / 2, 0.1, dz], { r: 0.015 });
-      for (const x of [0.15, L / 2, L - 0.15]) b.box(C.dark, [0.05, 0.36, 0.05], [x, 0.1, dz], { r: 0.015, mat: 'clay' });
-    }
-    // 짐칸 앞벽·뒷문(닫힌 문짝) + 아래 프레임
-    const H = 1.52;
-    b.box(C.wall, [0.07, H, 1.14], [L - 0.035, 0.1, 0], { r: 0.03 });
-    b.box(C.steelLight, [0.06, H, 1.14], [0.03, 0.1, 0], { r: 0.02, mat: 'metal' });
-    b.box(C.dark, [1.2, 0.1, 0.5], [L / 2, -0.08, 0], { r: 0.03, mat: 'clay' });
-    // 가운데 등뼈(지붕 축)
-    b.box(C.steel, [L, 0.06, 0.08], [L / 2, 0.1 + H, 0], { r: 0.02, mat: 'metal' });
-    bedBand.box(C.white, [L - 0.2, 0.12, 0.03], [L / 2, 0.24, 0.6], { r: 0.01 });
-    bedBand.box(C.white, [L - 0.2, 0.12, 0.03], [L / 2, 0.24, -0.6], { r: 0.01 });
-    bed.add(b.build('truck-wing-box'));
-    bed.add(stripeGroup(bedBand, stripe));
-    // 날개: 지붕 반쪽 + 옆벽. 지붕 가운데 축에서 x축으로 돈다
-    const wings = [-1, 1].map((side) => {
-      const wing = new Group();
-      wing.position.set(L / 2, 0.1 + H + 0.03, 0);
-      const w = new Kit('gloss');
-      w.box(C.wall, [L - 0.12, 0.05, 0.57], [0, 0, side * 0.285], { r: 0.015 });
-      w.box(C.wall, [L - 0.12, H - 0.12, 0.05], [0, -H + 0.12, side * 0.57], { r: 0.015 });
-      w.box(C.blue, [L - 0.12, 0.06, 0.06], [0, -0.03, side * 0.575], { r: 0.02 });
-      wing.add(w.build('truck-wing'));
-      bed.add(wing);
-      return wing;
-    });
-    const gate = new Group();
-    const load = new Group();
-    load.visible = false;
-    bed.add(gate, load);
-    root.add(bed);
-    return { root, bed, gate, load, wings, wheels, beacon, pivot, stripe };
-  }
   b.box(paint, [L, 0.08, 1.14], [L / 2, 0, 0], { r: 0.03 });
   for (const dz of [-0.55, 0.55]) {
     b.box(paint, [L, 0.62, 0.06], [L / 2, 0.06, dz], { r: 0.025 });
@@ -202,16 +164,155 @@ export function buildTruck(variant: number, kind: 'dump' | 'wing' = 'dump'): Tru
   bed.add(load);
   root.add(bed);
 
-  return { root, bed, gate, load, wings: [], wheels, beacon, pivot, stripe };
+  return { root, bed, gate, load, sides: [], wheels, beacon, pivot, stripe };
+}
+
+/**
+ * 상차 트럭: 25톤 카고(대형, S2j). 월드 단위로 바로 만든다(배율 1): 길이 LOAD_TRUCK.length, 폭 LOAD_TRUCK.width, 운전석 지붕 LOAD_TRUCK.height.
+ * 흰 운전석(앞 두 축) + 낮은 적재함(뒤 두 축): 바닥판(윗면 LOAD_TRUCK.deckY) · 앞 가림판 · 아래 경첩으로 내려가는 옆판(양쪽 세 쪽씩) · 낮은 뒷문.
+ * 지붕·벽이 없어 실린 베일(Bales가 그린다)이 늘 보인다. 모두 +X를 앞으로 보고, 원점은 바닥 중심이다
+ */
+export function buildCargoTruck(variant: number): TruckModel {
+  void variant;
+  const root = new Group();
+  const k = new Kit('gloss');
+  const { length: TL, width: TW, height: TH, bedLength: BL, bedWidth: BW, deckY: DY } = LOAD_TRUCK;
+  const front = TL / 2;
+  const rearX = LOAD_BED_REAR;
+  const cabL = 0.95;
+  const cabX0 = front - cabL;
+  const wr = 0.27;
+  const halfW = TW / 2;
+
+  // 차대: 긴 두 줄 + 가로대
+  for (const dz of [-0.3, 0.3]) k.box(C.dark, [TL - 0.3, 0.14, 0.1], [0, 0.34, dz], { r: 0.03, mat: 'clay' });
+  for (let i = 0; i < 6; i += 1) k.box(C.dark, [0.08, 0.1, 0.62], [rearX + 0.4 + i * 0.95, 0.36, 0], { r: 0.02, mat: 'clay' });
+  // 연료 탱크·공구함
+  k.cyl(C.steelLight, 0.14, 0.7, [cabX0 - 0.55, 0.42, halfW - 0.3], { axis: 'x', mat: 'metal' });
+  k.box(C.dark, [0.6, 0.24, 0.2], [cabX0 - 0.6, 0.32, -(halfW - 0.3)], { r: 0.04, mat: 'clay' });
+
+  const stripe = (MAT.gloss as MeshPhysicalMaterial).clone();
+  const band = new Kit('gloss');
+
+  // 운전석 (흰색, 높은 지붕) + 아래쪽 회사 띠
+  const cabH = TH - 0.5;
+  k.box(C.wall, [cabL, cabH, TW - 0.04], [cabX0 + cabL / 2, 0.5, 0], { r: 0.16, seg: 5 });
+  k.box(C.wall, [cabL - 0.2, 0.18, TW - 0.2], [cabX0 + cabL / 2 - 0.08, 0.5 + cabH - 0.02, 0], { r: 0.08, seg: 3 });
+  band.box(C.white, [cabL + 0.04, 0.2, TW], [cabX0 + cabL / 2, 0.62, 0], { r: 0.08, seg: 3 });
+  // 앞 유리·옆 창
+  k.box(C.dark, [0.06, 0.62, TW - 0.3], [front - 0.02, 1.02, 0], { r: 0.03, mat: 'clay' });
+  k.box(C.glass, [0.03, 0.56, TW - 0.36], [front + 0.008, 1.05, 0], { r: 0.015, mat: 'glass' });
+  for (const dz of [-1, 1]) {
+    k.box(C.dark, [0.5, 0.5, 0.04], [front - 0.36, 1.06, dz * (halfW - 0.01)], { r: 0.02, mat: 'clay' });
+    k.box(C.glass, [0.46, 0.46, 0.03], [front - 0.36, 1.08, dz * (halfW + 0.005)], { r: 0.015, mat: 'glass' });
+    // 거울
+    k.box(C.dark, [0.04, 0.04, 0.22], [front - 0.1, 1.3, dz * (halfW + 0.1)], { r: 0.015, mat: 'clay' });
+    k.box(C.dark, [0.05, 0.3, 0.1], [front - 0.08, 1.1, dz * (halfW + 0.22)], { r: 0.025, mat: 'clay' });
+    // 전조등, 방향등
+    k.box('#fff6d6', [0.04, 0.12, 0.26], [front + 0.005, 0.56, dz * (halfW - 0.24)], { r: 0.02, mat: 'glow', glow: 2.2 });
+    k.box(C.amber, [0.04, 0.07, 0.1], [front + 0.005, 0.58, dz * (halfW - 0.06)], { r: 0.015, mat: 'glow', glow: 1.4 });
+    // 발판
+    k.box(C.dark, [0.42, 0.05, 0.14], [front - 0.42, 0.34, dz * (halfW + 0.02)], { r: 0.02, mat: 'clay' });
+  }
+  k.box(C.steelLight, [0.16, 0.2, TW - 0.04], [front - 0.02, 0.26, 0], { r: 0.05, mat: 'metal' });
+  k.box(C.white, [0.02, 0.1, 0.34], [front + 0.07, 0.32, 0], { r: 0.01, mat: 'clay' });
+  // 배기관
+  k.cyl(C.steelLight, 0.05, 1.3, [cabX0 - 0.06, 0.6, -(halfW - 0.18)], { mat: 'metal', seg: 10 });
+  // 후미등, 번호판, 뒤 범퍼
+  k.box(C.dark, [0.08, 0.1, TW - 0.2], [-front + 0.04, 0.32, 0], { r: 0.03, mat: 'clay' });
+  for (const dz of [-1, 1]) k.box(C.red, [0.04, 0.09, 0.18], [-front + 0.0, 0.42, dz * (halfW - 0.2)], { r: 0.02, mat: 'glow', glow: 1.5 });
+  k.box(C.white, [0.02, 0.1, 0.34], [-front - 0.005, 0.42, 0], { r: 0.01, mat: 'clay' });
+  // 바퀴 흙받이
+  for (const x of [-1.85, -1.25]) for (const dz of [-1, 1]) k.box(C.dark, [0.6, 0.05, 0.3], [x, wr * 2 + 0.04, dz * (halfW - 0.15)], { r: 0.02, mat: 'clay' });
+  root.add(k.build('cargo-body'));
+  root.add(stripeGroup(band, stripe));
+
+  // 경광등 (움직일 때 깜빡인다)
+  const beaconKit = new Kit('glow');
+  beaconKit.cyl(C.amber, 0.06, 0.08, [cabX0 + 0.3, 0.5 + cabH + 0.16, 0.3], { seg: 10, glow: 3 });
+  const beacon = beaconKit.build();
+  root.add(beacon);
+
+  // 바퀴: 앞 두 축(조향), 뒤 두 축(복륜). 하나의 바퀴 그룹이 복륜 둘을 함께 그린다
+  const wheels: Group[] = [];
+  const axles: Array<[number, number]> = [
+    [front - 0.55, 0.22],
+    [front - 1.3, 0.22],
+    [-1.85, 0.32],
+    [-1.25, 0.32],
+  ];
+  for (const [x, width] of axles) {
+    for (const dz of [-1, 1]) {
+      const w = wheel(wr, width);
+      w.position.set(x, wr, dz * (halfW - width / 2 - 0.02));
+      root.add(w);
+      wheels.push(w);
+    }
+  }
+
+  // 적재함 (들리지 않는다: bed 그룹은 Actors가 기울이지 않는다)
+  const pivot: [number, number, number] = [rearX, DY, 0];
+  const bed = new Group();
+  bed.position.set(...pivot);
+  const b = new Kit('gloss');
+  // 바닥판(윗면이 0 = DY) + 아래 틀
+  b.box(C.steel, [BL, 0.08, BW], [BL / 2, -0.08, 0], { r: 0.02, mat: 'metal' });
+  b.box(C.dark, [BL, 0.1, BW + 0.02], [BL / 2, -0.17, 0], { r: 0.02, mat: 'clay' });
+  for (const dz of [-0.45, -0.15, 0.15, 0.45]) b.box(C.steelLight, [BL - 0.08, 0.012, 0.03], [BL / 2, 0, dz], { r: 0.005, mat: 'metal' });
+  // 앞 가림판: 기둥 둘 + 가로대 넷 (운전석 뒤를 지킨다)
+  const HB = 0.9;
+  for (const dz of [-1, 1]) b.box(C.blue, [0.08, HB, 0.08], [BL - 0.04, 0, dz * (BW / 2 - 0.04)], { r: 0.02 });
+  for (const y of [0.2, 0.42, 0.64, 0.86]) b.box(C.blue, [0.06, 0.06, BW], [BL - 0.04, y - 0.03, 0], { r: 0.015 });
+  // 옆판 꽂이(기둥 자리)
+  for (const dz of [-1, 1]) for (let i = 0; i <= 3; i += 1) b.box(C.dark, [0.05, 0.1, 0.025], [0.05 + (i * (BL - 0.1)) / 3, -0.1, dz * (BW / 2 + 0.01)], { r: 0.01, mat: 'clay' });
+  bed.add(b.build('cargo-deck'));
+  // 옆판: 바닥판 옆 아래 모서리를 축(x)으로 바깥 아래로 내려간다. sides[0]은 −z, sides[1]은 +z. 한쪽 세 쪽, 회사 띠는 바깥에
+  const SH = 0.26;
+  const sides = [-1, 1].map((side) => {
+    const gateSide = new Group();
+    gateSide.position.set(BL / 2, 0, side * (BW / 2 + 0.01));
+    const w = new Kit('gloss');
+    const seg = (BL - 0.12) / 3;
+    for (let i = 0; i < 3; i += 1) {
+      const cx = -BL / 2 + 0.06 + seg * (i + 0.5);
+      w.box(C.steelLight, [seg - 0.04, SH, 0.035], [cx, 0, 0], { r: 0.012, mat: 'metal' });
+      w.box(C.blue, [seg - 0.02, 0.05, 0.05], [cx, SH - 0.03, 0], { r: 0.018 });
+      for (const dx of [-seg / 4, seg / 4]) w.box(C.steel, [0.012, SH - 0.06, 0.042], [cx + dx, 0.02, 0], { r: 0.004, mat: 'metal' });
+    }
+    gateSide.add(w.build('cargo-side'));
+    const sb = new Kit('gloss');
+    sb.box(C.white, [BL - 0.6, 0.07, 0.01], [0, 0.08, side * 0.024], { r: 0.004 });
+    gateSide.add(stripeGroup(sb, stripe));
+    bed.add(gateSide);
+    return gateSide;
+  });
+  // 뒷문(낮음, 닫힌 채)
+  const gate = new Group();
+  const g = new Kit('gloss');
+  g.box(C.steelLight, [0.035, SH, BW], [0.02, 0, 0], { r: 0.012, mat: 'metal' });
+  g.box(C.blue, [0.05, 0.05, BW + 0.02], [0.02, SH - 0.03, 0], { r: 0.018 });
+  gate.add(g.build('cargo-gate'));
+  const load = new Group();
+  load.visible = false;
+  bed.add(gate, load);
+  root.add(bed);
+  return { root, bed, gate, load, sides, wheels, beacon, pivot, stripe };
 }
 
 export interface ForkliftModel {
   root: Group;
   carriage: Group;
+  /** 늘어나는 마스트 두 단(가운데·안쪽): 클램프가 바깥 마스트 위로 오르면 함께 올라간다 (Actors가 높이를 정한다, S2j #10) */
+  mastStages: Group[];
   jaws: Group[];
   wheels: Group[];
   beacon: Group;
 }
+
+/** 지게차 바깥 마스트 높이(모형): 바닥에서 위 가로대 위까지 */
+export const MAST_H = 1.81;
+/** 클램프 틀 높이(모형, 클램프 배율 전) */
+export const CLAMP_H = 0.5;
 
 export function buildForklift(): ForkliftModel {
   const root = new Group();
@@ -234,6 +335,16 @@ export function buildForklift(): ForkliftModel {
   k.box(C.steel, [0.07, 0.07, 0.56], [0.52, 1.74, 0], { r: 0.02, mat: 'metal' });
   k.box(C.steel, [0.07, 0.07, 0.56], [0.52, 0.9, 0], { r: 0.02, mat: 'metal' });
   k.cyl(C.steelLight, 0.035, 1.3, [0.47, 0.2, 0], { seg: 10, mat: 'metal' });
+  // 늘어나는 마스트(3단 마스트의 가운데·안쪽 단): 바깥 마스트 안쪽에 겹쳐 있다가 클램프를 따라 오른다
+  const mastStages = [0.205, 0.17].map((dz0, i) => {
+    const stage = new Group();
+    const m = new Kit('metal');
+    for (const dz of [-dz0, dz0]) m.box(i === 0 ? C.steelLight : C.steel, [0.06, MAST_H - 0.04, 0.05], [0.535, 0.08, dz], { r: 0.015 });
+    m.box(C.steel, [0.06, 0.06, dz0 * 2 + 0.05], [0.535, MAST_H - 0.02, 0], { r: 0.015 });
+    stage.add(m.build(`forklift-mast-${i}`));
+    root.add(stage);
+    return stage;
+  });
   // 등
   for (const dz of [-0.28, 0.28]) k.box('#fff6d6', [0.04, 0.07, 0.1], [0.5, 0.42, dz], { r: 0.015, mat: 'glow', glow: 2.2 });
   for (const dz of [-0.28, 0.28]) k.box(C.red, [0.04, 0.06, 0.1], [-0.6, 0.44, dz], { r: 0.015, mat: 'glow', glow: 1.4 });
@@ -282,7 +393,7 @@ export function buildForklift(): ForkliftModel {
     return group;
   });
   root.add(carriage);
-  return { root, carriage, jaws, wheels, beacon };
+  return { root, carriage, mastStages, jaws, wheels, beacon };
 }
 
 export interface WorkerModel {

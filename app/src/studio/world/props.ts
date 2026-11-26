@@ -53,9 +53,9 @@ export function bale(k: Kit, x: number, y: number, z: number, rotY = 0): void {
     k.box(C.kraft, [d, h, w], [0, 0, 0], { r: 0.06, seg: 3 });
     // 눌린 종이 층
     for (let i = 1; i < 5; i += 1) k.box(i % 2 ? C.kraftDark : C.kraftLight, [d + 0.012, 0.022, w + 0.012], [0, (h * i) / 5 - 0.01, 0], { r: 0.01 });
-    k.box(C.paper, [0.16, 0.05, w + 0.016], [0.18, h * 0.52, 0], { r: 0.012 });
-    k.box(C.paperGrey, [0.2, 0.045, w + 0.016], [-0.24, h * 0.3, 0], { r: 0.012 });
+    k.box(C.paper, [d * 0.17, 0.05, w + 0.016], [d * 0.19, h * 0.52, 0], { r: 0.012 });
+    k.box(C.paperGrey, [d * 0.21, 0.045, w + 0.016], [-d * 0.25, h * 0.3, 0], { r: 0.012 });
     // 결속 끈
-    for (const dx of [-0.3, 0, 0.3]) k.box(C.dark, [0.028, h + 0.02, w + 0.02], [dx, -0.01, 0], { r: 0.008 });
+    for (const dx of [-0.32, 0, 0.32]) k.box(C.dark, [0.028, h + 0.02, w + 0.02], [dx * d, -0.01, 0], { r: 0.008 });
   });
 }
