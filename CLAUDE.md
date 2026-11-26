@@ -76,7 +76,7 @@ EcoCycle/
 | 4. 장시간·현장 테스트 | realtime, app(빌드·배포) | 하루 이상 구동해도 느려짐·멈춤 없음 |
 | 5. 확장 | studio, features | 2단계에서 여유 확인된 경우만 |
 
-**현재 단계: 2 (3D 홈 시안), 범위가 "살아있는 3D 월드"로 확장되어 재작업 중(2026-10-13, 사용자 요청). 2026-11-24 실제 부지 배치·섹터 2곳 개편 완료(`docs/work-plan.md` S2c·S2d, 스크린샷 `docs/screenshots/studio/site-layout/`). 실제 태블릿 측정(초당 30프레임·30분)은 재작업 완료 후로 미룬다.** 단계가 바뀌면 이 줄과 `docs/decisions.md`를 갱신한다.
+**현재 단계: 2 (3D 홈 시안), 범위가 "살아있는 3D 월드"로 확장되어 재작업 중(2026-10-13, 사용자 요청). 2026-11-24 실제 부지 배치·섹터 2곳 개편 완료(`docs/work-plan.md` S2c·S2d, 스크린샷 `docs/screenshots/studio/site-layout/`). 2026-11-26 출차 계근·상차 차량(S2f)과 현장 사진 기준 3D 다듬기(S2e) 완료, 다음은 데스크톱 위에서 보기 맞춤(S2g). 실제 태블릿 측정(초당 30프레임·30분)은 재작업 완료 후로 미룬다.** 단계가 바뀌면 이 줄과 `docs/decisions.md`를 갱신한다.
 
 로봇팔 동기화 후퇴 순서: ① 관절 값 실시간 → ② 단계+진행률 → ③ 정해진 동작 반복(최후).
 
@@ -101,6 +101,7 @@ node app/scripts/topBar.mjs        # 상단 바 하나·3D 홈 표: 세 크기(3
 node app/scripts/floatingBar.mjs   # 떠 있는 상단 바·사이드바 폭: 세 크기(1440·820·390)에서 3D 홈·대시보드·공정 기록의 바 자리·모양·내용 간격·사이드바 폭이 같은지, 접기 기억, 나란히 놓은 비교 (약 3분, 로컬 Chromium 필요)
 node app/scripts/robotControls.mjs # 로봇팔 7단위: 390×844·1440×900에서 로봇팔 페이지 세 모드·수동 놓기 대기·적용 자리, 섹터 지정 중인 배치의 계획 vs 실제 배합, 사건 기록, 집기 기록 두 단계, 3D 홈 로봇 패널 조작 (약 5분, 로컬 Chromium 필요, 결과 docs/screenshots/robot-controls)
 node app/scripts/yardSoak.mjs      # 베일 적치 장시간: /scene-demo?yardprobe=1을 월드 시계 10분(YARD_SOAK_MIN로 조절) 돌리며 5초마다 베일·지게차·트럭 겹침과 칸 정합을 보고, 끝나면 1440×900·390×844 스크린샷 (약 12분, 로컬 Chromium 필요, 결과 docs/screenshots/studio/site-layout/yard)
+node app/scripts/yardStatic.mjs    # 현장 사진 비교 스크린샷: 시연·실제 홈을 390×844·820×1180·1440×900에서 부지 전체·기본 구역·위에서 보기와 사진 방향 화면으로 찍는다 (약 10~15분, 로컬 Chromium 필요, 결과와 README docs/screenshots/studio/site-layout)
 node app/scripts/recordPopups.mjs  # 기록 상세 팝업: 베일 기록 API, 폰·데스크톱에서 팝업 셋·이어 열기·뒤로 가기·깊은 링크 점검과 스크린샷 (약 2분, 로컬 Chromium 필요)
 npm run build               # app 프로덕션 빌드 (타입 검사 포함)
 ```
