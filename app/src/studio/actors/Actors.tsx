@@ -291,7 +291,7 @@ export function Trucks({ director, onSelect, blobs = false, lite = false }: Acto
         />
       ))}
       <instancedMesh ref={pour} args={[geometry, MAT.clay, POUR_SLOTS * POUR_PER_TRUCK]} castShadow frustumCulled={false} />
-      {!lite && <instancedMesh ref={tines} args={[tine, MAT.metal, TINE_TRUCKS * TINE_COUNT]} castShadow frustumCulled={false} />}
+      {!lite && <instancedMesh name="grapple-tines" ref={tines} args={[tine, MAT.metal, TINE_TRUCKS * TINE_COUNT]} castShadow frustumCulled={false} />}
     </>
   );
 }

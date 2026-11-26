@@ -32,9 +32,9 @@ const VEHICLE_EVERY = 80;
 const VEHICLE_STEPS: Array<[Vehicle['stage'], number]> = [
   ['arrived', 0],
   ['identified', 17],
-  ['unloading', 32],
-  ['unloaded', 42],
-  ['weighing_out', 48],
+  ['unloading', 36],
+  ['unloaded', 46],
+  ['weighing_out', 52],
   ['departed', 80],
 ];
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { Vehicle } from '@ecocycle/shared';
 import { VEHICLE_TIMING_SEC } from '../../../../mock-server/src/fixtures/process';
-import { CRANE, GRABS, GRAPPLE_TOTAL_SEC, GRAPPLE_TRUCK, grappleSim, grappleStowed, inboundBody, solveCrane, stepGrapple } from './grapple';
+import { CRANE, GRABS, GRAPPLE_TOTAL_SEC, GRAPPLE_TRUCK, grappleSim, grappleStowed, inboundBody, planGrabs, solveCrane, stepGrapple } from './grapple';
 
 // S2m 입고 집게차: 차량 종류는 ID로 고정(2:1), 하역 동작은 서버 하역 단계 안에서 끝나고, 단계가 먼저 넘어가면 바로 접는다
 
@@ -50,6 +51,32 @@ describe('집게차 하역', () => {
     expect(g.load).toBe(0);
     expect(t).toBeLessThan(VEHICLE_TIMING_SEC.afterWork);
   });
+  it('늦게 서면 남은 하역 시간에 맞춰 집는 횟수를 줄이고 그 안에 다 접는다', () => {
+    expect(planGrabs(VEHICLE_TIMING_SEC.unload)).toEqual({ plan: GRABS, rate: 1 });
+    for (const left of [7, 5.5, 4, 2.5, 1.6]) {
+      const { plan } = planGrabs(left);
+      expect(plan).toBeGreaterThanOrEqual(1);
+      expect(plan).toBeLessThan(GRABS);
+      const g = grappleSim();
+      let t = 0;
+      let drops = 0;
+      let wasHolding = false;
+      // 하역 단계가 끝나는 때(left초)까지 집고, 그 뒤는 출차 계근을 기다리는 단계
+      for (; t < left + VEHICLE_TIMING_SEC.afterWork && !(t > 0.1 && grappleStowed(g)); t += DT) {
+        stepGrapple(g, DT, t < left ? 'unloading' : 'unloaded', left - t);
+        if (wasHolding && !g.holding) drops += 1;
+        wasHolding = g.holding;
+      }
+      expect(grappleStowed(g)).toBe(true);
+      expect(g.load).toBe(0);
+      // 1.6초처럼 아주 짧으면 빨리 해도 한 번을 다 못 할 수 있다(단계가 넘어가면 그만두고 접는다)
+      if (left >= 2.5) {
+        expect(drops).toBe(plan);
+        expect(t).toBeLessThanOrEqual(left + 0.25);
+      }
+      expect(t).toBeLessThan(left + VEHICLE_TIMING_SEC.afterWork);
+    }
+  });
   it('하역 단계 전에는 받침다리를 내리지 않는다', () => {
     const g = grappleSim();
     for (let t = 0; t < 5; t += DT) stepGrapple(g, DT, 'identified');
@@ -70,5 +97,61 @@ describe('집게차 하역', () => {
       const ty = CRANE.pivotY + Math.sin(pose.a1) * CRANE.boom1 + Math.sin(pose.a1 + pose.a2) * l2;
       expect(Math.hypot(tr - r, ty - y)).toBeLessThan(0.02);
     }
+  });
+});
+
+describe('집게차 하역과 서버 단계 (모의 서버 단계 시간, Director)', () => {
+  it('크레인은 하역 단계(와 그 직후 접는 동안)에만 펴지고, 섹터 앞을 떠날 때는 늘 접혀 있다', async () => {
+    const { Director } = await import('./director');
+    const { demoData } = await import('../demo/demoData');
+    const S = VEHICLE_TIMING_SEC;
+    const steps: Array<[Vehicle['stage'], number]> = [
+      ['arrived', 0],
+      ['identified', S.identify],
+      ['unloading', S.identify + S.toSector],
+      ['unloaded', S.identify + S.toSector + S.unload],
+      ['weighing_out', S.identify + S.toSector + S.unload + S.afterWork],
+      ['departed', S.identify + S.toSector + S.unload + S.afterWork + S.weighOut],
+    ];
+    const every = 70;
+    const T0 = Date.parse('2026-10-16T09:00:00.000Z');
+    const iso = (ms: number) => new Date(ms).toISOString();
+    const d = new Director();
+    let worked = 0;
+    const lastPhase = new Map<string, string>();
+    for (let i = 0; i < 20 * 900; i += 1) {
+      const t = i * DT;
+      if (i % 10 === 0) {
+        const data = demoData(T0, Math.floor(t));
+        const vehicles: Vehicle[] = [];
+        for (let n = 0; n * every <= t; n += 1) {
+          const age = t - n * every;
+          let stage: Vehicle['stage'] = 'arrived';
+          const stageTimes: Vehicle['stageTimes'] = {};
+          for (const [s, at] of steps) {
+            if (age < at) continue;
+            stage = s;
+            stageTimes[s] = iso(T0 + (n * every + at) * 1000);
+          }
+          if (stage === 'departed' && age > steps[steps.length - 1]![1] + 11) continue;
+          const known = stage !== 'arrived';
+          vehicles.push({ id: `veh-20261016-${String(n).padStart(3, '0')}`, kind: 'inbound', baleIds: [], stage, plate: known ? `1${n % 10}가 3456` : null, companyName: known ? '예시' : null, sectorId: known ? (n % 2 ? 'sector-a' : 'sector-c') : null, stageTimes, updatedAt: iso(T0) });
+        }
+        d.sync({ devices: data.devices, vehicles, batches: data.batches, bales: [] }, T0 + t * 1000);
+      }
+      d.step(DT);
+      for (const x of d.trucks) {
+        if (!x.active || !x.grapple) continue;
+        const busy = x.crane.mode === 'legsDown' || x.crane.mode === 'work';
+        if (busy) {
+          worked += 1;
+          expect(x.stage).toBe('unloading');
+        }
+        if (lastPhase.get(x.id) === 'atTip' && x.phase !== 'atTip') expect(grappleStowed(x.crane)).toBe(true);
+        lastPhase.set(x.id, x.phase);
+      }
+    }
+    // 집게차가 실제로 크레인을 썼다 (늦게 와도 남은 시간에 맞춰 한 번은 집는다)
+    expect(worked).toBeGreaterThan(0);
   });
 });

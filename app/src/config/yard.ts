@@ -48,3 +48,9 @@ export const REAL_SIZE_M = {
   /** 작업자 키 */
   worker: { height: 1.75 },
 } as const;
+
+/**
+ * 3D 홈 하역 연출이 기대하는 하역 단계(unloading) 길이(초). 서버 값이 아니라 가정이다(모의 서버 VEHICLE_TIMING_SEC.unload와 같게).
+ * 트럭이 섹터 앞에 늦게 서면 "하역 시작 시각 + 이 값"까지 남은 시간에 맞춰 집게차는 집는 횟수(1~4)를, 덤프는 쏟는 시간을 줄인다(S2m)
+ */
+export const UNLOAD_EXPECTED_SEC = 9;

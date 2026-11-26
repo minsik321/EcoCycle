@@ -42,6 +42,7 @@ import type { Mover } from './mover';
 import { angleDelta, roundedPath, samplePath } from './paths';
 import type { P2, Path, Pose } from './paths';
 import { Token } from './token';
+import { UNLOAD_EXPECTED_SEC } from '../../config/yard';
 import { grappleKey, grappleMidUnload, grappleSim, grappleStowed, inboundBody, resetGrapple, stepGrapple } from './grapple';
 import type { GrappleSim } from './grapple';
 import { Yard } from './yard';
@@ -138,6 +139,8 @@ export interface TruckSim extends Mover {
   grapple: boolean;
   /** 집게차의 받침다리·크레인·집게 (덤프·상차 차량은 쓰지 않는다) */
   crane: GrappleSim;
+  /** 하역 단계에서 남았으리라 보는 시간(초): 서버 하역 시작 시각 + UNLOAD_EXPECTED_SEC까지. 하역 단계가 아니면 Infinity */
+  unloadLeft: number;
 }
 
 export type WorkerPose = 'walk' | 'stand' | 'tablet' | 'wave';
@@ -184,6 +187,12 @@ const TRUCK_ACCEL = 2.2;
 const WORKER_SPEED = 0.75;
 export const BELT_SPEED = 0.7;
 const TILT_RATE = 0.42;
+
+/** 하역 단계에서 남았으리라 보는 시간(초). 하역 단계가 아니면 Infinity */
+function unloadLeft(v: Vehicle, nowMs: number): number {
+  const start = v.stage === 'unloading' ? v.stageTimes.unloading : undefined;
+  return start ? UNLOAD_EXPECTED_SEC - (nowMs - Date.parse(start)) / 1000 : Infinity;
+}
 const UNLOAD_SEC = 6.5;
 /** 계근대에서 무게를 재는 동안 서 있는 최소 시간(초, 연출) */
 const WEIGH_SEC = 2.0;
@@ -323,7 +332,7 @@ export class Director {
   }
 
   private addTruckSlot(): TruckSim {
-    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, serverPlate: null, serverCompany: null, outbound: false, want: 0, sides: 0, leaveWaitT: 0, weighT: 0, plateT: 0, clearS: 0, y: 0, leaving: false, stuckT: 0, grapple: false, crane: grappleSim() };
+    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, serverPlate: null, serverCompany: null, outbound: false, want: 0, sides: 0, leaveWaitT: 0, weighT: 0, plateT: 0, clearS: 0, y: 0, leaving: false, stuckT: 0, grapple: false, crane: grappleSim(), unloadLeft: Infinity };
     this.trucks.push(t);
     return t;
   }
@@ -368,6 +377,7 @@ export class Director {
       const truck = this.trucks.find((t) => t.active && t.id === v.id);
       if (truck?.leaving) continue;
       if (truck) {
+        if (truck.stage !== v.stage || v.stage === 'unloading') truck.unloadLeft = unloadLeft(v, nowMs);
         truck.stage = v.stage;
         truck.bay = v.sectorId;
         truck.serverCompany = v.companyName;
@@ -400,6 +410,7 @@ export class Director {
     truck.outbound = v.kind === 'outbound';
     truck.want = v.baleIds.length;
     truck.grapple = !truck.outbound && inboundBody(v.id) === 'grapple';
+    truck.unloadLeft = unloadLeft(v, nowMs);
     resetGrapple(truck.crane);
     truck.bedTilt = 0;
     truck.load = 1;
@@ -711,6 +722,7 @@ export class Director {
     const order = this.trucks.filter((t) => t.active).sort((a, b) => a.seq - b.seq);
     for (const t of order) {
       t.pouring = false;
+      t.unloadLeft -= dt;
       switch (t.phase) {
         case 'road':
           if (advance(t, dt, ROAD_SPEED, TRUCK_ACCEL, this.truckBlocked(t))) {
@@ -806,14 +818,15 @@ export class Director {
           t.bedTilt += Math.max(-TILT_RATE * dt, Math.min(TILT_RATE * dt, want - t.bedTilt));
           if (t.grapple) {
             // 집게차: 받침다리 → 크레인으로 여러 번 옮김 → 접기 (sim/grapple, 하역 단계 안에서 끝난다)
-            stepGrapple(t.crane, dt, t.stage);
+            stepGrapple(t.crane, dt, t.stage, t.unloadLeft);
             t.load = t.crane.load;
             t.pouring = t.crane.dropT < 0.6;
             if (t.pouring) t.pourT = t.crane.dropT;
           } else if (t.stage === 'unloading' && t.bedTilt > 0.55 && t.load > 0) {
             t.pouring = true;
             t.pourT += dt;
-            t.load = Math.max(0, t.load - dt / UNLOAD_SEC);
+            // 늦게 섰으면 남은 하역 시간(적재함을 내리는 시간을 빼고) 안에 다 쏟는다
+            t.load = Math.max(0, t.load - dt / Math.max(1.5, Math.min(UNLOAD_SEC, t.unloadLeft - 1 / TILT_RATE)));
           }
           if (t.stage === 'unloaded' || t.stage === 'weighing_out' || t.stage === 'departed') t.load = 0;
           // 출차 단계가 오면 다시 재러 간다. 마당 안쪽 길과 계근대를 함께 잡아야 떠난다

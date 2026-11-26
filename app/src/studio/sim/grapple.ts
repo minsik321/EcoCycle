@@ -74,6 +74,10 @@ export interface GrappleSim {
   seg: number;
   segT: number;
   grabs: number;
+  /** 이번 하역에서 집을 횟수(1~GRABS): 남은 하역 시간에 맞춘다 */
+  plan: number;
+  /** 동작 빠르기(1 = 보통). 남은 시간이 한 번 집기에도 모자라면 빨리 한다 */
+  rate: number;
   /** 집게 0(벌림)~1(오므림) */
   jaw: number;
   holding: boolean;
@@ -142,6 +146,8 @@ export function grappleSim(): GrappleSim {
     seg: 0,
     segT: 0,
     grabs: 0,
+    plan: GRABS,
+    rate: 1,
     jaw: 0,
     holding: false,
     load: 1,
@@ -167,6 +173,7 @@ export function grappleMidUnload(g: GrappleSim): void {
   g.mode = 'work';
   g.legs = 1;
   g.grabs = 2;
+  g.plan = GRABS;
   startSeg(g, 0);
 }
 
@@ -205,20 +212,40 @@ function beginStow(g: GrappleSim): void {
   g.holding = false;
 }
 
+/** 고정 동작 시간(받침다리 내림·접기·받침다리 올림) */
+const FIXED_SEC = LEGS_SEC + STOW_SEC + LEGS_SEC;
+/** 가장 빨리 할 때의 빠르기 */
+const RATE_MAX = 2.5;
+
 /**
- * 한 걸음. stage는 서버 차량 단계. 하역 단계(unloading)에만 집고, 그 밖의 단계가 오면 접는다.
- * 하역이 끝난 단계(unloaded 뒤)면 실린 파지는 0이다(서버 값을 따른다).
+ * 남은 하역 시간(초)에 맞춰 집는 횟수와 빠르기를 정한다: 넉넉하면 GRABS번 보통 빠르기, 모자라면 횟수를 줄이고,
+ * 한 번 집기에도 모자라면 한 번을 빨리(최대 RATE_MAX배) 한다. 그래도 모자라면 단계가 넘어갈 때 하던 동작을 그만두고 접는다
  */
-export function stepGrapple(g: GrappleSim, dt: number, stage: string): void {
+export function planGrabs(left: number): { plan: number; rate: number } {
+  const usable = left;
+  const plan = Math.max(1, Math.min(GRABS, Math.floor((usable - FIXED_SEC) / GRAB_SEC)));
+  const need = FIXED_SEC + plan * GRAB_SEC;
+  return { plan, rate: Math.min(RATE_MAX, Math.max(1, need / Math.max(0.1, usable))) };
+}
+
+/**
+ * 한 걸음. stage는 서버 차량 단계, left는 하역 단계에서 남았으리라 보는 시간(초, 모르면 Infinity).
+ * 하역 단계(unloading)에만 집고, 그 밖의 단계가 오면 접는다. 하역이 끝난 단계(unloaded 뒤)면 실린 파지는 0이다(서버 값을 따른다).
+ */
+export function stepGrapple(g: GrappleSim, dtIn: number, stage: string, left = Infinity): void {
   const unloading = stage === 'unloading';
+  const dt = dtIn * g.rate;
   if (!unloading && stage !== 'arrived' && stage !== 'identified') {
     g.load = 0;
     if (g.mode === 'legsDown' || g.mode === 'work') beginStow(g);
   }
-  g.dropT += dt;
+  g.dropT += dtIn;
   switch (g.mode) {
     case 'stowed':
-      if (unloading && g.load > 0) g.mode = 'legsDown';
+      if (unloading && g.load > 0) {
+        g.mode = 'legsDown';
+        Object.assign(g, planGrabs(left));
+      }
       break;
     case 'legsDown':
       g.legs = Math.min(1, g.legs + dt / LEGS_SEC);
@@ -238,7 +265,7 @@ export function stepGrapple(g: GrappleSim, dt: number, stage: string): void {
       if (g.seg === 2) {
         // 움켜쥠: 적재함 더미가 한 번만큼 준다
         g.holding = true;
-        g.load = Math.max(0, g.load - 1 / GRABS);
+        g.load = Math.max(0, g.load - 1 / g.plan);
       }
       if (g.seg === 4) {
         // 벌리기 시작: 떨어뜨린 파지가 섹터 쪽으로 떨어진다
@@ -247,12 +274,17 @@ export function stepGrapple(g: GrappleSim, dt: number, stage: string): void {
         g.dropT = 0;
         g.holding = false;
       }
+      // 구간을 넘친 시간은 다음 구간으로 넘긴다 (걸음마다 조금씩 늦어지지 않게)
+      const spill = g.segT - len;
       if (g.seg < SEG_SEC.length - 1) startSeg(g, g.seg + 1);
       else {
         g.grabs += 1;
-        if (g.grabs >= GRABS || g.load <= 0.001) beginStow(g);
-        else startSeg(g, 0);
+        if (g.grabs >= g.plan || g.load <= 0.001) {
+          g.load = 0;
+          beginStow(g);
+        } else startSeg(g, 0);
       }
+      g.segT = spill;
       break;
     }
     case 'stow':
@@ -263,7 +295,10 @@ export function stepGrapple(g: GrappleSim, dt: number, stage: string): void {
       break;
     case 'legsUp':
       g.legs = Math.max(0, g.legs - dt / LEGS_SEC);
-      if (g.legs <= 0) g.mode = 'stowed';
+      if (g.legs <= 0) {
+        g.mode = 'stowed';
+        g.rate = 1;
+      }
       break;
   }
   solveCrane(g.tip, g.pose);
