@@ -1,4 +1,4 @@
-import type { BatchRecord, MixPart, TankId, Vehicle, VehicleRecord } from '@ecocycle/shared';
+import type { BatchRecord, MixPart, TankId, Vehicle, VehicleRecord, VehicleRecordStatus, VehicleStage } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
 import { BATCH_HISTORY, MIX_RATIOS, TARGET_PRESSURE_MPA } from '../fixtures/process';
 
@@ -20,26 +20,47 @@ const siteDate = (ms: number) => iso(ms + SITE_OFFSET).slice(0, 10).replaceAll('
 const vehicleHistory: VehicleRecord[] = [];
 const batchHistory: BatchRecord[] = [];
 
-interface Weight {
-  grossT: number;
-  tareT: number;
-  netT: number;
+/** 지금까지 잰 무게. 아직 재지 않은 값은 null (입고는 총중량 먼저, 상차는 공차 먼저, 나머지와 순중량은 출차 계근 뒤) */
+export interface MeasuredWeight {
+  grossT: number | null;
+  tareT: number | null;
+  netT: number | null;
 }
 
-/** 공정 흐름의 차량 한 대를 기록 한 줄로: 출차 계량 전에는 공차·순중량이 없다 */
-export function toVehicleRecord(vehicle: Vehicle, weight: Weight): VehicleRecord {
+/** 차량 단계 → 기록 상태 (명세 6절 "공정 기록": 인식 · 하역 · 상차 · 출차 계근 · 출차) */
+export function vehicleRecordStatus(stage: VehicleStage): VehicleRecordStatus {
+  switch (stage) {
+    case 'arrived':
+    case 'identified':
+      return 'identified';
+    case 'unloading':
+    case 'unloaded':
+      return 'unloading';
+    case 'loading':
+    case 'loaded':
+      return 'loading';
+    case 'weighing_out':
+      return 'weighing_out';
+    case 'departed':
+      return 'departed';
+  }
+}
+
+/** 공정 흐름의 차량 한 대를 기록 한 줄로. 무게는 지금까지 잰 값 그대로(출차 계근 전에는 나중 값·순중량이 null) */
+export function toVehicleRecord(vehicle: Vehicle, weight: MeasuredWeight): VehicleRecord {
   const departed = vehicle.stage === 'departed';
-  const status = departed ? 'departed' : vehicle.stage === 'unloading' || vehicle.stage === 'unloaded' ? 'unloading' : 'identified';
   return {
     id: vehicle.id,
-    status,
+    kind: vehicle.kind,
+    status: vehicleRecordStatus(vehicle.stage),
     plate: vehicle.plate,
     companyName: vehicle.companyName,
-    sectorId: vehicle.sectorId,
+    sectorId: vehicle.kind === 'inbound' ? vehicle.sectorId : null,
+    baleIds: [...vehicle.baleIds],
     arrivedAt: vehicle.stageTimes.arrived ?? vehicle.updatedAt,
     departedAt: vehicle.stageTimes.departed ?? null,
     grossT: weight.grossT,
-    tareT: departed ? weight.tareT : null,
+    tareT: weight.tareT,
     netT: departed ? weight.netT : null,
     stageTimes: { ...vehicle.stageTimes },
   };
@@ -48,6 +69,7 @@ export function toVehicleRecord(vehicle: Vehicle, weight: Weight): VehicleRecord
 /** 출차를 마친 차량 기록 한 줄을 남긴다. 오래된 기록은 버린다 */
 export function addVehicleRecord(record: VehicleRecord): void {
   vehicleHistory.push(record);
+  vehicleHistory.sort((a, b) => a.arrivedAt.localeCompare(b.arrivedAt));
   const keepFrom = Date.now() - BATCH_HISTORY.keepDays * DAY;
   while (vehicleHistory[0] && Date.parse(vehicleHistory[0].arrivedAt) < keepFrom) vehicleHistory.shift();
 }

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,6 +6,7 @@ import type { BatchEvent } from '@ecocycle/shared';
 import * as batchesApi from '../../api/batches';
 import * as recordsApi from '../../api/records';
 import * as api from '../../api';
+import { processSynced } from '../../store';
 import { ADMIN, renderWithStore } from '../../test/utils';
 import { BatchBalePage } from './BatchBalePage';
 import { RecordPopupLayer } from './popup/RecordPopupLayer';
@@ -14,6 +15,21 @@ vi.mock('../../api/records', () => ({ getRecords: vi.fn() }));
 vi.mock('../../api/batches', () => ({ getBatchControl: vi.fn(), getBaleDetail: vi.fn() }));
 vi.mock('../../api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api')>()),
+  getVehicleRecord: vi.fn(async (id: string) => ({
+    id,
+    kind: 'outbound',
+    status: 'departed',
+    plate: '82바 1047',
+    companyName: '대한판지',
+    sectorId: null,
+    baleIds: ['BL-20261015-0411'],
+    arrivedAt: '2026-10-15T04:30:00.000Z',
+    departedAt: '2026-10-15T04:31:30.000Z',
+    grossT: 9.98,
+    tareT: 8.94,
+    netT: 1.04,
+    stageTimes: { arrived: '2026-10-15T04:30:00.000Z', departed: '2026-10-15T04:31:30.000Z' },
+  })),
   getBatchRecord: vi.fn(async (id: string) => ({
     id,
     result: 'completed',
@@ -47,6 +63,7 @@ beforeEach(() => {
     id,
     batchId: 'batch-0407',
     stage: 'created',
+    vehicleId: null,
     stageTimes: { created: '2026-10-15T04:24:10.000Z' },
     updatedAt: '2026-10-15T04:24:10.000Z',
     pressureMpa: 28.3,
@@ -164,5 +181,57 @@ describe('배치·베일 사건 기록 → 팝업', () => {
     await userEvent.click(within(list).getAllByRole('button')[1] as HTMLElement);
     expect(screen.getByTestId('where')).toHaveTextContent('/records/batches/batch-0407');
     expect(within(screen.getByRole('dialog')).getByRole('heading', { name: '배치 상세' })).toBeInTheDocument();
+  });
+});
+
+describe('배치·베일 화면: 베일 줄의 실은 차량', () => {
+  it('출하된 베일은 실은 차량 링크(차량 팝업으로 이어 열기), 적치 중인 베일은 "–"', async () => {
+    vi.mocked(batchesApi.getBatchControl).mockResolvedValue({
+      eventsRevision: 3,
+      current: {
+        batch: {
+          id: 'batch-0411',
+          stage: 'compressing',
+          mix: [{ sectorId: 'sector-a', percent: 100 }],
+          actualMix: null,
+          pinning: null,
+          pinChanges: [],
+          avgMoisturePercent: 11.8,
+          targetPressureMpa: 28.5,
+          stageTimes: { planned: '2026-10-15T04:20:00.000Z' },
+          updatedAt: '2026-10-15T04:22:00.000Z',
+        },
+        paused: false,
+        skipped: false,
+        progressPercent: 90,
+        currentPressureMpa: 28,
+        baleIds: ['BL-20261015-0411', 'BL-20261015-0412'],
+      },
+      next: null,
+      pressureRange: { min: 27, max: 30 },
+    });
+    const { store } = app();
+    act(() => {
+      store.dispatch(
+        processSynced({
+          vehicles: [],
+          batches: [],
+          bales: [
+            { id: 'BL-20261015-0411', batchId: 'batch-0411', stage: 'shipped', vehicleId: 'veh-20261015-s001', stageTimes: { created: '2026-10-15T04:24:10.000Z', shipped: '2026-10-15T04:30:30.000Z' }, updatedAt: '2026-10-15T04:30:30.000Z' },
+            { id: 'BL-20261015-0412', batchId: 'batch-0411', stage: 'created', vehicleId: null, stageTimes: { created: '2026-10-15T04:25:10.000Z' }, updatedAt: '2026-10-15T04:25:10.000Z' },
+          ],
+          updatedAt: '2026-10-15T04:30:30.000Z',
+        }),
+      );
+    });
+    const card = await screen.findByRole('region', { name: '현재 배치' });
+    const rows = within(await within(card).findByRole('list', { name: '생산 베일' })).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('실은 차량');
+    expect(rows[1]).toHaveTextContent('실은 차량–');
+    expect(within(rows[1] as HTMLElement).queryByRole('link', { name: /실은 차량/ })).toBeNull();
+    await userEvent.click(within(rows[0] as HTMLElement).getByRole('link', { name: '실은 차량 veh-20261015-s001 보기' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/records/vehicles/veh-20261015-s001');
+    expect(await within(screen.getByRole('dialog')).findByText('82바 1047')).toBeInTheDocument();
   });
 });

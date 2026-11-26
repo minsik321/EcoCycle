@@ -8,7 +8,7 @@ import type { Bale, Batch, DeviceId, DeviceState, Vehicle } from '@ecocycle/shar
 import { chainSpecFor } from './robot/chain';
 import { fixedSource } from './robot/jointSource';
 import type { JointSource } from './robot/jointSource';
-import { cctvToggled, connectionChanged, devicesReceived, vehicleReceived } from '../store';
+import { baleReceived, cctvToggled, connectionChanged, devicesReceived, vehicleReceived } from '../store';
 import { NOW, conveyorState, renderWithStore, robotState, tankState } from '../test/utils';
 import { LiveStudio } from './LiveStudio';
 import type { StageProps } from './Stage';
@@ -56,6 +56,8 @@ const iso = (ms: number) => new Date(ms).toISOString();
 
 const vehicle = (id: string, stageName: Vehicle['stage'], sectorId: Vehicle['sectorId'] = null, atMs = T0): Vehicle => ({
   id,
+  kind: 'inbound',
+  baleIds: [],
   stage: stageName,
   plate: sectorId ? '12가 3456' : null,
   companyName: sectorId ? '예시자원' : null,
@@ -64,7 +66,7 @@ const vehicle = (id: string, stageName: Vehicle['stage'], sectorId: Vehicle['sec
   updatedAt: iso(atMs),
 });
 
-const bale = (id: string, stageName: Bale['stage'], createdMs = T0): Bale => ({ id, batchId: 'batch-1', stage: stageName, stageTimes: { created: iso(createdMs) }, updatedAt: iso(createdMs) });
+const bale = (id: string, stageName: Bale['stage'], createdMs = T0): Bale => ({ id, batchId: 'batch-1', stage: stageName, vehicleId: null, stageTimes: { created: iso(createdMs) }, updatedAt: iso(createdMs) });
 
 const compressorState = (): DeviceState => ({ id: 'compressor-1', type: 'compressor', status: 'normal', running: true, pressureMpa: 27.9, temperatureC: 41.2, cycleStage: 'pressing', updatedAt: NOW });
 
@@ -382,17 +384,20 @@ describe('연결 끊김: 모든 움직임이 멈춘다', () => {
     expect(screen.getByRole('button', { name: /^지역:/ }).closest('.st-area-dock')).not.toBeNull();
   });
 
-  it('표에서 장면에 없는 대상(출차한 차량)을 누르면 카메라는 그대로 두고 기록 팝업만 연다', async () => {
+  it('표에서 장면에 없는 대상(출하된 베일)을 누르면 카메라는 그대로 두고 기록 팝업만 연다', async () => {
+    // S2f 맞춤: 차량 탭은 회사 안 차량만 보여 주므로(명세 3절) 출차한 차량 줄 대신 출하된 베일 줄로 본다
     const user = userEvent.setup();
     const openRecord = vi.fn();
     const gone: Vehicle = { ...vehicle('v-gone', 'departed', 'sector-a'), plate: '34나 7788' };
-    render(view({ data: input({ vehicles: [gone, vehicle('v1', 'unloading', 'sector-c')] }), openRecord }));
+    render(view({ data: input({ vehicles: [gone, vehicle('v1', 'unloading', 'sector-c')], bales: [{ ...bale('BL-0901', 'shipped'), vehicleId: 'v-out' }] }), openRecord }));
     const table = screen.getByRole('region', { name: '공정 기록' });
-    await user.click(within(table).getByText('34나 7788'));
-    expect(openRecord).toHaveBeenCalledWith({ kind: 'vehicle', id: 'v-gone' });
-    expect(screen.queryByRole('complementary', { name: '차량 상세' })).toBeNull();
+    expect(within(table).queryByText('34나 7788')).toBeNull();
+    await user.click(within(table).getByRole('tab', { name: /^베일/ }));
+    await user.click(within(table).getByText('0901', { exact: false }));
+    expect(openRecord).toHaveBeenCalledWith({ kind: 'bale', id: 'BL-0901' });
     expect(stage.last?.routeKeys.current).toEqual([]);
     // 장면에 있는 차량은 지금처럼 고른다 (카메라가 다가가고 상세)
+    await user.click(within(table).getByRole('tab', { name: /^차량/ }));
     await user.click(within(table).getByText('12가 3456'));
     expect(openRecord).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('complementary', { name: '차량 상세' })).toBeInTheDocument();
@@ -694,7 +699,7 @@ describe('공정 기록 링크 (앱이 주소를 그려 넘긴다)', () => {
     const { rerender } = render(<Detail data={data} disconnected={false} selection={`veh:${vehicleId}`} onSelect={() => {}} recordLink={recordLink} />);
     expect(screen.getByRole('link', { name: '이 차량 기록' })).toHaveAttribute('href', `#vehicle:${vehicleId}`);
 
-    const bale: Bale = { id: 'BL-20261013-0412', batchId: 'batch-0412', stage: 'created', stageTimes: { created: NOW }, updatedAt: NOW };
+    const bale: Bale = { id: 'BL-20261013-0412', batchId: 'batch-0412', stage: 'created', vehicleId: null, stageTimes: { created: NOW }, updatedAt: NOW };
     rerender(<Detail data={{ ...data, bales: [bale] }} disconnected={false} selection={`bale:${bale.id}`} onSelect={() => {}} recordLink={recordLink} />);
     expect(screen.getByRole('link', { name: '이 배치 상세' })).toHaveAttribute('href', `#batch:${bale.batchId}`);
 
@@ -775,19 +780,23 @@ describe('표: 접기·펼치기와 장면에 없는 대상', () => {
     expect(screen.getAllByRole('row').every((r) => !r.hasAttribute('tabindex'))).toBe(true);
   });
 
-  it('3D 홈(LiveStudio)에서는 장면에 없는 차량 줄이 그 차량의 기록 팝업 주소를 연다', async () => {
+  it('3D 홈(LiveStudio)에서는 장면에 없는 베일 줄이 그 베일의 기록 팝업 주소를 연다 (출차한 차량은 차량 탭에 없다)', async () => {
     const user = userEvent.setup();
     const { store } = renderWithStore(
       <Routes>
         <Route index element={<LiveStudio onFailed={() => {}} />} />
-        <Route path="/records/vehicles/:id" element={<p>차량 기록 팝업 주소</p>} />
+        <Route path="/records/bales/:id" element={<p>베일 기록 팝업 주소</p>} />
       </Routes>,
       { devices: [tankState(), robotState(), conveyorState()], me: ADMIN },
     );
     act(() => {
       store.dispatch(vehicleReceived({ ...vehicle('v-gone', 'departed', 'sector-a'), plate: '34나 7788' }));
+      store.dispatch(baleReceived({ ...bale('BL-0902', 'shipped'), vehicleId: 'v-out' }));
     });
-    await user.click(within(screen.getByRole('region', { name: '공정 기록' })).getByText('34나 7788'));
-    expect(screen.getByText('차량 기록 팝업 주소')).toBeInTheDocument();
+    const table = screen.getByRole('region', { name: '공정 기록' });
+    expect(within(table).queryByText('34나 7788')).toBeNull();
+    await user.click(within(table).getByRole('tab', { name: /^베일/ }));
+    await user.click(within(table).getByText('0902', { exact: false }));
+    expect(screen.getByText('베일 기록 팝업 주소')).toBeInTheDocument();
   });
 });

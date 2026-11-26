@@ -25,10 +25,12 @@ vi.mock('../../api/batches', async (importOriginal) => ({
 
 const DEPARTED: VehicleRecord = {
   id: 'veh-20261015-034',
+  kind: 'inbound',
   status: 'departed',
   plate: '12가 3456',
   companyName: '한빛자원',
   sectorId: 'sector-a',
+  baleIds: [],
   arrivedAt: '2026-10-15T04:11:58.000Z',
   departedAt: '2026-10-15T04:13:25.000Z',
   grossT: 18.42,
@@ -39,6 +41,7 @@ const DEPARTED: VehicleRecord = {
     identified: '2026-10-15T04:12:04.000Z',
     unloading: '2026-10-15T04:12:20.000Z',
     unloaded: '2026-10-15T04:12:40.000Z',
+    weighing_out: '2026-10-15T04:12:50.000Z',
     departed: '2026-10-15T04:13:25.000Z',
   },
 };
@@ -52,6 +55,45 @@ const UNLOADING: VehicleRecord = {
   tareT: null,
   netT: null,
   stageTimes: { arrived: '2026-10-15T05:00:00.000Z', identified: '2026-10-15T05:00:06.000Z', unloading: '2026-10-15T05:00:22.000Z' },
+};
+
+/** 상차 차량(출차): 들어올 때 공차, 출차 계근 때 총중량, 실은 베일 둘 */
+const OUTBOUND_ID = 'veh-20261015-s001';
+const OUTBOUND: VehicleRecord = {
+  id: OUTBOUND_ID,
+  kind: 'outbound',
+  status: 'departed',
+  plate: '82바 1047',
+  companyName: '대한판지',
+  sectorId: null,
+  baleIds: ['BL-20261015-0407', 'BL-20261015-0411'],
+  arrivedAt: '2026-10-15T04:30:00.000Z',
+  departedAt: '2026-10-15T04:31:30.000Z',
+  grossT: 11.04,
+  tareT: 8.94,
+  netT: 2.1,
+  stageTimes: {
+    arrived: '2026-10-15T04:30:00.000Z',
+    identified: '2026-10-15T04:30:06.000Z',
+    loading: '2026-10-15T04:30:24.000Z',
+    loaded: '2026-10-15T04:30:40.000Z',
+    weighing_out: '2026-10-15T04:30:44.000Z',
+    departed: '2026-10-15T04:31:30.000Z',
+  },
+};
+/** 상차 중인 상차 차량: 공차만 있고 총중량·순중량·출차 시각은 아직 없다 */
+const LOADING: VehicleRecord = {
+  ...OUTBOUND,
+  id: 'veh-20261015-s002',
+  status: 'loading',
+  plate: '64사 5512',
+  companyName: '성원제지',
+  baleIds: [],
+  departedAt: null,
+  grossT: null,
+  tareT: 10.38,
+  netT: null,
+  stageTimes: { arrived: '2026-10-15T05:10:00.000Z', identified: '2026-10-15T05:10:06.000Z', loading: '2026-10-15T05:10:24.000Z' },
 };
 
 const BATCH = (over: Partial<BatchRecord> = {}): BatchRecord => ({
@@ -121,6 +163,7 @@ const BALE = (id: string, batchId: string, over: Partial<BaleDetailData> = {}): 
   id,
   batchId,
   stage: 'shipped',
+  vehicleId: OUTBOUND_ID,
   stageTimes: { created: '2026-10-15T04:24:10.000Z', shipped: '2026-10-15T04:24:35.000Z' },
   updatedAt: '2026-10-15T04:24:35.000Z',
   pressureMpa: 28.3,
@@ -142,6 +185,7 @@ const BALE_ROW: BaleRecord = {
   id: BALE_A,
   batchId: BATCH_X,
   stage: 'created',
+  vehicleId: null,
   createdAt: '2026-10-15T04:24:10.000Z',
   shippedAt: null,
   pressureMpa: 28.3,
@@ -153,20 +197,20 @@ beforeEach(() => {
   vi.mocked(api.getRecords).mockImplementation(
     async (path) =>
       (path === '/vehicles/records'
-        ? page([DEPARTED, UNLOADING])
+        ? page([DEPARTED, UNLOADING, OUTBOUND, LOADING])
         : path === '/bales/records'
-          ? page([BALE_ROW, { ...BALE_ROW, id: BALE_B, batchId: BATCH_Y, stage: 'shipped', shippedAt: '2026-10-15T05:00:00.000Z' }])
+          ? page([BALE_ROW, { ...BALE_ROW, id: BALE_B, batchId: BATCH_Y, stage: 'shipped', vehicleId: OUTBOUND_ID, shippedAt: '2026-10-15T05:00:00.000Z' }])
           : page([BATCH(), BATCH({ id: 'batch-0406', result: 'skipped', actualPressureMpa: null, balesProduced: 0, baleIds: [] })])) as never,
   );
   vi.mocked(api.getVehicleRecord).mockReset();
-  vi.mocked(api.getVehicleRecord).mockResolvedValue(DEPARTED);
+  vi.mocked(api.getVehicleRecord).mockImplementation(async (id) => (id === OUTBOUND_ID ? OUTBOUND : id === LOADING.id ? LOADING : DEPARTED));
   vi.mocked(api.getBatchRecord).mockReset();
   vi.mocked(api.getBatchRecord).mockImplementation(async (id) =>
     id === BATCH_X ? BATCH({ id: BATCH_X, balesProduced: 2, baleIds: [BALE_A, BALE_B] }) : BATCH({ id, baleIds: [BALE_B] }),
   );
   vi.mocked(batchesApi.getBaleDetail).mockReset();
   vi.mocked(batchesApi.getBaleDetail).mockImplementation(async (id) =>
-    id === BALE_A ? BALE(BALE_A, BATCH_X) : BALE(id, BATCH_Y, { stage: 'created', stageTimes: { created: '2026-10-15T04:50:00.000Z' } }),
+    id === BALE_A ? BALE(BALE_A, BATCH_X) : BALE(id, BATCH_Y, { stage: 'created', vehicleId: null, stageTimes: { created: '2026-10-15T04:50:00.000Z' } }),
   );
 });
 
@@ -471,14 +515,16 @@ describe('차량 기록 상세', () => {
     expect(within(popup()).getByRole('link', { name: '섹터 A' })).toHaveAttribute('href', '/tanks/sector-a');
     const stages = within(popup()).getByRole('region', { name: '단계별 시각' });
     expect(within(stages).getByText('번호판 인식')).toBeInTheDocument();
-    expect(within(stages).getByText('출차')).toBeInTheDocument();
+    // 하역 뒤 출차 계근을 거쳐 출차 (입고 단계 순서)
+    expect(within(stages).getAllByRole('term').map((t) => t.textContent)).toEqual(['계중대 도착', '번호판 인식', '하역 시작', '하역 완료', '출차 계근', '출차']);
+    expect(within(popup()).getByText('입고', { selector: 'dd' })).toBeInTheDocument();
   });
 
   it('출차 전에는 공차·순중량이 "–"이고 안내를 보인다', async () => {
     vi.mocked(api.getVehicleRecord).mockResolvedValue(UNLOADING);
     app('/records/vehicles/veh-20261015-035');
     expect(await within(popup()).findByText('87나 1203')).toBeInTheDocument();
-    expect(within(popup()).getByText('공차와 순중량은 출차 계량 뒤에 확정됩니다.')).toBeInTheDocument();
+    expect(within(popup()).getByText('공차와 순중량은 출차 계근 뒤에 확정됩니다.')).toBeInTheDocument();
     expect(within(popup()).getByText('아직 출차하지 않았습니다')).toBeInTheDocument();
   });
 
@@ -512,4 +558,87 @@ describe('배치·베일 상세', () => {
     expect(within(popup()).getByText('28.3 MPa')).toBeInTheDocument();
     expect(within(popup()).getByRole('button', { name: `배치 ${BATCH_Y} 보기` })).toBeInTheDocument();
   });
+});
+
+describe('상차 차량 (kind: outbound)', () => {
+  it('차량 탭: 종류(입고·상차), 상차는 섹터 대신 실은 베일 수, 상차 중이면 공차만 있고 총중량·순중량은 "–"', async () => {
+    app('/records');
+    const table = await screen.findByRole('table', { name: '차량 기록' });
+    expect(within(within(table).getByText('12가 3456').closest('tr') as HTMLElement).getByText('입고')).toBeInTheDocument();
+    const out = within(table).getByText('82바 1047').closest('tr') as HTMLElement;
+    expect(within(out).getByText('상차')).toBeInTheDocument();
+    expect(within(out).getByText('베일 2개')).toBeInTheDocument();
+    expect(within(out).getByText('11.04 t')).toBeInTheDocument();
+    expect(within(out).getByText('8.94 t')).toBeInTheDocument();
+    expect(within(out).getByText('2.10 t')).toBeInTheDocument();
+    const loading = within(table).getByText('64사 5512').closest('tr') as HTMLElement;
+    expect(within(loading).getAllByText('상차')).toHaveLength(2);
+    expect(within(loading).getByText('10.38 t')).toBeInTheDocument();
+    expect(within(loading).getByText('베일 0개')).toBeInTheDocument();
+    // 폰 줄: 종류 · 실은 베일 · 상태, 무게는 공차와 안내
+    const list = screen.getByRole('list', { name: '차량 기록' });
+    const phone = within(list).getByRole('button', { name: /64사 5512/ });
+    expect(phone).toHaveTextContent('상차 · 베일 0개 · 상차');
+    expect(phone).toHaveTextContent('공차 10.38 t · 총중량·순중량은 출차 계근 뒤');
+  });
+
+  it('차량 팝업: 종류 상차, 배정 섹터 대신 실은 베일 수와 베일 링크, 무게 셋(공차 → 총중량 → 순중량)', async () => {
+    app(`/records/vehicles/${OUTBOUND_ID}`);
+    expect(await within(popup()).findByText('82바 1047')).toBeInTheDocument();
+    expect(within(popup()).getByText('상차', { selector: 'dd' })).toBeInTheDocument();
+    expect(within(popup()).queryByText('배정 섹터')).not.toBeInTheDocument();
+    const bales = within(popup()).getByRole('region', { name: '실은 베일 2개' });
+    expect(within(bales).getByRole('button', { name: `베일 ${BALE_A} 보기` })).toBeInTheDocument();
+    expect(within(bales).getByRole('button', { name: `베일 ${BALE_B} 보기` })).toBeInTheDocument();
+    const weights = within(popup()).getByRole('region', { name: '계중대 무게' });
+    expect(within(weights).getAllByRole('term').map((t) => t.textContent)).toEqual(['공차 (입차)', '총중량 (출차 계근)', '순중량']);
+    expect(within(weights).getAllByRole('definition').map((d) => d.textContent)).toEqual(['8.94 t', '11.04 t', '2.10 t']);
+    const stages = within(popup()).getByRole('region', { name: '단계별 시각' });
+    expect(within(stages).getAllByRole('term').map((t) => t.textContent)).toEqual(['계중대 도착', '번호판 인식', '상차 시작', '상차 완료', '출차 계근', '출차']);
+  });
+
+  it('상차 중 팝업: 총중량·순중량은 "–"와 안내, 아직 실은 베일이 없다', async () => {
+    app(`/records/vehicles/${LOADING.id}`);
+    expect(await within(popup()).findByText('64사 5512')).toBeInTheDocument();
+    const weights = within(popup()).getByRole('region', { name: '계중대 무게' });
+    expect(within(weights).getAllByRole('definition').map((d) => d.textContent)).toEqual(['10.38 t', '–', '–']);
+    expect(within(weights).getByText('총중량과 순중량은 출차 계근 뒤에 확정됩니다.')).toBeInTheDocument();
+    expect(within(popup()).getByText('아직 실은 베일이 없습니다.')).toBeInTheDocument();
+  });
+
+  it('차량 팝업의 "베일 보기" → 베일 팝업의 "실은 차량" → "차량 보기"로 이어 연다', async () => {
+    app(`/records/vehicles/${OUTBOUND_ID}`);
+    await userEvent.click(await within(popup()).findByRole('button', { name: `베일 ${BALE_A} 보기` }));
+    expect(where()).toBe(`/records/bales/${BALE_A}`);
+    expect(await within(popup()).findByText(OUTBOUND_ID)).toBeInTheDocument();
+    expect(within(popup()).getByText('실은 차량')).toBeInTheDocument();
+    await userEvent.click(within(popup()).getByRole('button', { name: `차량 ${OUTBOUND_ID} 보기` }));
+    expect(where()).toBe(`/records/vehicles/${OUTBOUND_ID}`);
+    expect(await within(popup()).findByText('82바 1047')).toBeInTheDocument();
+  });
+
+  it('적치 중인 베일 팝업은 "실은 차량"이 비어 있다', async () => {
+    app(`/records/bales/${BALE_B}`);
+    expect(await within(popup()).findByText('아직 싣지 않았습니다')).toBeInTheDocument();
+    expect(within(popup()).queryByRole('button', { name: /^차량 .* 보기$/ })).not.toBeInTheDocument();
+  });
+
+  it('베일 탭: 출하된 베일 줄의 실은 차량은 차량 팝업 링크(줄의 베일 팝업은 열지 않음), 적치 중이면 "–"', async () => {
+    app('/records?tab=bales');
+    const table = await screen.findByRole('table', { name: '베일 기록' });
+    expect(within(table).getByRole('columnheader', { name: '실은 차량' })).toBeInTheDocument();
+    const stacked = within(table).getByText(BALE_A).closest('tr') as HTMLElement;
+    expect(within(stacked).queryByRole('link')).toBeNull();
+    expect(within(stacked).getAllByRole('cell').at(-2)).toHaveTextContent('–');
+    // 폰 목록: 차량이 없어도 항목은 "차량 –"로 남는다
+    const list = screen.getByRole('list', { name: '베일 기록' });
+    expect(within(list).getByRole('button', { name: new RegExp(BALE_A) })).toHaveTextContent('차량 –');
+    expect(within(list).getByRole('button', { name: new RegExp(BALE_B) })).toHaveTextContent('차량 #s001');
+    const shipped = within(table).getByText(BALE_B).closest('tr') as HTMLElement;
+    await userEvent.click(within(shipped).getByRole('link', { name: `실은 차량 ${OUTBOUND_ID} 보기` }));
+    expect(where()).toBe(`/records/vehicles/${OUTBOUND_ID}`);
+    expect(await within(popup()).findByText('82바 1047')).toBeInTheDocument();
+    expect(within(popup()).getByRole('heading', { name: '차량 기록' })).toBeInTheDocument();
+  });
+
 });

@@ -1,5 +1,5 @@
 import type { Bale, Batch, Vehicle } from '@ecocycle/shared';
-import { BALE_STAGE_TEXT, VEHICLE_STAGE_TEXT, shortId } from '../../../config/processDisplay';
+import { BALE_STAGE_TEXT, VEHICLE_KIND_LABEL, VEHICLE_STAGE_TEXT, shortId } from '../../../config/processDisplay';
 
 // 대시보드가 store 값에서 고르는 것. 값을 만들지 않고 서버가 준 목록에서 고르기·정렬만 한다.
 
@@ -25,7 +25,7 @@ export interface ActivityRow {
   id: string;
   /** 번호판 또는 베일 번호 */
   title: string;
-  /** 회사 이름 등 (없으면 null) */
+  /** 차량은 종류(입고·상차)와 회사 이름, 베일은 없음(null) */
   sub: string | null;
   stage: string;
   /** 이 대상의 마지막 갱신 시각 (서버 값) */
@@ -40,7 +40,7 @@ export function recentActivity(vehicles: readonly Vehicle[], bales: readonly Bal
       kind: 'vehicle' as const,
       id: v.id,
       title: v.plate ?? '번호판 인식 전',
-      sub: v.companyName,
+      sub: v.companyName ? `${VEHICLE_KIND_LABEL[v.kind]} · ${v.companyName}` : VEHICLE_KIND_LABEL[v.kind],
       stage: VEHICLE_STAGE_TEXT[v.stage],
       at: v.updatedAt,
     })),

@@ -281,7 +281,11 @@ export class Director {
     this.conveyorRunning = conveyor?.type === 'conveyor' && conveyor.running;
     this.pressing = compressor?.type === 'compressor' && compressor.running && input.batches.some((b: Batch) => b.stage === 'compressing');
 
-    for (const v of input.vehicles) {
+    for (const server of input.vehicles) {
+      // S2f 임시 맞춤(S2e가 다시 그릴 때까지): 서버 상차 차량(kind outbound)은 기존 "예시" 상차 차량이 맡으므로 건너뛰고,
+      // 입고 차량의 출차 계근(weighing_out)은 기존 흐름의 하역 완료 대기로 본다(출차 단계에 계근대에서 다시 잰다)
+      if (server.kind === 'outbound') continue;
+      const v: Vehicle = server.stage === 'weighing_out' ? { ...server, stage: 'unloaded' } : server;
       const truck = this.trucks.find((t) => t.active && !t.example && t.id === v.id);
       if (truck) {
         truck.stage = v.stage;

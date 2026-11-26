@@ -13,10 +13,13 @@ import { findWrappedText } from './textAudit.mjs';
 const root = path.resolve(import.meta.dirname, '../..');
 const out = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'docs/screenshots/record-search');
 fs.mkdirSync(out, { recursive: true });
-const api = 'http://localhost:14020/api/v1';
-const origin = 'http://localhost:15220';
-const mock = start('mock', ['run', 'start', '-w', '@ecocycle/mock-server'], root, { PORT: '14020', CORS_ORIGINS: origin }, '[mock-server]');
-const app = start('app', ['run', 'dev', '-w', '@ecocycle/app', '--', '--port', '15220', '--strictPort'], root, { VITE_API_BASE: api, VITE_WS_BASE: 'ws://localhost:14020/ws/v1/stream', VITE_USE_MOCK: 'true' }, 'Local:');
+// 포트: 다른 점검과 겹치지 않게 RECORD_SEARCH_MOCK_PORT·RECORD_SEARCH_APP_PORT로 바꿀 수 있다
+const mockPort = process.env.RECORD_SEARCH_MOCK_PORT ?? '14020';
+const appPort = process.env.RECORD_SEARCH_APP_PORT ?? '15220';
+const api = `http://localhost:${mockPort}/api/v1`;
+const origin = `http://localhost:${appPort}`;
+const mock = start('mock', ['run', 'start', '-w', '@ecocycle/mock-server'], root, { PORT: mockPort, CORS_ORIGINS: origin }, '[mock-server]');
+const app = start('app', ['run', 'dev', '-w', '@ecocycle/app', '--', '--port', appPort, '--strictPort'], root, { VITE_API_BASE: api, VITE_WS_BASE: `ws://localhost:${mockPort}/ws/v1/stream`, VITE_USE_MOCK: 'true' }, 'Local:');
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 let browser;
 const problems = [];
@@ -54,10 +57,15 @@ async function total(scope) {
   return match ? Number(match[1]) : null;
 }
 
-async function waitTotal(scope, predicate, label) {
+/** 건수가 predicate를 만족할 때까지 기다린다. settle이면 기간을 바꾼 직후의 앞 기간 건수를 잡지 않게, 1초 사이 두 번 같은 값일 때 돌려준다 */
+async function waitTotal(scope, predicate, label, settle = false) {
   for (let i = 0; i < 40; i++) {
     const n = await total(scope);
-    if (n !== null && predicate(n)) return n;
+    if (n !== null && predicate(n)) {
+      if (!settle) return n;
+      await pause(1000);
+      if ((await total(scope)) === n) return n;
+    }
     await pause(150);
   }
   throw new Error(`건수를 기다리다 시간 초과: ${label} (마지막 ${await total(scope)})`);
@@ -87,8 +95,18 @@ try {
     await go(page, '/records?tab=vehicles');
     let section = page.getByRole('region', { name: '차량 기록' });
     await section.getByRole('button', { name: '최근 7일' }).click();
-    const all = await waitTotal(section, (n) => n > 3, '차량 전체');
-    assert.equal(await section.getByRole('searchbox').getAttribute('placeholder'), '번호판, 회사 검색');
+    const all = await waitTotal(section, (n) => n > 3, '차량 전체', true);
+    assert.equal(await section.getByRole('searchbox').getAttribute('placeholder'), '번호판, 회사, 입고·상차 검색');
+    // 종류 이름 "상차": 상차 차량만 남는다 (보이는 줄마다 "상차")
+    await search(section, '차량 기록 검색', '상차');
+    const outbound = await waitTotal(section, (n) => n >= 1 && n < all, '상차 검색');
+    const rows = width < 768 ? section.getByRole('list', { name: '차량 기록' }).getByRole('button') : section.getByRole('table', { name: '차량 기록' }).locator('tbody tr');
+    const rowTexts = await rows.allInnerTexts();
+    assert.ok(rowTexts.length > 0 && rowTexts.every((t) => t.includes('상차')), `상차 검색 결과에 입고 줄이 있다: ${rowTexts.join(' | ')}`);
+    await shot(page, width, height, 'records-vehicles-outbound');
+    await section.getByRole('button', { name: '검색어 지우기' }).click();
+    // 점검하는 동안 새 차량이 들어올 수 있다
+    await waitTotal(section, (n) => n >= all, '검색어 지운 뒤 전체', true);
     const plate = /\d{2,3}[가-힣]\s\d{4}/.exec(await section.innerText())?.[0];
     assert.ok(plate, '화면에서 번호판을 못 찾았다');
     await search(section, '차량 기록 검색', plate.replace(/\s+/g, ''));
@@ -115,17 +133,18 @@ try {
     await go(page, '/records?tab=batches');
     section = page.getByRole('region', { name: '배치 기록' });
     await section.getByRole('button', { name: '최근 7일' }).click();
-    const batchesAll = await waitTotal(section, (n) => n > 2, '배치 전체');
+    const batchesAll = await waitTotal(section, (n) => n > 2, '배치 전체', true);
     assert.equal(await section.getByRole('searchbox').getAttribute('placeholder'), '배치 ID, 섹터 검색');
     await search(section, '배치 기록 검색', '섹터 A');
-    const batchesA = await waitTotal(section, (n) => n >= 1 && n <= batchesAll, '배치 A');
+    // 배치는 거의 다 A를 섞고, 점검하는 동안 새 배치가 계획될 수 있어 전체 건수에 몇 건의 여유를 둔다
+    const batchesA = await waitTotal(section, (n) => n >= 1 && n <= batchesAll + 3, '배치 A');
     await shot(page, width, height, 'records-batches-search');
 
     // ── 공정 기록 · 베일: 베일 ID 일부
     await go(page, '/records?tab=bales');
     section = page.getByRole('region', { name: '베일 기록' });
     await section.getByRole('button', { name: '최근 7일' }).click();
-    const balesAll = await waitTotal(section, (n) => n > 3, '베일 전체');
+    const balesAll = await waitTotal(section, (n) => n > 3, '베일 전체', true);
     assert.equal(await section.getByRole('searchbox').getAttribute('placeholder'), '베일 ID, 배치 ID 검색');
     const baleId = /BL-\d+-\d+/.exec(await section.innerText())?.[0];
     assert.ok(baleId, '화면에서 베일 ID를 못 찾았다');
@@ -138,7 +157,7 @@ try {
     section = page.getByRole('region', { name: '하역 기록' });
     await section.scrollIntoViewIfNeeded();
     await section.getByRole('button', { name: '최근 7일' }).click();
-    const unloadsAll = await waitTotal(section, (n) => n > 2, '하역 전체');
+    const unloadsAll = await waitTotal(section, (n) => n > 2, '하역 전체', true);
     assert.equal(await section.getByRole('searchbox').getAttribute('placeholder'), '번호판, 회사 검색');
     const unloadPlate = /\d{2,3}[가-힣]\s\d{4}/.exec(await section.innerText())?.[0];
     assert.ok(unloadPlate);
@@ -151,7 +170,7 @@ try {
     await page.getByRole('button', { name: '알람 이력' }).click();
     await pause(800);
     const main = page.locator('main');
-    const alarmsAll = await waitTotal(main, (n) => n >= 3, '알람 전체');
+    const alarmsAll = await waitTotal(main, (n) => n >= 3, '알람 전체', true);
     assert.equal(await main.getByRole('searchbox').getAttribute('placeholder'), '기기 이름, 알람 내용 검색');
     await search(main, '알람 검색', '압축기');
     const alarmsFound = await waitTotal(main, (n) => n >= 1 && n < alarmsAll, '알람 압축기');
@@ -160,11 +179,11 @@ try {
     await main.getByText('검색 결과가 없습니다').waitFor();
     await shot(page, width, height, 'alarms-empty-search');
 
-    console.log(`${width}×${height}: 차량 ${all}→${found}, 배치 ${batchesAll}→${batchesA}, 베일 ${balesAll}, 하역 ${unloadsAll}, 알람 ${alarmsAll}→${alarmsFound}`);
+    console.log(`${width}×${height}: 차량 ${all}→${found}(상차 ${outbound}), 배치 ${batchesAll}→${batchesA}, 베일 ${balesAll}, 하역 ${unloadsAll}, 알람 ${alarmsAll}→${alarmsFound}`);
     await context.close();
   }
   assert.deepEqual(problems, []);
-  console.log('PASS: 390×844, 1440×900 (검색 + 기간, 공백 무시, X, 결과 없음, 글 꺾임·가로 넘침 없음)');
+  console.log('PASS: 390×844, 1440×900 (검색 + 기간, 공백 무시, 종류 이름 상차, X, 결과 없음, 글 꺾임·가로 넘침 없음)');
 } finally {
   await browser?.close();
   app.stop();

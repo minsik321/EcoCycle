@@ -1,7 +1,7 @@
 import type { TankId, UnloadRecord, VehicleRecord } from '@ecocycle/shared';
 import { TANK_IDS } from '@ecocycle/shared';
-import type { TruckFixture } from '../fixtures/process';
-import { COMPANIES, FILL_PERCENT_PER_TON, UNLOAD_HISTORY } from '../fixtures/process';
+import type { OutboundTruckFixture, TruckFixture } from '../fixtures/process';
+import { BALE_WEIGHT_T, COMPANIES, FILL_PERCENT_PER_TON, UNLOAD_HISTORY, VEHICLE_TIMING_SEC } from '../fixtures/process';
 import { addVehicleRecord } from './records';
 
 // 섹터 하역 기록 (GET /devices/{id}/unloads/records). 차량 흐름(sim/process)이 출차 계량을 마칠 때마다 한 줄씩 쌓고,
@@ -29,6 +29,17 @@ export function weighTruck(truck: TruckFixture): { grossT: number; tareT: number
   return { grossT: round2(tareT + netT), tareT, netT };
 }
 
+/** 상차 차량의 들어올 때 계근(공차): 등록 공차 ±0.06 t */
+export const weighEmpty = (truck: OutboundTruckFixture): number => round2(truck.tareT + rnd(-0.06, 0.06));
+
+/** 상차 차량의 출차 계근: 공차 + 실은 베일 무게(예시 범위) → 총중량, 순중량 = 총중량 − 공차 */
+export function weighLoaded(tareT: number, baleCount: number): { grossT: number; tareT: number; netT: number } {
+  let load = 0;
+  for (let i = 0; i < baleCount; i += 1) load += rnd(BALE_WEIGHT_T[0], BALE_WEIGHT_T[1]);
+  const grossT = round2(tareT + load);
+  return { grossT, tareT, netT: round2(grossT - tareT) };
+}
+
 /** 순중량만큼 오르는 적재율 %p (예시 환산) */
 export const fillGainPercent = (netT: number): number => netT * FILL_PERCENT_PER_TON;
 
@@ -41,22 +52,26 @@ export function addUnloadRecord(record: UnloadRecord): void {
 
 export const unloadRecords = (sectorId: TankId): UnloadRecord[] => records.filter((r) => r.sectorId === sectorId);
 
-/** 지난 하역 한 줄에 해당하는 차량 기록: 단계 시각은 sim/process의 지난 예시 차량과 같은 간격(하역 완료 기준) */
+/** 지난 하역 한 줄에 해당하는 차량 기록: 단계 시각은 sim/process의 지난 예시 차량과 같은 간격(하역 완료 기준), 하역 뒤 출차 계근을 거쳐 출차 */
 function vehicleOf(r: UnloadRecord): VehicleRecord {
   const at = Date.parse(r.unloadedAt);
   const iso = (offsetSec: number) => new Date(at + offsetSec * 1000).toISOString();
+  const weighOut = VEHICLE_TIMING_SEC.afterWork;
+  const departed = weighOut + VEHICLE_TIMING_SEC.weighOut;
   return {
     id: r.vehicleId,
+    kind: 'inbound',
     status: 'departed',
     plate: r.plate,
     companyName: r.companyName,
     sectorId: r.sectorId,
+    baleIds: [],
     arrivedAt: iso(-31),
-    departedAt: iso(14),
+    departedAt: iso(departed),
     grossT: r.grossT,
     tareT: r.tareT,
     netT: r.netT,
-    stageTimes: { arrived: iso(-31), identified: iso(-25), unloading: iso(-9), unloaded: iso(0), departed: iso(14) },
+    stageTimes: { arrived: iso(-31), identified: iso(-25), unloading: iso(-9), unloaded: iso(0), weighing_out: iso(weighOut), departed: iso(departed) },
   };
 }
 

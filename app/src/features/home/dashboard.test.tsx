@@ -6,6 +6,7 @@ import type { Bale, Batch, DeviceState, PlantSummary, Vehicle } from '@ecocycle/
 import * as api from '../../api';
 import { alarmReceived, connectionChanged, plantReceived, processSynced } from '../../store';
 import { NOW, conveyorState, renderWithStore, robotState } from '../../test/utils';
+import { VEHICLE_STAGE_TEXT } from '../../config/processDisplay';
 import { HomePage } from './HomePage';
 import { currentBatch, recentActivity } from './dashboard/dashboardData';
 import * as support from './sceneSupport';
@@ -45,6 +46,8 @@ const summary: PlantSummary = { averageMoisturePercent: 11.1, totalFillPercent: 
 const at = (min: number) => `2026-10-13T05:${String(min).padStart(2, '0')}:00.000Z`;
 const vehicle = (id: string, stage: Vehicle['stage'], min: number, plate: string | null = '12가 3456'): Vehicle => ({
   id,
+  kind: 'inbound',
+  baleIds: [],
   stage,
   plate,
   companyName: plate ? '한빛자원' : null,
@@ -67,11 +70,11 @@ const batch = (id: string, stage: Batch['stage'], min: number): Batch => ({
   stageTimes: { planned: at(min), ...(stage !== 'planned' ? { mixing: at(min) } : {}), ...(stage === 'compressing' ? { compressing: at(min) } : {}) },
   updatedAt: at(min),
 });
-const bale = (id: string, stage: Bale['stage'], min: number): Bale => ({ id, batchId: 'batch-1', stage, stageTimes: { created: at(min), ...(stage === 'shipped' ? { shipped: at(min) } : {}) }, updatedAt: at(min) });
+const bale = (id: string, stage: Bale['stage'], min: number): Bale => ({ id, batchId: 'batch-1', stage, vehicleId: stage === 'shipped' ? 'v0' : null, stageTimes: { created: at(min), ...(stage === 'shipped' ? { shipped: at(min) } : {}) }, updatedAt: at(min) });
 
 const devices = (): DeviceState[] => [tank('sector-a', 72.4), tank('sector-c', 82, 'caution'), robotState(), conveyorState(), compressor];
 
-function page() {
+function page(vehicles: Vehicle[] = [vehicle('v1', 'departed', 1), vehicle('v2', 'unloading', 6), vehicle('v3', 'arrived', 7, null)]) {
   const utils = renderWithStore(
     <Routes>
       <Route path="/" element={<HomePage />} />
@@ -83,7 +86,7 @@ function page() {
     utils.store.dispatch(plantReceived(summary));
     utils.store.dispatch(
       processSynced({
-        vehicles: [vehicle('v1', 'departed', 1), vehicle('v2', 'unloading', 6), vehicle('v3', 'arrived', 7, null)],
+        vehicles,
         batches: [batch('batch-1128', 'completed', 2), batch('batch-1129', 'compressing', 5)],
         bales: [bale('BL-20261013-0412', 'shipped', 4)],
         updatedAt: at(7),
@@ -192,6 +195,29 @@ describe('대시보드 홈', () => {
     expect(steps.map((li) => li.querySelector('span.block')?.textContent)).toEqual(['입고', '차량 인식', '하역', '배합', '압축', '출하']);
     expect(steps[4]).toHaveAttribute('aria-current', 'step');
     expect(within(tracker).getByText('지금 압축')).toBeInTheDocument();
+  });
+
+  it('6단계 공정 추적: 출차 계근 중인 입고 차량은 하역 칸에, 상차 차량은 출하 칸에 config 단계 이름으로 적는다', () => {
+    const weighing: Vehicle = { ...vehicle('v4', 'weighing_out', 6, '34다 7781'), stageTimes: { arrived: at(1), identified: at(1), unloading: at(3), unloaded: at(4), weighing_out: at(6) } };
+    const loading: Vehicle = {
+      ...vehicle('v5', 'loading', 7, '82바 1047'),
+      kind: 'outbound',
+      companyName: '대한판지',
+      sectorId: null,
+      baleIds: ['BL-20261013-0412'],
+      stageTimes: { arrived: at(2), identified: at(2), loading: at(7) },
+    };
+    page([weighing, loading]);
+    const tracker = screen.getByRole('region', { name: '공정 추적' });
+    const steps = within(tracker).getAllByRole('listitem');
+    expect(steps[2]).toHaveTextContent(`34다 7781 ${VEHICLE_STAGE_TEXT.weighing_out}`);
+    expect(steps[5]).toHaveTextContent(`82바 1047 ${VEHICLE_STAGE_TEXT.loading} · 베일 1개`);
+    expect(VEHICLE_STAGE_TEXT).toMatchObject({ weighing_out: '출차 계근', loading: '상차 중', loaded: '상차 완료' });
+    // 최근 차량: 종류와 단계 이름
+    const recent = within(screen.getByRole('region', { name: '최근 차량·베일' })).getAllByRole('listitem');
+    expect(recent[0]).toHaveTextContent('상차 · 대한판지');
+    expect(recent[0]).toHaveTextContent('상차 중');
+    expect(recent.some((li) => li.textContent?.includes('입고 · 한빛자원') && li.textContent.includes('출차 계근'))).toBe(true);
   });
 
   it('최근 차량·베일: 늦은 것부터', () => {

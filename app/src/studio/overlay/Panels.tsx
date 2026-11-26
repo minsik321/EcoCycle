@@ -24,7 +24,7 @@ import { VIEWS } from '../world/views';
 import type { ViewPreset } from '../world/views';
 import { Icon } from './icons';
 import type { IconName } from './icons';
-import { BALE_STAGE_TEXT, BATCH_STAGE_TEXT, VEHICLE_STAGE_TEXT, cycleSteps, deviceLine, mixText, shortId } from './text';
+import { BALE_STAGE_TEXT, BATCH_STAGE_TEXT, VEHICLE_STAGE_TEXT, cycleSteps, deviceLine, mixText, onSiteVehicles, shortId } from './text';
 import type { CycleStep } from './text';
 
 // 스튜디오의 유리 패널들. 3D 위에 떠 있고, 값은 받은 그대로 표시한다.
@@ -71,7 +71,7 @@ const AREA_BADGE: Record<string, IconName> = { site: 'layers', process: 'robot',
 
 /** 지역 전환 목록의 둘째 줄: 그 구역의 서버 값 한 줄 (세기만 하고 계산하지 않는다) */
 function areaLine(key: string, data: StudioData): ReactNode {
-  const onSite = data.vehicles.filter((v) => v.stage !== 'departed');
+  const onSite = onSiteVehicles(data.vehicles);
   const waiting = data.bales.filter((b) => b.stage === 'created').length;
   const compressor = data.devices['compressor-1'];
   switch (key) {
@@ -700,15 +700,15 @@ function TableBody({ tab, data, disconnected, selection, onSelect, openRecord }:
         {tab === 'vehicles' && (
         <table>
           <tbody>
-            {newest(data.vehicles).map((v) => (
-              <tr key={v.id} {...row(v.stage === 'departed' ? null : `veh:${v.id}`, { kind: 'vehicle', id: v.id })}>
+            {onSiteVehicles(data.vehicles).map((v) => (
+              <tr key={v.id} {...row(`veh:${v.id}`, { kind: 'vehicle', id: v.id })}>
                 <td>
                   <b className="st-cell-main">{v.plate ?? '인식 중'}</b>
                   <small className="st-cell-sub">{v.companyName ?? '–'}</small>
                 </td>
-                <td className="st-col-opt">{v.sectorId ? `섹터 ${SECTOR_LABEL[v.sectorId]}` : '계중대'}</td>
+                <td className="st-col-opt">{v.kind === 'outbound' ? '상차' : v.sectorId ? `섹터 ${SECTOR_LABEL[v.sectorId]}` : '계중대'}</td>
                 <td>
-                  <span className={`st-pill${v.stage === 'departed' ? '' : ' st-pill-blue'}`}>{VEHICLE_STAGE_TEXT[v.stage]}</span>
+                  <span className="st-pill st-pill-blue">{VEHICLE_STAGE_TEXT[v.stage]}</span>
                 </td>
                 <td className="st-cell-time">{hhmm(v.updatedAt)}</td>
               </tr>
@@ -978,7 +978,7 @@ export function Tables({ data, disconnected, selection, onSelect, recordLink, op
   const [collapsed, setCollapsed] = useRememberedFlag(TABLE_COLLAPSED_KEY);
   // 머리 줄(접힌 때는 한 줄 전체)을 끌어서 여닫는다. 가로 끌기는 탭 줄에 남긴다
   const drag = useDragToggle((open) => setCollapsed(!open), 'pan-x');
-  const onSite = data.vehicles.filter((v) => v.stage !== 'departed').length;
+  const onSite = onSiteVehicles(data.vehicles).length;
   const openBatches = data.batches.filter((b) => b.stage !== 'completed').length;
   const stacked = data.bales.filter((b) => b.stage === 'created').length;
   const tabs: Array<{ key: TableTab; label: string; count: number }> = [
@@ -1079,7 +1079,7 @@ export function PhoneSheet({ data, disconnected, selection, onSelect, deviceActi
     if (selection) setOpen(true);
   }, [selection]);
   const batch = data.batches.find((b) => b.stage === 'compressing') ?? data.batches.find((b) => b.stage === 'mixing') ?? data.batches.find((b) => b.stage === 'planned');
-  const onSite = data.vehicles.filter((v) => v.stage !== 'departed').length;
+  const onSite = onSiteVehicles(data.vehicles).length;
   const stacked = data.bales.filter((b) => b.stage === 'created').length;
   const counts: Record<SheetTab, number> = {
     batches: data.batches.filter((b) => b.stage !== 'completed').length,

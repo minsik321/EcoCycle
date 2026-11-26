@@ -1,20 +1,26 @@
 // 기록 상세 팝업(차량·배치·베일)을 실제 모의 서버·브라우저로 확인하고 스크린샷을 남긴다.
 // 폰 390×844(아래 시트)과 데스크톱 1440×900(가운데 대화상자): 팝업 셋, 베일 → 배치 → 베일 이어 열기, 닫으면 바로 전 팝업,
-// 뒤로 가기·깊은 링크, 대시보드의 "이 배치 상세". 결과는 docs/screenshots/record-popups.
+// 뒤로 가기·깊은 링크, 대시보드의 "이 배치 상세", 상차 차량 팝업(실은 베일·무게 셋) → 베일 팝업의 "실은 차량" → 차량 팝업.
+// 새 팝업 화면은 글 꺾임·가로 넘침도 본다. 결과는 docs/screenshots/record-popups.
 // 실행: node app/scripts/recordPopups.mjs (로컬 Chromium 필요)
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { findChromium, start } from './browserKit.mjs';
+import { findWrappedText } from './textAudit.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const out = path.join(root, 'docs/screenshots/record-popups');
 fs.mkdirSync(out, { recursive: true });
-const api = 'http://localhost:14018/api/v1';
-const origin = 'http://localhost:15218';
-const mock = start('mock', ['run', 'start', '-w', '@ecocycle/mock-server'], root, { PORT: '14018', CORS_ORIGINS: origin }, '[mock-server]');
-const app = start('app', ['run', 'dev', '-w', '@ecocycle/app', '--', '--port', '15218', '--strictPort'], root, { VITE_API_BASE: api, VITE_WS_BASE: 'ws://localhost:14018/ws/v1/stream', VITE_USE_MOCK: 'true' }, 'Local:');
+// 포트: 다른 점검과 겹치지 않게 RECORD_POPUPS_MOCK_PORT·RECORD_POPUPS_APP_PORT로 바꿀 수 있다
+const mockPort = process.env.RECORD_POPUPS_MOCK_PORT ?? '14018';
+const appPort = process.env.RECORD_POPUPS_APP_PORT ?? '15218';
+const api = `http://localhost:${mockPort}/api/v1`;
+const origin = `http://localhost:${appPort}`;
+const mock = start('mock', ['run', 'start', '-w', '@ecocycle/mock-server'], root, { PORT: mockPort, CORS_ORIGINS: origin }, '[mock-server]');
+const app = start('app', ['run', 'dev', '-w', '@ecocycle/app', '--', '--port', appPort, '--strictPort'], root, { VITE_API_BASE: api, VITE_WS_BASE: `ws://localhost:${mockPort}/ws/v1/stream`, VITE_USE_MOCK: 'true' }, 'Local:');
+const problems = [];
 
 let browser;
 try {
@@ -32,6 +38,14 @@ try {
   assert.equal(one.pressureMpa, bales.items[0].pressureMpa);
   assert.equal((await get(`/bales/records?from=${to}&to=${from}&page=1&pageSize=10`)).status, 422);
   console.log(`✓ GET /bales/records: ${bales.total}건, 한 건 조회와 같은 값`);
+  // 상차 차량: 출차한 것 중 베일을 실은 것 하나, 그 베일의 vehicleId가 같다
+  const outboundPage = await (await get(`/vehicles/records?from=${from}&to=${to}&page=1&pageSize=50&q=${encodeURIComponent('상차')}`)).json();
+  const outbound = outboundPage.items.find((v) => v.kind === 'outbound' && v.status === 'departed' && v.baleIds.length > 0);
+  assert.ok(outbound, '최근 7일에 베일을 실은 상차 차량이 없습니다');
+  const loadedBale = await (await get(`/bales/${encodeURIComponent(outbound.baleIds[0])}`)).json();
+  assert.equal(loadedBale.vehicleId, outbound.id);
+  assert.equal(loadedBale.stage, 'shipped');
+  console.log(`✓ 상차 차량 ${outbound.id}: 베일 ${outbound.baleIds.length}개, 베일 vehicleId 일치`);
 
   browser = await chromium.launch({ executablePath: findChromium() });
   for (const [width, height, size] of [
@@ -49,9 +63,14 @@ try {
     await page.getByRole('button', { name: '로그인', exact: true }).click();
     await page.waitForURL((u) => u.pathname === '/');
     const dialog = page.getByRole('dialog');
-    const shot = async (name) => {
+    const shot = async (name, audit = false) => {
       await page.waitForTimeout(400);
       await page.screenshot({ path: path.join(out, `${size}-${name}.png`) });
+      if (audit) {
+        const wrapped = await page.evaluate(findWrappedText);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+        if (wrapped.length || overflow) problems.push({ size, name, wrapped, overflow });
+      }
       console.log(`✓ ${size} ${name}`);
     };
     // 앱 안에서 주소를 바꾼다 (다시 불러오지 않는다). 상태 없이 상세 주소로 가면 주소를 바로 연 것(깊은 링크)과 같다
@@ -128,6 +147,10 @@ try {
 
     // 대시보드의 "이 배치 상세": 홈 위에 배치 팝업
     await go('/');
+    // 넓은 화면은 홈이 3D로 열릴 수 있어(기억한 모드가 앞 단계에서 바뀜) 전환에서 대시보드를 고른다
+    const dashboardTab = page.getByRole('tablist', { name: '홈 보기' }).getByRole('tab', { name: '대시보드' });
+    await dashboardTab.waitFor({ timeout: 15_000 });
+    if ((await dashboardTab.getAttribute('aria-selected')) !== 'true') await dashboardTab.click();
     await page.getByRole('region', { name: '지금 배치' }).waitFor({ timeout: 15_000 });
     const detail = page.getByRole('link', { name: '이 배치 상세 →' });
     await detail.waitFor({ timeout: 20_000 }).catch(() => undefined);
@@ -140,8 +163,33 @@ try {
     } else {
       console.log(`- ${size}: 지금 진행 중인 배치가 없어 대시보드 팝업은 건너뜀`);
     }
+    // 상차 차량 팝업: 종류 상차, 실은 베일 수와 베일 링크, 무게 셋 → 베일 팝업의 "실은 차량" → 차량 팝업
+    await go(`/records/vehicles/${encodeURIComponent(outbound.id)}`);
+    await heading('차량 기록');
+    await dialog.getByText(`실은 베일 ${outbound.baleIds.length}개`).waitFor();
+    await dialog.getByText('공차 (입차)').waitFor();
+    await dialog.getByText('총중량 (출차 계근)').waitFor();
+    assert.equal(await dialog.getByText('배정 섹터').count(), 0, '상차 차량에 배정 섹터가 보입니다');
+    await shot('9-outbound-vehicle', true);
+    await dialog.getByRole('button', { name: `베일 ${outbound.baleIds[0]} 보기` }).click();
+    await heading('베일 상세');
+    await dialog.getByText('실은 차량').waitFor();
+    await dialog.getByText(outbound.id, { exact: true }).waitFor();
+    await shot('10-outbound-bale-vehicle', true);
+    await dialog.getByRole('button', { name: `차량 ${outbound.id} 보기` }).click();
+    await heading('차량 기록');
+    await dialog.getByText(`실은 베일 ${outbound.baleIds.length}개`).waitFor();
+    assert.match(new URL(page.url()).pathname, new RegExp(`^/records/vehicles/${outbound.id}$`));
+    await closeAll();
+    // 공정 기록 차량 탭(상차 검색) 화면도 넘침을 본다
+    await go('/records?tab=vehicles');
+    await page.getByRole('region', { name: '차량 기록' }).waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(800);
+    await shot('11-vehicles-tab', true);
+
     await context.close();
   }
+  assert.deepEqual(problems, [], '글 꺾임·가로 넘침');
   console.log(`스크린샷: ${path.relative(root, out)}`);
 } finally {
   await browser?.close();

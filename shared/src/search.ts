@@ -1,5 +1,5 @@
 import type { DeviceId, TankId } from './ids';
-import type { BatchEvent } from './process';
+import type { BatchEvent, VehicleKind } from './process';
 
 /*
  * 기록 검색 (명세 6절 "기록 목록"의 `q`). 검색은 서버가 한다 — 이 파일은 그 규칙을 한 곳에 적어 모의 서버와 테스트가 함께 쓴다.
@@ -47,3 +47,16 @@ export const BATCH_EVENT_TYPE_TEXT: Record<BatchEvent['type'], string> = {
   pin_changed: '섹터 지정 변경',
   pin_ended: '섹터 지정 해제',
 };
+
+/** 차량 종류의 화면 이름. 차량 기록 검색(번호판·회사와 함께)이 이 이름도 찾는다 ⚠ B41 */
+export const VEHICLE_KIND_TEXT: Record<VehicleKind, string> = {
+  inbound: '입고',
+  outbound: '상차',
+};
+
+/** 차량 기록 한 줄이 찾아지는 값: 번호판, 회사, 종류 이름("입고"·"상차") */
+export const vehicleSearchTerms = (vehicle: { plate: string | null; companyName: string | null; kind: VehicleKind }): Array<string | null> => [
+  vehicle.plate,
+  vehicle.companyName,
+  VEHICLE_KIND_TEXT[vehicle.kind],
+];

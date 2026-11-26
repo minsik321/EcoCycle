@@ -9,8 +9,8 @@ import { useRecord } from './useRecord';
 const stamp = (iso: string | undefined) => (iso ? <time dateTime={iso}>{formatLocalTime(iso)}</time> : '–');
 
 /**
- * 베일 팝업의 본문 (`GET /bales/{id}`): 생산 당시 압력·수분·배합 스냅샷(배합 변경의 영향을 받지 않는다), 적치·출하 상태.
- * "배치 보기"는 그 배치 팝업을 연다(이 팝업은 바로 전 팝업으로 남는다).
+ * 베일 팝업의 본문 (`GET /bales/{id}`): 생산 당시 압력·수분·배합 스냅샷(배합 변경의 영향을 받지 않는다), 적치·출하 상태, 실은 상차 차량.
+ * "배치 보기"·"차량 보기"는 그 배치·차량 팝업을 연다(이 팝업은 바로 전 팝업으로 남는다).
  */
 export function BaleDetail({ id, onOpen }: { id: string; onOpen: (target: PopupTarget) => void }) {
   const { state, retry } = useRecord(id, getBaleDetail);
@@ -35,6 +35,23 @@ export function BaleDetail({ id, onOpen }: { id: string; onOpen: (target: PopupT
                   배치 보기 →
                 </button>
               </span>
+            </DetailRow>
+            <DetailRow label="실은 차량">
+              {bale.vehicleId ? (
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <span className="truncate tabular-nums">{bale.vehicleId}</span>
+                  <button
+                    type="button"
+                    onClick={() => onOpen({ kind: 'vehicle', id: bale.vehicleId as string })}
+                    aria-label={`차량 ${bale.vehicleId} 보기`}
+                    className="inline-flex min-h-12 shrink-0 items-center rounded-control px-2 text-sm font-semibold whitespace-nowrap text-accent-strong active:bg-paper-deep"
+                  >
+                    차량 보기 →
+                  </button>
+                </span>
+              ) : (
+                '아직 싣지 않았습니다'
+              )}
             </DetailRow>
             <DetailRow label="생산 시각">{stamp(bale.stageTimes.created ?? bale.updatedAt)}</DetailRow>
             <DetailRow label="출하 시각">{bale.stageTimes.shipped ? stamp(bale.stageTimes.shipped) : '아직 출하하지 않았습니다'}</DetailRow>
