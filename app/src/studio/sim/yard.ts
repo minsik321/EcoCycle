@@ -1185,7 +1185,8 @@ export class Yard {
    *     (베일 긴 쪽이 지게차 옆 방향이 되어, 차 곁에서 차를 보고 실으면 긴 쪽이 차 길이 방향이다)
    *  3. 그 자리의 곁(서쪽 곁은 바로, 동쪽 곁은 차 앞을 돌아)으로 가서 차를 보고 들어가 내려놓는다
    *  4. 왔던 길로 북서 길 동쪽 끝에 돌아와 마당 차례를 놓고 그대로 선다 (다음 베일은 여기서 곧장 칸으로)
-   * 마당 차례는 처음부터 끝까지 쥔다(트럭 길을 건너므로). 지게차 앞을 막는 것은 hits가 본다(상차 차량은 빼고)
+   * 마당 차례는 처음부터 끝까지 쥔다(트럭 길을 건너므로). 단 북서 칸에서 베일을 집어 북서 길로 물러난 뒤 한 번 놓았다 다시 잡는다(트럭이 기다리면 양보, S2m).
+   * 지게차 앞을 막는 것은 hits가 본다(상차 차량은 빼고)
    */
   private startLoad(f: ForkliftSim, order: number): void {
     const lo = this.loader;
@@ -1230,6 +1231,10 @@ export class Yard {
         // 칸에서 곧게 뒤로 빠진 뒤(아래 베일에 닿지 않게) 달리면서 포크를 내린다
         more.push({ kind: 'drive', to: [YARD.nwXs[best]!, YARD.nwLaneZ], reverse: true }, { kind: 'forkTo', height: LOW_FORK });
         at.z = YARD.nwLaneZ;
+        // 양보 자리(S2m): 북서 길은 트럭 길에서 떨어져 있다. 여기서 마당 차례를 한 번 놓았다가 다시 잡는다 — 입고 트럭이 계근대에서
+        // 기다리면(차례를 원하면) 그 차가 섹터 앞에 들어설 때까지 베일을 든 채 기다린다. 전에는 상차 한 번(약 27초) 내내 쥐어
+        // 인식된 트럭이 계근대에서 하역 단계를 놓쳤다
+        more.push({ kind: 'token', take: false }, { kind: 'token', take: true });
         // 돌려 잡기: 자리 앞 길에서 마당 쪽(+z)으로 들어가 내려놓는다
         const [rx, rz] = YARD.regrip;
         this.nwLaneTo(more, at, rx);

@@ -739,6 +739,9 @@ export class Director {
           }
           break;
         case 'toScale':
+          // 입고 트럭은 곧 계근대에서 인식되고 마당 안쪽 길로 간다: 경사로에 들어설 때부터 알려, 상차 중인 지게차가 양보 자리에서
+          // 기다리게 한다 (S2m: 트럭이 계근대에서 기다리다 하역 단계를 놓치던 문제)
+          if (!t.outbound) this.yardToken.wanted = true;
           if (advance(t, dt, TRUCK_SPEED * 0.8, TRUCK_ACCEL, this.truckBlocked(t))) {
             // 계근대 서쪽 끝 앞에서 서쪽을 보고 섰다: 후진으로 계근대에 오른다
             t.phase = 'reverseIn';

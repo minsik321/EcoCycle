@@ -155,3 +155,23 @@ describe('집게차 하역과 서버 단계 (모의 서버 단계 시간, Direct
     expect(worked).toBeGreaterThan(0);
   });
 });
+
+describe('시연 원본: 트럭이 하역 단계 전후로 섹터 앞에 선다 (S2m, 지게차 양보 자리)', () => {
+  it('첫 800초 동안 집게차 넷 이상이 4번 다 집는다 (전에는 상차 지게차가 마당 차례를 약 27초 쥐어 둘뿐이었다)', async () => {
+    const { Director } = await import('./director');
+    const { demoData } = await import('../demo/demoData');
+    const T0 = Date.parse('2026-10-16T09:00:00.000Z');
+    const d = new Director();
+    const full = new Set<string>();
+    for (let i = 0; i < 20 * 800; i += 1) {
+      const t = i * DT;
+      if (i % 10 === 0) {
+        const data = demoData(T0, Math.floor(t));
+        d.sync({ devices: data.devices, vehicles: data.vehicles, batches: data.batches, bales: data.bales }, T0 + t * 1000);
+      }
+      d.step(DT);
+      for (const x of d.trucks) if (x.active && x.grapple && x.crane.grabs >= GRABS) full.add(x.id);
+    }
+    expect(full.size).toBeGreaterThanOrEqual(4);
+  });
+});
