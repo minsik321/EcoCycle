@@ -9,7 +9,11 @@ import {
   CLAMP_SCALE,
   CLAMP_SHIFT,
   FORESTS,
+  LOAD_BED_REAR,
+  LOAD_BED_Y,
+  LOAD_ORDER,
   LOAD_SLOTS,
+  LOAD_TRUCK,
   M,
   M_PER_UNIT,
   PHOTO,
@@ -209,11 +213,28 @@ describe('사진 → 월드 변환 (sitePx)', () => {
     // 트럭 길이는 베일 길이의 5배, 폭은 베일 폭의 2.2배 (실제 비율)
     expect(TRUCK.length / BALE.d).toBeCloseTo(5, 6);
     expect(1.01 * WORKER_SCALE * M_PER_UNIT).toBeCloseTo(1.75, 6);
-    // 윙바디 짐칸(모형 x −1.42 ~ 0.48) 안에 베일 자리가 모두 들어간다
-    for (const [along] of LOAD_SLOTS) {
-      expect(along - BALE.w / 2).toBeGreaterThan(-1.42 * TRUCK.sx);
-      expect(along + BALE.w / 2).toBeLessThan(0.48 * TRUCK.sx);
+    // 상차 트럭(25톤 카고, S2j): 12 × 2.5 m, 적재함 10.1 × 2.35 m. 베일 24자리가 모두 적재함 안에, 서로 겹치지 않게
+    expect(LOAD_TRUCK.length * M_PER_UNIT).toBeCloseTo(12, 6);
+    expect(LOAD_TRUCK.width * M_PER_UNIT).toBeCloseTo(2.5, 6);
+    expect(LOAD_SLOTS).toHaveLength(24);
+    expect(LOAD_ORDER).toHaveLength(20);
+    expect(new Set(LOAD_ORDER).size).toBe(20);
+    for (const slot of LOAD_SLOTS) {
+      expect(slot.along - BALE.d / 2).toBeGreaterThanOrEqual(LOAD_BED_REAR - 1e-9);
+      expect(slot.along + BALE.d / 2).toBeLessThanOrEqual(LOAD_BED_REAR + LOAD_TRUCK.bedLength + 1e-9);
+      expect(Math.abs(slot.across) + BALE.w / 2).toBeLessThanOrEqual(LOAD_TRUCK.bedWidth / 2 + 1e-9);
+      expect(slot.level).toBeLessThan(2);
     }
+    // 2단 높이(바닥 1.3 m + 베일 2개)는 도로 높이 제한 4 m 안
+    expect((LOAD_BED_Y + 2 * BALE.h) * M_PER_UNIT).toBeLessThan(4);
+    // 위 단 베일은 모두 아래 단 베일 위에 놓인다 (싣는 차례에서 아래가 먼저)
+    LOAD_ORDER.forEach((idx, k) => {
+      const s = LOAD_SLOTS[idx]!;
+      if (s.level === 0) return;
+      const below = LOAD_SLOTS.findIndex((o) => o.level === 0 && o.along === s.along && o.across === s.across);
+      expect(LOAD_ORDER.indexOf(below)).toBeGreaterThanOrEqual(0);
+      expect(LOAD_ORDER.indexOf(below)).toBeLessThan(k);
+    });
   });
 
   it('지게차(S2k): 몸체 폭 1.2 m(3톤급), 베일 클램프 판 사이는 베일 폭(1.1 m)보다 넓고 판 길이는 베일 길이의 0.65 이상', () => {

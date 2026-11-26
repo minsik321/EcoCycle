@@ -37,11 +37,14 @@ const VEHICLE_STEPS: Array<[Vehicle['stage'], number]> = [
   ['weighing_out', 48],
   ['departed', 80],
 ];
-/** 상차 차량: 네 번째 차마다. 상차 자리에서 LOAD_EACH초마다 적치 베일 하나를 싣는다(최대 LOAD_MAX) */
-const OUTBOUND_EVERY = 4;
+/**
+ * 상차 차량(25톤 카고): 여덟 번째 차마다. 상차 자리에서 LOAD_EACH초마다 베일 하나를 싣는다(한 대 LOAD_MAX = 20개, S2j).
+ * LOAD_EACH는 3D 지게차가 베일 하나를 싣는 데 걸리는 시간(약 22초)보다 길게 둔다
+ */
+const OUTBOUND_EVERY = 8;
 const LOAD_START = 34;
-const LOAD_EACH = 14;
-const LOAD_MAX = 4;
+const LOAD_EACH = 24;
+const LOAD_MAX = 20;
 const OUTBOUND_STEPS: Array<[Vehicle['stage'], number]> = [
   ['arrived', 0],
   ['identified', 6],
@@ -63,9 +66,10 @@ const FIRST_BATCH = -4;
 
 /**
  * 상차 일정: 상차 차량이 실은 베일 (시각만으로 정해진다). 상차 시각마다 그때 적치된(만들어진) 가장 오래된 베일을 하나 싣는다.
+ * 만들어진 베일이 없으면 예시 재고(이 시연 전부터 있던 베일, 아이디만 있음)를 싣는다: stock에 [차량 번호, 실은 시각, 아이디]
  * 돌려주는 값: 베일 번호 → [차량 번호, 실은 시각(초)]
  */
-function loadSchedule(tSec: number): Map<number, [number, number]> {
+function loadSchedule(tSec: number, stock: Array<[number, number, string]> = []): Map<number, [number, number]> {
   const out = new Map<number, [number, number]>();
   let bale = FIRST_BATCH;
   const lastVehicle = Math.floor((tSec - 2) / VEHICLE_EVERY);
@@ -77,6 +81,8 @@ function loadSchedule(tSec: number): Map<number, [number, number]> {
       if (bale * BATCH_EVERY + 49 <= at) {
         out.set(bale, [n, at]);
         bale += 1;
+      } else {
+        stock.push([n, at, `ex-BL-S${String(n + 100).padStart(3, '0')}-${String(i + 1).padStart(2, '0')}`]);
       }
     }
   }
@@ -87,12 +93,15 @@ function loadSchedule(tSec: number): Map<number, [number, number]> {
 export function demoData(startMs: number, tSec: number): StudioData {
   const now = startMs + tSec * 1000;
 
-  const schedule = loadSchedule(tSec);
+  const stock: Array<[number, number, string]> = [];
+  const schedule = loadSchedule(tSec, stock);
   const loadedBy = new Map<number, string[]>();
-  for (const [b, [n, at]] of schedule) {
+  const loads: Array<[number, number, string]> = [...[...schedule].map(([b, [n, at]]): [number, number, string] => [n, at, `ex-BL-${String(b + 500).padStart(4, '0')}`]), ...stock];
+  loads.sort((a, b) => a[1] - b[1]);
+  for (const [n, at, id] of loads) {
     if (at > tSec) continue;
     const list = loadedBy.get(n) ?? [];
-    list.push(`ex-BL-${String(b + 500).padStart(4, '0')}`);
+    list.push(id);
     loadedBy.set(n, list);
   }
   const vehicleId = (n: number) => `ex-veh-${String(n + 100).padStart(3, '0')}`;
@@ -266,8 +275,15 @@ const resend = (s: StudioData): StudioData => ({
   alarms: [...s.alarms],
 });
 
+function demoAtFromUrl(): number {
+  if (typeof window === 'undefined') return 0;
+  const v = Number(new URLSearchParams(window.location.search).get('demoAt'));
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}
+
 export function useDemoData(disconnected: boolean): { data: StudioData; startMs: number; lastReceivedAt: string } {
-  const startMs = useRef(Date.now()).current;
+  // 점검 스크립트용: 주소의 ?demoAt=초 로 시연 원본의 그 시각부터 연다 (상차 장면 등을 기다리지 않고 찍는다, S2j)
+  const startMs = useRef(Date.now() - demoAtFromUrl() * 1000).current;
   const [tick, setTick] = useState(0);
   const [lastReceivedAt, setLast] = useState(() => iso(Date.now()));
   useEffect(() => {

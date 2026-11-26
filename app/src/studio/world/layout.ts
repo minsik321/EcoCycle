@@ -373,20 +373,31 @@ export const OFFICE = { center: sitePx(457.5, 155), w: 85 * SITE_SCALE, d: 110 *
 export const SHED = { center: sitePx(454, 219), w: 16 * SITE_SCALE, d: 14 * SITE_SCALE } as const;
 
 /**
- * 계근대(노란 테두리 철판, 사진 420~493 × 233~261px, 위성사진 실측 66.9px): 가로로 길고 동쪽 끝이 옹벽이다.
+ * 계근대 길이(사진 px): 상차 트럭(25톤 카고 12 m)이 다 올라서도록 14 m(REAL_SIZE_M.weighbridge)로 늘렸다 (S2j, 위성사진은 66.9px = 9.6 m).
+ * 동쪽 끝(옹벽, 493px)은 그대로 두고 서쪽(마당 쪽)으로 늘인다: 사진 약 396~493px
+ */
+const SCALE_LEN_PX = M(REAL_SIZE_M.weighbridge.length) / SITE_SCALE;
+const SCALE_EAST_PX = 493;
+/** 계근대 위에 서는 자리(사진 px): 가운데보다 조금 동쪽. 12 m 차도 동쪽 끝(옹벽) 안에 든다 */
+const SCALE_STOP_PX: P2 = [445, 247];
+/**
+ * 계근대(노란 테두리 철판, 사진 약 396~493 × 233~261px): 가로로 길고 동쪽 끝이 옹벽이다.
  * 차는 마당 쪽(서쪽)에서만 오르내린다: 입차 계근은 후진으로 올라 앞으로 나가고(서쪽을 봄), 출차 계근은 앞으로 올라 후진으로 내려온다(동쪽을 봄)
  */
 export const SCALE = {
-  center: sitePx(456.5, 247),
+  center: sitePx(SCALE_EAST_PX - SCALE_LEN_PX / 2, 247),
   /** 긴 쪽 방향(사진 동 → 서) */
   heading: siteHeading(-1, 0),
-  length: 67 * SITE_SCALE,
+  length: SCALE_LEN_PX * SITE_SCALE,
   width: 28 * SITE_SCALE,
   /** 트럭이 서는 자리 */
-  stop: sitePx(456, 247),
+  stop: sitePx(...SCALE_STOP_PX),
 } as const;
-/** 번호판 인식 카메라 기둥: 계근대 서남 끝(사진 415, 266px), 계근대를 본다 */
-export const PLATE_CAMERA = { at: sitePx(415, 266), heading: siteHeading(1, -0.45) } as const;
+/**
+ * 번호판 인식 카메라 기둥: 계근대 남쪽 동편(사진 470, 268px)에서 계근대 서쪽 끝(차가 오르내리는 곳)을 본다.
+ * S2j: 계근대를 늘리고 25톤 카고가 계근대에서 상차 자리로 크게 꺾여 들면서 옛 자리(서남 끝 415, 266px)를 차 뒤가 쓸고 지나가 옮겼다
+ */
+export const PLATE_CAMERA = { at: sitePx(470, 268), heading: siteHeading(-1, -0.3) } as const;
 
 // ── 압축기 건물·레일 ──────────────────────────────────────────────────
 
@@ -637,6 +648,11 @@ export const YARD = {
   ] as readonly P2[],
   /** 남동 길 동쪽 끝 → 북서 길 동쪽 끝: 꺾이는 점 (사진 px로 잡아 옮긴다). 상차 자리·쏟는 자리·대기 자리 트럭을 피한다 */
   crossing: [yardPx(340, 400), yardPx(328, 296), yardPx(316, 250)] as readonly P2[],
+  /**
+   * 돌려 잡기 자리(S2j): 북서 길 동쪽 끝 앞(+z, 마당 쪽). 상차할 베일을 칸에서 옆면으로 집어 와 여기 내려놓고, 서쪽(−x)으로 돌아 끝면을 잡는다
+   * (긴 쪽이 차 길이 방향으로 실리게). 트럭 길·상차 차량·가로등·베일 더미에서 떨어져 있다(layout.test)
+   */
+  regrip: [NW_XS[NW_XS.length - 1]! + 0.4, NW_LANE_Z + 1.55] as P2,
 } as const;
 
 /** 점과 다각형 테두리의 거리 */
@@ -730,6 +746,25 @@ export const TRUCK = {
   sz: M(REAL_SIZE_M.truck.width) / TRUCK_MODEL.width,
 } as const;
 
+/**
+ * 상차 트럭(25톤 카고) 크기 (S2j): 12 × 2.5 m, 운전석 3.2 m, 적재함 10.1 × 2.35 m·바닥 높이 1.3 m. 모형은 월드 단위로 바로 만든다(배율 1, actors/build의 buildCargoTruck)
+ */
+export const LOAD_TRUCK = {
+  length: M(REAL_SIZE_M.loadTruck.length),
+  width: M(REAL_SIZE_M.loadTruck.width),
+  height: M(REAL_SIZE_M.loadTruck.height),
+  bedLength: M(REAL_SIZE_M.loadTruck.bedLength),
+  bedWidth: M(REAL_SIZE_M.loadTruck.bedWidth),
+  deckY: M(REAL_SIZE_M.loadTruck.deckHeight),
+} as const;
+/** 적재함 뒤 끝(트럭 가운데에서 뒤로): 차 뒤 끝에서 조금 안쪽 */
+export const LOAD_BED_REAR = -LOAD_TRUCK.length / 2 + 0.04;
+
+/** 트럭 외곽선(길이·폭): 상차 차량(서버 kind outbound)은 25톤 카고, 입고는 5톤 */
+export function truckSize(outbound: boolean): { length: number; width: number } {
+  return outbound ? LOAD_TRUCK : TRUCK;
+}
+
 /** 도로 차로의 가운데 선: 남쪽으로 가는 차로(부지 쪽, 서쪽)를 따라간다 */
 function roadLanePx(offset: number): P2[] {
   const out: P2[] = [];
@@ -768,13 +803,19 @@ export const TIP: Record<TankId, Spot> = {
   'sector-a': spot(...TIP_PX['sector-a'], NE[0], NE[1]),
   'sector-c': spot(...TIP_PX['sector-c'], NE[0], NE[1]),
 };
-/** 상차 자리(남동 구역 북동 날개 곁): 남쪽을 보고 선다. 지게차가 서쪽 곁에서 북서 재고의 베일을 싣는다 */
-export const HOLD = spot(366, 345, 0, 1);
-/** 배정 더미 앞에 다른 트럭이 있을 때 기다리는 자리 (계근대 서쪽 위, 서쪽을 봄) */
-export const QUEUE = spot(384, 217, -1, 0);
+/**
+ * 상차 자리(사진 px): 북서 재고 동쪽 끝과 사무실 서쪽 벽 사이의 빈 마당, 북쪽을 보고 선다 (S2j: 25톤 카고 12 m, 양옆에서 싣는다).
+ * 전에는 남동 날개 곁(366, 345)이었으나 12 m 차와 양옆 지게차 길이 섹터 C 하역 길·지게차 가로지르는 길과 겹쳐 옮겼다.
+ * 지게차는 서쪽 곁(북서 길 동쪽 끝 쪽)에서 가까운 줄을, 차 앞(북쪽 끝)을 돌아 동쪽 곁에서 먼 줄을 싣는다
+ */
+export const HOLD_PX: P2 = [372, 168];
+export const HOLD = spot(...HOLD_PX, 0, -1);
+/** 배정 더미 앞에 다른 트럭이 있을 때 기다리는 자리 (계근대 서쪽 위, 서쪽을 봄). 상차 자리로 드나드는 길을 비켜 동쪽으로 (S2j) */
+const QUEUE_PX: P2 = [400, 221];
+export const QUEUE = spot(...QUEUE_PX, -1, 0);
 /** 계근대 위에 서는 자리: 입차 계근은 서쪽을 보고(후진으로 올라옴), 출차 계근은 동쪽을 본다(앞으로 올라옴) */
-export const SCALE_STOP = spot(456, 247, -1, 0);
-export const SCALE_STOP_EAST = spot(456, 247, 1, 0);
+export const SCALE_STOP = spot(...SCALE_STOP_PX, -1, 0);
+export const SCALE_STOP_EAST = spot(...SCALE_STOP_PX, 1, 0);
 /** 계근대 서쪽 끝 앞: 입차 차가 서쪽을 보고 서서 후진으로 계근대에 오르는 곳 */
 export const SCALE_WEST = spot(372, 250, -1, 0);
 /** 도로에서 계근대가 빌 때까지 기다리는 자리 (남쪽으로 가는 차로, 입구 북쪽). 앞에서부터 차례로 줄 선다 */
@@ -810,11 +851,11 @@ export const ROAD_TO_SCALE: P2[] = pts([LANE_PX[3]!, ...RAMP_IN_PX]);
 export const SCALE_REVERSE_IN: P2[] = pts([
   [372, 250],
   [400, 248],
-  [456, 247],
+  SCALE_STOP_PX,
 ]);
 /** 계근대 위(동쪽을 봄) → 후진으로 서쪽에 내려옴 (출차 계근 뒤) */
 export const SCALE_REVERSE_OUT: P2[] = pts([
-  [456, 247],
+  SCALE_STOP_PX,
   [410, 248],
   [380, 250],
 ]);
@@ -884,8 +925,8 @@ function filletPx(a: P2, k: P2, b: P2, r: number, steps = 10): P2[] {
 
 /** 계근대(서쪽을 봄) → 앞으로 내려가 → 더미 앞에서 후진할 자리 */
 const TO_TIP_PX: Record<TankId, readonly P2[]> = {
-  'sector-a': [[456, 247], [396, 248], [330, 262], [286, 300], [241, 306], BACK_START_PX['sector-a']],
-  'sector-c': [[456, 247], [396, 250], [352, 300], [326, 331], BACK_START_PX['sector-c']],
+  'sector-a': [SCALE_STOP_PX, [396, 248], [330, 262], [286, 300], [241, 306], BACK_START_PX['sector-a']],
+  'sector-c': [SCALE_STOP_PX, [396, 250], [352, 300], [326, 331], BACK_START_PX['sector-c']],
 };
 /** 후진 길의 원호 반지름(px): A는 45°, C는 135°를 돈다 */
 const BACK_ARC_PX: Record<TankId, number> = { 'sector-a': 30, 'sector-c': 20 };
@@ -896,20 +937,20 @@ const REVERSE_PX: Record<TankId, readonly P2[]> = {
 };
 /** 쏟는 자리 → 앞으로 북동쪽 → 계근대 서쪽 끝에서 앞으로 올라 동쪽을 보고 다시 잰다 (출차 계근) */
 const TIP_TO_SCALE_PX: Record<TankId, readonly P2[]> = {
-  'sector-a': [TIP_PX['sector-a'], plus(TIP_PX['sector-a'], NE, 34), [330, 262], [396, 248], [456, 247]],
-  'sector-c': [TIP_PX['sector-c'], plus(TIP_PX['sector-c'], NE, 34), [340, 285], [396, 250], [456, 247]],
+  'sector-a': [TIP_PX['sector-a'], plus(TIP_PX['sector-a'], NE, 34), [330, 262], [396, 248], SCALE_STOP_PX],
+  'sector-c': [TIP_PX['sector-c'], plus(TIP_PX['sector-c'], NE, 34), [340, 285], [396, 250], SCALE_STOP_PX],
 };
 /** 기다리는 자리 → 서쪽·남쪽으로 → 더미 앞에서 후진할 자리 */
 const QUEUE_TO_TIP_PX: Record<TankId, readonly P2[]> = {
-  'sector-a': [[384, 217], [350, 220], [330, 250], [300, 290], [241, 306], BACK_START_PX['sector-a']],
-  'sector-c': [[384, 217], [350, 222], [336, 262], [326, 331], BACK_START_PX['sector-c']],
+  'sector-a': [QUEUE_PX, [350, 224], [330, 250], [300, 290], [241, 306], BACK_START_PX['sector-a']],
+  'sector-c': [QUEUE_PX, [352, 226], [336, 262], [326, 331], BACK_START_PX['sector-c']],
 };
 /** 계근대(서쪽을 봄) → 앞으로 내려가 북쪽으로 비켜 기다리는 자리 */
 export const SCALE_TO_QUEUE: P2[] = pts([
-  [456, 247],
-  [420, 247],
-  [404, 224],
-  [384, 217],
+  SCALE_STOP_PX,
+  [428, 246],
+  [414, 228],
+  QUEUE_PX,
 ]);
 
 export const truckToTip = (id: TankId): P2[] => pts(TO_TIP_PX[id]);
@@ -917,40 +958,53 @@ export const truckQueueToTip = (id: TankId): P2[] => pts(QUEUE_TO_TIP_PX[id]);
 export const truckReverse = (id: TankId): P2[] => pts(REVERSE_PX[id]);
 export const truckTipToScale = (id: TankId): P2[] => pts(TIP_TO_SCALE_PX[id]);
 
-/** 상차 차량: 계근대(서쪽을 봄) → 상차 자리 (남쪽을 보고 선다) */
-export const SCALE_TO_HOLD: P2[] = pts([
-  [456, 247],
-  [400, 252],
-  [372, 290],
-  [366, 345],
-]);
-/** 상차 자리 → 후진으로 북쪽에 물림 */
-export const HOLD_REVERSE: P2[] = pts([
-  [366, 345],
-  [366, 292],
-]);
-/** 물린 곳(남쪽을 봄) → 마당 가운데에서 돌아 → 계근대 서쪽 끝에서 앞으로 올라 동쪽을 보고 잰다. 첫 구간은 남쪽 그대로(방향이 한 번에 꺾이지 않게, S2i) */
+/** 상차 차량이 상차 자리로 꺾어 드는 곳(사진 px): 계근대 서쪽을 지나 상차 자리 줄(x)에서 북쪽으로 */
+const HOLD_TURN_PX: P2 = [HOLD_PX[0], 249];
+/** 상차 차량: 계근대(서쪽을 봄) → 앞으로 서쪽 → 원호 하나로 북쪽으로 꺾어 → 상차 자리 (북쪽을 보고 선다) */
+export const SCALE_TO_HOLD: P2[] = pts(filletPx(SCALE_STOP_PX, HOLD_TURN_PX, HOLD_PX, 60));
+/** 상차 자리 → 후진으로 남쪽으로 물러나며 원호로 꺾여 동쪽을 보고 선다 (뒤가 서쪽으로 돈다) */
+export const HOLD_REVERSE: P2[] = pts(filletPx(HOLD_PX, [HOLD_PX[0], 254], [300, 254], 30));
+/** 물린 곳(동쪽을 봄) → 앞으로 동쪽 → 계근대 서쪽 끝에서 앞으로 올라 동쪽을 보고 잰다. 첫 구간은 보던 방향 그대로 (S2i) */
 export const HOLD_TO_SCALE: P2[] = pts([
-  [366, 292],
-  [365, 306],
-  [350, 314],
-  [322, 300],
-  [330, 268],
-  [370, 252],
-  [456, 247],
+  [HOLD_PX[0] - 30, 254],
+  [372, 252],
+  [400, 249],
+  SCALE_STOP_PX,
 ]);
 
 /** 마당 안쪽 길을 벗어났다고 보는 곳: 계근대 서쪽 끝 (사진 px) */
-export const SCALE_WEST_PX: P2 = [424, 247];
+export const SCALE_WEST_PX: P2 = [SCALE_EAST_PX - SCALE_LEN_PX + 4, 247];
 /** 마당 안쪽 길(트럭이 다니는 곳)에서 계근대 쪽 끝을 벗어났다고 보는 거리: 계근대 가운데에서 이만큼 서쪽 */
-export const SCALE_CLEAR = 5.6;
+export const SCALE_CLEAR = 6.6;
 
-/** 상차 차량에 베일을 놓는 자리: 적재함 위 (트럭 기준 앞뒤 거리, 단) */
-// 윙바디 짐칸(모형 x −1.42 ~ 0.48)에 베일을 가로로(긴 쪽이 차 폭 방향) 4개씩 2단. S2k: 베일이 실제 크기라 4 × 2
-const LOAD_ALONG = [0, 1, 2, 3].map((i) => -1.42 * TRUCK.sx + 0.08 + BALE.w / 2 + i * (BALE.w + BALE_GAP));
-export const LOAD_SLOTS: ReadonlyArray<readonly [number, number]> = [0, 1].flatMap((level) => LOAD_ALONG.map((a) => [a, level] as const));
-/** 상차 차량의 적재함 바닥 높이 (모형 바닥판 윗면 0.6 × 높이 배율) */
-export const LOAD_BED_Y = 0.6 * TRUCK.sy;
+/**
+ * 상차 차량(25톤 카고)의 베일 자리: 트럭 기준 (앞뒤 along, 옆 across(+는 트럭 로컬 +z), 단 level). 베일 1.5 m 쪽이 차 길이 방향,
+ * 6열 × 2줄 × 2단 = 24자리 (S2j 사용자 결정). 적재함 10.1 × 2.35 m 안에 틈 0.1 m로 든다
+ */
+export interface LoadSlot {
+  along: number;
+  across: number;
+  level: number;
+}
+const LOAD_COLS = 6;
+const LOAD_PITCH = BALE.d + BALE_GAP;
+const LOAD_ALONG0 = LOAD_BED_REAR + 0.1 + BALE.d / 2;
+const LOAD_ACROSS = BALE.w / 2 + BALE_GAP / 2;
+export const LOAD_SLOTS: readonly LoadSlot[] = [0, 1].flatMap((level) =>
+  [-1, 1].flatMap((side) => Array.from({ length: LOAD_COLS }, (_, i) => ({ along: LOAD_ALONG0 + i * LOAD_PITCH, across: side * LOAD_ACROSS, level }))),
+);
+/**
+ * 싣는 차례(LOAD_SLOTS 번호, 20개): 서쪽 곁(트럭 로컬 −z, 북쪽을 보고 선 차의 서쪽)에서 가까운 줄 아래 단 6개 → 위 단 가운데 4개,
+ * 이어서 차 앞을 돌아 동쪽 곁(+z)에서 같은 순서. 한쪽 곁 베일을 몰아 실어 돌아가는 것은 한 번뿐이다.
+ * 서버가 실었다고 한 수(baleIds)가 이보다 적으면 앞에서부터 그만큼만 싣는다
+ */
+const slotIndex = (side: -1 | 1, level: number, col: number): number => level * 2 * LOAD_COLS + (side < 0 ? 0 : LOAD_COLS) + col;
+export const LOAD_ORDER: readonly number[] = ([-1, 1] as const).flatMap((side) => [
+  ...[0, 1, 2, 3, 4, 5].map((c) => slotIndex(side, 0, c)),
+  ...[1, 2, 3, 4].map((c) => slotIndex(side, 1, c)),
+]);
+/** 상차 차량의 적재함 바닥 높이 */
+export const LOAD_BED_Y = LOAD_TRUCK.deckY;
 
 // ── 기준점 (핀·카메라) ────────────────────────────────────────────────
 

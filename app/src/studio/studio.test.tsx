@@ -22,7 +22,7 @@ import { Pace } from './sim/pace';
 import { STUDIO_PROFILES, deviceClass, studioTier } from './quality';
 import type { RecordLink, StudioData } from './types';
 import { EMPTY_DATA } from './types';
-import { AREAS, DEFAULT_VIEW, EXIT_HOLD, HOLD, SCALE_STOP, SCALE_STOP_EAST, TIER_DISTANCE, TIP, TOP_VIEW, VIEWS, WIDE_VIEW, YARD, closeDistance, tierOf, worldToPx, yardToWorld } from './world/layout';
+import { AREAS, DEFAULT_VIEW, EXIT_HOLD, HOLD, LOAD_TRUCK, SCALE_STOP, SCALE_STOP_EAST, TIER_DISTANCE, TIP, TOP_VIEW, VIEWS, WIDE_VIEW, YARD, closeDistance, tierOf, worldToPx, yardToWorld } from './world/layout';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { TopBar } from '../components/layout/TopBar';
@@ -247,7 +247,7 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     expect(d.bales.some((b) => b.active && b.id === 'BL-0')).toBe(false);
   });
 
-  it('상차 차량(서버 kind outbound, 윙바디)은 계근 → 남동 구역 곁 상차 자리에서 날개를 열고 지게차가 북서에서 하나씩 싣는다 → 출차 계근 → 출차', () => {
+  it('상차 차량(서버 kind outbound, 25톤 카고)은 계근 → 상차 자리에서 옆판을 내리고 지게차가 북서에서 하나씩 싣는다 → 마지막 베일 뒤 출차 계근 → 출차', () => {
     const d = new Director();
     const out = (stageName: Vehicle['stage'], baleIds: string[], at: number): Vehicle => ({ ...vehicle('o1', stageName, null, at), kind: 'outbound', baleIds, plate: stageName === 'arrived' ? null : '82바 1047', companyName: stageName === 'arrived' ? null : '예시제지' });
     const shipped = (ids: string[], at: number): Bale[] => ids.map((id) => ({ ...bale(id, 'shipped', T0 - 600_000), vehicleId: 'o1', stageTimes: { created: iso(T0 - 600_000), shipped: iso(at) } }));
@@ -269,7 +269,7 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
       run(d, 9);
     }
     run(d, 70);
-    expect(truck.wing).toBeGreaterThan(0.9);
+    expect(truck.sides).toBeGreaterThan(0.9);
     expect(d.bales.filter((b) => b.active && b.state === 'loaded')).toHaveLength(3);
     expect(d.yard.audit().nwStacked).toBe(nw0 - 3);
     d.sync(input({ vehicles: [out('weighing_out', ids, T0 + 200_000)], bales: shipped(ids, T0 + 80_000) }), T0 + 200_000);
@@ -283,7 +283,7 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     for (const b of d.bales.filter((x) => x.active && x.state === 'loaded')) {
       const w = { x: 0, z: 0 };
       yardToWorld(b.x, b.z, w);
-      expect(Math.hypot(w.x - truck.x, w.z - truck.z)).toBeLessThan(2);
+      expect(Math.hypot(w.x - truck.x, w.z - truck.z)).toBeLessThan(LOAD_TRUCK.length / 2);
     }
     d.sync(input({ vehicles: [out('departed', ids, T0 + 260_000)], bales: shipped(ids, T0 + 80_000) }), T0 + 260_000);
     // 출차: 도로로 달려 나간 뒤 빠진다

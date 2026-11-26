@@ -32,6 +32,7 @@ import {
   truckQueueToTip,
   truckReverse,
   TRUCK_REVERSE_RADIUS,
+  truckSize,
   truckTipToScale,
   truckToTip,
   yardToWorld,
@@ -108,12 +109,14 @@ export interface TruckSim extends Mover {
   company: string | null;
   /** 서버가 인식한 번호판 (인식 전 null). 번호판 인식 장면에 그대로 적는다 */
   plate: string | null;
-  /** 상차 차량(윙바디, 서버 kind outbound): 베일을 실으러 온다 */
+  /** 상차 차량(낮은 카고, 서버 kind outbound): 베일을 실으러 온다 */
   outbound: boolean;
   /** 서버가 이 차에 실었다고 한 베일 수 (baleIds) */
   want: number;
-  /** 윙바디 날개 열림 0~1 (상차 자리에서 연다) */
-  wing: number;
+  /** 카고 옆판 내림 0~1 (상차 자리에서 내린다) */
+  sides: number;
+  /** 상차 자리에서 서버가 출차 계근을 준 뒤 마지막 베일을 기다린 시간(초) */
+  leaveWaitT: number;
   /** 계근대 위에서 머문 시간(초) */
   weighT: number;
   /** 계근대 위에서 번호판(서버 값)이 보인 시간(초): 인식 장면을 잠깐 보여 준 뒤에 내려간다 */
@@ -177,6 +180,8 @@ const UNLOAD_SEC = 6.5;
 const WEIGH_SEC = 2.0;
 /** 번호판 인식 장면: 인식된 번호판을 계근대 위에서 보여 주는 시간(초, 연출). 1.4초는 너무 짧아 보이지 않았다 (S2i #4) */
 export const PLATE_SHOW_SEC = 3.2;
+/** 상차 자리에서 서버가 출차 계근을 준 뒤 마지막 베일을 기다리는 최대 시간(초). 넘으면 새로 싣지 않고 떠난다 */
+const LOAD_WAIT_SEC = 150;
 
 /** 처음 만들어 두는 트럭 칸 수. 회사 안 차량이 더 많으면 늘린다(상한 없음: 서버의 회사 안 차량은 모두 그린다) */
 const TRUCK_POOL = 8;
@@ -208,8 +213,9 @@ const PATH_EXIT = roundedPath(SCALE_TO_EXIT, 1.5);
 const PATH_LEAVE = roundedPath(EXIT_LEAVE, 1.4);
 /** PATH_LEAVE에서 경사로를 다 내려가 도로에 선 거리: 여기서 계근대 차례(경사로)를 놓는다 */
 const LEAVE_CLEAR_S = distanceTo(PATH_LEAVE, EXIT_RAMP_CLEAR_PX[0], EXIT_RAMP_CLEAR_PX[1]);
-const PATH_TO_LOAD = roundedPath(SCALE_TO_HOLD, 1.7);
-const PATH_LOAD_BACK = roundedPath(HOLD_REVERSE, 1.0);
+// 상차 자리로 드는 길·물러나는 길은 원호로 이미 이어 두었다(layout): 조각 사이만 다듬는다
+const PATH_TO_LOAD = roundedPath(SCALE_TO_HOLD, 0.3);
+const PATH_LOAD_BACK = roundedPath(HOLD_REVERSE, 0.3);
 const PATH_LOAD_TO_SCALE = roundedPath(HOLD_TO_SCALE, 1.4);
 const PATH_TO_QUEUE = roundedPath(SCALE_TO_QUEUE, 1.0);
 const LOAD_SCALE_CLEAR = distanceTo(PATH_LOAD_TO_SCALE, SCALE_WEST_PX[0], SCALE_WEST_PX[1]);
@@ -286,7 +292,7 @@ export class Director {
   private readonly tmp: Pose = { x: 0, z: 0, heading: 0 };
   private readonly probeA: Pose = { x: 0, z: 0, heading: 0 };
   private readonly probeB: Pose = { x: 0, z: 0, heading: 0 };
-  private readonly loader: LoaderState = { present: false, parked: false, id: '', x: 0, z: 0, heading: 0, loaded: 0, want: 0, loading: false };
+  private readonly loader: LoaderState = { present: false, parked: false, id: '', x: 0, z: 0, heading: 0, loaded: 0, want: 0, loading: false, hurry: false };
   private readonly wpos = { x: 0, z: 0 };
 
   constructor() {
@@ -304,7 +310,7 @@ export class Director {
   }
 
   private addTruckSlot(): TruckSim {
-    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, outbound: false, want: 0, wing: 0, weighT: 0, plateT: 0, clearS: 0, y: 0, leaving: false, stuckT: 0 };
+    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, outbound: false, want: 0, sides: 0, leaveWaitT: 0, weighT: 0, plateT: 0, clearS: 0, y: 0, leaving: false, stuckT: 0 };
     this.trucks.push(t);
     return t;
   }
@@ -384,6 +390,7 @@ export class Director {
     truck.pouring = false;
     truck.pourT = 0;
     truck.weighT = 0;
+    truck.leaveWaitT = 0;
     truck.leaving = false;
     truck.stuckT = 0;
     if (fresh) {
@@ -393,7 +400,7 @@ export class Director {
       // 이미 상차 중인 상차 차량: 상차 자리에 바로 놓는다
       this.place(truck, HOLD.x, HOLD.z, HOLD.heading);
       truck.phase = 'loading';
-      truck.wing = 1;
+      truck.sides = 1;
       this.yard.preload(v.baleIds.length);
     } else if ((v.stage === 'unloading' || v.stage === 'unloaded' || v.stage === 'weighing_out') && v.sectorId && !this.tipBusy(truck, v.sectorId)) {
       // 이미 하역 중이거나 끝난 차: 있어야 할 자리(배정 더미 앞)에 바로 놓는다
@@ -426,7 +433,7 @@ export class Director {
     }
     const queued = this.trucks.some((o) => o !== t && o.active && (o.phase === 'road' || o.phase === 'roadHold'));
     // 줄이 없으면 사진 위 끝(도로가 부지에 닿는 곳)에서 들어오고, 줄이 있으면 그 뒤(사진 밖 도로)에 선다
-    const start = queued ? Math.max(0, Math.min(ROAD_EDGE_S, s - TRUCK.length - 1.2)) : ROAD_EDGE_S;
+    const start = queued ? Math.max(0, Math.min(ROAD_EDGE_S, s - truckSize(t.outbound).length - 1.2)) : ROAD_EDGE_S;
     this.place(t, 0, 0, 0);
     t.phase = 'road';
     t.path = PATH_ROAD;
@@ -486,13 +493,15 @@ export class Director {
 
   /** 상차 차량의 자리를 마당에 알린다 (지게차가 싣는다) */
   private syncLoader(): void {
-    // 상차 자리로 가거나 서 있는 동안만 싣는다 (떠나기 시작하면 실을 차가 없다: 싣던 베일은 yard가 거둔다)
-    const t = this.trucks.find((x) => x.active && x.outbound && (x.phase === 'toLoad' || x.phase === 'loading') && x.stage !== 'weighing_out');
+    // 상차 자리로 가거나 서 있는 동안만 싣는다. 서버가 출차 계근을 줘도 서버가 실었다고 한 베일을 다 싣기 전에는 떠나지 않으므로 계속 싣는다 (S2j #12).
+    // 지게차는 차가 상차 자리에 서서 옆판을 다 내린 뒤에야 다가간다(parked)
+    const t = this.trucks.find((x) => x.active && x.outbound && (x.phase === 'toLoad' || x.phase === 'loading'));
     this.loader.present = Boolean(t);
-    this.loader.parked = Boolean(t && t.phase === 'loading');
+    this.loader.parked = Boolean(t && t.phase === 'loading' && t.sides >= 1);
     this.loader.id = t?.id ?? '';
     this.loader.want = t?.want ?? 0;
-    this.loader.loading = t?.stage === 'identified' || t?.stage === 'loading' || t?.stage === 'loaded';
+    this.loader.loading = Boolean(t && t.stage !== 'arrived' && t.leaveWaitT < LOAD_WAIT_SEC);
+    this.loader.hurry = Boolean(t && t.stage !== 'arrived' && t.stage !== 'identified' && t.stage !== 'loading');
     // 상차 자리를 떠난 차도 실린 베일이 따라가게 자리만 알린다 (실은 채 계근대·도로로 나간다, S2i: 나가는 길이 길어졌다)
     const carrier = t ?? this.trucks.find((x) => x.active && x.outbound && CARRY_PHASES.has(x.phase));
     if (!carrier) return;
@@ -527,7 +536,7 @@ export class Director {
     s.out = t.phase === 'atScale2';
     s.t += dt;
     // 카메라에 가까운 쪽(서쪽 끝)의 번호판: 서쪽을 보면 앞, 동쪽을 보면 뒤
-    const half = TRUCK.length / 2;
+    const half = truckSize(t.outbound).length / 2;
     const toWest = Math.cos(t.heading - SCALE.heading) > 0 ? 1 : -1;
     s.x = t.x + Math.cos(t.heading) * half * toWest;
     s.z = t.z - Math.sin(t.heading) * half * toWest;
@@ -542,7 +551,7 @@ export class Director {
     if (this.plateScan.active) k += Math.min(this.plateScan.t, 3) * 4.9;
     for (const id of TANK_IDS) k += this.fill[id] * 0.013;
     this.trucks.forEach((t, i) => {
-      if (t.active) k += (t.x * 1.3 + t.z * 2.9 + t.heading * 4.1 + t.bedTilt * 6.7 + t.load * 8.3 + (t.pouring ? t.pourT : 0)) * (i + 1);
+      if (t.active) k += (t.x * 1.3 + t.z * 2.9 + t.heading * 4.1 + t.bedTilt * 6.7 + t.load * 8.3 + t.sides * 5.3 + (t.pouring ? t.pourT : 0)) * (i + 1);
     });
     k += this.yard.motionKey();
     this.lumps.forEach((l, i) => {
@@ -572,19 +581,23 @@ export class Director {
    * 서 있는 자리와 경로는 서로 닿지 않게 놓았으니(world/layout) 실제 외곽선으로 견준다. 서로 막으면 먼저 온 쪽이 간다
    */
   private truckBlocked(a: TruckSim): boolean {
-    const half = TRUCK.length / 2 + 0.12;
-    const hw = TRUCK.width / 2 + 0.1;
+    const size = truckSize(a.outbound);
+    const half = size.length / 2 + 0.12;
+    const hw = size.width / 2 + 0.1;
     // 멈추는 데 드는 거리(advance의 감속 2.2배 가속)만큼 더 살핀다
     const look = 0.8 + (a.speed * a.speed) / (2 * TRUCK_ACCEL * 2.2);
     const p = this.ahead(a, this.probeA, look);
     for (const b of this.trucks) {
       if (b === a || !b.active) continue;
-      if (Math.hypot(b.x - p.x, b.z - p.z) > TRUCK.length + 1) continue;
-      if (!rectsOverlap(p, b, half, hw)) continue;
+      const bs = truckSize(b.outbound);
+      const bhl = bs.length / 2 + 0.12;
+      const bhw = bs.width / 2 + 0.1;
+      if (Math.hypot(b.x - p.x, b.z - p.z) > half + bhl + 1) continue;
+      if (!rectsOverlap(p, b, half, hw, bhl, bhw)) continue;
       // 지금 이미 겹쳐 있으면(처음 놓일 때 등) 벗어나는 쪽은 막지 않는다
-      if (rectsOverlap(a, b, half, hw) && !this.closer(p, a, b)) continue;
+      if (rectsOverlap(a, b, half, hw, bhl, bhw) && !this.closer(p, a, b)) continue;
       // 서로 막고 있으면 먼저 온 쪽이 간다
-      const mutual = b.path !== null && rectsOverlap(this.ahead(b, this.probeB, 0.8 + (b.speed * b.speed) / (2 * TRUCK_ACCEL * 2.2)), a, half, hw);
+      const mutual = b.path !== null && rectsOverlap(this.ahead(b, this.probeB, 0.8 + (b.speed * b.speed) / (2 * TRUCK_ACCEL * 2.2)), a, bhl, bhw, half, hw);
       if (mutual && a.seq < b.seq) continue;
       return true;
     }
@@ -592,8 +605,8 @@ export class Director {
     for (const f of this.yard.forklifts) {
       yardToWorld(f.x, f.z, this.wpos);
       const dir = a.reverse ? -1 : 1;
-      const px0 = a.x + Math.cos(a.heading) * dir * (TRUCK.length / 2 + 0.8);
-      const pz0 = a.z - Math.sin(a.heading) * dir * (TRUCK.length / 2 + 0.8);
+      const px0 = a.x + Math.cos(a.heading) * dir * (size.length / 2 + 0.8);
+      const pz0 = a.z - Math.sin(a.heading) * dir * (size.length / 2 + 0.8);
       if (Math.hypot(px0 - this.wpos.x, pz0 - this.wpos.z) < 1.8) return true;
     }
     return false;
@@ -792,18 +805,23 @@ export class Director {
             }
           }
           break;
-        case 'loading':
-          // 서버가 출차 계근 단계를 주고, 서버가 실었다고 한 베일을 다 실은 뒤에 날개를 닫고 떠난다
-          t.wing = Math.min(1, t.wing + dt * 0.8);
-          // 서버가 출차 계근을 주면 싣기를 멈추고 떠난다 (덜 실은 만큼은 차가 떠날 때 clearLoaded가 서버 수에 맞춘다)
-          const leave = t.stage === 'weighing_out' || t.stage === 'departed';
-          if (leave) t.wing = Math.max(0, t.wing - dt * 1.6);
+        case 'loading': {
+          // 서버가 출차 계근 단계를 주고, 서버가 실었다고 한 베일을 지게차가 다 실어 놓은 뒤에 옆판을 올리고 떠난다 (S2j #12).
+          // 장면이 오래 못 따라가면(LOAD_WAIT_SEC) 새로 싣기를 멈추고, 들고 오던 베일만 놓은 뒤 떠난다 (덜 실은 만큼은 떠날 때 clearLoaded가 서버 수에 맞춘다)
+          const leaveStage = t.stage === 'weighing_out' || t.stage === 'departed';
+          if (leaveStage) t.leaveWaitT += dt;
+          const leave = leaveStage && !this.yard.loadingBusy() && (this.yard.loadingDone() || t.leaveWaitT >= LOAD_WAIT_SEC);
+          // 오래 기다려도 다 못 실었으면(북서 재고가 비는 등) 남은 베일을 적재함에 바로 놓고 떠난다: 실린 수가 서버 값과 같게
+          if (leave && !this.yard.loadingDone()) this.yard.preload(t.want);
+          if (leave) t.sides = Math.max(0, t.sides - dt * 1.6);
+          else t.sides = Math.min(1, t.sides + dt * 0.8);
           // 계근대와 마당 안쪽 길을 함께 잡아야 떠난다 (물렸다가 돌아 계근대에 오르는 동안 다른 차와 서로 막히지 않게)
-          if (leave && t.wing <= 0 && this.bothTokens(t.id)) {
+          if (leave && t.sides <= 0 && this.bothTokens(t.id)) {
             t.phase = 'loadBack';
             follow(t, PATH_LOAD_BACK, true);
           }
           break;
+        }
         case 'loadBack':
           if (advance(t, dt, TRUCK_REVERSE, TRUCK_ACCEL, this.truckBlocked(t))) {
             if (this.bothTokens(t.id)) {
@@ -920,7 +938,9 @@ export class Director {
     const live = this.trucks.filter((t) => t.active);
     for (let i = 0; i < live.length; i += 1) {
       for (let j = i + 1; j < live.length; j += 1) {
-        if (rectsOverlap(live[i]!, live[j]!, TRUCK.length / 2, TRUCK.width / 2)) n += 1;
+        const a = truckSize(live[i]!.outbound);
+        const b = truckSize(live[j]!.outbound);
+        if (rectsOverlap(live[i]!, live[j]!, a.length / 2, a.width / 2, b.length / 2, b.width / 2)) n += 1;
       }
     }
     return n;
@@ -1008,7 +1028,8 @@ export class Director {
 }
 
 /** 두 차량(가운데·방향·반길이·반폭)의 바닥 직사각형이 겹치는가 */
-function rectsOverlap(a: Pose, b: Pose, hl: number, hw: number): boolean {
+/** 두 직사각형(가운데·방향, 반길이·반폭)이 겹치는가. b의 크기를 주지 않으면 a와 같다 */
+function rectsOverlap(a: Pose, b: Pose, hl: number, hw: number, bhl = hl, bhw = hw): boolean {
   const axes: Array<[number, number]> = [
     [Math.cos(a.heading), -Math.sin(a.heading)],
     [Math.sin(a.heading), Math.cos(a.heading)],
@@ -1020,7 +1041,7 @@ function rectsOverlap(a: Pose, b: Pose, hl: number, hw: number): boolean {
   for (const [ax, az] of axes) {
     const d = Math.abs(dx * ax + dz * az);
     const ra = hl * Math.abs(Math.cos(a.heading) * ax - Math.sin(a.heading) * az) + hw * Math.abs(Math.sin(a.heading) * ax + Math.cos(a.heading) * az);
-    const rb = hl * Math.abs(Math.cos(b.heading) * ax - Math.sin(b.heading) * az) + hw * Math.abs(Math.sin(b.heading) * ax + Math.cos(b.heading) * az);
+    const rb = bhl * Math.abs(Math.cos(b.heading) * ax - Math.sin(b.heading) * az) + bhw * Math.abs(Math.sin(b.heading) * ax + Math.cos(b.heading) * az);
     if (d > ra + rb) return false;
   }
   return true;

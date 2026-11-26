@@ -100,7 +100,8 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
     const inbound = done.filter((id) => !outbound.has(id));
     const out = done.filter((id) => outbound.has(id));
     expect(inbound.length).toBeGreaterThanOrEqual(15);
-    expect(out.length).toBeGreaterThanOrEqual(3);
+    // 상차 차량(25톤 카고, S2j)은 여덟 번째 차마다 오고 한 대에 약 9.5분(20개) 머문다: 30분에 한 대 넘게 다 돈다
+    expect(out.length).toBeGreaterThanOrEqual(1);
     // 계근 동선: 입차는 후진으로 올라 계근(atScale), 출차는 앞으로 올라 계근(atScale2) 뒤 후진으로 내려온다
     // 대부분의 차는 출차 계근까지 마치고 나갔다 (장면이 서버 단계보다 늦어 출차 계근 전에 출차 단계가 온 드문 차는 그 자리에서 빠진다)
     const weighedOut = done.filter((id) => phases.get(id)!.includes('atScale2'));

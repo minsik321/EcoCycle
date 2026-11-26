@@ -7,15 +7,21 @@ import { C, UNKNOWN_STRIPE, companyStripe } from '../theme';
 import { MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { blobShadow } from '../three/bakedShadow';
 import type { Director } from '../sim/director';
-import { CLAMP_SCALE, CLAMP_SHIFT, FORKLIFT_SCALE, TRUCK, WORKER_SCALE, YARD_FRAME, groundY } from '../world/layout';
+import { BALE, CLAMP_SCALE, CLAMP_SHIFT, FORKLIFT_SCALE, LOAD_TRUCK, TRUCK, WORKER_SCALE, YARD_FRAME, groundY } from '../world/layout';
 import type { TruckModel } from './build';
-import { buildBale, buildForklift, buildTruck, buildWorker } from './build';
+import { CLAMP_H, MAST_H, buildBale, buildCargoTruck, buildForklift, buildTruck, buildWorker } from './build';
 
 // 스스로 움직이는 것들을 그린다. 위치·자세는 모두 Director가 정하고 여기서는 옮겨 적기만 한다.
 // (Director가 멈추면 이 컴포넌트들도 같은 값을 다시 적을 뿐이라 화면이 멈춘다.)
 
 const GROUND_Y = 0.03;
 const BED_MAX = 0.84;
+/** 카고 옆판을 다 내렸을 때 돈 각도 (거의 수직으로 매달리되 바퀴에 닿지 않게 조금 바깥으로) */
+const SIDE_DROP = Math.PI * 0.97;
+/** 클램프 판을 넓혀 베일 끝면(긴 쪽 1.5 m)을 잡을 때의 판 자리 (클램프 모형 좌표, 돌려 잡기 S2j) */
+const JAW_WIDE_Z = (BALE.d / 2) * 1.03 / CLAMP_SCALE + 0.0125 + 0.025;
+/** 클램프 위 끝 높이(지게차 모형 좌표, 클램프 배율을 곱한 값) */
+const CLAMP_TOP = (CLAMP_H * CLAMP_SCALE) / FORKLIFT_SCALE;
 const POUR_PER_TRUCK = 28;
 
 interface ActorProps {
@@ -30,18 +36,22 @@ const stop = (e: ThreeEvent<MouseEvent>, fn: () => void) => {
   fn();
 };
 
-/** 트럭 칸마다 덤프(입고)와 윙바디(상차) 모형을 하나씩 두고, 서버 kind에 맞는 쪽만 보인다. 모형은 축마다 TRUCK.sx·sy·sz배로 그린다 */
+/** 트럭 칸마다 덤프(입고)와 25톤 카고(상차) 모형을 하나씩 두고, 서버 kind에 맞는 쪽만 보인다. 덤프는 축마다 TRUCK.sx·sy·sz배, 카고는 월드 크기 그대로 */
 interface TruckPair {
   dump: TruckModel;
-  wing: TruckModel;
+  cargo: TruckModel;
 }
 
 /** 쏟아지는 파지 칸(동시에 쏟는 트럭 수). 쏟는 자리는 더미 앞 둘뿐이라 넉넉히 넷: 쏟는 트럭에만 차례로 준다 */
 const POUR_SLOTS = 4;
 
 function makePair(i: number): TruckPair {
-  const pair = { dump: buildTruck(i, 'dump'), wing: buildTruck(i, 'wing') };
-  for (const m of [pair.dump, pair.wing]) {
+  const pair = { dump: buildTruck(i), cargo: buildCargoTruck(i) };
+  // 상차 트럭(25톤 카고)은 월드 단위로 만들었다(배율 1). 덤프만 축마다 배율을 준다
+  pair.cargo.root.rotation.order = 'YZX';
+  pair.cargo.root.userData.truckIndex = i;
+  pair.cargo.root.visible = false;
+  for (const m of [pair.dump]) {
     m.root.scale.set(TRUCK.sx, TRUCK.sy, TRUCK.sz);
     // 길이 배율이 높이 배율보다 커서 바퀴가 타원이 된다: 바퀴마다 받침을 끼워 앞뒤 배율을 되돌린다 (돌리는 것은 안쪽 그룹)
     for (const w of m.wheels) {
@@ -73,7 +83,7 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
     const list = pairsRef.current;
     return () => {
       list.forEach((p) =>
-        [p.dump, p.wing].forEach((m) => {
+        [p.dump, p.cargo].forEach((m) => {
           disposeTree(m.root);
           m.stripe.dispose();
         }),
@@ -81,16 +91,17 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
       list.length = 0;
     };
   }, []);
-  const models = useMemo(() => pairs.flatMap((p) => [p.dump, p.wing]), [pairs]);
+  const models = useMemo(() => pairs.flatMap((p) => [p.dump, p.cargo]), [pairs]);
   useEffect(() => {
     if (!blobs) return;
     const added = models.map((m) => {
-      const b = blobShadow(2.9, 1.16);
+      // 덤프는 모형 크기(그룹 배율로 커진다), 카고는 월드 크기
+      const b = pairs.some((p) => p.cargo === m) ? blobShadow(LOAD_TRUCK.length, LOAD_TRUCK.width) : blobShadow(2.9, 1.16);
       m.root.add(b);
       return b;
     });
     return () => added.forEach((b) => b.removeFromParent());
-  }, [models, blobs]);
+  }, [models, pairs, blobs]);
   const pour = useRef<InstancedMesh>(null);
   const geometry = useMemo(() => chunkGeometry(0.2, 0.1, 0.15, 0.03), []);
   const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(), axis: new Vector3(0.6, 0.5, 0.62).normalize(), color: new Color() }), []);
@@ -112,24 +123,26 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
     director.trucks.forEach((sim, i) => {
       const pair = pairs[i];
       if (!pair) return;
-      const model = sim.outbound ? pair.wing : pair.dump;
+      const model = sim.outbound ? pair.cargo : pair.dump;
       // 보이지 않는 모형은 장면 그래프의 행렬 갱신도 건너뛴다 (트럭 칸마다 모형이 둘이라 숨은 쪽이 매 장 부담이 된다)
-      const other = (sim.outbound ? pair.dump : pair.wing).root;
+      const other = (sim.outbound ? pair.dump : pair.cargo).root;
       other.visible = false;
       other.matrixWorldAutoUpdate = false;
       model.root.visible = sim.active;
       model.root.matrixWorldAutoUpdate = sim.active;
       if (sim.active) {
         // 경사로·비탈 도로: 앞뒤 바퀴 자리의 바닥 높이로 차체를 기울인다
-        const fx = Math.cos(sim.heading) * 1.45;
-        const fz = -Math.sin(sim.heading) * 1.45;
+        const axle = sim.outbound ? LOAD_TRUCK.length * 0.38 : 1.45;
+        const fx = Math.cos(sim.heading) * axle;
+        const fz = -Math.sin(sim.heading) * axle;
         const yf = groundY(sim.x + fx, sim.z + fz);
         const yb = groundY(sim.x - fx, sim.z - fz);
         model.root.position.set(sim.x, GROUND_Y + (yf + yb) / 2, sim.z);
-        model.root.rotation.set(0, sim.heading, Math.atan2(yf - yb, 2.9));
+        model.root.rotation.set(0, sim.heading, Math.atan2(yf - yb, axle * 2));
         model.stripe.color.set(sim.company ? companyStripe(sim.company) : UNKNOWN_STRIPE);
-        model.wings.forEach((w, side) => {
-          w.rotation.x = (side === 0 ? 1 : -1) * sim.wing * 1.25;
+        // 낮은 카고의 옆판: 아래 모서리를 축으로 바깥 아래로 내려간다 (sides[0]은 −z 쪽)
+        model.sides.forEach((w, side) => {
+          w.rotation.x = (side === 0 ? -1 : 1) * sim.sides * SIDE_DROP;
         });
         const angle = sim.bedTilt * BED_MAX;
         model.bed.rotation.z = angle;
@@ -214,8 +227,12 @@ export function Forklifts({ director, onSelect, blobs = false }: ActorProps) {
       model.root.rotation.y = sim.heading;
       // 포크 높이는 월드 값(sim.fork): 모형은 FORKLIFT_SCALE배로 그리므로 모형 좌표로 나눈다
       model.carriage.position.y = (sim.fork + 0.02) / FORKLIFT_SCALE;
+      // 클램프 위 끝이 바깥 마스트 위로 오르면 가운데·안쪽 마스트가 늘어나 클램프를 받친다 (마스트 위로 클램프가 삐져나오지 않게)
+      const ext = Math.max(0, model.carriage.position.y + CLAMP_TOP + 0.05 - MAST_H);
+      model.mastStages[0]!.position.y = ext / 2;
+      model.mastStages[1]!.position.y = ext;
       model.jaws.forEach((jaw, side) => {
-        jaw.position.z = (side === 0 ? -1 : 1) * (0.415 - sim.clamp * 0.025);
+        jaw.position.z = (side === 0 ? -1 : 1) * (0.415 + sim.wide * (JAW_WIDE_Z - 0.415) - sim.clamp * 0.025);
       });
       for (const w of model.wheels) w.rotation.z = -sim.wheel;
       model.beacon.visible = (sim.legs.length > 0 || sim.speed > 0.05) && Math.sin(director.t * 9) > 0;
