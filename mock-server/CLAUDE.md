@@ -25,7 +25,7 @@ mock-server/
     │                     alarmOps, publish(변할 때·5초마다), history(가짜 이력), bus(sim → stream)
     ├── scenarios/        index(시나리오 9종), gate(침묵·지연 스위치)
     └── fixtures/         accounts(역할별 계정·권한 표), robotModel(범용 6축, base −270~270°), cameras, settings(설정 키·범위),
-                      process(가상의 회사·차량(번호판·등록 공차·싣는 양)·배정 섹터, 배합비·압력 범위, 단계별 시간, 하역 기록 채우기 규칙)
+                      process(가상의 회사·차량(번호판·등록 공차·싣는 양)·배정 섹터, 배합비·압력 범위, 단계별 시간, 하역 기록 채우기 규칙, 상차 호출 `OUTBOUND_CALL`: 적치 40개 이상이면 한 대, 한 대 20개, 베일당 약 30초)
 ```
 
 로봇팔 7단위(명세 6절): 수동은 `pick_from`(집어 들고 멈춤) → `place_on_conveyor` 두 명령이고 순서가 틀리면 409(`sim/commands.ts`의 `conflictReason`, 실행 때 다시 검사). 섹터 지정 중인 배치는 `sim/process.ts`가 놓은 부피로 실제 배합·평균 수분·목표 압력을 다시 계산하고(`setRobotPin`·`notePlaced`) 지정 사건을 남긴다.

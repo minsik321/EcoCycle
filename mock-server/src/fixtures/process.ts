@@ -69,7 +69,7 @@ export const VEHICLE_TIMING_SEC = {
   spawnGap: 35,
 };
 
-/** 상차 차량(윙바디) 한 대: 번호판, 등록 공차 t, 한 번에 싣는 베일 수 */
+/** 상차 차량(25톤 카고) 한 대: 번호판, 등록 공차 t, 한 번에 싣는 베일 수 */
 export interface OutboundTruckFixture {
   plate: string;
   tareT: number;
