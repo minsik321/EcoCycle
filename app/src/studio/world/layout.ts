@@ -1,7 +1,7 @@
 import { TANK_IDS } from '@ecocycle/shared';
 import type { DeviceId, TankId } from '@ecocycle/shared';
 import { DEMO_CYCLE, TANK_BASE_DEG } from '../../config/robotCycle';
-import { YARD_FLOW } from '../../config/yard';
+import { REAL_SIZE_M, YARD_FLOW } from '../../config/yard';
 import { chainSpecFor } from '../robot/chain';
 import { tipPosition } from '../robot/kinematics';
 import type { P2 } from '../sim/paths';
@@ -37,6 +37,14 @@ const DEG = Math.PI / 180;
 export const PHOTO = { width: 613, height: 616 } as const;
 /** 사진 1px의 월드 길이 */
 export const SITE_SCALE = 0.072;
+/**
+ * 축척(S2k): 월드 1단위 = 2 m. 부지 총면적(REAL_SIZE_M.siteAreaM2, 4,007 m²)을 마당 포장 판(PLATEAU 안, 사진 안, 두 숲 밖:
+ * 약 193,000px²)의 넓이로 보면 1px = 0.144 m이고, 1px = 0.072단위이므로 1단위 = 2.00 m다(`layout.test.ts`가 넓이로 다시 잰다).
+ * 베일·차량·사람은 REAL_SIZE_M(m)을 M()으로 바꿔 그린다
+ */
+export const M_PER_UNIT = 2;
+/** 실제 길이(m) → 월드 길이 */
+export const M = (meters: number): number => meters / M_PER_UNIT;
 /** 변환의 기준점 (사진 px): 로봇 자리, 레일이 건물로 들어가는 곳 */
 export const SITE_ANCHORS = { robot: [200, 385] as P2, railEntry: [152, 428] as P2 } as const;
 
@@ -426,20 +434,24 @@ export const RAIL_SLOPE = Math.atan2(RAIL.endY - RAIL.startY, RAIL.endU - RAIL.s
 /** 레일 위 u(수평 거리)에서의 벨트 윗면 높이 */
 export const railY = (u: number): number => RAIL.startY + ((u - RAIL.startU) / (RAIL.endU - RAIL.startU)) * (RAIL.endY - RAIL.startY);
 
-/** 베일 (긴 쪽 d가 로컬 X). 사진의 줄 간격(13.3 × 13.8px)에 맞춘 크기와 틈 */
-export const BALE = { w: 0.9, h: 0.66, d: 0.95 } as const;
-export const BALE_GAP = 0.06;
+/** 베일 (긴 쪽 d가 로컬 X): 실제 1.1 × 1.1 × 1.5 m (S2k, 전에는 사진의 줄 간격에 맞춘 0.90 × 0.66 × 0.95) */
+export const BALE = { w: M(REAL_SIZE_M.bale.width), h: M(REAL_SIZE_M.bale.height), d: M(REAL_SIZE_M.bale.length) } as const;
+export const BALE_GAP = M(REAL_SIZE_M.bale.gap);
 /** 베일이 배출구로 나오는 방향 (+w) */
 export const CHUTE_HEADING = RAIL_H + Math.PI / 2;
 
+/** 지게차 모형(배율 1)의 몸체 폭(머리 보호 틀 포함), 클램프 판 사이(열었을 때) */
+const FORKLIFT_MODEL = { width: 0.78, jawGap: 0.805 } as const;
 /**
- * 지게차 모형 배율(몸체). 2026-11-26 S2h: 부지(도로 폭·계근대·건물)에 비해 커서 1.15 → 0.9로 줄였다.
- * 베일 클램프(마스트 앞 틀·양옆 판)는 베일 크기(0.9 × 0.95)에 맞춰야 하므로 몸체와 따로 CLAMP_SCALE배로 그린다
- * (실제 베일 클램프도 판이 몸체보다 넓다). 클램프 틀은 줄인 마스트 앞에 붙도록 CLAMP_SHIFT만큼 뒤로 당긴다
+ * 지게차 모형 배율(몸체): 3톤급 폭 1.2 m에 맞춘다(S2k: 0.77, 머리 보호 틀 높이 2.3 m. 모형이 장난감처럼 짧아 길이는 클램프까지 약 3.0 m).
+ * 베일 클램프(마스트 앞 틀·양옆 판)는 베일 폭(1.1 m)을 잡도록 몸체와 따로 CLAMP_SCALE배로 그린다.
+ * 클램프 틀은 마스트 앞에 붙도록 CLAMP_SHIFT만큼 당긴다
  */
-export const FORKLIFT_SCALE = 0.9;
-/** 베일 클램프 배율: 판 사이 0.955(베일 폭 0.9), 판 길이 0.87(베일 길이 0.95) */
-export const CLAMP_SCALE = 1.15;
+export const FORKLIFT_SCALE = M(REAL_SIZE_M.forklift.width) / FORKLIFT_MODEL.width;
+/** 베일 클램프 배율: 판 사이가 베일 폭의 1.06배 */
+export const CLAMP_SCALE = (BALE.w * 1.06) / FORKLIFT_MODEL.jawGap;
+/** 작업자 모형(배율 1, 키 1.01)을 실제 키(1.75 m)로 그리는 배율 */
+export const WORKER_SCALE = M(REAL_SIZE_M.worker.height) / 1.01;
 /** 클램프 틀(모형 x 0.6)이 몸체 배율과 클램프 배율의 차이로 앞으로 나가는 만큼을 당긴다 (월드 m) */
 export const CLAMP_SHIFT = 0.6 * (CLAMP_SCALE - FORKLIFT_SCALE);
 /** 지게차가 클램프로 베일을 드는 거리(지게차 중심 → 베일 중심) */
@@ -699,14 +711,19 @@ export function yardPoint(x: number, z: number): P2 {
 
 // ── 트럭 자리·경로 (사진 px로 적고 옮긴다) ─────────────────────────────
 
-/** 트럭 모형(배율 1)의 길이·폭 */
-const TRUCK_MODEL = { length: 2.9, width: 1.157 } as const;
-const TRUCK_SCALE = 1.1;
+/** 트럭 모형(배율 1)의 길이·폭·운전석 지붕 높이 */
+const TRUCK_MODEL = { length: 2.9, width: 1.157, height: 1.4 } as const;
 /**
- * 트럭(덤프·윙바디) 크기: 모형을 TRUCK_SCALE배로 그린 값. 2026-11-26 S2h: 1.4배(4.06 × 1.62)는 두 차로 도로(2.6)를 거의 다 덮고
- * 마당에 비해 커서 1.1배(3.19 × 1.27, 44 × 18px)로 줄였다: 한 차로(1.3)에 들어가고 계근대(4.82)의 2/3
+ * 트럭(덤프·윙바디) 크기: 5톤 화물차급 7.5 × 2.4 m, 운전석 2.9 m (S2k: 3.75 × 1.2단위, 계근대 4.82의 0.78, 한 차로 1.3 안).
+ * 모형은 축마다 배율이 다르다(sx 길이, sy 높이, sz 폭. 바퀴는 Actors가 둥글게 되돌린다). 전에는 1.1배 3.19 × 1.27(S2h)
  */
-export const TRUCK = { length: TRUCK_MODEL.length * TRUCK_SCALE, width: TRUCK_MODEL.width * TRUCK_SCALE, scale: TRUCK_SCALE } as const;
+export const TRUCK = {
+  length: M(REAL_SIZE_M.truck.length),
+  width: M(REAL_SIZE_M.truck.width),
+  sx: M(REAL_SIZE_M.truck.length) / TRUCK_MODEL.length,
+  sy: M(REAL_SIZE_M.truck.height) / TRUCK_MODEL.height,
+  sz: M(REAL_SIZE_M.truck.width) / TRUCK_MODEL.width,
+} as const;
 
 /** 도로 차로의 가운데 선: 남쪽으로 가는 차로(부지 쪽, 서쪽)를 따라간다 */
 function roadLanePx(offset: number): P2[] {
@@ -736,8 +753,8 @@ const spot = (x: number, y: number, dx: number, dy: number): Spot => {
 
 /** 레일의 반대 방향(사진 북동): 쏟는 트럭이 보는 방향 */
 const NE: P2 = [-PU[0], -PU[1]];
-// 트럭 뒤(적재함 끝)가 더미 북동 면에 닿는 자리: 트럭을 줄여(S2h) 가운데를 −72 → −66px로 당겼다
-const tipPx = (sign: 1 | -1): P2 => railToPhoto(-66, sign * 45);
+// 트럭 뒤(적재함 끝)가 더미 북동 면에 닿는 자리: 실제 크기 트럭(S2k, 길이 3.75)에 맞춰 가운데를 −66 → −71px로 물렸다
+const tipPx = (sign: 1 | -1): P2 => railToPhoto(-71, sign * 45);
 const plus = (p: P2, d: P2, k: number): P2 => [p[0] + d[0] * k, p[1] + d[1] * k];
 
 /** 섹터 더미에 쏟는 자리: 더미 북동 면 바깥, 적재함 뒤가 더미 쪽(앞이 북동). A·C가 레일 축에 대칭이다 */
@@ -816,25 +833,61 @@ export const EXIT_LEAVE: P2[] = pts([[478, 306], [498, 307], [512, 316], ...LANE
 /** EXIT_LEAVE에서 이만큼(사진 px, 경사로 동쪽 끝 + 트럭 길이) 지나면 경사로가 빈다 */
 export const EXIT_RAMP_CLEAR_PX: P2 = [506, 360];
 
+/**
+ * 더미 앞에서 후진을 시작하는 자리 (S2k: 하역 후진이 한 구간 안에서 앞뒤로 뒤집혀 방향이 180° 튀던 것을 고쳤다).
+ * 앞으로 들어와 이 자리에 선 방향 그대로 후진을 시작하고, 후진 길은 한 번 둥글게 꺾여 쏟는 자리(앞이 북동)에 닿는다:
+ *  - A: 쏟는 자리 동쪽을 지나 북쪽으로 올라선다(북쪽을 봄) → 남쪽으로 물러나며 남서로 꺾여 들어간다 (45°)
+ *  - C: 쏟는 자리 북쪽에 서쪽을 보고 선다 → 동쪽으로 물러나며 남·남서로 둥글게 들어간다 (135°)
+ */
+const BACK_START_PX: Record<TankId, P2> = { 'sector-a': [241, 272], 'sector-c': [274, 331] };
+/** 후진 길(원호를 미리 이은 점들)을 다시 둥글리는 반지름(월드): 원호 조각 사이만 다듬는다 */
+export const TRUCK_REVERSE_RADIUS = 0.3;
+/** 후진 길이 꺾이는 점: 후진 시작 자리에서 똑바로 물러난 선과 쏟는 자리의 북동 축이 만나는 곳 */
+const BACK_TURN_PX: Record<TankId, P2> = {
+  'sector-a': [241, TIP_PX['sector-a'][1] + ((241 - TIP_PX['sector-a'][0]) / NE[0]) * NE[1]],
+  'sector-c': [TIP_PX['sector-c'][0] + ((331 - TIP_PX['sector-c'][1]) / NE[1]) * NE[0], 331],
+};
+/**
+ * 두 직선 a → k, k → b를 반지름 r(px)의 원호로 잇는 점들(사진 px): a, 원호(steps 조각), b. 2차 곡선 둥글리기(roundedPath)는
+ * 크게 꺾이는 곳(135°)에서 가운데만 급하게 돌아서, 후진 길은 원호로 미리 이어 둔다 (방향이 고르게 바뀐다)
+ */
+function filletPx(a: P2, k: P2, b: P2, r: number, steps = 10): P2[] {
+  const n = (x: number, y: number): P2 => {
+    const l = Math.hypot(x, y) || 1;
+    return [x / l, y / l];
+  };
+  const u1 = n(a[0] - k[0], a[1] - k[1]);
+  const u2 = n(b[0] - k[0], b[1] - k[1]);
+  const ang = Math.acos(Math.max(-1, Math.min(1, u1[0] * u2[0] + u1[1] * u2[1])));
+  const t = r / Math.tan(ang / 2);
+  const bis = n(u1[0] + u2[0], u1[1] + u2[1]);
+  const c: P2 = [k[0] + (bis[0] * r) / Math.sin(ang / 2), k[1] + (bis[1] * r) / Math.sin(ang / 2)];
+  const p1: P2 = [k[0] + u1[0] * t, k[1] + u1[1] * t];
+  const p2: P2 = [k[0] + u2[0] * t, k[1] + u2[1] * t];
+  const a1 = Math.atan2(p1[1] - c[1], p1[0] - c[0]);
+  let sweep = Math.atan2(p2[1] - c[1], p2[0] - c[0]) - a1;
+  while (sweep > Math.PI) sweep -= 2 * Math.PI;
+  while (sweep < -Math.PI) sweep += 2 * Math.PI;
+  const out: P2[] = [a];
+  for (let i = 0; i <= steps; i += 1) {
+    const q = a1 + (sweep * i) / steps;
+    out.push([c[0] + Math.cos(q) * r, c[1] + Math.sin(q) * r]);
+  }
+  out.push(b);
+  return out;
+}
+
 /** 계근대(서쪽을 봄) → 앞으로 내려가 → 더미 앞에서 후진할 자리 */
 const TO_TIP_PX: Record<TankId, readonly P2[]> = {
-  'sector-a': [
-    [456, 247],
-    [396, 248],
-    [330, 262],
-    [244, 278],
-  ],
-  'sector-c': [
-    [456, 247],
-    [396, 250],
-    [340, 290],
-    [300, 316],
-  ],
+  'sector-a': [[456, 247], [396, 248], [330, 262], [286, 300], [241, 306], BACK_START_PX['sector-a']],
+  'sector-c': [[456, 247], [396, 250], [352, 300], [326, 331], BACK_START_PX['sector-c']],
 };
-/** 후진할 자리 → 동쪽으로 물렸다가 더미 쪽으로 후진해 쏟는 자리까지 */
+/** 후진 길의 원호 반지름(px): A는 45°, C는 135°를 돈다 */
+const BACK_ARC_PX: Record<TankId, number> = { 'sector-a': 30, 'sector-c': 20 };
+/** 후진할 자리 → 원호 하나로 꺾여 더미 쪽으로 후진해 쏟는 자리까지 */
 const REVERSE_PX: Record<TankId, readonly P2[]> = {
-  'sector-a': [[244, 278], [270, 276], plus(TIP_PX['sector-a'], NE, 26), TIP_PX['sector-a']],
-  'sector-c': [[300, 316], [326, 318], plus(TIP_PX['sector-c'], NE, 26), TIP_PX['sector-c']],
+  'sector-a': filletPx(BACK_START_PX['sector-a'], BACK_TURN_PX['sector-a'], TIP_PX['sector-a'], BACK_ARC_PX['sector-a']),
+  'sector-c': filletPx(BACK_START_PX['sector-c'], BACK_TURN_PX['sector-c'], TIP_PX['sector-c'], BACK_ARC_PX['sector-c']),
 };
 /** 쏟는 자리 → 앞으로 북동쪽 → 계근대 서쪽 끝에서 앞으로 올라 동쪽을 보고 다시 잰다 (출차 계근) */
 const TIP_TO_SCALE_PX: Record<TankId, readonly P2[]> = {
@@ -843,20 +896,8 @@ const TIP_TO_SCALE_PX: Record<TankId, readonly P2[]> = {
 };
 /** 기다리는 자리 → 서쪽·남쪽으로 → 더미 앞에서 후진할 자리 */
 const QUEUE_TO_TIP_PX: Record<TankId, readonly P2[]> = {
-  'sector-a': [
-    [384, 217],
-    [350, 220],
-    [330, 250],
-    [300, 268],
-    [244, 278],
-  ],
-  'sector-c': [
-    [384, 217],
-    [350, 222],
-    [334, 256],
-    [322, 296],
-    [300, 316],
-  ],
+  'sector-a': [[384, 217], [350, 220], [330, 250], [300, 290], [241, 306], BACK_START_PX['sector-a']],
+  'sector-c': [[384, 217], [350, 222], [336, 262], [326, 331], BACK_START_PX['sector-c']],
 };
 /** 계근대(서쪽을 봄) → 앞으로 내려가 북쪽으로 비켜 기다리는 자리 */
 export const SCALE_TO_QUEUE: P2[] = pts([
@@ -900,16 +941,11 @@ export const SCALE_WEST_PX: P2 = [424, 247];
 export const SCALE_CLEAR = 5.6;
 
 /** 상차 차량에 베일을 놓는 자리: 적재함 위 (트럭 기준 앞뒤 거리, 단) */
-export const LOAD_SLOTS: ReadonlyArray<readonly [number, number]> = [
-  [-1.5, 0],
-  [-0.52, 0],
-  [-1.5, 1],
-  [-0.52, 1],
-  [-1.5, 2],
-  [-0.52, 2],
-];
-/** 상차 차량의 적재함 바닥 높이 */
-export const LOAD_BED_Y = 0.85;
+// 윙바디 짐칸(모형 x −1.42 ~ 0.48)에 베일을 가로로(긴 쪽이 차 폭 방향) 4개씩 2단. S2k: 베일이 실제 크기라 4 × 2
+const LOAD_ALONG = [0, 1, 2, 3].map((i) => -1.42 * TRUCK.sx + 0.08 + BALE.w / 2 + i * (BALE.w + BALE_GAP));
+export const LOAD_SLOTS: ReadonlyArray<readonly [number, number]> = [0, 1].flatMap((level) => LOAD_ALONG.map((a) => [a, level] as const));
+/** 상차 차량의 적재함 바닥 높이 (모형 바닥판 윗면 0.6 × 높이 배율) */
+export const LOAD_BED_Y = 0.6 * TRUCK.sy;
 
 // ── 기준점 (핀·카메라) ────────────────────────────────────────────────
 

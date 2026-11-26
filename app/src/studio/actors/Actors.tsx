@@ -1,13 +1,13 @@
 import { useFrame } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Color, Matrix4, Quaternion, Vector3 } from 'three';
+import { Color, Group, Matrix4, Quaternion, Vector3 } from 'three';
 import type { InstancedMesh, Mesh } from 'three';
 import { C, UNKNOWN_STRIPE, companyStripe } from '../theme';
 import { MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { blobShadow } from '../three/bakedShadow';
 import type { Director } from '../sim/director';
-import { CLAMP_SCALE, CLAMP_SHIFT, FORKLIFT_SCALE, TRUCK, YARD_FRAME, groundY } from '../world/layout';
+import { CLAMP_SCALE, CLAMP_SHIFT, FORKLIFT_SCALE, TRUCK, WORKER_SCALE, YARD_FRAME, groundY } from '../world/layout';
 import type { TruckModel } from './build';
 import { buildBale, buildForklift, buildTruck, buildWorker } from './build';
 
@@ -30,7 +30,7 @@ const stop = (e: ThreeEvent<MouseEvent>, fn: () => void) => {
   fn();
 };
 
-/** 트럭 칸마다 덤프(입고)와 윙바디(상차) 모형을 하나씩 두고, 서버 kind에 맞는 쪽만 보인다. 모형은 TRUCK.scale배로 그린다 */
+/** 트럭 칸마다 덤프(입고)와 윙바디(상차) 모형을 하나씩 두고, 서버 kind에 맞는 쪽만 보인다. 모형은 축마다 TRUCK.sx·sy·sz배로 그린다 */
 interface TruckPair {
   dump: TruckModel;
   wing: TruckModel;
@@ -42,7 +42,17 @@ const POUR_SLOTS = 4;
 function makePair(i: number): TruckPair {
   const pair = { dump: buildTruck(i, 'dump'), wing: buildTruck(i, 'wing') };
   for (const m of [pair.dump, pair.wing]) {
-    m.root.scale.setScalar(TRUCK.scale);
+    m.root.scale.set(TRUCK.sx, TRUCK.sy, TRUCK.sz);
+    // 길이 배율이 높이 배율보다 커서 바퀴가 타원이 된다: 바퀴마다 받침을 끼워 앞뒤 배율을 되돌린다 (돌리는 것은 안쪽 그룹)
+    for (const w of m.wheels) {
+      const holder = new Group();
+      holder.position.copy(w.position);
+      holder.scale.set(TRUCK.sy / TRUCK.sx, 1, 1);
+      w.position.set(0, 0, 0);
+      m.root.remove(w);
+      holder.add(w);
+      m.root.add(holder);
+    }
     m.root.rotation.order = 'YZX';
     m.root.userData.truckIndex = i;
     m.root.visible = false;
@@ -139,10 +149,10 @@ export function Trucks({ director, onSelect, blobs = false }: ActorProps) {
       for (let j = 0; j < POUR_PER_TRUCK; j += 1) {
         const u = (sim.pourT * 0.9 + j / POUR_PER_TRUCK) % 1;
         const side = ((j * 37) % 17) / 17 - 0.5;
-        const back = (1.5 + u * 0.95) * TRUCK.scale;
-        tmp.p.set(sim.x - fx * back - fz * side * 1.15, (0.95 - u * u * 0.75 + Math.sin(j * 2.1) * 0.05) * TRUCK.scale, sim.z - fz * back + fx * side * 1.15);
+        const back = (1.5 + u * 0.95) * TRUCK.sx;
+        tmp.p.set(sim.x - fx * back - fz * side * 1.15, (0.95 - u * u * 0.75 + Math.sin(j * 2.1) * 0.05) * TRUCK.sy, sim.z - fz * back + fx * side * 1.15);
         tmp.q.setFromAxisAngle(tmp.axis, u * 7 + j);
-        const scale = (0.7 + ((j * 13) % 7) / 10) * TRUCK.scale;
+        const scale = (0.7 + ((j * 13) % 7) / 10) * TRUCK.sy;
         tmp.s.setScalar(scale * Math.min(1, u * 8) * Math.min(1, (1 - u) * 5));
         mesh.setMatrixAt(base + j, tmp.m.compose(tmp.p, tmp.q, tmp.s));
       }
@@ -285,7 +295,15 @@ export function Bales({ director, onSelect }: ActorProps) {
 }
 
 export function Workers({ director }: { director: Director }) {
-  const models = useMemo(() => director.workers.map((w, i) => buildWorker(i, w.pose === 'tablet')), [director]);
+  const models = useMemo(
+    () =>
+      director.workers.map((w, i) => {
+        const m = buildWorker(i, w.pose === 'tablet');
+        m.root.scale.setScalar(WORKER_SCALE);
+        return m;
+      }),
+    [director],
+  );
   useEffect(() => () => models.forEach((m) => disposeTree(m.root)), [models]);
 
   useFrame(() => {

@@ -31,6 +31,7 @@ import {
   sitePx,
   truckQueueToTip,
   truckReverse,
+  TRUCK_REVERSE_RADIUS,
   truckTipToScale,
   truckToTip,
   yardToWorld,
@@ -745,7 +746,7 @@ export class Director {
           if (this.fromScale(t) > SCALE_CLEAR) this.scaleToken.release(t.id);
           if (advance(t, dt, TRUCK_SPEED, TRUCK_ACCEL, this.truckBlocked(t)) && t.bay) {
             t.phase = 'reversing';
-            follow(t, truckReverse(t.bay), true, 1.2);
+            follow(t, truckReverse(t.bay), true, TRUCK_REVERSE_RADIUS);
           }
           break;
         case 'reversing':

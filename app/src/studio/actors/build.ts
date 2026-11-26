@@ -54,7 +54,7 @@ const BED_PAINTS = [C.steelLight, C.blue, C.wall, C.blueSoft];
 const CAB_PAINT = C.yellow;
 
 /**
- * 트럭(모형 크기, 장면에서는 TRUCK.scale배로 그린다). kind 'wing'이면 상차 차량(윙바디): 들리는 적재함 대신 낮은 바닥판과
+ * 트럭(모형 크기, 장면에서는 축마다 TRUCK.sx·sy·sz배로 그린다). kind 'wing'이면 상차 차량(윙바디): 들리는 적재함 대신 낮은 바닥판과
  * 양쪽 날개가 위로 열리는 짐칸, 흰 운전석. 실린 베일은 Bales가 그린다
  */
 export function buildTruck(variant: number, kind: 'dump' | 'wing' = 'dump'): TruckModel {
