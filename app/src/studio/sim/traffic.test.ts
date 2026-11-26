@@ -57,7 +57,8 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
       t += DT;
       expect(d.truckOverlaps(), `t=${t.toFixed(1)} 트럭끼리 겹침`).toBe(0);
       // 매 걸음 표의 "차량 N"(회사 안 차량)과 장면에 보이는(active) 트럭 대수가 같다 (yardSoak도 같은 점검을 한다)
-      if (onSiteVehicles(vehicles).length !== d.trucks.filter((x) => x.active).length) countMismatch += 1;
+      // (출차해 도로로 달려 나가는 차는 회사 밖이라 세지 않는다: truckCount)
+      if (onSiteVehicles(vehicles).length !== d.truckCount()) countMismatch += 1;
       const a = d.yard.audit(d.trucks);
       expect(a.forkOnTruck + a.forkOnFork + a.forkOnBale + a.baleOnBale + a.forkOnWall, `t=${t.toFixed(1)} 지게차·베일 겹침`).toBe(0);
       for (const truck of d.trucks) {
@@ -150,6 +151,12 @@ describe('부지 차량 흐름 (시연 원본으로 30분)', () => {
     expect(d.truckCount()).toBe(7);
     d.sync({ devices: {}, vehicles: [], batches: [], bales: [] }, T0 + 121_000);
     expect(d.truckCount()).toBe(0);
+    // 출차한 차는 하던 동선을 마치고 도로로 나간 뒤 모두 빠진다 (막혀 남는 차가 없다)
+    for (let i = 0; i < 20 * 600 && d.leavingCount() > 0; i += 1) {
+      d.step(DT);
+      expect(d.truckOverlaps(), `t=${(i * DT).toFixed(1)} 나가는 트럭끼리 겹침`).toBe(0);
+    }
+    expect(d.leavingCount(), d.trucks.filter((x) => x.active).map((x) => `${x.id}:${x.phase}:${x.stage}:${x.waiting}`).join(" ")).toBe(0);
   });
 
   it.each([2, 3])('서버 값이 월드 시계보다 %s배 빨리 흘러도(느린 화면) 겹치거나 멈춰 버리지 않는다', (speed) => {

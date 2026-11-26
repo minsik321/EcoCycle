@@ -43,7 +43,7 @@ function visibleTrucks(scene: Object3D): number {
 }
 
 describe('트럭 모형 렌더 (보이는 모형 수 = 표의 차량 N)', () => {
-  it('12대(처음 칸 8개를 넘음) → 모두 보이고, 5대 출차 → 7, 빈 목록 → 0', async () => {
+  it('12대(처음 칸 8개를 넘음) → 모두 보이고, 5대 출차 → 도로로 나간 뒤 7, 빈 목록 → 0', async () => {
     const d = new Director();
     // 장면을 먼저 올린다(처음 칸 8개) → 그 뒤 12대가 들어온다: 모형 칸이 그만큼 늘어나야 한다
     const renderer = await ReactThreeTestRenderer.create(<Trucks director={d} onSelect={() => {}} />);
@@ -67,10 +67,18 @@ describe('트럭 모형 렌더 (보이는 모형 수 = 표의 차량 N)', () => 
     d.sync({ devices: {}, vehicles: departed, batches: [], bales: [] }, T0 + 120_000);
     await frames();
     expect(onSiteVehicles(departed)).toHaveLength(7);
+    // 출차한 차는 바로 사라지지 않고 도로로 달려 나간 뒤 빠진다 (S2i #7): 나가는 차만큼 더 보이다가 모두 나가면 7
+    expect(visibleTrucks(scene)).toBe(7 + d.leavingCount());
+    const drain = async () => {
+      for (let i = 0; i < 20 * 300 && d.leavingCount() > 0; i += 1) d.step(1 / 20);
+      await frames();
+    };
+    await drain();
+    expect(d.leavingCount()).toBe(0);
     expect(visibleTrucks(scene)).toBe(7);
 
     d.sync({ devices: {}, vehicles: [], batches: [], bales: [] }, T0 + 121_000);
-    await frames();
+    await drain();
     expect(visibleTrucks(scene)).toBe(0);
     await renderer.unmount();
   });

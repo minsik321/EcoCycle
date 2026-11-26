@@ -2,6 +2,8 @@ import { TANK_IDS } from '@ecocycle/shared';
 import type { Bale, Batch, DeviceId, DeviceState, TankId, Vehicle, VehicleStage } from '@ecocycle/shared';
 import {
   BALE,
+  EXIT_LEAVE,
+  EXIT_RAMP_CLEAR_PX,
   HOLD,
   HOLD_REVERSE,
   HOLD_TO_SCALE,
@@ -84,7 +86,8 @@ export type TruckPhase =
   | 'atScale2'
   | 'reverseOut'
   | 'toExit'
-  | 'exitHold';
+  | 'exitHold'
+  | 'leave';
 
 export interface TruckSim extends Mover {
   active: boolean;
@@ -118,6 +121,10 @@ export interface TruckSim extends Mover {
   clearS: number;
   /** 바닥 높이 (도로·경사로) */
   y: number;
+  /** 서버가 출차(departed)를 줬다: 회사 밖이다. 하던 동선을 마치고 경사로·도로로 달려 나간 뒤 빠진다 (표의 "차량 N"에 세지 않는다) */
+  leaving: boolean;
+  /** 나가는 차가 길에서 막혀 서 있은 시간(초): 드물게 서로 막히면(하역 없이 출차한 차 등) 오래 기다리지 않고 뺀다 */
+  stuckT: number;
 }
 
 export type WorkerPose = 'walk' | 'stand' | 'tablet' | 'wave';
@@ -166,12 +173,14 @@ export const BELT_SPEED = 0.7;
 const TILT_RATE = 0.42;
 const UNLOAD_SEC = 6.5;
 /** 계근대에서 무게를 재는 동안 서 있는 최소 시간(초, 연출) */
-const WEIGH_SEC = 1.6;
-/** 번호판 인식 장면: 인식된 번호판을 계근대 위에서 보여 주는 시간(초, 연출) */
-const PLATE_SHOW_SEC = 1.4;
+const WEIGH_SEC = 2.0;
+/** 번호판 인식 장면: 인식된 번호판을 계근대 위에서 보여 주는 시간(초, 연출). 1.4초는 너무 짧아 보이지 않았다 (S2i #4) */
+export const PLATE_SHOW_SEC = 3.2;
 
 /** 처음 만들어 두는 트럭 칸 수. 회사 안 차량이 더 많으면 늘린다(상한 없음: 서버의 회사 안 차량은 모두 그린다) */
 const TRUCK_POOL = 8;
+/** 출차해 나가는 차가 길에서 이만큼(초) 막혀 있으면 뺀다 */
+const LEAVE_STUCK_SEC = 6;
 const LUMP_POOL = 12;
 
 /** 경로 위에서 사진의 한 점(px)에 가장 가까운 곳까지의 거리 */
@@ -195,11 +204,17 @@ const PATH_ROAD_TO_SCALE = roundedPath(ROAD_TO_SCALE, 1.3);
 const PATH_REVERSE_IN = roundedPath(SCALE_REVERSE_IN, 1.0);
 const PATH_REVERSE_OUT = roundedPath(SCALE_REVERSE_OUT, 1.0);
 const PATH_EXIT = roundedPath(SCALE_TO_EXIT, 1.5);
+const PATH_LEAVE = roundedPath(EXIT_LEAVE, 1.4);
+/** PATH_LEAVE에서 경사로를 다 내려가 도로에 선 거리: 여기서 계근대 차례(경사로)를 놓는다 */
+const LEAVE_CLEAR_S = distanceTo(PATH_LEAVE, EXIT_RAMP_CLEAR_PX[0], EXIT_RAMP_CLEAR_PX[1]);
 const PATH_TO_LOAD = roundedPath(SCALE_TO_HOLD, 1.7);
 const PATH_LOAD_BACK = roundedPath(HOLD_REVERSE, 1.0);
 const PATH_LOAD_TO_SCALE = roundedPath(HOLD_TO_SCALE, 1.4);
 const PATH_TO_QUEUE = roundedPath(SCALE_TO_QUEUE, 1.0);
 const LOAD_SCALE_CLEAR = distanceTo(PATH_LOAD_TO_SCALE, SCALE_WEST_PX[0], SCALE_WEST_PX[1]);
+
+/** 상차 자리를 떠나 베일을 실은 채 움직이는 단계 */
+const CARRY_PHASES: ReadonlySet<TruckPhase> = new Set<TruckPhase>(['loadBack', 'toScale2', 'atScale2', 'reverseOut', 'toExit', 'exitHold', 'leave']);
 
 const ms = (iso: string | undefined): number => (iso ? Date.parse(iso) : Number.NaN);
 
@@ -288,7 +303,7 @@ export class Director {
   }
 
   private addTruckSlot(): TruckSim {
-    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, outbound: false, want: 0, wing: 0, weighT: 0, plateT: 0, clearS: 0, y: 0 };
+    const t: TruckSim = { ...mover(0, 0, 0), active: false, id: '', seq: 0, phase: 'road', stage: 'arrived', bay: null, bedTilt: 0, load: 1, pouring: false, pourT: 0, variant: this.trucks.length, company: null, plate: null, outbound: false, want: 0, wing: 0, weighT: 0, plateT: 0, clearS: 0, y: 0, leaving: false, stuckT: 0 };
     this.trucks.push(t);
     return t;
   }
@@ -312,18 +327,26 @@ export class Director {
     this.conveyorRunning = conveyor?.type === 'conveyor' && conveyor.running;
     this.pressing = compressor?.type === 'compressor' && compressor.running && input.batches.some((b: Batch) => b.stage === 'compressing');
 
-    // 출차(departed)한 차는 회사 밖이다: 장면에서 바로 뺀다 (출차 계근 뒤 경사로 위에서 나갈 채비를 하고 기다리던 차).
-    // 서버 목록에서 빠진 차도 같다. 그래서 장면의 트럭 대수는 언제나 서버의 회사 안 차량 수와 같다
+    // 출차(departed)한 차는 회사 밖이다: 그 자리에서 지우지 않고(S2i #6·#7: 순간이동·사라짐) 하던 동선(출차 계근까지)을 마친 뒤
+    // 경사로를 내려가 도로를 따라 사진 밖까지 달려 나가고 빠진다. 서버 목록에서 빠진 차도 같다.
+    // 나가는 차(leaving)는 표의 "차량 N"에 세지 않는다: truckCount() = 서버의 회사 안 차량 수.
+    // 아직 도로에서 들어오지도 않은 차(부지 밖)는 바로 뺀다
     const listed = new Map<string, Vehicle>();
     for (const v of input.vehicles) listed.set(v.id, v);
     for (const t of this.trucks) {
-      if (!t.active) continue;
+      if (!t.active || t.leaving) continue;
       const v = listed.get(t.id);
-      if (!v || v.stage === 'departed') this.finish(t);
+      if (v && v.stage !== 'departed') continue;
+      if (t.phase === 'road' || t.phase === 'roadHold') this.finish(t);
+      else {
+        t.leaving = true;
+        t.stage = 'departed';
+      }
     }
     for (const v of input.vehicles) {
       if (v.stage === 'departed') continue;
       const truck = this.trucks.find((t) => t.active && t.id === v.id);
+      if (truck?.leaving) continue;
       if (truck) {
         truck.stage = v.stage;
         truck.bay = v.sectorId;
@@ -360,6 +383,8 @@ export class Director {
     truck.pouring = false;
     truck.pourT = 0;
     truck.weighT = 0;
+    truck.leaving = false;
+    truck.stuckT = 0;
     if (fresh) {
       // 막 들어온 차: 도로에서부터 들어오는 모습을 보여 준다
       this.fromRoad(truck);
@@ -467,6 +492,12 @@ export class Director {
     this.loader.id = t?.id ?? '';
     this.loader.want = t?.want ?? 0;
     this.loader.loading = t?.stage === 'identified' || t?.stage === 'loading' || t?.stage === 'loaded';
+    // 상차 자리를 떠난 차도 실린 베일이 따라가게 자리만 알린다 (실은 채 계근대·도로로 나간다, S2i: 나가는 길이 길어졌다)
+    const carrier = t ?? this.trucks.find((x) => x.active && x.outbound && CARRY_PHASES.has(x.phase));
+    if (!carrier) return;
+    this.loader.x = carrier.x;
+    this.loader.z = carrier.z;
+    this.loader.heading = carrier.heading;
     if (!t) return;
     this.loader.x = t.x;
     this.loader.z = t.z;
@@ -595,6 +626,7 @@ export class Director {
     this.yardToken.release(t.id);
     if (t.outbound) this.yard.clearLoaded(t.want);
     t.active = false;
+    t.leaving = false;
     t.path = null;
     t.id = '';
   }
@@ -618,7 +650,7 @@ export class Director {
   private canEnter(self: TruckSim): boolean {
     if (this.trucks.some((t) => t !== self && t.active && ((t.phase === 'atTip' && (t.stage === 'weighing_out' || t.stage === 'departed')) || (t.phase === 'loading' && (t.stage === 'weighing_out' || t.stage === 'departed'))))) return false;
     // 경사로 위 출차 대기 자리에 차가 있으면(곧 나간다) 경사로가 막혀 있다
-    if (this.trucks.some((t) => t !== self && t.active && (t.phase === 'toExit' || t.phase === 'exitHold'))) return false;
+    if (this.trucks.some((t) => t !== self && t.active && (t.phase === 'toExit' || t.phase === 'exitHold' || (t.phase === 'leave' && t.s < LEAVE_CLEAR_S)))) return false;
     if (self.outbound) return !this.holdBusy(self);
     return (self.bay !== null && !this.tipBusy(self, self.bay)) || !this.queueBusy(self);
   }
@@ -816,7 +848,21 @@ export class Director {
           }
           break;
         case 'exitHold':
+          // 서버가 출차를 주면 앞으로 경사로를 내려가 도로로 나간다 (방향·자리가 이어진다: 대기 자리에서 보던 동쪽 그대로)
+          if (t.leaving) {
+            t.phase = 'leave';
+            follow(t, PATH_LEAVE);
+          }
           break;
+        case 'leave':
+          // 경사로를 내려가는 동안은 계근대 속도, 도로에 서면 도로 속도. 길 끝(사진 남서쪽 밖)에 닿으면 빠진다
+          if (advance(t, dt, t.s < LEAVE_CLEAR_S ? TRUCK_SPEED * 0.8 : ROAD_SPEED, TRUCK_ACCEL, this.truckBlocked(t))) this.finish(t);
+          break;
+      }
+      // 나가는 차가 길에서 오래 막혔다(서로 막힘): 회사 밖 차라 기다리게 두지 않고 뺀다 (드문 경우의 안전판, LEAVE_STUCK_SEC)
+      if (t.active && t.leaving) {
+        t.stuckT = t.path && t.waiting ? t.stuckT + dt : 0;
+        if (t.stuckT > LEAVE_STUCK_SEC) this.finish(t);
       }
       t.y = t.active ? groundY(t.x, t.z) : 0;
     }
@@ -881,10 +927,15 @@ export class Director {
 
   /**
    * 장면에 그리는 트럭 대수 (시험·점검용: 표의 "차량 N"과 견준다). 트럭 모형은 active인 칸만 보이고(actors/Actors.tsx),
-   * 출차(departed)한 차는 sync에서 바로 빠지므로 이 수가 곧 화면에 보이는 트럭 수다
+   * 출차(departed)해 도로로 나가는 차(leaving)는 세지 않는다: 이 수가 곧 부지 안에 보이는 트럭 수다
    */
   truckCount(): number {
-    return this.trucks.filter((t) => t.active).length;
+    return this.trucks.filter((t) => t.active && !t.leaving).length;
+  }
+
+  /** 출차해 도로로 달려 나가는 중인 트럭 수 (시험·점검용: 회사 밖이라 truckCount에 세지 않는다) */
+  leavingCount(): number {
+    return this.trucks.filter((t) => t.active && t.leaving).length;
   }
 
   // ── 기준점 (핀·카메라·선택) ─────────────────────────────────────────

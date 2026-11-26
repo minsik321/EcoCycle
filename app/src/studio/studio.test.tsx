@@ -22,7 +22,7 @@ import { Pace } from './sim/pace';
 import { STUDIO_PROFILES, deviceClass, studioTier } from './quality';
 import type { RecordLink, StudioData } from './types';
 import { EMPTY_DATA } from './types';
-import { AREAS, DEFAULT_VIEW, EXIT_HOLD, HOLD, SCALE_STOP, SCALE_STOP_EAST, TIER_DISTANCE, TIP, TOP_VIEW, VIEWS, WIDE_VIEW, YARD, closeDistance, tierOf, worldToPx } from './world/layout';
+import { AREAS, DEFAULT_VIEW, EXIT_HOLD, HOLD, SCALE_STOP, SCALE_STOP_EAST, TIER_DISTANCE, TIP, TOP_VIEW, VIEWS, WIDE_VIEW, YARD, closeDistance, tierOf, worldToPx, yardToWorld } from './world/layout';
 import { Route, Routes } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { TopBar } from '../components/layout/TopBar';
@@ -162,10 +162,28 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     expect(truck.z).toBeCloseTo(EXIT_HOLD.z, 1);
     expect(phases.filter((p) => p === 'reverseIn' || p === 'reverseOut')).toEqual(['reverseIn', 'reverseOut']);
 
-    // 출차(departed): 회사 밖이다. 같은 입구(경사로)에 서 있던 차가 바로 장면에서 빠진다 (장면 트럭 대수 = 회사 안 차량 수)
+    // 출차(departed): 회사 밖이다(표의 "차량 N"에 세지 않는다). 그 자리에서 사라지지 않고(S2i #7) 경사로를 내려가
+    // 도로를 따라 사진 남서쪽 밖 도로 끝까지 달려 나간 뒤 빠진다. 한 걸음 사이에 자리·방향이 튀지 않는다(S2i #6)
     d.sync(input({ vehicles: [vehicle('v1', 'departed', 'sector-c', T0 + 120_000)] }), T0 + 120_000);
-    expect(truck.active).toBe(false);
     expect(d.truckCount()).toBe(0);
+    expect(truck.active).toBe(true);
+    let lastPx: readonly [number, number] = worldToPx(truck.x, truck.z);
+    let maxY = -Infinity;
+    let prev = { x: truck.x, z: truck.z, heading: truck.heading };
+    run(d, 40, () => {
+      if (!truck.active) return;
+      note();
+      expect(Math.hypot(truck.x - prev.x, truck.z - prev.z)).toBeLessThan(0.5);
+      expect(Math.abs(Math.atan2(Math.sin(truck.heading - prev.heading), Math.cos(truck.heading - prev.heading)))).toBeLessThan(0.25);
+      prev = { x: truck.x, z: truck.z, heading: truck.heading };
+      lastPx = worldToPx(truck.x, truck.z);
+      maxY = Math.max(maxY, lastPx[1]);
+    });
+    expect(phases).toContain('leave');
+    expect(truck.active).toBe(false);
+    // 사진(616px) 밖 남서쪽 도로 끝에서 빠졌다
+    expect(maxY).toBeGreaterThan(800);
+    expect(lastPx[0]).toBeLessThan(120);
   });
 
   it('처음 본 차량이 이미 하역 중이면 들어오는 장면을 지어내지 않고 그 자리에 놓는다. 출차한 차량은 만들지 않는다', () => {
@@ -189,7 +207,8 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     run(d, 40, () => void (overlaps += d.truckOverlaps()));
 
     expect(d.trucks[1]!.phase).toBe('atTip'); // 막혀서 멈춘 채로 끝나지 않는다
-    expect(d.trucks[0]!.active).toBe(false);
+    run(d, 40, () => void (overlaps += d.truckOverlaps()));
+    expect(d.trucks[0]!.active).toBe(false); // 출차한 차는 도로로 달려 나간 뒤 빠졌다
     expect(overlaps).toBe(0);
   });
 
@@ -260,7 +279,16 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     });
     expect(seen).toContain('atScale2');
     expect(truck.phase).toBe('exitHold');
+    // 실린 베일은 상차 자리를 떠난 차를 따라간다 (적재함 위)
+    for (const b of d.bales.filter((x) => x.active && x.state === 'loaded')) {
+      const w = { x: 0, z: 0 };
+      yardToWorld(b.x, b.z, w);
+      expect(Math.hypot(w.x - truck.x, w.z - truck.z)).toBeLessThan(2);
+    }
     d.sync(input({ vehicles: [out('departed', ids, T0 + 260_000)], bales: shipped(ids, T0 + 80_000) }), T0 + 260_000);
+    // 출차: 도로로 달려 나간 뒤 빠진다
+    expect(d.truckCount()).toBe(0);
+    run(d, 40);
     expect(truck.active).toBe(false);
     // 실린 베일은 차가 나가면 사라진다
     expect(d.bales.some((b) => b.active && b.state === 'loaded')).toBe(false);
