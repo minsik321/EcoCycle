@@ -767,6 +767,7 @@ export class Yard {
   step(dt: number, trucks: readonly Obstacle[], loader: LoaderState | null = null): void {
     this.localize(trucks, loader);
     this.stepStand(dt);
+    this.settlePlate();
     this.tryEject();
     for (const f of this.forklifts) this.stepForklift(f, dt);
     this.stepBales();
@@ -875,6 +876,23 @@ export class Yard {
     bale.fromZ = STAND.fromZ;
     this.standMove = 0;
     this.events.onEject?.();
+  }
+
+  /**
+   * 철판 위 베일이 끝 쪽에 빈 자리를 두고 멈춰 있으면(앞 베일을 지게차가 가져갔다) 그대로 미끄러져 내려가 빈 자리를 채운다 (S2t).
+   * 경사 철판 위 베일은 새 베일이 밀어 주지 않으면 지게차가 집을 수 없어 끝없이 기다렸다. 집으러 오는 베일이 있거나 막 집어 빠지는 중이면 기다린다
+   */
+  private settlePlate(): void {
+    if (this.standMove >= 0) return;
+    const onPlate = this.bales.filter((b) => b.active && b.state === 'stand').sort((p, q) => p.pos - q.pos);
+    if (onPlate.length === 0 || onPlate.every((b, i) => b.pos === i)) return;
+    if (onPlate.some((b) => b.owner !== 0)) return;
+    for (const b of this.bales) if (b.active && b.state === 'carried' && Math.abs(b.x - STAND.x) < BALE.w && b.z < STAND.slots[0]! + BALE.d + 0.05) return;
+    onPlate.forEach((b, i) => {
+      b.fromZ = b.z;
+      b.pos = i;
+    });
+    this.standMove = 0;
   }
 
   private stepStand(dt: number): void {
