@@ -363,7 +363,7 @@ export function Bales({ director, onSelect, lite = false }: ActorProps & { lite?
     return { group, meshes };
   }, [lite]);
   const refs = useRef<Array<InstancedMesh | null>>([]);
-  const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(1, 1, 1), zero: new Vector3(0, 0, 0), up: new Vector3(0, 1, 0) }), []);
+  const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(1, 1, 1), zero: new Vector3(0, 0, 0), up: new Vector3(0, 1, 0), xAxis: new Vector3(1, 0, 0), qTilt: new Quaternion() }), []);
   // 첫 장 전에 모든 인스턴스를 접어 둔다 (기본 행렬은 원점에 크기 1이라 그대로 두면 한 장 동안 원점에 보인다)
   useEffect(() => {
     for (const mesh of refs.current) {
@@ -385,6 +385,8 @@ export function Bales({ director, onSelect, lite = false }: ActorProps & { lite?
           continue;
         }
         tmp.q.setFromAxisAngle(tmp.up, sim.rot);
+        // 경사 철판 위 베일은 마당 x축으로 기운다 (S2t)
+        if (sim.tilt && (sim.state === 'stand' || sim.state === 'ejecting')) tmp.q.premultiply(tmp.qTilt.setFromAxisAngle(tmp.xAxis, sim.tilt));
         mesh.setMatrixAt(i, tmp.m.compose(tmp.p.set(sim.x, sim.y + (sim.state === 'stack' ? 0.03 : 0.02), sim.z), tmp.q, tmp.s));
       }
       mesh.instanceMatrix.needsUpdate = true;

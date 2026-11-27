@@ -1,6 +1,6 @@
 import type { Bale } from '@ecocycle/shared';
 import { YARD_FLOW } from '../../config/yard';
-import { BALE, CLAMP_SCALE, CLAMP_SHIFT, FORKLIFT_SCALE, FORK_REACH, LOAD_BED_Y, LOAD_ORDER, LOAD_SLOTS, LOAD_TRUCK, YARD, YARD_FRAME, staticBaleCells, truckSize, worldToYard, yardToWorld } from '../world/layout';
+import { BALE, CLAMP_SCALE, CLAMP_SHIFT, FORKLIFT_SCALE, FORK_REACH, LOAD_BED_Y, LOAD_ORDER, LOAD_SLOTS, LOAD_TRUCK, YARD, plateAt, YARD_FRAME, staticBaleCells, truckSize, worldToYard, yardToWorld } from '../world/layout';
 import { FRESH_MS, advance, follow, mover } from './mover';
 import type { Mover } from './mover';
 import { angleDelta, headingTo } from './paths';
@@ -51,6 +51,8 @@ export interface BaleSim {
   pos: number;
   /** 받침대에서 밀려 움직이는 중: 시작 z */
   fromZ: number;
+  /** 철판 위(stand·ejecting)에서만 쓰는 앞뒤 기울기(rad): 경사 철판 위면 기울어 내려온다 (S2t) */
+  tilt: number;
 }
 
 type Leg =
@@ -313,6 +315,7 @@ export class Yard {
   private blockedEjectT = 0;
   /** 저울 위 한 쌍을 잰 시간 */
   private weighT = 0;
+  private readonly plateTmp = { y: 0, tilt: 0 };
   private readonly boxA = newBox();
   private readonly boxB = newBox();
   private readonly obstacles: LocalObstacle[] = [];
@@ -323,7 +326,7 @@ export class Yard {
   private readonly tmp = { x: 0, y: 0, z: 0 };
 
   constructor(private readonly token: Token | null = null) {
-    for (let i = 0; i < BALE_POOL; i += 1) this.bales.push({ active: false, id: '', state: 'gone', x: 0, y: 0, z: 0, rot: 0, slot: -1, t: 0, seq: 0, owner: 0, load: -1, pos: -1, fromZ: 0 });
+    for (let i = 0; i < BALE_POOL; i += 1) this.bales.push({ active: false, id: '', state: 'gone', x: 0, y: 0, z: 0, rot: 0, slot: -1, t: 0, seq: 0, owner: 0, load: -1, pos: -1, fromZ: 0, tilt: 0 });
     for (let i = 0; i < YARD_FLOW.forkliftCount; i += 1) {
       const home = YARD.homes[i]!;
       this.forklifts.push({ ...mover(home[0], home[1], FACE_MINUS_Z), id: i + 1, fork: LOW_FORK, clamp: 0, carrying: null, carrying2: null, legs: [], task: null, idleT: 0, home, blockedT: 0, forkGoal: null, waitT: 0, cross: false, wide: 0 });
@@ -780,7 +783,8 @@ export class Yard {
     bale.state = 'ejecting';
     bale.pos = 2;
     bale.x = STAND.x;
-    bale.y = STAND.y;
+    bale.y = STAND.outletY;
+    bale.tilt = 0;
     bale.z = STAND.fromZ;
     bale.fromZ = STAND.fromZ;
     this.standMove = 0;
@@ -796,6 +800,10 @@ export class Yard {
       if (!b.active || (b.state !== 'stand' && b.state !== 'ejecting')) continue;
       const to = STAND.slots[b.pos] ?? b.z;
       b.z = b.fromZ + (to - b.fromZ) * ease;
+      // 배출구 → 경사 철판 → 바닥 철판: 철판 높이를 따라 내려오고 경사 위에서는 기운다
+      plateAt(b.z, this.plateTmp);
+      b.y = this.plateTmp.y;
+      b.tilt = this.plateTmp.tilt;
       if (k >= 1) {
         b.z = to;
         b.fromZ = to;

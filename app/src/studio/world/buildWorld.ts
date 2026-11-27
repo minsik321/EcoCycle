@@ -722,17 +722,23 @@ function houseRoof(): Group {
 function standAndScale(k: Kit): void {
   const { stand, scale } = YARD;
   k.at([YARD_FRAME.x, TOP, YARD_FRAME.z], YARD_FRAME.rotY, () => {
-    // 금속 받침대: 배출구에서 마당 쪽으로 베일 세 개 길이. 다리 + 양옆 레일 + 가로 받침 (롤러 없음)
+    // 바닥 철판(S2t, 레일·받침대 없음): 배출구 통로 바닥에서 짧은 경사 철판이 땅으로 내려오고, 그 앞에 바닥에 깐 평평한 철판
     const z0 = stand.outletZ;
+    const zs = stand.slopeEnd;
     const z1 = stand.outletZ + stand.length;
-    const half = BALE.w / 2 + 0.06;
-    for (const dx of [-1, 1]) {
-      k.box(C.steel, [0.08, 0.1, z1 - z0], [stand.x + dx * half, stand.y - 0.1, mid(z0, z1)], { r: 0.01, mat: 'metal' });
-      for (let z = z0 + 0.15; z < z1; z += 0.75) k.box(C.steel, [0.07, stand.y - 0.1, 0.07], [stand.x + dx * half, 0, z], { r: 0.01, mat: 'metal' });
-    }
-    for (let z = z0 + 0.2; z < z1; z += 0.45) k.box(C.steelLight, [half * 2, 0.05, 0.08], [stand.x, stand.y - 0.05, z], { r: 0.01, mat: 'metal' });
-    // 끝 멈춤 턱 (노랑)
-    k.box(C.yellow, [half * 2 + 0.1, 0.18, 0.06], [stand.x, stand.y - 0.05, z1 + 0.03], { r: 0.02 });
+    const w = BALE.w + 0.5;
+    const th = 0.03;
+    // 평평한 철판 (땅 위 얇은 판, 윗면 stand.y) + 줄무늬 미끄럼막이
+    k.box(C.steel, [w, stand.y, z1 - zs], [stand.x, 0, mid(zs, z1)], { r: 0.005, mat: 'metal' });
+    for (let z = zs + 0.18; z < z1 - 0.1; z += 0.3) k.box(C.steelLight, [w - 0.16, 0.008, 0.05], [stand.x, stand.y, z], { r: 0, mat: 'metal' });
+    // 경사 철판: 배출구 높이(outletY)에서 평평한 철판까지 비스듬한 판 하나 + 밑을 받치는 삼각 옆판
+    const run = zs - z0;
+    const len = Math.hypot(run, stand.outletY - stand.y);
+    k.box(C.steel, [w, th, len + 0.02], [stand.x, mid(stand.outletY, stand.y) - th, mid(z0, zs)], { r: 0.005, rot: [stand.slope, 0, 0], mat: 'metal' });
+    for (const dx of [-1, 1]) k.box(C.dark, [0.04, stand.outletY - 0.02, run * 0.5], [stand.x + dx * (w / 2 - 0.03), 0, z0 + run * 0.25], { r: 0.005, mat: 'metal' });
+    // 가장자리 노랑 띠 (양옆) + 끝 낮은 멈춤 턱
+    for (const dx of [-1, 1]) k.box(C.yellow, [0.06, 0.012, z1 - zs], [stand.x + dx * (w / 2 - 0.03), stand.y, mid(zs, z1)], { r: 0 });
+    k.box(C.yellow, [w, 0.08, 0.06], [stand.x, 0, z1 + 0.03], { r: 0.02 });
     // 베일 저울: 낮은 판 + 노란 테두리 + 표시 기둥(숫자 없음)
     const s = scale.size;
     k.box(C.dark, [s, scale.y, s], [scale.x, 0, scale.z], { r: 0.02, mat: 'metal' });
