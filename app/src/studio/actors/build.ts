@@ -35,7 +35,7 @@ export interface TruckModel {
   beacon: Group;
   /** 적재함이 도는 축의 위치 (트럭 좌표) */
   pivot: [number, number, number];
-  /** 회사 띠의 재질 (트럭마다 하나). 색은 Actors가 회사 이름으로 정한다 */
+  /** 띠의 재질 (트럭마다 하나). 색은 Actors가 정하고 번호판 인식 전후로 같다(TRUCK_STRIPE, S2n) */
   stripe: MeshPhysicalMaterial;
 }
 
@@ -66,8 +66,8 @@ export function buildTruck(variant: number): TruckModel {
   k.box(C.dark, [0.2, 0.2, 1.0], [-1.0, 0.24, 0], { r: 0.05, mat: 'clay' });
   k.cyl(C.steelLight, 0.15, 0.55, [0.12, 0.33, 0.47], { axis: 'x', mat: 'metal' });
   k.box(C.dark, [0.3, 0.22, 0.2], [0.1, 0.24, -0.47], { r: 0.05, mat: 'clay' });
-  // 뒷바퀴 흙받이
-  for (const dz of [-0.5, 0.5]) k.box(C.dark, [1.12, 0.06, 0.26], [-0.8, 0.56, dz], { r: 0.03, mat: 'clay' });
+  // 뒷바퀴 흙받이: 적재함 바닥(0.5~0.58) 두께 안에 둔다. 전에는 0.62까지 올라와 빈 적재함 바닥에 검은 띠로 비쳤다(S2n)
+  for (const dz of [-0.5, 0.5]) k.box(C.dark, [1.12, 0.045, 0.26], [-0.8, 0.525, dz], { r: 0.02, mat: 'clay' });
 
   const stripe = (MAT.gloss as MeshPhysicalMaterial).clone();
   const band = new Kit('gloss');
@@ -455,10 +455,10 @@ export function buildWorker(index: number, withTablet: boolean): WorkerModel {
   return { root, body, legL, legR, armL, armR, head };
 }
 
-/** 움직이는 베일 하나 (지게차가 나른다) */
-export function buildBale(): Group {
+/** 움직이는 베일 하나 (지게차가 나른다). 바탕 재고 벽과 같은 모양(props의 bale), lite는 low 단계 */
+export function buildBale(lite = false): Group {
   const k = new Kit('clay');
-  baleParts(k, 0, 0, 0, 0);
+  baleParts(k, 0, 0, 0, 0, lite);
   return k.build('bale');
 }
 

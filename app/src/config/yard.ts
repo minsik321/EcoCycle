@@ -26,6 +26,19 @@ export const YARD_FLOW = {
 export const YARD_CAPACITY = (YARD_FLOW.seColumns + YARD_FLOW.nwColumns) * YARD_FLOW.levels;
 
 /**
+ * 처음 장면을 열 때의 바탕 재고 칸 수 (북서 nwStartColumns × levels + 남동 seStartColumns × levels = 36 + 32 = 68).
+ * ⚠ B41 가정(S2q 2026-11-27 사용자 결정 A안): 모의 서버는 적치(created) 베일을 이만큼 가진 채 시작하고(mock-server fixtures
+ * OUTBOUND_CALL.seedYardBales, 같은 값임을 app/src/test/vehicleFlow.test.ts가 본다), 3D는 이 재고 칸을 그 서버 베일에 맡긴다(sim/yard.ts).
+ */
+export const YARD_SEED_BALES = (YARD_FLOW.nwStartColumns + YARD_FLOW.seStartColumns) * YARD_FLOW.levels;
+
+/**
+ * 상차 차량을 부르는 기준: 적치 베일이 위쪽(북서) 줄 칸 수(nwColumns × levels = 36)를 넘으면, 곧 북서 줄이 가득 차면 한 대(20개).
+ * ⚠ B41 가정(S2q 2026-11-27 사용자 결정 A안). 부르는 것은 서버(모의 서버 OUTBOUND_CALL.callAboveYardBales, 같은 값)이고 3D는 이 값을 쓰지 않는다.
+ */
+export const YARD_CALL_ABOVE_BALES = YARD_FLOW.nwColumns * YARD_FLOW.levels;
+
+/**
  * 3D 홈의 실제 크기 가정(m). 장면은 이 값을 월드 단위로 바꿔 그린다(studio/world/layout.ts의 `M`, 1단위 = 2 m).
  * 서버 값이 아니라 현장 설명에서 온 가정이다(2026-11-26 S2k 사용자 요청): 부지 면적, 베일 크기, 일반적인 차량 크기.
  */

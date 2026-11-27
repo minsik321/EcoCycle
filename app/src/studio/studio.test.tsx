@@ -155,12 +155,12 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     expect(weighed!.z).toBeCloseTo(SCALE_STOP_EAST.z, 1);
     expect(Math.cos(weighed!.heading - SCALE_STOP_EAST.heading)).toBeGreaterThan(0.99);
     expect(scanOut).toBe(true);
-    // 잰 뒤 후진으로 서쪽에 내려와 경사로 위 출차 대기 자리에서 도로 쪽(동쪽)을 보고 출차를 기다린다 (아직 회사 안)
-    expect(truck.phase).toBe('exitHold');
+    // 잰 뒤에도 출차(departed)가 올 때까지 계근대 위에서 기다린다 (아직 회사 안, 출차 계근 중). 출입문 앞 대기 자리에 서지 않는다 (S2p)
+    expect(truck.phase).toBe('atScale2');
     expect(truck.active).toBe(true);
-    expect(truck.x).toBeCloseTo(EXIT_HOLD.x, 1);
-    expect(truck.z).toBeCloseTo(EXIT_HOLD.z, 1);
-    expect(phases.filter((p) => p === 'reverseIn' || p === 'reverseOut')).toEqual(['reverseIn', 'reverseOut']);
+    expect(truck.x).toBeCloseTo(SCALE_STOP_EAST.x, 1);
+    expect(truck.z).toBeCloseTo(SCALE_STOP_EAST.z, 1);
+    expect(phases.filter((p) => p === 'reverseIn' || p === 'reverseOut')).toEqual(['reverseIn']);
 
     // 출차(departed): 회사 밖이다(표의 "차량 N"에 세지 않는다). 그 자리에서 사라지지 않고(S2i #7) 경사로를 내려가
     // 도로를 따라 사진 남서쪽 밖 도로 끝까지 달려 나간 뒤 빠진다. 한 걸음 사이에 자리·방향이 튀지 않는다(S2i #6)
@@ -170,16 +170,22 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     let lastPx: readonly [number, number] = worldToPx(truck.x, truck.z);
     let maxY = -Infinity;
     let prev = { x: truck.x, z: truck.z, heading: truck.heading };
-    run(d, 40, () => {
+    let nearHold = Infinity;
+    run(d, 60, () => {
       if (!truck.active) return;
       note();
+      nearHold = Math.min(nearHold, Math.hypot(truck.x - EXIT_HOLD.x, truck.z - EXIT_HOLD.z));
       expect(Math.hypot(truck.x - prev.x, truck.z - prev.z)).toBeLessThan(0.5);
       expect(Math.abs(Math.atan2(Math.sin(truck.heading - prev.heading), Math.cos(truck.heading - prev.heading)))).toBeLessThan(0.25);
       prev = { x: truck.x, z: truck.z, heading: truck.heading };
       lastPx = worldToPx(truck.x, truck.z);
       maxY = Math.max(maxY, lastPx[1]);
     });
+    // 출차를 받으면 후진으로 서쪽에 내려와 경사로 위 출차 대기 자리를 서지 않고 지나 도로로 나간다 (S2p)
+    expect(phases.filter((p) => p === 'reverseIn' || p === 'reverseOut')).toEqual(['reverseIn', 'reverseOut']);
     expect(phases).toContain('leave');
+    expect(phases).not.toContain('exitHold');
+    expect(nearHold).toBeLessThan(0.3);
     expect(truck.active).toBe(false);
     // 사진(616px) 밖 남서쪽 도로 끝에서 빠졌다
     expect(maxY).toBeGreaterThan(800);
@@ -274,11 +280,14 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
     expect(d.yard.audit().nwStacked).toBe(nw0 - 3);
     d.sync(input({ vehicles: [out('weighing_out', ids, T0 + 200_000)], bales: shipped(ids, T0 + 80_000) }), T0 + 200_000);
     const seen: string[] = [];
-    run(d, 60, () => {
+    const track = () => {
       if (seen[seen.length - 1] !== truck.phase) seen.push(truck.phase);
-    });
+    };
+    for (let k = 0; k < 60 && truck.phase !== 'atScale2'; k += 1) run(d, 1, track);
+    run(d, 10, track);
+    // 잰 뒤 출차(departed)를 계근대 위에서 기다린다 (S2p: 출입문 앞에 서지 않는다)
     expect(seen).toContain('atScale2');
-    expect(truck.phase).toBe('exitHold');
+    expect(truck.phase).toBe('atScale2');
     // 실린 베일은 상차 자리를 떠난 차를 따라간다 (적재함 위)
     for (const b of d.bales.filter((x) => x.active && x.state === 'loaded')) {
       const w = { x: 0, z: 0 };
@@ -583,15 +592,15 @@ describe('참고 화면에 맞춘 화면 구성', () => {
     expect(within(pin).getByText(/12가 3456/)).toBeInTheDocument();
   });
 
-  it('장면 핀·패널에 "예시" 표시가 없다(앱의 "예시 데이터" 표시는 상단 바가 맡는다). 번호판 인식 핀은 입력 칸 없이 서버 번호판만 적는다', () => {
+  it('장면 핀·패널에 "예시" 표시가 없다(앱의 "예시 데이터" 표시는 상단 바가 맡는다). 번호판 인식 안내 핀(입차 계근 · 인식 중…)은 없다(S2o)', () => {
     render(view({ data: input({ vehicles: [vehicle('v1', 'identified', 'sector-a')] }) }));
     const pins = document.querySelector('.st-pins')!;
     // (회사 이름 "예시자원"은 시험용 서버 값이다) 서버 값이 없는 "예시" 핀(상차 예시, 고정 재고 예시)은 없다
     expect(pins.querySelector('.st-pin-example, [aria-label$="예시"]')).toBeNull();
     expect(pins.textContent).not.toMatch(/고정 재고|상차 차량\s*예시/);
-    const scan = screen.getByLabelText('번호판 인식');
-    expect(scan.querySelector('input')).toBeNull();
-    expect(scan.textContent).toMatch(/인식 중/);
+    expect(screen.queryByLabelText('번호판 인식')).toBeNull();
+    expect(pins.textContent).not.toMatch(/인식 중|입차 계근|출차 계근/);
+    expect(pins.querySelector('input')).toBeNull();
   });
 
   it('상세 패널은 4~5줄만 바로 보이고 나머지는 "자세히" 안에 있다', async () => {

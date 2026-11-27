@@ -19,13 +19,13 @@ mock-server/
     │                     records(모든 `.../records`가 쓰는 페이지 나누기 `sendRecordPage`: 쿼리 검사 422, 구간 거르기, 최신 먼저, { items, total, page, pageSize })
     ├── sim/              state(현재 값), plant(섹터 2곳(노천 더미, 예시 용량 16 m³)·컨베이어(벨트 위 덩어리 `itemsToBaler`)·압축기(사이클 단계 `cycleStage`)·알람), robot(사이클·관절 15Hz, 집는 각도 `TANK_BASE_DEG`·`CONVEYOR_BASE_DEG`를 내보내 앱 테스트가 `config/robotCycle`과 비교), commands(접수→결과),
     │                     picks(집기 기록, 한 번에 집는 부피 `pickVolumeM3`: 0.06~0.14 m³, 적재율·등급·잡음),
-    │                     process(차량·배치·베일: 회사·배정 섹터·배합비·목표 압력을 예시로 정함, 로봇이 집을 섹터도 여기서),
+    │                     process(차량·배치·베일: 회사·배정 섹터·배합비·목표 압력을 예시로 정함, 로봇이 집을 섹터도 여기서. 베일 목록은 적치 베일 모두 + 출하 최근 20건),
     │                     unloads(섹터 하역 기록: 출차 때 한 줄, 시작할 때 지난 30일치, 계중대 무게 weighTruck),
     │                     records(공정 기록: 끝난 차량·배치 보관, 시작할 때 지난 30일치 배치에 건너뜀 약 7%·일시정지됨 약 5%를 섞음. 진행 중인 것은 process가 `live...Records()`로 내줌),
     │                     alarmOps, publish(변할 때·5초마다), history(가짜 이력), bus(sim → stream)
     ├── scenarios/        index(시나리오 9종), gate(침묵·지연 스위치)
     └── fixtures/         accounts(역할별 계정·권한 표), robotModel(범용 6축, base −270~270°), cameras, settings(설정 키·범위),
-                      process(가상의 회사·차량(번호판·등록 공차·싣는 양)·배정 섹터, 배합비·압력 범위, 단계별 시간, 하역 기록 채우기 규칙, 상차 호출 `OUTBOUND_CALL`: 적치 40개 이상이면 한 대, 한 대 20개, 베일당 약 30초)
+                      process(가상의 회사·차량(번호판·등록 공차·싣는 양)·배정 섹터, 배합비·압력 범위, 단계별 시간, 하역 기록 채우기 규칙, 상차 호출 `OUTBOUND_CALL`: 적치 68개(3D 바탕 재고 칸 수)를 가진 채 시작, 적치가 36개(3D 북서 줄 칸 수)를 넘으면 한 대, 한 대 20개, 베일당 약 30초)
 ```
 
 로봇팔 7단위(명세 6절): 수동은 `pick_from`(집어 들고 멈춤) → `place_on_conveyor` 두 명령이고 순서가 틀리면 409(`sim/commands.ts`의 `conflictReason`, 실행 때 다시 검사). 섹터 지정 중인 배치는 `sim/process.ts`가 놓은 부피로 실제 배합·평균 수분·목표 압력을 다시 계산하고(`setRobotPin`·`notePlaced`) 지정 사건을 남긴다.

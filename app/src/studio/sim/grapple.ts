@@ -1,10 +1,11 @@
 import { REAL_SIZE_M } from '../../config/yard';
 
-// 입고 집게차(S2m): 5톤 카고 + 운전석 뒤 너클 크레인 + 갈퀴 6개 오렌지필 집게. three 미사용, 테스트 가능.
+// 입고 집게차(S2m, S2n 후미 크레인): 5톤 카고 + 높은 적재함 + 차 맨 뒤(후미) 너클 크레인 + 갈퀴 6개 오렌지필 집게. three 미사용, 테스트 가능.
 //  - 차량 종류는 서버 값이 아니다(하역 기록에 차량 종류가 없다). 연출로 차량 ID에서 정하고, 같은 차는 늘 같은 종류다(`inboundBody`).
 //  - 하역 동작은 서버 하역 단계(unloading) 안에서만 한다: 받침다리 내림 → (움켜 → 들어 → 돌려 → 벌려 떨어뜨림) × GRABS → 크레인 접기 → 받침다리 올림.
 //    전부 합쳐 GRAPPLE_TOTAL_SEC초로 모의 서버의 하역 9초 안에 끝난다. 서버 단계가 먼저 넘어가면 하던 동작을 그만두고 바로 접는다(늦게 떠나지 않는다).
-//  - 좌표는 트럭 좌표(월드 단위, +X가 앞, 원점은 바닥 중심). 크레인 기둥은 운전석 바로 뒤(`CRANE.x`).
+//  - 좌표는 트럭 좌표(월드 단위, +X가 앞, 원점은 바닥 중심). 크레인 기둥은 적재함 뒤끝 너머 차대 위(`CRANE.x`, S2n: 전에는 운전석 바로 뒤).
+//    트럭은 섹터 앞에 후진으로 서므로(뒤가 섹터 쪽) 크레인이 섹터에 가깝다. 접으면 붐이 적재함 위로 앞을 보고 눕는다.
 
 const M = (m: number) => m / 2;
 
@@ -16,19 +17,19 @@ export const GRAPPLE_TRUCK = {
   cabHeight: M(REAL_SIZE_M.truck.height),
   /** 운전석 길이 */
   cabLength: M(1.9),
-  /** 적재함 바닥 윗면 높이, 옆판 높이 */
+  /** 적재함 바닥 윗면 높이, 옆판 높이 (S2n: 고물상 집게차처럼 망·판으로 높인 적재함, 1.7 m) */
   deckY: M(1.12),
-  sideH: M(0.5),
-  /** 적재함 앞 끝(크레인 뒤)·뒤 끝 (트럭 가운데에서) */
-  bedFront: M(1.2),
-  bedRear: -M(3.68),
+  sideH: M(1.7),
+  /** 적재함 앞 끝(운전석 뒤)·뒤 끝(크레인 앞) (트럭 가운데에서) */
+  bedFront: M(1.75),
+  bedRear: -M(2.6),
 } as const;
 
 /** 크레인: 기둥(돌아가는 받침)·붐 1·붐 2(+ 늘어나는 끝)·집게 */
 export const CRANE = {
-  /** 기둥 자리(트럭 x)와 붐 1 축 높이 */
-  x: M(1.56),
-  pivotY: M(1.9),
+  /** 기둥 자리(트럭 x, 적재함 뒤끝과 차 뒤끝 사이)와 붐 1 축 높이(높은 옆판 위) */
+  x: -M(3.1),
+  pivotY: M(2.9),
   boom1: M(2.25),
   boom2: M(2.0),
   /** 붐 2 끝이 늘어나는 최대 길이 */
@@ -93,15 +94,15 @@ export interface GrappleSim {
   drop: { x: number; y: number; z: number };
 }
 
-/** 접은 자리: 붐을 적재함 앞쪽 위에 눕히고 집게는 실린 파지 위에 얹는다 (운전석 지붕을 넘지 않게) */
-const REST: Cyl = { slew: Math.PI, r: M(4.1), y: M(2.66) };
-/** 움켜 들어 올리는 높이, 떨어뜨리는 자리(트럭 뒤 끝 너머, 섹터 더미 쪽)의 높이 */
-const LIFT_Y = M(3.8);
+/** 접은 자리: 붐을 앞(운전석 쪽)으로 적재함 위에 눕히고 집게는 실린 파지 위에 얹는다 (높이 4 m 안) */
+const REST: Cyl = { slew: 0, r: M(4.2), y: M(3.2) };
+/** 움켜 들어 올리는 높이(갈퀴 끝이 높은 옆판을 넘는다), 떨어뜨리는 자리(트럭 뒤 끝 너머, 섹터 더미 쪽)의 높이 */
+const LIFT_Y = M(4.2);
 const DROP_Y = M(4.0);
-const GRAB_X = [-0.25, -0.95, -1.4, -0.6] as const;
+const GRAB_X = [0.45, -0.3, 0.1, -0.7] as const;
 const GRAB_Z = [0.14, -0.16, 0.08, -0.1] as const;
 const DROP_Z = [0.7, -0.55, 0.25, -0.75] as const;
-const DROP_BACK = 0.8;
+const DROP_BACK = 0.77;
 
 /** 차량 ID → 입고 차량 모양. 집게차 2 : 덤프 1 (ID 해시, 무작위 아님: 같은 차는 늘 같은 모양) */
 export function inboundBody(id: string): 'grapple' | 'dump' {
@@ -117,9 +118,11 @@ const toCyl = (x: number, z: number, y: number): Cyl => ({ slew: Math.atan2(-z, 
 const smooth = (u: number) => u * u * (3 - 2 * u);
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
+/** 실린 파지 더미의 가득 찬 높이(적재함 바닥 위, 옆판 1.7 m보다 조금 낮게) */
+export const HEAP_H = M(1.15);
 /** 적재함 파지 더미 윗면 높이 (load 0~1) */
 export function heapTop(load: number): number {
-  return GRAPPLE_TRUCK.deckY + 0.05 + load * M(0.95);
+  return GRAPPLE_TRUCK.deckY + 0.05 + load * HEAP_H;
 }
 
 /** 크레인 끝 자리 → 붐 각도 (두 마디 역기구학, 꺾인 곳이 위). 닿지 않으면 끝까지 편다 */
@@ -181,7 +184,7 @@ function grabCyl(k: number, y: number): Cyl {
   return toCyl(GRAB_X[k % GRAB_X.length]!, GRAB_Z[k % GRAB_Z.length]!, y);
 }
 function dropCyl(k: number): Cyl {
-  return toCyl(GRAPPLE_TRUCK.bedRear - DROP_BACK, DROP_Z[k % DROP_Z.length]!, DROP_Y);
+  return toCyl(-GRAPPLE_TRUCK.length / 2 - DROP_BACK, DROP_Z[k % DROP_Z.length]!, DROP_Y);
 }
 
 function startSeg(g: GrappleSim, seg: number): void {

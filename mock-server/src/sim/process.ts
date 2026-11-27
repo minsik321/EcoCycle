@@ -245,6 +245,27 @@ function remember<T extends { id: string }>(list: T[], item: T): void {
   while (list.length > RECENT_LIMIT) list.shift();
 }
 
+/**
+ * 베일 목록(GET /process/state의 bales): 진행 중인 적치(created) 베일은 모두, 그 밖(출하)은 최근 RECENT_LIMIT건 (명세 "진행 중 + 종류별 최근 20건").
+ * 3D 마당은 목록에서 빠진 베일을 출하된 것으로 보므로 적치 베일을 잘라 내지 않는다(S2q).
+ */
+function rememberBale(bale: Bale): void {
+  const index = bales.findIndex((x) => x.id === bale.id);
+  if (index >= 0) bales[index] = bale;
+  else bales.push(bale);
+  trimBales();
+}
+
+function trimBales(): void {
+  let finished = bales.filter((b) => b.stage !== 'created').length;
+  for (let i = 0; i < bales.length && finished > RECENT_LIMIT; ) {
+    if (bales[i]!.stage !== 'created') {
+      bales.splice(i, 1);
+      finished -= 1;
+    } else i += 1;
+  }
+}
+
 function sendVehicle(vehicle: Vehicle): void {
   remember(vehicles, vehicle);
   publish({ type: 'process.vehicle', vehicle: structuredClone(vehicle) });
@@ -258,7 +279,7 @@ function sendBatch(batch: Batch): void {
 function sendBale(bale: Bale): void {
   const detail = baleDetails.get(bale.id);
   if (detail) baleDetails.set(bale.id, { ...detail, ...structuredClone(bale) });
-  remember(bales, bale);
+  rememberBale(bale);
   publish({ type: 'process.bale', bale: structuredClone(bale) });
 }
 
@@ -374,11 +395,11 @@ function spawnOutbound(now: number): void {
   notifyVehicleEvent('vehicle.arrived', run.vehicle);
 }
 
-/** 계근대가 비어 있으면 차량 한 대를 들인다. 적치 베일이 기준(OUTBOUND_CALL) 이상이면 상차 차량을 먼저(한 번에 한 대) */
+/** 계근대가 비어 있으면 차량 한 대를 들인다. 적치 베일이 기준(OUTBOUND_CALL.callAboveYardBales, 3D 북서 줄 칸 수)을 넘으면 상차 차량을 먼저(한 번에 한 대) */
 function spawnVehicle(now: number): void {
   if (now - lastSpawnAt < VEHICLE_TIMING_SEC.spawnGap * 1000) return;
   if (scaleBusy()) return;
-  if (!activeRuns.some((r) => r.outbound) && yardBales().length >= OUTBOUND_CALL.callAtYardBales) spawnOutbound(now);
+  if (!activeRuns.some((r) => r.outbound) && yardBales().length > OUTBOUND_CALL.callAboveYardBales) spawnOutbound(now);
   else spawnInbound(now);
 }
 
@@ -788,7 +809,8 @@ function seedRecent(): void {
 
 /**
  * 지난 베일을 상차 차량에 나눠 싣는다: 생산 순서대로 1~3개씩 한 대(OUTBOUND_HISTORY), 마지막 베일이 나온 뒤 5~40분에 들어와
- * 입고 차량과 같은 단계(계근 → 상차 → 출차 계근 → 출차)를 거친다. 지금에 가까워 출차하지 못했을 베일은 적치(created)로 남긴다.
+ * 입고 차량과 같은 단계(계근 → 상차 → 출차 계근 → 출차)를 거친다. 가장 새 베일 OUTBOUND_CALL.seedYardBales개(3D 바탕 재고 칸 수)는
+ * 적치(created)로 남긴다(S2q). 그 앞의 남는 베일이 한 대 분량보다 적으면 마지막 차는 있는 만큼 싣는다. 지금에 가까워 출차하지 못했을 베일도 적치로 남는다.
  * 실은 베일은 shipped + 그 차량의 vehicleId, 차량 기록의 baleIds와 같다.
  */
 function seedOutbound(): void {
@@ -799,10 +821,10 @@ function seedOutbound(): void {
   const seqByDay = new Map<string, number>();
   let freeAt = 0;
   let index = 0;
-  while (index < list.length) {
-    const count = minBales + Math.floor(Math.random() * (maxBales - minBales + 1));
+  const shippable = Math.max(0, list.length - OUTBOUND_CALL.seedYardBales);
+  while (index < shippable) {
+    const count = Math.min(minBales + Math.floor(Math.random() * (maxBales - minBales + 1)), shippable - index);
     const group = list.slice(index, index + count);
-    if (group.length < count) break;
     const lastCreated = Date.parse(group[group.length - 1]?.stageTimes.created ?? '');
     const arrivedAt = Math.max(lastCreated + (minAfter + Math.random() * (maxAfter - minAfter)) * 60_000, freeAt + 60_000);
     const identifiedAt = arrivedAt + VEHICLE_TIMING_SEC.identify * 1000;
@@ -850,6 +872,11 @@ function seedOutbound(): void {
   }
   vehicles.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
   while (vehicles.length > RECENT_LIMIT) vehicles.shift();
+  // 베일 목록: 적치 베일 모두 + 최근 출하 베일 (오래된 것부터)
+  const kept = [...baleDetails.values()];
+  const shipped = kept.filter((d) => d.stage !== 'created').sort((a, b) => (a.stageTimes.shipped ?? '').localeCompare(b.stageTimes.shipped ?? '')).slice(-RECENT_LIMIT);
+  const live = [...kept.filter((d) => d.stage === 'created'), ...shipped].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+  bales.splice(0, bales.length, ...live.map((d): Bale => ({ id: d.id, batchId: d.batchId, stage: d.stage, vehicleId: d.vehicleId, stageTimes: structuredClone(d.stageTimes), updatedAt: d.updatedAt })));
 }
 
 seedRecent();

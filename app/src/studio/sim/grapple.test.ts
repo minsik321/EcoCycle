@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Vehicle } from '@ecocycle/shared';
 import { VEHICLE_TIMING_SEC } from '../../../../mock-server/src/fixtures/process';
-import { CRANE, GRABS, GRAPPLE_TOTAL_SEC, GRAPPLE_TRUCK, grappleSim, grappleStowed, inboundBody, planGrabs, solveCrane, stepGrapple } from './grapple';
+import { CRANE, GRABS, GRAPPLE_TOTAL_SEC, GRAPPLE_TRUCK, grappleSim, grappleStowed, heapTop, inboundBody, planGrabs, solveCrane, stepGrapple } from './grapple';
 
 // S2m 입고 집게차: 차량 종류는 ID로 고정(2:1), 하역 동작은 서버 하역 단계 안에서 끝나고, 단계가 먼저 넘어가면 바로 접는다
 
@@ -83,10 +83,39 @@ describe('집게차 하역', () => {
     expect(grappleStowed(g)).toBe(true);
     expect(g.legs).toBe(0);
   });
-  it('접은 크레인은 운전석 지붕을 크게 넘지 않는다 (0.3 m 안)', () => {
+  it('접은 크레인의 꺾인 곳은 차 높이 4 m(도로 높이 제한) 안이다', () => {
     const g = grappleSim();
     const knuckle = CRANE.pivotY + Math.sin(g.pose.a1) * CRANE.boom1;
-    expect(knuckle).toBeLessThan(GRAPPLE_TRUCK.cabHeight + 0.15);
+    expect(knuckle).toBeLessThan(4 / 2);
+  });
+  it('크레인 기둥은 차 맨 뒤(적재함 뒤끝과 차 뒤끝 사이)에 있고, 접으면 붐이 적재함 위로 앞을 본다 (S2n)', () => {
+    const T = GRAPPLE_TRUCK;
+    expect(CRANE.x).toBeLessThan(T.bedRear);
+    expect(CRANE.x).toBeGreaterThan(-T.length / 2);
+    const g = grappleSim();
+    // 접은 붐 끝: 적재함 위, 운전석 뒤
+    const tipX = CRANE.x + Math.cos(g.tip.slew) * g.tip.r;
+    expect(tipX).toBeGreaterThan(T.bedRear);
+    expect(tipX).toBeLessThan(T.bedFront);
+    // 붐 1 축은 높인 옆판 위, 접은 집게 끝은 가득 실린 파지 위
+    expect(CRANE.pivotY).toBeGreaterThan(T.deckY + T.sideH);
+    expect(g.tip.y - CRANE.hang).toBeGreaterThan(heapTop(1));
+  });
+  it('높인 적재함: 옆판 1.5~2 m, 가득 실린 파지는 옆판 안에 든다', () => {
+    const T = GRAPPLE_TRUCK;
+    expect(T.sideH * 2).toBeGreaterThanOrEqual(1.5);
+    expect(T.sideH * 2).toBeLessThanOrEqual(2);
+    expect(heapTop(1)).toBeLessThan(T.deckY + T.sideH);
+  });
+  it('집는 동안 들어 올린 집게(갈퀴 끝)는 높인 옆판 위로 지나간다', () => {
+    const g = grappleSim();
+    let minLift = Infinity;
+    for (let t = 0; t < 12; t += DT) {
+      stepGrapple(g, DT, 'unloading');
+      // 섹터로 돌리기(4)와 다음 집기로 돌아오기(0, 첫 번째 말고): 뒤판을 넘어 오간다
+      if (g.mode === 'work' && (g.seg === 4 || (g.seg === 0 && g.grabs > 0))) minLift = Math.min(minLift, g.tip.y - CRANE.hang);
+    }
+    expect(minLift).toBeGreaterThan(GRAPPLE_TRUCK.deckY + GRAPPLE_TRUCK.sideH);
   });
   it('크레인 끝이 목표 자리에 닿는다 (역기구학)', () => {
     const pose = { slew: 0, a1: 0, a2: 0, ext: 0 };

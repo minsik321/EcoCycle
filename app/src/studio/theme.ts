@@ -96,18 +96,7 @@ export const C = {
 } as const;
 
 
-/**
- * 트럭 회사별 띠 색 (차분한 색). 회사 이름은 서버 값이고, 여기서는 이름 → 색을 고르기만 한다.
- * 번호판 인식 전(회사 null)에는 회색 띠.
- */
-export const COMPANY_STRIPES = ['#2563eb', '#159a86', '#e0773a', '#7c5cd6', '#d9475d', '#3f9d4b'] as const;
-export const UNKNOWN_STRIPE = '#aab3bf';
-
-export function companyStripe(name: string | null): string {
-  if (!name) return UNKNOWN_STRIPE;
-  let h = 0;
-  for (let i = 0; i < name.length; i += 1) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return COMPANY_STRIPES[h % COMPANY_STRIPES.length]!;
-}
+/** 트럭 띠 색: 번호판 인식 전후로 같은 회색 (S2n, 회사는 핀·패널 글자로 알린다) */
+export const TRUCK_STRIPE = '#aab3bf';
 
 export type ColorName = keyof typeof C;
