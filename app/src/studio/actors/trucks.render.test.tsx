@@ -1,6 +1,7 @@
 import ReactThreeTestRenderer from '@react-three/test-renderer';
 import type { InstancedMesh, Object3D } from 'three';
-import { Matrix4 } from 'three';
+import { Matrix4, MeshPhysicalMaterial } from 'three';
+import type { Mesh } from 'three';
 import { describe, expect, it } from 'vitest';
 import type { Vehicle } from '@ecocycle/shared';
 import { onSiteVehicles } from '../../config/processDisplay';
@@ -8,6 +9,8 @@ import { Director } from '../sim/director';
 import { Trucks } from './Actors';
 import { inboundBody } from '../sim/grapple';
 import { TINE_COUNT } from './grappleTruck';
+import { MAT } from '../three/kit';
+import { TRUCK_STRIPE } from '../theme';
 
 // 렌더와 연결된 차량 수 회귀 시험: 연출 감독의 값이 아니라, 프레임·React 갱신을 돌린 뒤
 // 장면 그래프에서 실제로 보이는(visible) 트럭 모형 루트를 센다 (모형 칸이 모자라 빠지는 차를 잡는다).
@@ -127,5 +130,35 @@ describe('트럭 모형 렌더 (보이는 모형 수 = 표의 차량 N)', () => 
     const low = await shown(true);
     expect(low.kinds).toEqual(high.kinds);
     expect(low.tines).toBeNull();
-  });
+    // 모형을 두 번(high·low) 모두 만든다: 높인 집게차 적재함(S2n)으로 조각이 늘어 전체 시험 중에는 5초를 넘기기도 한다
+  }, 20_000);
+
+  it('번호판 인식 뒤에도 차 띠 색이 그대로다 (S2n: 전에는 회사 이름으로 띠가 빨강 등으로 바뀌었다)', async () => {
+    const before = vehicles(1).map((v) => ({ ...v, companyName: null, plate: null }));
+    const after = before.map((v) => ({ ...v, stage: 'identified' as const, plate: '12가 3456', companyName: '예시자원' }));
+    const d = new Director();
+    const renderer = await ReactThreeTestRenderer.create(<Trucks director={d} onSelect={() => {}} />);
+    const stripes = async (list: Vehicle[], at: number) => {
+      d.sync({ devices: {}, vehicles: list, batches: [], bales: [] }, at);
+      for (let i = 0; i < 3; i += 1) {
+        d.step(1 / 20);
+        await renderer.advanceFrames(2, 1 / 30);
+        await renderer.update(<Trucks director={d} onSelect={() => {}} />);
+      }
+      // 띠는 공용 재질(MAT)이 아닌 트럭 전용 광택 재질이다
+      const shared = new Set<unknown>(Object.values(MAT));
+      const colors = new Set<string>();
+      (renderer.scene.instance as Object3D).traverse((o) => {
+        const mat = (o as Mesh).material;
+        if (mat instanceof MeshPhysicalMaterial && !shared.has(mat)) colors.add(`#${mat.color.getHexString()}`);
+      });
+      return colors;
+    };
+    const a = await stripes(before, T0);
+    const b = await stripes(after, T0 + 5_000);
+    expect(a.size).toBeGreaterThan(0);
+    expect([...b]).toEqual([...a]);
+    expect([...a]).toEqual([TRUCK_STRIPE]);
+    await renderer.unmount();
+  }, 20_000);
 });

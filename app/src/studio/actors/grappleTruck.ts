@@ -2,11 +2,11 @@ import { Group, MeshPhysicalMaterial } from 'three';
 import type { BufferGeometry, Mesh } from 'three';
 import { C } from '../theme';
 import { Kit, MAT } from '../three/kit';
-import { CRANE, GRAPPLE_TRUCK } from '../sim/grapple';
+import { CRANE, GRAPPLE_TRUCK, HEAP_H } from '../sim/grapple';
 import type { TruckModel } from './build';
 import { stripeGroup, wheel } from './build';
 
-// 입고 집게차 모형(S2m): 5톤 카고(파랑 운전석) + 운전석 바로 뒤 너클 크레인(노랑) + 오렌지필 집게.
+// 입고 집게차 모형(S2m, S2n): 5톤 카고(파랑 운전석) + 망·판으로 높인 적재함(1.7 m) + 차 맨 뒤 너클 크레인(노랑) + 오렌지필 집게.
 // 월드 단위로 바로 만든다(배율 1). +X가 앞, 원점은 바닥 중심. 움직이는 마디마다 그룹:
 //   column(돌림 y) → boom1(올림 z) → boom2(꺾임 z) → ext(늘어남 x) → head(늘 아래로 매달림) → 갈퀴
 // 갈퀴 6개는 standard·high에서만 그리고(Actors의 InstancedMesh 하나가 모든 집게차의 갈퀴를 그린다: `tineGeometry`),
@@ -31,6 +31,8 @@ export interface GrappleModel extends TruckModel {
 }
 
 const T = GRAPPLE_TRUCK;
+/** 높인 적재함의 철망 색 */
+const NET = '#59626d';
 const HALF_W = T.width / 2;
 const WR = 0.23;
 /** 받침다리 빔이 나오는 길이, 발이 내려가는 길이 */
@@ -74,27 +76,37 @@ export function buildGrappleTruck(variant: number, lite: boolean): GrappleModel 
   k.box(C.white, [0.02, 0.09, 0.3], [front + 0.06, 0.27, 0], { r: 0.01, mat: 'clay' });
   k.box(C.blueDeep, [T.cabLength * 0.5, 0.1, T.width - 0.3], [cabX0 + T.cabLength * 0.45, 0.42 + cabH - 0.02, 0], { r: 0.04, seg: 3 });
 
-  // 적재함: 낮은 옆판 카고 (들리지 않는다)
+  // 적재함: 망·판으로 높인 옆판(고물상 집게차, S2n). 들리지 않는다. 아래는 철판, 위는 철망(비치는 재질)이고 기둥·윗대가 잡는다
   const BL = T.bedFront - T.bedRear;
   const bx = (T.bedFront + T.bedRear) / 2;
   const DY = T.deckY;
+  const SH = T.sideH;
+  const PLATE = 0.3;
   k.box(C.steel, [BL, 0.07, T.width - 0.04], [bx, DY - 0.07, 0], { r: 0.02, mat: 'metal' });
   k.box(C.dark, [BL, 0.09, T.width - 0.02], [bx, DY - 0.16, 0], { r: 0.02, mat: 'clay' });
+  const posts = 4;
   for (const dz of [-1, 1]) {
-    k.box(C.steelLight, [BL, T.sideH, 0.04], [bx, DY, dz * (HALF_W - 0.04)], { r: 0.012, mat: 'metal' });
-    k.box(C.blue, [BL + 0.02, 0.05, 0.06], [bx, DY + T.sideH - 0.03, dz * (HALF_W - 0.04)], { r: 0.018 });
-    for (let i = 1; i < 4; i += 1) k.box(C.steel, [0.03, T.sideH - 0.04, 0.05], [T.bedRear + (BL * i) / 4, DY + 0.02, dz * (HALF_W - 0.03)], { r: 0.006, mat: 'metal' });
+    const z = dz * (HALF_W - 0.04);
+    k.box(C.steelLight, [BL, PLATE, 0.04], [bx, DY, z], { r: 0.012, mat: 'metal' });
+    k.box(C.blue, [BL + 0.02, 0.05, 0.06], [bx, DY + PLATE - 0.02, z], { r: 0.018 });
+    k.box(C.blue, [BL + 0.02, 0.05, 0.06], [bx, DY + SH - 0.04, z], { r: 0.018 });
+    k.box(NET, [BL - 0.04, SH - PLATE - 0.06, 0.012], [bx, DY + PLATE + 0.02, z], { r: 0, mat: 'net' });
+    for (let i = 0; i <= posts; i += 1) k.box(C.blueDeep, [0.05, SH, 0.06], [T.bedRear + 0.03 + ((BL - 0.06) * i) / posts, DY, z], { r: r(0.01) });
   }
-  // 뒷문과 앞 가림판(크레인 쪽)
-  k.box(C.steelLight, [0.04, T.sideH, T.width - 0.06], [T.bedRear + 0.02, DY, 0], { r: 0.012, mat: 'metal' });
-  k.box(C.blue, [0.06, 0.05, T.width - 0.04], [T.bedRear + 0.02, DY + T.sideH - 0.03, 0], { r: 0.018 });
-  k.box(C.blue, [0.05, T.sideH + 0.18, T.width - 0.06], [T.bedFront - 0.03, DY, 0], { r: 0.015 });
+  // 뒤판(크레인 쪽)·앞판(운전석 쪽): 아래 철판 + 위 철망, 앞판은 조금 더 높다
+  for (const [x, h] of [[T.bedRear + 0.02, SH], [T.bedFront - 0.02, SH + 0.1]] as const) {
+    k.box(C.steelLight, [0.04, PLATE, T.width - 0.08], [x, DY, 0], { r: 0.012, mat: 'metal' });
+    k.box(NET, [0.012, h - PLATE - 0.06, T.width - 0.12], [x, DY + PLATE + 0.02, 0], { r: 0, mat: 'net' });
+    k.box(C.blue, [0.06, 0.05, T.width - 0.04], [x, DY + h - 0.04, 0], { r: 0.018 });
+    k.box(C.blue, [0.06, 0.05, T.width - 0.04], [x, DY + PLATE - 0.02, 0], { r: 0.018 });
+  }
   // 후미등, 번호판, 흙받이
   for (const dz of [-1, 1]) k.box(C.red, [0.04, 0.07, 0.14], [-front, 0.38, dz * (HALF_W - 0.18)], { r: 0.02, mat: 'glow', glow: 1.5 });
   k.box(C.white, [0.02, 0.09, 0.3], [-front - 0.005, 0.38, 0], { r: 0.01, mat: 'clay' });
   for (const dz of [-1, 1]) k.box(C.dark, [0.9, 0.05, 0.26], [-0.95, WR * 2 + 0.05, dz * (HALF_W - 0.14)], { r: 0.02, mat: 'clay' });
-  // 크레인 받침(돌지 않는 아래 틀)과 받침다리 빔 상자
-  k.box(C.yellowDeep, [0.34, 0.2, T.width - 0.1], [CRANE.x, 0.36, 0], { r: r(0.04) });
+  // 크레인 받침(돌지 않는 아래 틀, 적재함 뒤끝 너머 차대 위)과 받침다리 빔 상자
+  k.box(C.yellowDeep, [0.36, 0.2, T.width - 0.1], [CRANE.x, 0.36, 0], { r: r(0.04) });
+  k.box(C.dark, [0.2, 0.06, T.width - 0.3], [CRANE.x, 0.3, 0], { r: r(0.02), mat: 'clay' });
   root.add(k.build('grapple-body'));
   root.add(stripeGroup(band, stripe));
 
@@ -147,11 +159,12 @@ export function buildGrappleTruck(variant: number, lite: boolean): GrappleModel 
     seed = (seed * 1103515245 + 12345) & 0x7fffffff;
     return seed / 0x7fffffff;
   };
-  p.box(C.kraft, [BL - 0.12, 0.34, T.width - 0.16], [0, 0, 0], { r: r(0.1), seg: 3 });
-  p.box(C.kraftLight, [BL - 0.5, 0.18, T.width - 0.4], [0, 0.3, 0], { r: r(0.08), seg: 3 });
+  // 바닥에서 HEAP_H(가득 찬 높이)까지: 아래 덩어리 + 위 덩어리 + 흩어진 조각 (Actors가 남은 양만큼 y로 줄인다)
+  p.box(C.kraft, [BL - 0.12, HEAP_H * 0.72, T.width - 0.16], [0, 0, 0], { r: r(0.1), seg: 3 });
+  p.box(C.kraftLight, [BL - 0.45, HEAP_H * 0.2, T.width - 0.4], [0, HEAP_H * 0.68, 0], { r: r(0.08), seg: 3 });
   for (let i = 0; i < (lite ? 10 : 30); i += 1) {
     const s = 0.12 + rnd() * 0.12;
-    p.box(tones[i % tones.length]!, [s * 1.3, s * 0.7, s], [(rnd() - 0.5) * (BL - 0.4), 0.3 + rnd() * 0.18, (rnd() - 0.5) * (T.width - 0.4)], { r: r(0.03), rot: [rnd() * 0.8, rnd() * 3, rnd() * 0.8] });
+    p.box(tones[i % tones.length]!, [s * 1.3, s * 0.7, s], [(rnd() - 0.5) * (BL - 0.4), HEAP_H * (0.66 + rnd() * 0.22), (rnd() - 0.5) * (T.width - 0.4)], { r: r(0.03), rot: [rnd() * 0.8, rnd() * 3, rnd() * 0.8] });
   }
   load.add(p.build('grapple-load'));
   root.add(load);
@@ -160,12 +173,15 @@ export function buildGrappleTruck(variant: number, lite: boolean): GrappleModel 
   const column = new Group();
   column.position.set(CRANE.x, 0, 0);
   const ck = new Kit('gloss');
-  ck.cyl(C.yellow, 0.15, CRANE.pivotY - 0.46, [0, 0.46, 0], { seg: lite ? 8 : 18 });
+  ck.cyl(C.yellow, 0.14, CRANE.pivotY - 0.46, [0, 0.46, 0], { seg: lite ? 8 : 18 });
   ck.box(C.yellowDeep, [0.22, 0.14, 0.26], [0, CRANE.pivotY - 0.1, 0], { r: r(0.03) });
   if (!lite) {
-    // 돌림 톱니와 조종석 손잡이
+    // 돌림 톱니, 기둥 옆 높은 조종석(발판·의자·손잡이)
     ck.cyl(C.dark, 0.19, 0.06, [0, 0.46, 0], { seg: 18, mat: 'clay' });
-    for (const dz of [-1, 1]) ck.box(C.dark, [0.03, 0.12, 0.03], [0.14, 0.62, dz * 0.12], { r: 0.01, mat: 'clay' });
+    ck.box(C.dark, [0.2, 0.03, 0.2], [-0.02, CRANE.pivotY - 0.5, 0.22], { r: 0.01, mat: 'clay' });
+    ck.box(C.dark, [0.14, 0.08, 0.14], [-0.04, CRANE.pivotY - 0.47, 0.22], { r: 0.03, mat: 'clay' });
+    ck.box(C.dark, [0.03, 0.16, 0.14], [-0.11, CRANE.pivotY - 0.47, 0.22], { r: 0.012, mat: 'clay' });
+    for (const dz of [0.16, 0.28]) ck.box(C.dark, [0.03, 0.12, 0.03], [0.07, CRANE.pivotY - 0.44, dz], { r: 0.01, mat: 'clay' });
   }
   column.add(ck.build('crane-column'));
   const boom1 = new Group();
