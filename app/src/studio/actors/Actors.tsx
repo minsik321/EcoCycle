@@ -3,7 +3,7 @@ import type { ThreeEvent } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Color, Euler, Group, Matrix4, Quaternion, Vector3 } from 'three';
 import type { InstancedMesh, Mesh } from 'three';
-import { C, UNKNOWN_STRIPE, companyStripe } from '../theme';
+import { C, TRUCK_STRIPE } from '../theme';
 import { MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { blobShadow } from '../three/bakedShadow';
 import type { Director } from '../sim/director';
@@ -54,8 +54,12 @@ interface TruckPair {
 /** 갈퀴 인스턴스 칸: 집게차 한 대에 TINE_COUNT개, 이만큼의 집게차까지 (넘는 차는 갈퀴 없이 머리만) */
 const TINE_TRUCKS = 12;
 
+// 차량 띠 색(TRUCK_STRIPE)은 번호판 인식 전후로 같다(S2n). 전에는 인식 뒤 서버 회사 이름으로 띠 색(빨강 등)을 바꿔
+// 같은 차가 계근대에서 갑자기 다른 차처럼 보였다(사용자 지적 2026-11-27). 회사는 핀·패널 글자로 알린다
+
 function makeGrapple(i: number, lite: boolean): GrappleModel {
   const g = buildGrappleTruck(i, lite);
+  g.stripe.color.set(TRUCK_STRIPE);
   g.root.rotation.order = 'YZX';
   g.root.userData.truckIndex = i;
   g.root.visible = false;
@@ -89,6 +93,7 @@ const POUR_SLOTS = 4;
 
 function makePair(i: number, lite: boolean): TruckPair {
   const pair = { dump: buildTruck(i), cargo: buildCargoTruck(i), grapple: makeGrapple(i, lite) };
+  for (const m of [pair.dump, pair.cargo]) m.stripe.color.set(TRUCK_STRIPE);
   // 상차 트럭(25톤 카고)은 월드 단위로 만들었다(배율 1). 덤프만 축마다 배율을 준다
   pair.cargo.root.rotation.order = 'YZX';
   pair.cargo.root.userData.truckIndex = i;
@@ -199,7 +204,6 @@ export function Trucks({ director, onSelect, blobs = false, lite = false }: Acto
         const yb = groundY(sim.x - fx, sim.z - fz);
         model.root.position.set(sim.x, GROUND_Y + (yf + yb) / 2, sim.z);
         model.root.rotation.set(0, sim.heading, Math.atan2(yf - yb, axle * 2));
-        model.stripe.color.set(sim.company ? companyStripe(sim.company) : UNKNOWN_STRIPE);
         // 낮은 카고의 옆판: 아래 모서리를 축으로 바깥 아래로 내려간다 (sides[0]은 −z 쪽)
         model.sides.forEach((w, side) => {
           w.rotation.x = (side === 0 ? -1 : 1) * sim.sides * SIDE_DROP;
