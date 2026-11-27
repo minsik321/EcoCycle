@@ -280,7 +280,7 @@ Nov 24, 2026 · @민식 · 현재 구현(모의 서버 + 앱) 기준으로 정�
 | GET `/devices/{tank-…}/unloads/records` | 섹터 하나의 하역 기록(섹터 ID만) | 기록 목록 |
 | GET `/robots/{id}/model` | 로봇 모델 ⚠ B13 | `{deviceId, axisCount, joints:[{name,minDeg,maxDeg,zeroDeg}], linkLengthsM}` |
 | GET `/robots/robot-1/picks/records` | 로봇 집기 기록 | 기록 목록 |
-| GET `/process/state` | 공정 흐름 현재 상태(진행 중 + 종류별 최근 20건). 재연결 때 한 번 | `{vehicles, batches, bales, updatedAt}` |
+| GET `/process/state` | 공정 흐름 현재 상태(진행 중 + 종류별 최근 20건, 베일은 적치(`created`) 베일 모두 + 그 밖의 최근 20건). 재연결 때 한 번 | `{vehicles, batches, bales, updatedAt}` |
 | GET `/vehicles/records`, GET `/vehicles/{id}` | 차량 기록 목록·한 건(없으면 404) | 기록 목록 / `VehicleRecord` |
 | GET `/batches/records`, GET `/batches/{id}` | 배치 기록 목록·한 건(없으면 404) | 기록 목록 / `BatchRecord` |
 | GET `/bales/records`, GET `/bales/{id}` | 베일 기록 목록·한 건(없으면 404) | 기록 목록 / `BaleDetail` |
@@ -582,7 +582,7 @@ GET .../records?from=2026-10-15T00:00:00.000Z&to=2026-10-15T05:30:00.000Z&page=1
 | 배치·베일 | 배치당 베일 1개(모델 1→N), `batch.control` 관리자만, 투입 전 배합·압축 전 압력만 변경, 압축 중 건너뛰기 거부 | `shared/commands.ts`, 모의 서버 `fixtures/accounts.ts`·`sim/process.ts` |
 | 로봇 운전 모드 | 섹터 지정의 실제 배합, 수동 집기·놓기 두 단계(6절 "로봇팔 7단위") | `shared/process.ts`·`devices.ts`·`robot.ts`, 모의 서버 `sim/robot.ts`·`sim/commands.ts` |
 | 베일 적치 연출 | 남동 적치 구역에 서버 베일을 점점 쌓고(칸이 차면 오래된 줄부터 북서로 옮김, 그래도 차면 압축기 대기), 상차는 지게차가 북서에서 하나씩 꺼내 싣는 연출. 베일 저울은 무게 숫자 없이 모양만. 연출 속도(트럭 4.0 m/s, 지게차 5.6 m/s, 상차 차량 5분마다)도 가정 | `config/yard.ts` |
-| 상차(출하) 차량 | 서버가 입고 차량과 같은 공정 흐름으로 준다(`kind: outbound`, 계근 두 번, 실은 베일). 모의 서버는 가상의 회사·번호판으로 주기적으로 만든다 ⚠ B41 | `shared/process.ts`·`processRecords.ts`, 모의 서버 `sim/process.ts` |
+| 상차(출하) 차량 | 서버가 입고 차량과 같은 공정 흐름으로 준다(`kind: outbound`, 계근 두 번, 실은 베일). 모의 서버는 가상의 회사·번호판으로 만든다. 적치 베일이 마당 위쪽(북서) 줄 칸 수(36개)를 넘으면 한 대를 부르고(한 번에 한 대), 한 대에 20개를 베일당 약 30초에 싣는다. 시작할 때는 3D 바탕 재고만큼(68개) 적치 베일을 가진 채 시작한다 ⚠ B41 | `shared/process.ts`·`processRecords.ts`, 모의 서버 `sim/process.ts` |
 
 ## 위험과 대응
 
