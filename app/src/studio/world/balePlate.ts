@@ -53,7 +53,8 @@ export function balePlate(k: Kit, top: number): void {
     // 베일 저울: 낮은 판 + 노란 테두리 + 표시 기둥(숫자 없음)
     const s = scale.size;
     k.box(C.dark, [s, scale.y, s], [scale.x, 0, scale.z], { r: 0.02, mat: 'metal' });
-    k.box(C.steelLight, [s - 0.12, 0.02, s - 0.12], [scale.x, scale.y - 0.01, scale.z], { r: 0, mat: 'metal' });
+    // 저울 윗판도 철판처럼 어두운 회색 무광 (S2t: 햇빛에 하얗게 날리지 않게)
+    k.box(PLATE_LINE, [s - 0.12, 0.02, s - 0.12], [scale.x, scale.y - 0.01, scale.z], { r: 0 });
     for (const [dx, dz, w, dd] of [
       [0, s / 2, s + 0.08, 0.06],
       [0, -s / 2, s + 0.08, 0.06],
