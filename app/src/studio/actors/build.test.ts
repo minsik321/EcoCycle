@@ -30,3 +30,29 @@ describe('덤프 트럭 모형 (S2n)', () => {
     }
   });
 });
+
+describe('집게차 빈 적재함 (S2r)', () => {
+  it('적재함 바닥 위로 튀어나오거나 바닥과 겹치는 차체 조각이 없다 (전에는 흙받이 윗면이 바닥과 같은 높이라 검게 비쳤다)', async () => {
+    const { buildGrappleTruck } = await import('./grappleTruck');
+    const { GRAPPLE_TRUCK: T } = await import('../sim/grapple');
+    for (const lite of [false, true]) {
+      const m = buildGrappleTruck(0, lite);
+      m.root.updateMatrixWorld(true);
+      const body = m.root.getObjectByName('grapple-body')!;
+      const v = new Vector3();
+      let bad = 0;
+      body.traverse((o) => {
+        const mesh = o as Mesh;
+        if (!mesh.isMesh) return;
+        const pos = mesh.geometry.getAttribute('position');
+        for (let i = 0; i < pos.count; i += 1) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+          const inside = v.x > T.bedRear + 0.1 && v.x < T.bedFront - 0.1 && Math.abs(v.z) < T.width / 2 - 0.12;
+          // 바닥 철판(윗면 deckY, 두께 0.07)의 윗면·밑면 말고 그 사이·위에 있는 꼭짓점
+          if (inside && v.y > T.deckY - 0.065 && v.y < T.deckY + 0.3 && Math.abs(v.y - T.deckY) > 1e-4) bad += 1;
+        }
+      });
+      expect(bad).toBe(0);
+    }
+  });
+});

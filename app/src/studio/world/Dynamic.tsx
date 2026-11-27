@@ -13,9 +13,9 @@ import { Kit, MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { useClockWaker } from '../three/motion';
 import { BALER, PILES, PILE_MAX_H, PLATEAU, RAIL, RAIL_FRAME, RAIL_LEN, RAIL_SLOPE, SITE, TIP, YARD_FRAME, centroid, railAt, railY, sitePx } from './layout';
 import { buildFloor, disposeFloor } from '../three/floorTexture';
-import { bakeGroundShadow, disposeBaked } from '../three/bakedShadow';
+import { bakeGroundShadow, disposeBaked, footprintBounds } from '../three/bakedShadow';
 import { buildWorld, edgeDistance, inside } from './buildWorld';
-import { applyWall, roofNoShadow, roofShown, wallParts, wallShown } from './houseHide';
+import { applyWall, noCastShadow, roofShown, wallParts, wallShown } from './houseHide';
 
 // 월드의 고정물과, 기기 값에 따라 움직이는 부분(벨트·램·더미). 입구는 열린 경사로다(차가 멈추지 않고 그대로 지난다).
 
@@ -50,16 +50,21 @@ export function World({ baked = false }: { baked?: boolean }) {
   useEffect(() => () => {
     if (shadow) disposeBaked(shadow);
   }, [shadow]);
+  // 압축기 건물은 실시간 그림자를 만들지 않으므로 모든 단계에서 구운 바닥 그림자만 둔다 (레일 축으로 돌린 판, S2r)
+  const houseShadow = useMemo(() => bakeGroundShadow(world.houseFootprints, footprintBounds(world.houseFootprints, 5), RAIL_FRAME.heading), [world]);
+  useEffect(() => () => {
+    if (houseShadow) disposeBaked(houseShadow);
+  }, [houseShadow]);
   const camera = useThree((s) => s.camera);
-  // 벽·지붕 걷기 (houseHide: 걷힌 벽은 그림자만 그리고, 지붕은 그림자를 드리우지 않으며, 문턱에 여유를 둔다)
+  // 벽·지붕 걷기 (houseHide: 건물은 실시간 그림자를 만들지 않으므로 걷기는 모습만 바꾼다, 문턱에 여유를 둔다)
   const house = useMemo(() => {
-    roofNoShadow(world.roof);
     return { walls: world.walls.map((w) => ({ wall: w, parts: wallParts(w.group), shown: true, init: false })), roof: true };
   }, [world]);
   useEffect(
     () => () => {
       disposeTree(world.base);
       disposeTree(world.roof);
+      disposeTree(world.house);
       world.walls.forEach((w) => disposeTree(w.group));
     },
     [world],
@@ -76,7 +81,7 @@ export function World({ baked = false }: { baked?: boolean }) {
       if (shown === w.shown && w.init) continue;
       w.shown = shown;
       w.init = true;
-      applyWall(w.parts, shown, !baked);
+      applyWall(w.parts, shown);
     }
     house.roof = ground || roofShown(house.roof, Math.hypot(dx, camera.position.y, dz));
     world.roof.visible = house.roof;
@@ -84,8 +89,10 @@ export function World({ baked = false }: { baked?: boolean }) {
   return (
     <>
       <primitive object={world.base} />
+      <primitive object={world.house} />
       {floor && <primitive object={floor} />}
       {shadow && <primitive object={shadow} />}
+      {houseShadow && <primitive object={houseShadow} />}
       <primitive object={world.roof} />
       {world.walls.map((w) => (
         <primitive key={w.group.name} object={w.group} />
@@ -321,7 +328,8 @@ export function BalerParts({ director, status }: { director: Director; status: D
     tower.cyl(C.steelLight, 0.03, 0.9, [0, 0, 0], { seg: 10, mat: 'metal' });
     tower.cyl(C.dark, 0.06, 0.05, [0, 0.9, 0], { seg: 12 });
     tower.cyl(C.dark, 0.06, 0.04, [0, 1.36, 0], { seg: 12 });
-    return { ram: r.build('ram'), paper: p.build('chamber-paper'), tower: tower.build('tower') };
+    // 건물 안 움직이는 부품도 실시간 그림자를 만들지 않는다 (종이가 나타났다 사라질 때 그림자가 깜빡이지 않게, S2r)
+    return { ram: noCastShadow(r.build('ram')), paper: noCastShadow(p.build('chamber-paper')), tower: noCastShadow(tower.build('tower')) };
   }, []);
   const lamps = useMemo(() => LIGHTS.map(() => new MeshBasicMaterial({ toneMapped: false })), []);
   useEffect(

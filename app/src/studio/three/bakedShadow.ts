@@ -27,8 +27,11 @@ function layer(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext
   return [canvas, canvas.getContext('2d')!];
 }
 
-/** 고정물의 바닥 투영으로 그림자 판을 굽는다. 캔버스를 쓸 수 없으면 null */
-export function bakeGroundShadow(footprints: readonly Footprint[], bounds: Bounds): Mesh | null {
+/**
+ * 고정물의 바닥 투영으로 그림자 판을 굽는다. 캔버스를 쓸 수 없으면 null.
+ * rotY를 주면 footprints·bounds는 그만큼 돈 좌표계(예: 레일 축의 압축기 건물)의 값이고, 판도 그만큼 돌려 놓는다 (S2r)
+ */
+export function bakeGroundShadow(footprints: readonly Footprint[], bounds: Bounds, rotY = 0): Mesh | null {
   if (typeof document === 'undefined') return null;
   const W = bounds.maxX - bounds.minX;
   const D = bounds.maxZ - bounds.minZ;
@@ -41,9 +44,14 @@ export function bakeGroundShadow(footprints: readonly Footprint[], bounds: Bound
   const px = (x: number) => (x - bounds.minX) * PX_PER_M;
   const pz = (z: number) => (z - bounds.minZ) * PX_PER_M;
 
-  const horiz = Math.hypot(SUN.x, SUN.z);
-  const dirX = -SUN.x / horiz;
-  const dirZ = -SUN.z / horiz;
+  // 해 방향도 판의 좌표계로 돌린다 (월드 = Ry(rotY) · 판 좌표)
+  const c = Math.cos(rotY);
+  const s = Math.sin(rotY);
+  const sunX = SUN.x * c - SUN.z * s;
+  const sunZ = SUN.x * s + SUN.z * c;
+  const horiz = Math.hypot(sunX, sunZ);
+  const dirX = -sunX / horiz;
+  const dirZ = -sunZ / horiz;
   const slope = horiz / SUN.y;
 
   ao.fillStyle = `rgb(${SHADE})`;
@@ -85,11 +93,27 @@ export function bakeGroundShadow(footprints: readonly Footprint[], bounds: Bound
   const material = new MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false, fog: false });
   const geometry = new PlaneGeometry(W, D).rotateX(-Math.PI / 2);
   const mesh = new Mesh(geometry, material);
-  mesh.position.set(bounds.minX + W / 2, PLANE_Y, bounds.minZ + D / 2);
+  const cx = bounds.minX + W / 2;
+  const cz = bounds.minZ + D / 2;
+  mesh.position.set(cx * c + cz * s, PLANE_Y, -cx * s + cz * c);
+  mesh.rotation.y = rotY;
   mesh.renderOrder = -1;
   mesh.name = 'baked-ground-shadow';
   mesh.raycast = () => undefined;
   return mesh;
+}
+
+/** 바닥 투영들을 담는 범위 (pad만큼 넓힌다: 해 반대쪽 그림자·번짐 자리) */
+export function footprintBounds(footprints: readonly Footprint[], pad: number): Bounds {
+  const b = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+  for (const f of footprints) {
+    b.minX = Math.min(b.minX, f.x0);
+    b.maxX = Math.max(b.maxX, f.x1);
+    b.minZ = Math.min(b.minZ, f.z0);
+    b.maxZ = Math.max(b.maxZ, f.z1);
+  }
+  if (!Number.isFinite(b.minX)) return { minX: 0, maxX: 1, minZ: 0, maxZ: 1 };
+  return { minX: b.minX - pad, maxX: b.maxX + pad, minZ: b.minZ - pad, maxZ: b.maxZ + pad };
 }
 
 /** 굽은 판의 텍스처·지오메트리를 버린다 */
