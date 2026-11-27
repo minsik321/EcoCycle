@@ -1,9 +1,11 @@
 import type { Bale } from '@ecocycle/shared';
 import { YARD_FLOW } from '../../config/yard';
 import { BALE, CLAMP_SCALE, CLAMP_SHIFT, FORKLIFT_SCALE, FORK_REACH, LOAD_BED_Y, LOAD_ORDER, LOAD_SLOTS, LOAD_TRUCK, YARD, YARD_FRAME, staticBaleCells, truckSize, worldToYard, yardToWorld } from '../world/layout';
+import { FORK_LIMITS, LIFT_CLEAR, advanceRoute, buildRoute } from './forkRoute';
+import type { RouteInfo } from './forkRoute';
 import { FRESH_MS, advance, follow, mover } from './mover';
 import type { Mover } from './mover';
-import { angleDelta, headingTo } from './paths';
+import { angleDelta, samplePath } from './paths';
 import type { P2, Path, Pose } from './paths';
 import type { Token } from './token';
 
@@ -68,7 +70,31 @@ type Leg =
   | { kind: 'jaws'; wide: boolean }
   | { kind: 'call'; fn: () => void }
   | { kind: 'lane'; take: boolean }
-  | { kind: 'token'; take: boolean };
+  | { kind: 'token'; take: boolean }
+  /**
+   * 둥근 경로 하나(S2s): 지금 자리에서 pts를 차례로 지나 끝에서만 선다. 꺾이는 점은 회전 반경으로 돌고 속도를 잇는다.
+   * 시작 방향이 다르면 먼저 제자리에서 돈다. events는 pts[at]을 지날 때 부르는 즉시 일(길·차례 놓기, 포크 높이 정하기)
+   */
+  | { kind: 'route'; pts: P2[]; reverse?: boolean; events?: RouteEvent[]; gates?: RouteGate[]; liftNear?: number }
+  /** 클램프 판 넓힘을 정해 두고 기다리지 않는다 (다음 움직임과 함께) */
+  | { kind: 'jawsTo'; wide: boolean }
+  /** 마당 차례 양보(S2m → S2s): 트럭이 차례를 기다릴 때만 놓았다 다시 잡는다. 기다리는 트럭이 없으면 서지 않고 지난다 */
+  | { kind: 'yield' };
+
+/** 경로 위의 문: pts[at]을 지나기 전에 pass가 true여야 한다(길·차례 잡기). 못 잡으면 그 앞에서 선다 */
+interface RouteGate {
+  at: number;
+  pass: (f: ForkliftSim) => boolean;
+}
+
+interface RouteEvent {
+  /** pts의 몇 번째 점을 지날 때 (0부터) */
+  at: number;
+  fn: (f: ForkliftSim) => void;
+}
+
+/** 시간을 쓰지 않는 다리: 같은 걸음에 다음 다리까지 이어 처리한다 (다리 사이 한 프레임 멈춤 없음) */
+const INSTANT = new Set<Leg['kind']>(['call', 'lane', 'token', 'forkTo', 'jawsTo', 'yield']);
 
 type TaskKind = 'scale' | 'store' | 'transfer' | 'load' | 'home';
 
@@ -99,6 +125,13 @@ export interface ForkliftSim extends Mover {
   cross: boolean;
   /** 클램프 판 넓힘 0~1 (1이면 베일 끝면 간격) */
   wide: number;
+  /** jawsTo로 정해 둔 넓힘 (없으면 null) */
+  wideGoal: number | null;
+  /** 지금 따라가는 둥근 경로(route 다리), 다음에 부를 events 번호, 시작 전 제자리 돌기 중 */
+  route: RouteInfo | null;
+  routeEv: number;
+  routeGate: number;
+  routePivot: boolean;
 }
 
 export interface Obstacle extends Pose {
@@ -175,12 +208,12 @@ const FULL_AFTER_SEC = 20;
 /** 빈 포크 높이 */
 const LOW_FORK = 0.3;
 const IDLE_HOME_SEC = 0.4;
-/** 서버가 앞서 간 상차를 마저 실을 때 지게차 움직임 배속 */
-const HURRY = 2.2;
 /** 돌려 잡기: 내려놓은 뒤 물러나는 거리 */
 const REGRIP_BACK = 0.75;
 /** 상차: 차 곁에서 들어가기 전에 서는 거리(잡는 자리에서 더 밖으로) */
 const LOAD_APPROACH = 0.7;
+/** 상차: 차 곁에 들어가기 전, 차를 보는 방향으로 줄 서는 거리(곁에서 서서 돌지 않게) */
+const LOAD_LINEUP = 0.8;
 /** 상차 차량 앞을 돌 때: 앞 끝에서 나가는 거리, 옆으로 차 폭 밖 거리 */
 const FRONT_GAP = 1.2;
 const SIDE_GAP = 0.75;
@@ -201,6 +234,8 @@ const JAW_X1 = 1.37 * CS - CLAMP_SHIFT;
 const JAW_H0 = 0.12 * CS;
 const JAW_H1 = 0.52 * CS;
 const TOKEN_PATIENCE_SEC = 60;
+/** 경로 위 문(길·차례)을 못 잡았을 때 그 점보다 이만큼 앞에서 선다 */
+const GATE_BEFORE = 0.3;
 const CLEAR = 0.02;
 const TURN_R = 1.45 * FS;
 /** 마당 차례 없이 쌓아도 되는 북서 열 (이 열부터 동쪽) */
@@ -314,6 +349,7 @@ export class Yard {
   /** 저울 위 한 쌍을 잰 시간 */
   private weighT = 0;
   private readonly boxA = newBox();
+  private readonly lookPose: Pose = { x: 0, z: 0, heading: 0 };
   private readonly boxB = newBox();
   private readonly obstacles: LocalObstacle[] = [];
   private readonly loader: LoaderState = { present: false, parked: false, id: '', x: 0, z: 0, heading: 0, loaded: 0, want: 0, loading: false };
@@ -326,7 +362,7 @@ export class Yard {
     for (let i = 0; i < BALE_POOL; i += 1) this.bales.push({ active: false, id: '', state: 'gone', x: 0, y: 0, z: 0, rot: 0, slot: -1, t: 0, seq: 0, owner: 0, load: -1, pos: -1, fromZ: 0 });
     for (let i = 0; i < YARD_FLOW.forkliftCount; i += 1) {
       const home = YARD.homes[i]!;
-      this.forklifts.push({ ...mover(home[0], home[1], FACE_MINUS_Z), id: i + 1, fork: LOW_FORK, clamp: 0, carrying: null, carrying2: null, legs: [], task: null, idleT: 0, home, blockedT: 0, forkGoal: null, waitT: 0, cross: false, wide: 0 });
+      this.forklifts.push({ ...mover(home[0], home[1], FACE_MINUS_Z), id: i + 1, fork: LOW_FORK, clamp: 0, carrying: null, carrying2: null, legs: [], task: null, idleT: 0, home, blockedT: 0, forkGoal: null, waitT: 0, cross: false, wide: 0, wideGoal: null, route: null, routeEv: 0, routeGate: 0, routePivot: false });
     }
     // 바탕 재고: 남동·북서의 앞쪽 몇 열은 이미 차 있다 (이름 없음, 서버 베일이 아니다)
     for (let c = 0; c < Math.min(YARD_FLOW.seStartColumns, SE_COLS); c += 1) for (let l = 0; l < LEVELS; l += 1) this.stock(seSlot(c, l));
@@ -761,6 +797,8 @@ export class Yard {
   private canEject(): boolean {
     if (this.standMove >= 0) return false;
     for (const b of this.bales) if (b.active && b.state === 'stand' && (b.pos === 0 || b.owner !== 0)) return false;
+    // 막 집어 뒤로 빠지는 베일이 아직 받침대 끝 위에 있으면 밀지 않는다 (S2s: 실제 속도로 느리게 빠지므로)
+    for (const b of this.bales) if (b.active && b.state === 'carried' && Math.abs(b.x - STAND.x) < BALE.w && b.z < STAND.slots[0]! + BALE.d + 0.05) return false;
     return this.standCount() < 3;
   }
 
@@ -988,8 +1026,7 @@ export class Yard {
         const want = Math.min(this.loader.want, LOAD_ORDER.length);
         if (this.loader.parked && this.loader.loading && (!this.loader.hurry || LOAD_ORDER.some((_, i) => i < want && !this.loadClaimed[i]))) continue;
         legs.push({ kind: 'token', take: true });
-        this.backToCrossing(legs, cur);
-        this.homeFromCrossing(f, legs, cur);
+        this.nwHomeRoute(f, legs, cur, [], false);
         this.begin(f, { kind: 'home' }, legs);
         continue;
       }
@@ -1184,15 +1221,17 @@ export class Yard {
     const fromY = (have - n) * BALE.h + 0.03;
     this.seGo(f, legs, cur, YARD.seXs[src]!, SE_POCKET_Z, FACE_PLUS_Z, fromY);
     this.grab(f, legs, () => lift, fromY + 0.1);
-    this.seGo(f, legs, cur, YARD.laneEnd, YARD.laneZ, 0, LOW_FORK + 0.1);
-    legs.push({ kind: 'lane', take: false });
-    this.crossToNw(legs, cur);
-    // 북서 길의 동쪽 칸들은 트럭 길에서 떨어져 있다: 그 칸으로 갈 때는 마당 차례를 놓아 트럭(출차 계근 등)이 그동안 움직이게 하고,
-    // 돌아갈 때 다시 잡는다. 서쪽 끝 칸(쏟는 자리 A로 가는 트럭 곁)은 차례를 쥔 채 쌓는다
-    if (dst >= NW_FREE_FROM) legs.push({ kind: 'token', take: false });
+    // 칸에서 곧게 뒤로 빠진 뒤 낮춰 달린다: 남동 길 → 가로지르는 길 → 북서 길 → 놓을 열 앞을 한 둥근 경로로 (S2s #2)
+    legs.push({ kind: 'drive', to: [cur.x, YARD.laneZ], reverse: true }, { kind: 'forkTo', height: LOW_FORK + 0.1 });
+    cur.z = YARD.laneZ;
+    // 북서 길의 동쪽 칸들은 트럭 길에서 떨어져 있다: 그 칸으로 갈 때는 북서 길 동쪽 끝을 지나며 마당 차례를 놓아 트럭(출차 계근 등)이
+    // 그동안 움직이게 하고, 돌아갈 때 다시 잡는다. 서쪽 끝 칸(쏟는 자리 A로 가는 트럭 곁)은 차례를 쥔 채 쌓는다
     const toY = dstLevel * BALE.h + 0.03;
-    // 북서 길에서 칸 쪽으로 돌기 전에 이웃 열보다 높이 들어 둔다 (돌 때 든 베일이 옆 줄 위를 지난다)
-    this.nwGo(legs, cur, YARD.nwXs[dst]!, NW_POCKET_Z, LEVELS * BALE.h + 0.05, toY);
+    // 놓을 높이 + 여유만큼만 든다(S2s #4: 전에는 1단에 놓을 때도 맨 위 단 높이까지 들었다). 북서 길에서 놓을 열 앞에 닿기 직전에 든다
+    const enterY = toY + LIFT_CLEAR;
+    const dx = YARD.nwXs[dst]!;
+    this.seToNwRoute(legs, cur, [[dx, YARD.nwLaneZ]], { events: dst >= NW_FREE_FROM ? [{ at: Yard.NW_TAIL - 1, fn: this.dropToken }] : [], liftNear: enterY });
+    this.nwEnter(legs, cur, dx, NW_POCKET_Z, enterY, toY);
     legs.push(
       {
         kind: 'call',
@@ -1225,9 +1264,11 @@ export class Yard {
     const legs: Leg[] = [{ kind: 'token', take: true }];
     const cur = { x: f.x, z: f.z };
     if (!this.inNw(f)) {
-      this.seGo(f, legs, cur, YARD.laneEnd, YARD.laneZ, 0, LOW_FORK);
-      legs.push({ kind: 'lane', take: false });
-      this.crossToNw(legs, cur);
+      legs.push({ kind: 'lane', take: true });
+      if (Math.abs(cur.z - YARD.laneZ) > 0.05) legs.push({ kind: 'drive', to: [cur.x, YARD.laneZ], reverse: true });
+      cur.z = YARD.laneZ;
+      legs.push({ kind: 'forkTo', height: LOW_FORK });
+      this.seToNwRoute(legs, cur, []);
     }
     // 고를 열은 그때 정한다 (그 사이 출하로 맨 위가 빠질 수 있다)
     legs.push({
@@ -1257,21 +1298,21 @@ export class Yard {
         }
         b.owner = f.id;
         const y = b.y + 0.03;
-        this.nwGo(more, at, YARD.nwXs[best]!, NW_POCKET_Z, LEVELS * BALE.h + 0.05, y);
+        // 집을 높이까지만 든다(S2s #4): 길에서는 낮게, 칸 앞에 닿기 직전에 맞춘다
+        this.nwLaneTo(more, at, YARD.nwXs[best]!, y);
+        this.nwEnter(more, at, YARD.nwXs[best]!, NW_POCKET_Z, y, y);
         this.grab(f, more, () => [b], y + 0.1);
         // 칸에서 곧게 뒤로 빠진 뒤(아래 베일에 닿지 않게) 달리면서 포크를 내린다
         more.push({ kind: 'drive', to: [YARD.nwXs[best]!, YARD.nwLaneZ], reverse: true }, { kind: 'forkTo', height: LOW_FORK });
         at.z = YARD.nwLaneZ;
-        // 양보 자리(S2m): 북서 길은 트럭 길에서 떨어져 있다. 여기서 마당 차례를 한 번 놓았다가 다시 잡는다 — 입고 트럭이 계근대에서
-        // 기다리면(차례를 원하면) 그 차가 섹터 앞에 들어설 때까지 베일을 든 채 기다린다. 전에는 상차 한 번(약 27초) 내내 쥐어
-        // 인식된 트럭이 계근대에서 하역 단계를 놓쳤다
-        more.push({ kind: 'token', take: false }, { kind: 'token', take: true });
-        // 돌려 잡기: 자리 앞 길에서 마당 쪽(+z)으로 들어가 내려놓는다
+        // 양보 자리(S2m): 북서 길은 트럭 길에서 떨어져 있다. 입고 트럭이 계근대에서 차례를 기다리면 여기서 마당 차례를 놓고
+        // 그 차가 섹터 앞에 들어설 때까지 베일을 든 채 기다린다. 기다리는 트럭이 없으면 서지 않고 지난다(S2s: 전에는 늘 놓았다 다시 잡아 섰다)
+        more.push({ kind: 'yield' });
+        // 돌려 잡기: 북서 길에서 마당 쪽(+z)으로 둥글게 들어가 내려놓는다
         const [rx, rz] = YARD.regrip;
-        this.nwLaneTo(more, at, rx);
+        const back: P2 = [rx, rz - FORK_REACH - REGRIP_BACK];
         more.push(
-          { kind: 'turn', heading: FACE_PLUS_Z },
-          { kind: 'drive', to: [rx, rz - FORK_REACH], reverse: false },
+          { kind: 'route', pts: [[rx, YARD.nwLaneZ], [rx, rz - FORK_REACH]], liftNear: 0.03 },
           { kind: 'fork', height: 0.03 },
           {
             kind: 'call',
@@ -1285,16 +1326,16 @@ export class Yard {
             },
           },
           { kind: 'clamp', closed: false },
-          { kind: 'drive', to: [rx, rz - FORK_REACH - REGRIP_BACK], reverse: true },
-          { kind: 'jaws', wide: true },
+          // 물러나면서 클램프 판을 넓힌다
+          { kind: 'jawsTo', wide: true },
+          { kind: 'drive', to: back, reverse: true },
         );
-        // 서쪽(−x)으로 돌아 끝면 쪽에서 들어간다 (동쪽은 상차 차량 뒤 끝 쪽이라 비워 둔다)
+        // 서쪽(−x)으로 돌아 끝면 쪽에서 들어간다 (동쪽은 상차 차량 뒤 끝 쪽이라 비워 둔다): 한 둥근 경로
         const q: P2 = [rx - FORK_REACH - REGRIP_BACK, rz];
+        const hold: P2 = [rx - FORK_REACH, rz];
         more.push(
-          { kind: 'turn', heading: headingTo(rx, rz - FORK_REACH - REGRIP_BACK, q[0], q[1]) },
-          { kind: 'drive', to: q, reverse: false },
-          { kind: 'turn', heading: 0 },
-          { kind: 'drive', to: [rx - FORK_REACH, rz], reverse: false },
+          { kind: 'route', pts: [q, hold] },
+          { kind: 'jaws', wide: true },
           { kind: 'clamp', closed: true },
           {
             kind: 'call',
@@ -1304,76 +1345,78 @@ export class Yard {
               f.cross = true;
             },
           },
-          { kind: 'fork', height: LOW_FORK + 0.1 },
+          // 바닥에서 조금만 떼고, 달리면서 주행 높이로
+          { kind: 'fork', height: 0.15 },
+          { kind: 'forkTo', height: LOW_FORK + 0.1 },
         );
-        // 실을 자리와 그 곁
-        const slot = LOAD_SLOTS[LOAD_ORDER[order]!]!;
-        const pos = this.slotOnTruck(slot, { x: 0, y: 0, z: 0 });
-        const h = lo.heading;
-        const side = Math.sign(slot.across) || 1;
-        const nx = Math.sin(h) * side;
-        const nz = Math.cos(h) * side;
-        const grip: P2 = [pos.x + nx * FORK_REACH, pos.z + nz * FORK_REACH];
-        const approach: P2 = [pos.x + nx * (FORK_REACH + LOAD_APPROACH), pos.z + nz * (FORK_REACH + LOAD_APPROACH)];
-        const face = headingTo(grip[0], grip[1], pos.x, pos.z);
-        const forkY = pos.y + 0.03;
-        // 차 앞을 도는 점 (서쪽 곁 → 동쪽 곁): 차 앞 끝(북쪽)에서 조금 나간 곳, 양옆으로 차 폭 밖.
-        // 차 뒤(남쪽)는 계근대 서쪽 길·대기 자리·출차 길과 가까워 돌지 않는다
-        const around = (k: number): P2 => {
-          const ahead = LOAD_TRUCK.length / 2 + FRONT_GAP;
-          const off = LOAD_TRUCK.width / 2 + SIDE_GAP;
-          return [lo.x + Math.cos(h) * ahead + Math.sin(h) * off * k, lo.z - Math.sin(h) * ahead + Math.cos(h) * off * k];
-        };
-        const route: P2[] = side > 0 ? [around(-1), around(1), approach] : [approach];
-        let from: P2 = [rx - FORK_REACH, rz];
-        for (const p of route) {
-          more.push({ kind: 'turn', heading: headingTo(from[0], from[1], p[0], p[1]) }, { kind: 'drive', to: p, reverse: false });
-          from = p;
-        }
-        more.push(
-          { kind: 'turn', heading: face },
-          // 놓을 자리 바로 위(바닥판·아래 단 베일 위)까지만 든다
-          { kind: 'fork', height: forkY + 0.1 },
-          { kind: 'drive', to: grip, reverse: false },
-          { kind: 'fork', height: forkY },
-          {
-            kind: 'call',
-            fn: () => {
-              f.carrying = null;
-              f.cross = false;
-              // 싣는 사이 그 차가 떠났다(장면이 기다리다 넘겼다): 실을 차가 없으니 이 베일은 그 차에 실려 나간 것으로 보고 뺀다 (북서에서 이미 빠졌다)
-              if (!this.loader.present || this.loader.id !== loaderId) {
-                b.active = false;
-                b.state = 'gone';
-                b.owner = 0;
-                b.id = '';
-                return;
-              }
-              b.state = 'loaded';
-              b.owner = 0;
-              b.load = order;
-              this.stats.loadedOut += 1;
-            },
-          },
-          { kind: 'clamp', closed: false },
-          { kind: 'drive', to: approach, reverse: true },
-          { kind: 'forkTo', height: LOW_FORK },
-          { kind: 'jaws', wide: false },
-        );
-        // 북서 길 동쪽 끝으로 돌아간다 (동쪽 곁이면 차 앞을 다시 돈다)
-        from = approach;
-        const back: P2[] = side > 0 ? [around(1), around(-1)] : [];
-        for (const p of [...back, [YARD.nwLaneEnd, YARD.nwLaneZ] as P2]) {
-          more.push({ kind: 'turn', heading: headingTo(from[0], from[1], p[0], p[1]) }, { kind: 'drive', to: p, reverse: false });
-          from = p;
-        }
-        // 마당 차례를 놓고 그대로 선다 (다음 베일은 여기서 곧장 칸으로 간다: 제자리 돌기 없음)
-        more.push({ kind: 'token', take: false });
+        this.loadToTruck(f, more, order, loaderId, b, hold);
         f.legs.splice(0, 0, ...more);
       },
     });
     this.loadClaimed[order] = true;
     this.begin(f, { kind: 'load' }, legs);
+  }
+
+  /**
+   * 상차(S2s에서 나눔): 끝면을 잡은 베일을 든 지게차가 from(돌려 잡기 자리)에서 상차 차량 order 자리에 싣고 북서 길 동쪽 끝으로 돌아와
+   * 마당 차례를 놓는다. 차 곁까지는 한 둥근 경로(동쪽 곁은 차 앞을 돌아)로 가고, 마지막은 차를 보는 방향으로 곧게 줄 서서 들어간다
+   * (곁에서 서서 돌지 않는다). 포크는 곁에 닿기 직전에 적재 높이 + 여유로 든다
+   */
+  private loadToTruck(f: ForkliftSim, more: Leg[], order: number, loaderId: string, b: BaleSim, from: P2): void {
+    const lo = this.loader;
+    const slot = LOAD_SLOTS[LOAD_ORDER[order]!]!;
+    const pos = this.slotOnTruck(slot, { x: 0, y: 0, z: 0 });
+    const h = lo.heading;
+    const side = Math.sign(slot.across) || 1;
+    const nx = Math.sin(h) * side;
+    const nz = Math.cos(h) * side;
+    const at = (d: number): P2 => [pos.x + nx * d, pos.z + nz * d];
+    const grip = at(FORK_REACH);
+    const approach = at(FORK_REACH + LOAD_APPROACH);
+    const lineUp = at(FORK_REACH + LOAD_APPROACH + LOAD_LINEUP);
+    const forkY = pos.y + 0.03;
+    // 차 앞을 도는 점 (서쪽 곁 → 동쪽 곁): 차 앞 끝(북쪽)에서 조금 나간 곳, 양옆으로 차 폭 밖.
+    // 차 뒤(남쪽)는 계근대 서쪽 길·대기 자리·출차 길과 가까워 돌지 않는다
+    const around = (k: number): P2 => {
+      const ahead = LOAD_TRUCK.length / 2 + FRONT_GAP;
+      const off = LOAD_TRUCK.width / 2 + SIDE_GAP;
+      return [lo.x + Math.cos(h) * ahead + Math.sin(h) * off * k, lo.z - Math.sin(h) * ahead + Math.cos(h) * off * k];
+    };
+    void from;
+    const go: P2[] = side > 0 ? [around(-1), around(1), lineUp, approach] : [lineUp, approach];
+    more.push(
+      { kind: 'route', pts: go, liftNear: forkY + 0.1 },
+      // 놓을 자리 바로 위(바닥판·아래 단 베일 위)까지만 든다
+      { kind: 'fork', height: forkY + 0.1 },
+      { kind: 'drive', to: grip, reverse: false },
+      { kind: 'fork', height: forkY },
+      {
+        kind: 'call',
+        fn: () => {
+          f.carrying = null;
+          f.cross = false;
+          // 싣는 사이 그 차가 떠났다(장면이 기다리다 넘겼다): 실을 차가 없으니 이 베일은 그 차에 실려 나간 것으로 보고 뺀다 (북서에서 이미 빠졌다)
+          if (!this.loader.present || this.loader.id !== loaderId) {
+            b.active = false;
+            b.state = 'gone';
+            b.owner = 0;
+            b.id = '';
+            return;
+          }
+          b.state = 'loaded';
+          b.owner = 0;
+          b.load = order;
+          this.stats.loadedOut += 1;
+        },
+      },
+      { kind: 'clamp', closed: false },
+      { kind: 'jawsTo', wide: false },
+      { kind: 'drive', to: approach, reverse: true },
+      { kind: 'forkTo', height: LOW_FORK },
+    );
+    // 북서 길 동쪽 끝으로 돌아간다 (동쪽 곁이면 차 앞을 다시 돈다). 닿으면 마당 차례를 놓고 그대로 선다 (다음 베일은 여기서 곧장 칸으로)
+    const back: P2[] = [...(side > 0 ? [around(1), around(-1)] : []), [YARD.nwLaneEnd, YARD.nwLaneZ]];
+    more.push({ kind: 'route', pts: back, events: [{ at: back.length - 1, fn: this.dropToken }] });
   }
 
   /** 북서 길 쪽에 서 있다 (상차를 마치고 기다리는 중) */
@@ -1386,7 +1429,7 @@ export class Yard {
   /**
    * 남동 길에서 목표 자리(tx, tz)로: 지금 자리가 길 밖(칸 앞·받침대·저울·대기 자리)이면 길을 잡고 뒤로 빠져 길에 선 뒤,
    * 길을 따라 목표 x로 가서 heading으로 돌아 목표 자리로 들어간다. 길은 잡은 채로 둔다(이어지는 일을 하고 마지막에 놓는다).
-   * fork: 길에 나온 뒤 맞출 포크 높이(돌기 전에), 들어가기 전 높이도 같다
+   * fork: 들어가기 전 포크 높이. 길을 달리는 동안은 낮게 들고 끝에 닿기 직전에 맞춘다(S2s)
    */
   private seGo(f: ForkliftSim, legs: Leg[], cur: { x: number; z: number }, tx: number, tz: number, heading: number, fork: number = LOW_FORK): void {
     legs.push({ kind: 'lane', take: true });
@@ -1398,80 +1441,98 @@ export class Yard {
       legs.push({ kind: 'drive', to: [cur.x, YARD.laneZ], reverse: true });
       cur.z = YARD.laneZ;
     }
-    legs.push({ kind: 'fork', height: fork });
     if (Math.abs(cur.x - tx) > 0.05) {
-      legs.push({ kind: 'turn', heading: tx > cur.x ? 0 : Math.PI }, { kind: 'drive', to: [tx, YARD.laneZ], reverse: false });
+      legs.push({ kind: 'forkTo', height: Math.min(fork, LOW_FORK + 0.1) }, { kind: 'route', pts: [[tx, YARD.laneZ]], liftNear: fork });
       cur.x = tx;
     }
+    legs.push({ kind: 'fork', height: fork }, { kind: 'turn', heading });
     if (Math.abs(tz - YARD.laneZ) > 0.05) {
-      legs.push({ kind: 'turn', heading }, { kind: 'drive', to: [tx, tz], reverse: false });
+      legs.push({ kind: 'drive', to: [tx, tz], reverse: false });
       cur.z = tz;
-    } else {
-      legs.push({ kind: 'turn', heading });
     }
     void f;
   }
 
-  /** 남동 길 동쪽 끝 → 가로지르는 길 → 북서 길 동쪽 끝 (마당 차례는 잡았다) */
-  private crossToNw(legs: Leg[], cur: { x: number; z: number }): void {
-    let from: P2 = [cur.x, cur.z];
-    for (const p of [...YARD.crossing, [YARD.nwLaneEnd, YARD.nwLaneZ] as P2]) {
-      legs.push({ kind: 'turn', heading: headingTo(from[0], from[1], p[0], p[1]) }, { kind: 'drive', to: p, reverse: false });
-      from = p;
-    }
-    cur.x = YARD.nwLaneEnd;
-    cur.z = YARD.nwLaneZ;
+  /** 문: 남동 길을 잡는다 */
+  private passLane = (f: ForkliftSim): boolean => {
+    if (this.laneHolder !== null && this.laneHolder !== f) return false;
+    this.laneHolder = f;
+    return true;
+  };
+
+  /** 문: 마당 차례를 잡는다 (트럭이 기다리면 못 잡는다. 오래 기다리면 다음 차례를 맡아 둔다) */
+  private passToken = (f: ForkliftSim): boolean => {
+    const who = `forklift:${f.id}`;
+    if (!this.token || this.token.takeIfQuiet(who)) return true;
+    if (f.blockedT > TOKEN_PATIENCE_SEC) this.token.reserve(who);
+    return false;
+  };
+
+  private dropLane = (f: ForkliftSim): void => {
+    if (this.laneHolder === f) this.laneHolder = null;
+  };
+
+  private dropToken = (f: ForkliftSim): void => {
+    this.token?.release(`forklift:${f.id}`);
+  };
+
+  /**
+   * 남동 길(길을 잡고 길 위에 섰다) → 동쪽 끝 → 가로지르는 길 → 북서 길 동쪽 끝 → tail을 한 둥근 경로로 (마당 차례는 잡았다).
+   * 꺾이는 점에서 서서 돌지 않고 회전 반경으로 돌며 속도를 잇는다(S2s #2). 남동 길은 동쪽 끝을 지나며 놓는다.
+   * 돌려주는 값: tail의 첫 점 번호(events·gates에 쓴다)
+   */
+  private seToNwRoute(legs: Leg[], cur: { x: number; z: number }, tail: P2[], extra: { events?: RouteEvent[]; gates?: RouteGate[]; liftNear?: number } = {}): void {
+    const pts: P2[] = [[YARD.laneEnd, YARD.laneZ], ...YARD.crossing, [YARD.nwLaneEnd, YARD.nwLaneZ], ...tail];
+    legs.push({ kind: 'route', pts, events: [{ at: 0, fn: this.dropLane }, ...(extra.events ?? [])], gates: extra.gates, liftNear: extra.liftNear });
+    const last = pts[pts.length - 1]!;
+    cur.x = last[0];
+    cur.z = last[1];
   }
 
-  private nwLaneTo(legs: Leg[], cur: { x: number; z: number }, tx: number): void {
+  /** seToNwRoute의 tail 첫 점 번호 */
+  private static readonly NW_TAIL = 1 + YARD.crossing.length + 1;
+
+  private nwLaneTo(legs: Leg[], cur: { x: number; z: number }, tx: number, liftNear?: number): void {
     if (Math.abs(cur.x - tx) > 0.05) {
-      legs.push({ kind: 'turn', heading: tx > cur.x ? 0 : Math.PI }, { kind: 'drive', to: [tx, YARD.nwLaneZ], reverse: false });
+      legs.push({ kind: 'route', pts: [[tx, YARD.nwLaneZ]], liftNear });
       cur.x = tx;
     }
   }
 
-  /** 북서 길에서 칸 앞 자리로 들어간다: 돌기 전 포크 높이(liftY), 들어간 뒤 놓을 높이(placeY) */
-  private nwGo(legs: Leg[], cur: { x: number; z: number }, tx: number, tz: number, liftY: number, placeY: number): void {
-    this.nwLaneTo(legs, cur, tx);
-    legs.push({ kind: 'fork', height: liftY }, { kind: 'turn', heading: FACE_MINUS_Z }, { kind: 'drive', to: [tx, tz], reverse: false }, { kind: 'fork', height: placeY });
+  /**
+   * 북서 길에서 칸 앞 자리로 들어간다: enterY까지 들고(놓을 높이 + 여유, 집을 때는 집는 높이) 돌아 들어간 뒤 placeY로.
+   * 전에는 단 수와 상관없이 맨 위 단 높이까지 들었다(S2s #4). 길에서 돌 때 든 베일 끝은 옆 열 앞면에 닿지 않는다(칸 앞 간격 SLOT_GAP)
+   */
+  private nwEnter(legs: Leg[], cur: { x: number; z: number }, tx: number, tz: number, enterY: number, placeY: number): void {
+    legs.push({ kind: 'fork', height: enterY }, { kind: 'turn', heading: FACE_MINUS_Z }, { kind: 'drive', to: [tx, tz], reverse: false });
+    if (Math.abs(placeY - enterY) > 1e-6) legs.push({ kind: 'fork', height: placeY });
+    cur.x = tx;
     cur.z = tz;
   }
 
-  /** 북서 칸 앞에서 뒤로 빠져 북서 길 → 동쪽 끝 → 가로지르는 길을 되짚어 남동 길 → 대기 자리 */
+  /**
+   * 북서 칸 앞에서 뒤로 빠져 북서 길 → 동쪽 끝 → 가로지르는 길을 되짚어 남동 길 → 대기 자리.
+   * 한 둥근 경로로 달리고, 마당 차례(북서 길 동쪽 끝)·남동 길(가로지르는 길 둘째 점)은 지나는 문으로 잡는다: 잡히면 서지 않는다
+   */
   private nwBackToSe(f: ForkliftSim, legs: Leg[], cur: { x: number; z: number }): void {
-    legs.push({ kind: 'drive', to: [cur.x, YARD.nwLaneZ], reverse: true }, { kind: 'fork', height: LOW_FORK });
+    legs.push({ kind: 'drive', to: [cur.x, YARD.nwLaneZ], reverse: true }, { kind: 'forkTo', height: LOW_FORK });
     cur.z = YARD.nwLaneZ;
-    this.nwLaneTo(legs, cur, YARD.nwLaneEnd);
-    legs.push({ kind: 'token', take: true });
-    this.backToCrossing(legs, cur);
-    this.homeFromCrossing(f, legs, cur);
-  }
-
-  /** 북서 길 동쪽 끝 → 가로지르는 길의 셋째·둘째 점 (마당 차례를 잡은 채: 트럭이 이 길을 쓰지 않는 동안) */
-  private backToCrossing(legs: Leg[], cur: { x: number; z: number }): void {
-    let from: P2 = [cur.x, cur.z];
-    for (const p of [YARD.crossing[2]!, YARD.crossing[1]!]) {
-      legs.push({ kind: 'turn', heading: headingTo(from[0], from[1], p[0], p[1]) }, { kind: 'drive', to: p, reverse: false });
-      from = p;
-    }
-    cur.x = from[0];
-    cur.z = from[1];
+    this.nwHomeRoute(f, legs, cur, [[YARD.nwLaneEnd, YARD.nwLaneZ]], true);
   }
 
   /**
-   * 가로지르는 길 둘째 점(남동 길에서 멀리, 마당 차례를 잡은 채)에서 남동 길을 잡을 때까지 기다린 뒤, 첫 점을 지나 남동 길 동쪽 끝에 들어서서
-   * 마당 차례를 놓고 대기 자리로. 남동 길에서 일하는 지게차가 도는 원에 닿지 않는 곳에서 기다리므로 서로 막히지 않는다
+   * (head를 지나) 가로지르는 길 셋째·둘째·첫 점 → 남동 길 동쪽 끝(마당 차례를 놓는다) → 대기 자리.
+   * takeToken이면 head 끝에서 마당 차례를 문으로 잡는다. 남동 길은 가로지르는 길 둘째 점(남동 길에서 멀리)에서 문으로 잡는다:
+   * 남동 길에서 일하는 지게차가 도는 원에 닿지 않는 곳에서 기다리므로 서로 막히지 않는다
    */
-  private homeFromCrossing(f: ForkliftSim, legs: Leg[], cur: { x: number; z: number }): void {
-    const c0 = YARD.crossing[0]!;
-    legs.push(
-      { kind: 'lane', take: true },
-      { kind: 'turn', heading: headingTo(cur.x, cur.z, c0[0], c0[1]) },
-      { kind: 'drive', to: c0, reverse: false },
-      { kind: 'turn', heading: headingTo(c0[0], c0[1], YARD.laneEnd, YARD.laneZ) },
-      { kind: 'drive', to: [YARD.laneEnd, YARD.laneZ], reverse: false },
-      { kind: 'token', take: false },
-    );
+  private nwHomeRoute(f: ForkliftSim, legs: Leg[], cur: { x: number; z: number }, head: P2[], takeToken: boolean): void {
+    const [c0, c1, c2] = YARD.crossing as readonly [P2, P2, P2];
+    const pts: P2[] = [...head, c2, c1, c0, [YARD.laneEnd, YARD.laneZ]];
+    const h = head.length;
+    const gates: RouteGate[] = [];
+    if (takeToken) gates.push({ at: h, pass: this.passToken });
+    gates.push({ at: h + 1, pass: this.passLane });
+    legs.push({ kind: 'route', pts, gates, events: [{ at: h + 3, fn: this.dropToken }] });
     cur.x = YARD.laneEnd;
     cur.z = YARD.laneZ;
     this.seGo(f, legs, cur, f.home[0], f.home[1], FACE_MINUS_Z, LOW_FORK);
@@ -1507,24 +1568,129 @@ export class Yard {
     return false;
   }
 
-  private stepForklift(f: ForkliftSim, dtIn: number): void {
-    // 서버가 앞서 간 상차는 빠르게 마저 싣는다 (움직임만 빨라진다, 차례·막힘 규칙은 그대로)
-    const dt = f.task?.kind === 'load' && this.loader.hurry ? dtIn * HURRY : dtIn;
+  private stepForklift(f: ForkliftSim, dt: number): void {
+    // 실제 축척 한계를 넘어 빨리 돌리지 않는다 (S2s: 전에는 서버가 앞서면 상차 지게차를 2.2배로 돌려 빨리감기처럼 보였다)
+    this.stepGoals(f, dt);
+    // 시간을 쓰지 않는 다리(길·차례·포크 높이 정하기·부르기)는 같은 걸음에 이어서 처리한다: 다리 사이에 한 프레임씩 서지 않는다
+    for (let k = 0; k < 12; k += 1) {
+      const leg = f.legs[0];
+      const instant = leg !== undefined && INSTANT.has(leg.kind);
+      const done = this.stepLeg(f, dt);
+      if (!instant || !done) break;
+    }
+  }
+
+  /** 정해 둔 포크 높이·클램프 넓힘을 다른 움직임과 함께 맞춘다 */
+  private stepGoals(f: ForkliftSim, dt: number): void {
     const leg = f.legs[0];
     if (f.forkGoal !== null && leg?.kind !== 'fork') {
       const d = f.forkGoal - f.fork;
-      f.fork += Math.max(-YARD_FLOW.liftMps * dt, Math.min(YARD_FLOW.liftMps * dt, d));
+      f.fork += Math.max(-FORK_LIMITS.lift * dt, Math.min(FORK_LIMITS.lift * dt, d));
       if (Math.abs(f.forkGoal - f.fork) < 1e-3) {
         f.fork = f.forkGoal;
         f.forkGoal = null;
       }
     }
+    if (f.wideGoal !== null && leg?.kind !== 'jaws') {
+      const d = f.wideGoal - f.wide;
+      f.wide += Math.max(-dt * 3, Math.min(dt * 3, d));
+      if (Math.abs(f.wideGoal - f.wide) < 1e-3) {
+        f.wide = f.wideGoal;
+        f.wideGoal = null;
+      }
+    }
+  }
+
+  /** 제자리에서 heading으로 돈다 */
+  private pivot(f: ForkliftSim, heading: number, dt: number): 'done' | 'blocked' | 'turning' {
+    const d = angleDelta(f.heading, heading);
+    if (Math.abs(d) < 1e-3) {
+      f.heading = heading;
+      return 'done';
+    }
+    if (this.hits(f, f.x, f.z, f.heading, f.carrying ? TURN_R + 0.15 : TURN_R)) return 'blocked';
+    const stepA = Math.max(-FORK_LIMITS.turn * dt, Math.min(FORK_LIMITS.turn * dt, d));
+    f.heading += stepA;
+    f.wheel += stepA * 0.6;
+    if (Math.abs(d - stepA) < 1e-3) {
+      f.heading = heading;
+      return 'done';
+    }
+    return 'turning';
+  }
+
+  /** route 다리 한 걸음 (끝에 닿으면 done) */
+  private stepRoute(f: ForkliftSim, leg: Extract<Leg, { kind: 'route' }>, dt: number): { done: boolean; blocked: boolean } {
+    const reverse = leg.reverse ?? false;
+    if (!f.route) {
+      const r = buildRoute([f.x, f.z], leg.pts);
+      if (r.path.total < 1e-3) {
+        for (const e of leg.events ?? []) e.fn(f);
+        return { done: true, blocked: false };
+      }
+      f.route = r;
+      f.path = r.path;
+      f.s = 0;
+      f.reverse = reverse;
+      f.routeEv = 0;
+      f.routeGate = 0;
+      samplePath(r.path, Math.min(0.02, r.path.total), this.lookPose, reverse);
+      f.routePivot = Math.abs(angleDelta(f.heading, this.lookPose.heading)) > 0.02;
+    }
+    const r = f.route;
+    if (f.routePivot) {
+      samplePath(r.path, Math.min(0.02, r.path.total), this.lookPose, reverse);
+      const res = this.pivot(f, this.lookPose.heading, dt);
+      if (res === 'done') f.routePivot = false;
+      return { done: false, blocked: res === 'blocked' };
+    }
+    const accel = FORK_LIMITS.accel;
+    const look = 0.3 + (f.speed * f.speed) / (2 * accel * 2.2);
+    const ahead = samplePath(r.path, f.s + look, this.lookPose, reverse);
+    let blocked = this.hits(f, ahead.x, ahead.z, f.heading, 0);
+    // 문(길·차례): 제동 거리 안에 들면 잡아 본다. 못 잡으면 그 점 조금 앞에서 선다 (잡히면 서지 않고 지난다)
+    const gates = leg.gates ?? [];
+    let stopAt = Infinity;
+    while (f.routeGate < gates.length) {
+      const g = gates[f.routeGate]!;
+      const sg = Math.max(0, r.marks[g.at + 1]! - GATE_BEFORE);
+      if (sg - f.s > (f.speed * f.speed) / (2 * accel) + 0.6) break;
+      if (g.pass(f)) {
+        f.routeGate += 1;
+        continue;
+      }
+      stopAt = sg;
+      if (f.s >= sg - 1e-3) blocked = true;
+      break;
+    }
+    // 놓을(집을) 높이는 끝에 닿기 직전에 맞춘다: 그때까지는 주행 높이로 낮게 든다 (S2s #4)
+    if (leg.liftNear !== undefined && f.forkGoal !== leg.liftNear) {
+      const need = (Math.abs(leg.liftNear - f.fork) / FORK_LIMITS.lift) * Math.max(f.speed, 0.4) + 0.3;
+      if (r.path.total - f.s <= need) f.forkGoal = leg.liftNear;
+    }
+    const end = advanceRoute(f, r, dt, reverse ? FORK_LIMITS.reverse : FORK_LIMITS.drive, accel, blocked, stopAt);
+    // 지난 점의 일 (길·차례 놓기, 포크 높이 정하기). marks[0]은 출발점이라 pts[at]은 marks[at + 1]
+    const events = leg.events ?? [];
+    while (f.routeEv < events.length && (end || f.s >= r.marks[events[f.routeEv]!.at + 1]! - 1e-3)) {
+      events[f.routeEv]!.fn(f);
+      f.routeEv += 1;
+    }
+    if (end) {
+      f.route = null;
+      f.path = null;
+    }
+    return { done: end, blocked };
+  }
+
+  /** 다리 하나를 한 걸음. 끝났으면 true */
+  private stepLeg(f: ForkliftSim, dt: number): boolean {
+    const leg = f.legs[0];
     if (!leg) {
       f.task = null;
       f.speed = 0;
       f.idleT += dt;
       f.blockedT = 0;
-      return;
+      return false;
     }
     let done = false;
     let blocked = false;
@@ -1534,7 +1700,7 @@ export class Yard {
         f.legs.shift();
         leg.fn();
         f.blockedT = 0;
-        return;
+        return true;
       case 'lane':
         if (!leg.take) {
           if (this.laneHolder === f) this.laneHolder = null;
@@ -1557,6 +1723,14 @@ export class Yard {
           if (f.blockedT > TOKEN_PATIENCE_SEC) this.token.reserve(who);
         }
         break;
+      case 'yield':
+        // 트럭이 이번 걸음에 차례를 기다렸을 때만 놓고 다시 잡는다
+        if (this.token && this.token.wanted) {
+          this.token.release(who);
+          f.legs.splice(1, 0, { kind: 'token', take: true });
+        }
+        done = true;
+        break;
       case 'clamp': {
         const target = leg.closed ? 1 : 0;
         f.clamp += Math.max(-dt * 4, Math.min(dt * 4, target - f.clamp));
@@ -1565,12 +1739,17 @@ export class Yard {
         break;
       }
       case 'jaws': {
+        f.wideGoal = null;
         const target = leg.wide ? 1 : 0;
         f.wide += Math.max(-dt * 3, Math.min(dt * 3, target - f.wide));
         done = Math.abs(target - f.wide) < 1e-3;
         if (done) f.wide = target;
         break;
       }
+      case 'jawsTo':
+        f.wideGoal = leg.wide ? 1 : 0;
+        done = true;
+        break;
       case 'forkTo':
         f.forkGoal = leg.height;
         done = true;
@@ -1583,26 +1762,20 @@ export class Yard {
       case 'fork': {
         f.forkGoal = null;
         const d = leg.height - f.fork;
-        f.fork += Math.max(-YARD_FLOW.liftMps * dt, Math.min(YARD_FLOW.liftMps * dt, d));
+        f.fork += Math.max(-FORK_LIMITS.lift * dt, Math.min(FORK_LIMITS.lift * dt, d));
         done = Math.abs(leg.height - f.fork) < 1e-3;
         break;
       }
       case 'turn': {
-        const d = angleDelta(f.heading, leg.heading);
-        if (Math.abs(d) < 1e-3) {
-          f.heading = leg.heading;
-          done = true;
-        } else if (this.hits(f, f.x, f.z, f.heading, f.carrying ? TURN_R + 0.15 : TURN_R)) {
-          blocked = true;
-        } else {
-          const stepA = Math.max(-YARD_FLOW.turnRadPerSec * dt, Math.min(YARD_FLOW.turnRadPerSec * dt, d));
-          f.heading += stepA;
-          f.wheel += stepA * 0.6;
-          if (Math.abs(d - stepA) < 1e-3) {
-            f.heading = leg.heading;
-            done = true;
-          }
-        }
+        const res = this.pivot(f, leg.heading, dt);
+        done = res === 'done';
+        blocked = res === 'blocked';
+        break;
+      }
+      case 'route': {
+        const res = this.stepRoute(f, leg, dt);
+        done = res.done;
+        blocked = res.blocked;
         break;
       }
       case 'drive': {
@@ -1614,12 +1787,12 @@ export class Yard {
           break;
         }
         if (!f.path) follow(f, [[f.x, f.z], leg.to], leg.reverse, 0);
-        const accel = YARD_FLOW.accelMps2;
+        const accel = FORK_LIMITS.accel;
         const look = 0.3 + (f.speed * f.speed) / (2 * accel * 2.2);
         const ux = dist > 1e-6 ? dx / dist : 0;
         const uz = dist > 1e-6 ? dz / dist : 0;
         blocked = this.hits(f, f.x + ux * look, f.z + uz * look, f.heading, 0);
-        if (advance(f, dt, leg.reverse ? YARD_FLOW.reverseMps : YARD_FLOW.driveMps, accel, blocked)) {
+        if (advance(f, dt, leg.reverse ? FORK_LIMITS.reverse : FORK_LIMITS.drive, accel, blocked)) {
           f.path = null;
           done = true;
         }
@@ -1629,10 +1802,11 @@ export class Yard {
     if (blocked) {
       f.blockedT += dt;
       if (f.blockedT > this.maxBlockedSec) this.maxBlockedSec = f.blockedT;
-    } else if (done || leg.kind !== 'drive') {
+    } else if (done || (leg.kind !== 'drive' && leg.kind !== 'route')) {
       f.blockedT = 0;
     }
     if (done) f.legs.shift();
+    return done;
   }
 
   // ── 점검 (시험·점검용: 겹침과 데이터 일치) ──────────────────────────

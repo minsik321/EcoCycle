@@ -14,12 +14,18 @@ export const YARD_FLOW = {
   nwStartColumns: 9,
   /** 남동에 빈 열이 이만큼보다 적으면 가장 오래된 줄을 북서로 옮긴다 */
   seFreeColumnsMin: 3,
-  /** 지게차 속도·가속·회전·포크 오르내림 (m/s, m/s², rad/s, m/s) */
-  driveMps: 5.6,
-  reverseMps: 3.6,
-  accelMps2: 5.0,
-  turnRadPerSec: 6.2,
-  liftMps: 2.0,
+  /**
+   * 지게차(3톤급) 실제 축척 한계(S2s 2026-11-27 메인 승인): 앞 4.5 m/s(약 16 km/h), 후진 2.5 m/s, 가속 2 m/s², 포크 오르내림 0.5 m/s.
+   * 장면은 studio/sim/forkRoute.ts에서 월드 단위(1단위 = 2 m)로 바꿔 쓰고, 이 값을 넘어 빨리 돌리지 않는다(전에는 상차 끝에 2.2배).
+   * 모서리는 회전 반경(cornerRadiusM)으로 둥글리고 옆 가속(cornerAccelMps2) 안으로 줄인다. 제자리 돌기는 turnRadPerSec(rad/s)
+   */
+  driveMps: 4.5,
+  reverseMps: 2.5,
+  accelMps2: 2.0,
+  liftMps: 0.5,
+  cornerRadiusM: 2.2,
+  cornerAccelMps2: 2.5,
+  turnRadPerSec: 2.4,
 } as const;
 
 /** 장면이 쌓을 수 있는 칸 수 (남동 + 북서). 패널이 "마당 N칸"을 적을 때도 이 값을 쓴다 */
