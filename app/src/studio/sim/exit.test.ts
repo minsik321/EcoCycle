@@ -177,7 +177,7 @@ describe.each([
       if (last.get(key.split(':')[0]!)?.phase === key.split(':')[1]) continue;
       expect(scanTime.get(key) ?? 0, `${key} 번호판 인식 장면`).toBeGreaterThanOrEqual(PLATE_SHOW_SEC);
     }
-    expect(gone).toBeGreaterThanOrEqual(5); // S2t 두 개 운반 뒤 원래 기준으로 (8)
+    expect(gone).toBeGreaterThanOrEqual(8);
     // 출차한 차는 모두 도로 끝까지 달려 나간 뒤 빠졌다 (길에서 서로 막혀 빼는 안전판은 쓰이지 않았다)
     expect(goneAtRoadEnd).toBe(gone);
     // S2p: 출입문 앞에서 멈칫하지 않는다

@@ -82,6 +82,8 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
       }
       // #10: 놓는 순간 베일은 적재함 안, 집게 끝도 차 외곽선 안, 지게차 몸체(마스트)는 차 밖
       if (d.yard.stats.loadedOut > lastOut) {
+        // 한 번에 두 개(2단)를 놓으면 둘로 센다 (S2t)
+        const placedNow = d.yard.stats.loadedOut - lastOut;
         lastOut = d.yard.stats.loadedOut;
         const f = d.forklifts.find((g) => g.task?.kind === 'load')!;
         const placed = loaded.reduce<BaleSim | null>((best, b) => (best && Math.hypot(best.x - f.x, best.z - f.z) < Math.hypot(b.x - f.x, b.z - f.z) ? best : b), null)!;
@@ -90,14 +92,14 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
         expect(Math.abs(tip.across)).toBeLessThanOrEqual(LOAD_TRUCK.width / 2 + EPS);
         const front = toTruck(out, f.x + Math.cos(f.heading) * BODY_FRONT, f.z - Math.sin(f.heading) * BODY_FRONT);
         expect(Math.abs(front.across), `t=${t.toFixed(1)} 지게차가 적재함 옆선 안으로 들어왔다`).toBeGreaterThanOrEqual(LOAD_TRUCK.width / 2 - 0.02);
-        placements += 1;
+        placements += placedNow;
       }
       // 상차 자리를 떠나는 순간: 서버가 실었다고 한 수(최대 20)를 다 실었다
       if (out.phase === 'loadBack' && !left.some((x) => x.id === out.id)) left.push({ id: out.id, loaded: loaded.length, want: Math.min(out.want, LOAD_ORDER.length) });
       // 출차해 나가는 동안에도 실린 베일은 차를 따라간다 (서버가 departed를 먼저 보내도 상차 자리에서 마지막 베일을 마저 싣고 움직인다)
       if (out.leaving && out.phase !== 'loading') expect(loaded.length, `t=${t.toFixed(1)} ${out.id} ${out.stage}`).toBe(Math.min(out.want, LOAD_ORDER.length));
     });
-    expect(placements).toBeGreaterThanOrEqual(20); // S2t 두 개 운반 뒤 원래 기준으로 (30)
+    expect(placements).toBeGreaterThanOrEqual(30);
     expect(checkedBales).toBeGreaterThan(1000);
     // 시연 원본의 상차 차량 두 대가 다 싣고 떠났다 (한 대 20개)
     expect(left.length).toBeGreaterThanOrEqual(2);
@@ -133,7 +135,7 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
       prevPhase = out.phase;
     });
     expect(arrivals).toBeGreaterThanOrEqual(1);
-    expect(departures).toBeGreaterThanOrEqual(1); // S2t 두 개 운반 뒤 원래 기준으로 (2)
+    expect(departures).toBeGreaterThanOrEqual(2);
   });
 
   it('베일 계근: 둘째 베일을 저울에 놓고 집게만 벌린 채 무게를 재고, 같은 지게차가 대기 자리에 가지 않고 바로 남동 칸에 쌓는다', () => {
@@ -216,7 +218,7 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
     expect(departAt).toBeGreaterThan(0);
     expect(left, '상차 차가 떠나지 못했다').toBeGreaterThan(0);
     // 출차 뒤 기다리는 시간(150초) + 막힌 상차를 끝내기까지(30초) + 옆판을 올리고 차례를 잡는 몇 초
-    expect(left - departAt).toBeLessThan(150 + 30 + 50); // S2t 두 개 운반 뒤 원래 기준으로 (150 + 30 + 20)
+    expect(left - departAt).toBeLessThan(150 + 30 + 20);
     // 떠날 때 서버가 실었다고 한 수만큼 실려 있다 (든 베일도 적재함에)
     expect(loadedAtLeave).toBe(want);
   });

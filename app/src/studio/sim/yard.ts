@@ -236,6 +236,8 @@ const JAW_X1 = 1.37 * CS - CLAMP_SHIFT;
 const JAW_H0 = 0.12 * CS;
 const JAW_H1 = 0.52 * CS;
 const TOKEN_PATIENCE_SEC = 60;
+/** 상차 차량이 서서 기다릴 때 싣는 지게차의 참을성 (S2t: 시연 시작처럼 트럭이 차례를 계속 돌려 쓰면 60초 가까이 섰다) */
+const LOAD_TOKEN_PATIENCE_SEC = 20;
 /** 경로 위 문(길·차례)을 못 잡았을 때 그 점보다 이만큼 앞에서 선다 */
 const GATE_BEFORE = 0.3;
 /** 북서 → 남동으로 돌아올 때 가로지르는 길 첫 점에서 남동 길로 이만큼 서쪽에 들어선 뒤 마당 차례를 놓는다 */
@@ -1080,7 +1082,7 @@ export class Yard {
       if (f.idleT < IDLE_HOME_SEC) continue;
       // 저울에 첫 베일을 놓고 저울 앞에 남은 지게차: 받침대에서 곧 나올 베일이 있으면 잠시 그 자리에서 기다린다 (대기 자리로 왕복하지 않게)
       // (S2t: 다음 베일을 singleWaitSec까지 기다리고, 그래도 안 오면 이 지게차가 한 개를 재서 옮긴다)
-      if (Math.hypot(f.x - SCALE_POCKET[0], f.z - SCALE_POCKET[1]) < 0.15 && this.scaleCount() === 1 && f.idleT < Math.max(SCALE_WAIT_SEC, YARD_FLOW.singleWaitSec + 1)) continue;
+      if (Math.hypot(f.x - SCALE_POCKET[0], f.z - SCALE_POCKET[1]) < 0.15 && this.scaleCount() === 1 && f.idleT < Math.max(SCALE_WAIT_SEC, YARD_FLOW.singleWaitSec + 1) && !this.laneWanted(f)) continue;
       const legs: Leg[] = [];
       const cur = { x: f.x, z: f.z };
       if (this.inNw(f)) {
@@ -1089,6 +1091,8 @@ export class Yard {
         // 남동으로 돌아가면 남동에서 오는 다른 지게차와 북서 길 끝에서 서로 막힌다)
         const want = Math.min(this.loader.want, LOAD_ORDER.length);
         // (S2t: 북서에 꺼낼 베일이 없으면 기다리지 않는다. 북서에 지게차가 있으면 줄 옮기기가 시작되지 않아 서로 기다렸다)
+        // 상차를 끝낸 차가 상차 자리에서 떠나려는 중이면 먼저 보낸다 (S2t: 지게차가 차례를 쥐고 남동 길을 기다리면 차가 20초 넘게 못 떠났다)
+        if (this.loader.present && !this.loader.loading && this.loadedCount() > 0) continue;
         if (this.loader.parked && this.loader.loading && this.nwTopCount() > 0 && (!this.loader.hurry || LOAD_ORDER.some((_, i) => i < want && !this.loadClaimed[i]))) continue;
         legs.push({ kind: 'token', take: true });
         this.nwHomeRoute(f, legs, cur, [], false);
@@ -1590,13 +1594,23 @@ export class Yard {
   private passToken = (f: ForkliftSim): boolean => {
     const who = `forklift:${f.id}`;
     if (!this.token || this.token.takeIfQuiet(who)) return true;
-    if (f.blockedT > TOKEN_PATIENCE_SEC) this.token.reserve(who);
+    if (f.blockedT > this.patience(f)) this.token.reserve(who);
     return false;
   };
 
   private dropLane = (f: ForkliftSim): void => {
     if (this.laneHolder === f) this.laneHolder = null;
   };
+
+  /** 다른 지게차가 남동 길을 기다린다 (저울 앞에서 쉬는 지게차는 길을 쥔 채 기다리지 않고 비켜 준다, S2t) */
+  private laneWanted(f: ForkliftSim): boolean {
+    return this.forklifts.some((g) => g !== f && g.legs[0]?.kind === 'lane' && (g.legs[0] as { take: boolean }).take);
+  }
+
+  /** 마당 차례를 이만큼 기다리면 다음 차례를 맡아 둔다 (상차 차가 서서 기다리면 짧게) */
+  private patience(f: ForkliftSim): number {
+    return f.task?.kind === 'load' && this.loader.parked ? LOAD_TOKEN_PATIENCE_SEC : TOKEN_PATIENCE_SEC;
+  }
 
   private dropToken = (f: ForkliftSim): void => {
     this.token?.release(`forklift:${f.id}`);
@@ -1856,7 +1870,7 @@ export class Yard {
           done = true;
         } else {
           blocked = true;
-          if (f.blockedT > TOKEN_PATIENCE_SEC) this.token.reserve(who);
+          if (f.blockedT > this.patience(f)) this.token.reserve(who);
         }
         break;
       case 'yield':
