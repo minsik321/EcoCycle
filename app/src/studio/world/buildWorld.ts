@@ -537,7 +537,8 @@ function houseFloor(k: Kit): void {
   for (let i = 0; i < 4; i += 1) k.box(C.glass, [0.05, 0.5, 0.9], [lu(annex.u0) - 0.01, TOP + 1.6, ac[2] - ad / 2 + 1.2 + i * ((ad - 2.4) / 3)], { r: 0.02, mat: 'glass' });
 
   // 칠한 통로·압축기 둘레 노랑 테두리
-  const y = TOP + 0.082;
+  // 칠한 선의 밑면을 바닥 윗면(TOP + 0.08)에서 0.006 띄운다 (전에는 0.002: 먼 화면에서 깊이가 겹칠 수 있었다, S2o)
+  const y = TOP + 0.086;
   k.box(C.bluePale, [lu(main.u1 - main.u0) - 1.2, 0.012, 0.72], [lu(mid(main.u0, main.u1)), y, lw(main.w0) - 0.7], { r: 0 });
   for (const dx of [-1, 1]) k.box(C.yellow, [0.05, 0.012, BALER.backZ - BALER.outletZ], [BALER.x + dx * 1.15, y, mid(BALER.backZ, BALER.outletZ)], { r: 0 });
   // 조작반

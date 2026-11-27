@@ -15,12 +15,11 @@ import { BALER, PILES, PILE_MAX_H, PLATEAU, RAIL, RAIL_FRAME, RAIL_LEN, RAIL_SLO
 import { buildFloor, disposeFloor } from '../three/floorTexture';
 import { bakeGroundShadow, disposeBaked } from '../three/bakedShadow';
 import { buildWorld, edgeDistance, inside } from './buildWorld';
+import { applyWall, roofNoShadow, roofShown, wallParts, wallShown } from './houseHide';
 
 // 월드의 고정물과, 기기 값에 따라 움직이는 부분(벨트·램·더미). 입구는 열린 경사로다(차가 멈추지 않고 그대로 지난다).
 
 const HIT = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
-/** 압축기 건물의 파란 지붕을 걷는 카메라 거리 (부지 전체에서는 사진처럼 덮여 보이고, 구역 거리부터는 안이 보인다) */
-const ROOF_HIDE_DIST = 75;
 /** 카메라가 이보다 낮으면 땅에서 보는 화면으로 본다(m). 구역(mid)·대상(close) 보기는 이보다 높다 */
 const GROUND_VIEW_Y = 10;
 
@@ -52,6 +51,11 @@ export function World({ baked = false }: { baked?: boolean }) {
     if (shadow) disposeBaked(shadow);
   }, [shadow]);
   const camera = useThree((s) => s.camera);
+  // 벽·지붕 걷기 (houseHide: 걷힌 벽은 그림자만 그리고, 지붕은 그림자를 드리우지 않으며, 문턱에 여유를 둔다)
+  const house = useMemo(() => {
+    roofNoShadow(world.roof);
+    return { walls: world.walls.map((w) => ({ wall: w, parts: wallParts(w.group), shown: true, init: false })), roof: true };
+  }, [world]);
   useEffect(
     () => () => {
       disposeTree(world.base);
@@ -67,8 +71,15 @@ export function World({ baked = false }: { baked?: boolean }) {
     const len = Math.hypot(dx, dz) || 1;
     // 사람 눈높이(사진 방향 화면 등)에서는 건물을 밖에서 본 그대로 둔다: 벽·지붕(물탱크)을 걷지 않는다
     const ground = camera.position.y < GROUND_VIEW_Y;
-    for (const wall of world.walls) wall.group.visible = ground || (wall.nx * dx + wall.nz * dz) / len < 0.18;
-    world.roof.visible = ground || Math.hypot(dx, camera.position.y, dz) > ROOF_HIDE_DIST;
+    for (const w of house.walls) {
+      const shown = ground || wallShown(w.shown, (w.wall.nx * dx + w.wall.nz * dz) / len);
+      if (shown === w.shown && w.init) continue;
+      w.shown = shown;
+      w.init = true;
+      applyWall(w.parts, shown, !baked);
+    }
+    house.roof = ground || roofShown(house.roof, Math.hypot(dx, camera.position.y, dz));
+    world.roof.visible = house.roof;
   });
   return (
     <>
