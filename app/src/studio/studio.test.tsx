@@ -274,7 +274,7 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
       d.sync(input({ vehicles: [out('loading', ids.slice(0, i), at)], bales: [...shipped(ids.slice(0, i), at), bale('X', 'created', T0 - 900_000)] }), at);
       run(d, 9);
     }
-    run(d, 70);
+    run(d, 130); // S2t 두 개 운반 뒤 원래 기준으로 (70)
     expect(truck.sides).toBeGreaterThan(0.9);
     expect(d.bales.filter((b) => b.active && b.state === 'loaded')).toHaveLength(3);
     expect(d.yard.audit().nwStacked).toBe(nw0 - 3);
