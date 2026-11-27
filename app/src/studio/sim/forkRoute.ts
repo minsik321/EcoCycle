@@ -54,7 +54,8 @@ export function buildRoute(from: P2, pts: readonly P2[], corner: number = FORK_L
     const theta = Math.acos(cos);
     if (theta < 1e-4) continue;
     const k = theta / ((la + lb) / 2);
-    caps[i] = Math.sqrt(lateral / k);
+    // 옆 가속 한계, 그리고 달리면서 도는 빠르기가 제자리 돌기보다 빠르지 않게 (각속도 = 속도 × 곡률)
+    caps[i] = Math.min(Math.sqrt(lateral / k), FORK_LIMITS.turn / k);
   }
   // 넣은 점마다 가장 가까운 경로 점의 거리
   const marks = all.map((p) => {
