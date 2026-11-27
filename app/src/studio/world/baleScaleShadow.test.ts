@@ -3,7 +3,7 @@ import type { BufferGeometry } from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import * as layout from './layout';
 import { sitePx, staticBaleCells } from './layout';
-import { SHADOW_ONLY, WALL_BAND, WALL_HIDE_DOT, ROOF_HIDE_DIST, ROOF_SHOW_DIST, applyWall, roofNoShadow, roofShown, wallParts, wallShown } from './houseHide';
+import { WALL_BAND, WALL_HIDE_DOT, ROOF_HIDE_DIST, ROOF_SHOW_DIST, applyWall, roofShown, wallParts, wallShown } from './houseHide';
 
 // S2o: 베일 모양 하나, 계근대 인식 기둥 없음, 압축기 건물 벽·지붕 걷기(그림자 깜빡임)
 
@@ -102,27 +102,20 @@ describe('S2o 압축기 건물 벽·지붕 걷기', () => {
     expect(flips).toBe(1);
   });
 
-  it('걷힌 벽은 그림자 지도가 있으면 그림자만 그리고(그림자를 잃지 않는다), 없으면(low) 숨긴다. 지붕은 그림자를 드리우지 않는다', () => {
+  it('걷힌 벽은 숨기고 세우면 원래 재질로 보인다. 벽·지붕은 실시간 그림자를 드리우지 않는다 (S2r)', () => {
     const world = buildWorld(false);
     const parts = wallParts(world.walls[0]!.group);
-    applyWall(parts, false, true);
-    for (const p of parts) {
-      if (p.mesh.castShadow) {
-        expect(p.mesh.visible).toBe(true);
-        expect(p.mesh.material).toBe(SHADOW_ONLY);
-      } else expect(p.mesh.visible).toBe(false);
-    }
-    expect(SHADOW_ONLY.colorWrite).toBe(false);
-    applyWall(parts, true, true);
+    applyWall(parts, false);
+    expect(parts.every((p) => !p.mesh.visible)).toBe(true);
+    applyWall(parts, true);
     for (const p of parts) {
       expect(p.mesh.visible).toBe(true);
       expect(p.mesh.material).toBe(p.material);
     }
-    applyWall(parts, false, false);
-    expect(parts.every((p) => !p.mesh.visible)).toBe(true);
-    roofNoShadow(world.roof);
-    world.roof.traverse((o) => {
-      if ((o as Mesh).isMesh) expect((o as Mesh).castShadow).toBe(false);
-    });
+    for (const g of [world.roof, ...world.walls.map((w) => w.group)]) {
+      g.traverse((o) => {
+        if ((o as Mesh).isMesh) expect((o as Mesh).castShadow).toBe(false);
+      });
+    }
   });
 });

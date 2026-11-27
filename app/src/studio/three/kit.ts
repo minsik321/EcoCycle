@@ -19,7 +19,7 @@ import {
   Vector2,
   Vector3,
 } from 'three';
-import type { Material, Object3D } from 'three';
+import type { Box3, Material, Object3D } from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { C } from '../theme';
@@ -94,6 +94,8 @@ export interface Footprint {
 export class Kit {
   /** 기록을 켜면(footprints 배열을 주면) 서 있는 조각마다 바닥 투영을 적는다 */
   footprints: Footprint[] | null = null;
+  /** 바닥 투영을 월드 대신 이 방향(Y축 회전)의 좌표계로 적는다 (기울어진 건물의 벽이 큰 네모가 되지 않게, S2r). null이면 월드 */
+  footprintRotY: number | null = null;
   private readonly parts: Record<MatKey, BufferGeometry[]> = { clay: [], gloss: [], metal: [], glass: [], glow: [], net: [] };
   private readonly stack: Matrix4[] = [new Matrix4()];
   private readonly defaultMat: MatKey;
@@ -125,8 +127,16 @@ export class Kit {
     geometry.applyMatrix4(local.premultiply(this.top));
     const mat = o.mat ?? this.defaultMat;
     if (this.footprints && mat !== 'glow') {
-      geometry.computeBoundingBox();
-      const b = geometry.boundingBox!;
+      let b: Box3;
+      if (this.footprintRotY === null) {
+        geometry.computeBoundingBox();
+        b = geometry.boundingBox!;
+      } else {
+        const turned = geometry.clone().rotateY(-this.footprintRotY);
+        turned.computeBoundingBox();
+        b = turned.boundingBox!;
+        turned.dispose();
+      }
       if (b.max.y - b.min.y > 0.22 && b.max.y > 0.3) this.footprints.push({ x0: b.min.x, x1: b.max.x, z0: b.min.z, z1: b.max.z, y0: b.min.y, y1: b.max.y });
     }
     this.parts[mat].push(paint(geometry, hex, mat === 'glow' ? (o.glow ?? 2.4) : 1));

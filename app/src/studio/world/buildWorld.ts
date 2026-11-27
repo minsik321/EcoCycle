@@ -2,6 +2,7 @@ import { TANK_IDS } from '@ecocycle/shared';
 import type { Group } from 'three';
 import { C } from '../theme';
 import { Kit } from '../three/kit';
+import { balePlate } from './balePlate';
 import type { Footprint, Vec3 } from '../three/kit';
 import type { P2 } from '../sim/paths';
 import type { StaticBaleCell } from './layout';
@@ -49,6 +50,7 @@ import {
   worldToPx,
 } from './layout';
 import { bale, cone, lamp, pallet } from './props';
+import { noCastShadow } from './houseHide';
 
 export { inside } from './layout';
 
@@ -57,7 +59,7 @@ export { inside } from './layout';
 //  - 마당·계근대 단은 도로보다 높다. 동쪽은 블록 옹벽 + 쇠 난간, 입구 경사로 한 곳, 도로는 남쪽으로 오르막 (approach·weighbridge·entrance)
 //  - 사무실: 짙은 회색 골판 2층, 서쪽 1층 차양·큰 창, 동쪽 실외기, 남서 모서리 흰 창고, 소화기 (approach·weighbridge·from-gate-inside)
 //  - 압축기 건물: 회색 벽 + 파란 지붕의 긴 공장, 지붕 위 파란 물탱크 (entrance)
-//  - 북·남 높은 녹색 그물망, 남동 회색 철판 울타리 (from-upper-road), 도로변 전봇대·전선, 숲 쪽 높은 철 기둥
+//  - 북·남 높은 녹색 그물망, 남동 회색 철판 울타리 (from-upper-road), 도로변 전봇대·전선
 //  - 베일: 같은 방향·같은 간격의 블록 줄 4~5단 (북서 재고, 남동 긴 변의 벽, 북쪽 숲 경계 줄)
 //  - 부지 둘레 낮은 숲 언덕과 먼 산 능선. 주차 차량·세워 둔 화물차·이웃 건물은 넣지 않는다(장면의 차량은 모두 서버 값)
 // 압축기 건물 본동의 벽은 방향별로 따로 만들어 카메라 쪽 벽을 숨기고(안이 들여다보이는 "인형의 집" 방식), 파란 지붕은 가까이 오면 걷는다.
@@ -79,6 +81,10 @@ export interface World {
   houseCenter: P2;
   /** 서 있는 고정물의 바닥 투영 (low 단계에서 바닥 그림자를 미리 굽는 데 쓴다) */
   footprints: Footprint[];
+  /** 압축기 건물 고정물(바닥·옆동·조작반·압축기 몸체): 실시간 그림자를 만들지 않는다 (S2r 그림자 깜빡임) */
+  house: Group;
+  /** 압축기 건물(벽·옆동·압축기)의 바닥 투영, 레일 축 좌표계(RAIL_FRAME.heading만큼 돈 좌표). 모든 단계에서 이 그림자를 바닥에 구워 둔다 (S2r) */
+  houseFootprints: Footprint[];
 }
 
 const mid = (a: number, b: number) => (a + b) / 2;
@@ -307,7 +313,7 @@ function boundaries(k: Kit): void {
   }
 }
 
-/** 도로변 전봇대·전선, 숲 쪽 높은 철 기둥 */
+/** 도로변 전봇대·전선 (숲 쪽 높은 철 기둥은 섹터 A 옆에 너무 높게 서 있어 지웠다, S2r) */
 function poles(k: Kit): void {
   // 도로 동쪽 가장자리 밖 (차로 위에 두지 않는다, `POLE_PX`)
   const spots: P2[] = POLE_PX.map(([x, y]) => sitePx(x, y));
@@ -338,16 +344,6 @@ function poles(k: Kit): void {
         k.box(C.wire, [len, 0.018, 0.018], [mid(p[0], q[0]) + off * Math.sin(heading) * 0.6, mid(p[1], q[1]) - 0.009, mid(p[2], q[2]) + off * Math.cos(heading) * 0.6], { r: 0, rot: [0, heading, pitch] });
       }
     }
-  }
-  // 숲 쪽 높은 철 기둥 (사진 entrance·weighbridge의 높은 기둥): 쇠 기둥 + 버팀줄
-  const [mx, mz] = sitePx(126, 276);
-  k.cyl(C.steel, [0.07, 0.12], 11, [mx, TOP, mz], { seg: 10, mat: 'metal' });
-  k.box(C.steel, [1.4, 0.07, 0.07], [mx, TOP + 10.2, mz], { r: 0.01, mat: 'metal' });
-  for (const a of [0.4, 2.5, 4.6]) {
-    const ex = mx + Math.cos(a) * 3.2;
-    const ez = mz - Math.sin(a) * 3.2;
-    const len = Math.hypot(3.2, 10.5);
-    k.box(C.wire, [len, 0.02, 0.02], [mid(mx, ex), TOP + 5.25, mid(mz, ez)], { r: 0, rot: [0, a, -Math.atan2(10.5, 3.2)] });
   }
 }
 
@@ -632,6 +628,7 @@ function houseWalls(footprints: Footprint[]): Wall[] {
   const make = (build: (k: Kit) => void, name: string): Group => {
     const k = new Kit();
     k.footprints = footprints;
+    k.footprintRotY = RAIL_FRAME.heading;
     k.at([0, TOP, 0], RAIL_FRAME.heading, () => build(k));
     return k.build(name);
   };
@@ -717,38 +714,7 @@ function houseRoof(): Group {
   return k.build('house-roof');
 }
 
-// ── 배출 받침대·베일 저울 (마당 좌표계) ────────────────────────────────
-
-function standAndScale(k: Kit): void {
-  const { stand, scale } = YARD;
-  k.at([YARD_FRAME.x, TOP, YARD_FRAME.z], YARD_FRAME.rotY, () => {
-    // 금속 받침대: 배출구에서 마당 쪽으로 베일 세 개 길이. 다리 + 양옆 레일 + 가로 받침 (롤러 없음)
-    const z0 = stand.outletZ;
-    const z1 = stand.outletZ + stand.length;
-    const half = BALE.w / 2 + 0.06;
-    for (const dx of [-1, 1]) {
-      k.box(C.steel, [0.08, 0.1, z1 - z0], [stand.x + dx * half, stand.y - 0.1, mid(z0, z1)], { r: 0.01, mat: 'metal' });
-      for (let z = z0 + 0.15; z < z1; z += 0.75) k.box(C.steel, [0.07, stand.y - 0.1, 0.07], [stand.x + dx * half, 0, z], { r: 0.01, mat: 'metal' });
-    }
-    for (let z = z0 + 0.2; z < z1; z += 0.45) k.box(C.steelLight, [half * 2, 0.05, 0.08], [stand.x, stand.y - 0.05, z], { r: 0.01, mat: 'metal' });
-    // 끝 멈춤 턱 (노랑)
-    k.box(C.yellow, [half * 2 + 0.1, 0.18, 0.06], [stand.x, stand.y - 0.05, z1 + 0.03], { r: 0.02 });
-    // 베일 저울: 낮은 판 + 노란 테두리 + 표시 기둥(숫자 없음)
-    const s = scale.size;
-    k.box(C.dark, [s, scale.y, s], [scale.x, 0, scale.z], { r: 0.02, mat: 'metal' });
-    k.box(C.steelLight, [s - 0.12, 0.02, s - 0.12], [scale.x, scale.y - 0.01, scale.z], { r: 0, mat: 'metal' });
-    for (const [dx, dz, w, d] of [
-      [0, s / 2, s + 0.08, 0.06],
-      [0, -s / 2, s + 0.08, 0.06],
-      [s / 2, 0, 0.06, s + 0.08],
-      [-s / 2, 0, 0.06, s + 0.08],
-    ] as const) {
-      k.box(C.yellow, [w, 0.05, d], [scale.x + dx, scale.y - 0.02, scale.z + dz], { r: 0.01 });
-    }
-    k.cyl(C.steel, 0.04, 1.1, [scale.x - s / 2 - 0.25, 0, scale.z - s / 2], { seg: 8, mat: 'metal' });
-    k.box(C.wall, [0.2, 0.28, 0.1], [scale.x - s / 2 - 0.25, 1.1, scale.z - s / 2], { r: 0.03 });
-  });
-}
+// 배출구 바닥 철판·베일 저울은 balePlate.ts (S2t)
 
 // ── 베일 블록: 북서 재고 뒤쪽, 남동 북동 날개, 북쪽 숲 경계 줄 (같은 방향·같은 간격, 4~5단) ──
 
@@ -861,14 +827,23 @@ export function buildWorld(lite = false): World {
   debris(k);
   bales(k);
   yardMarks(k);
-  standAndScale(k);
+  balePlate(k, TOP);
   utilities(k);
-  k.at([0, 0, 0], RAIL_FRAME.heading, () => {
-    houseFloor(k);
-    rail(k);
-    baler(k);
+  k.at([0, 0, 0], RAIL_FRAME.heading, () => rail(k));
+  // 압축기 건물 고정물은 따로 조립해 실시간 그림자를 끈다(벽·지붕도 같다): 그림자는 houseFootprints로 바닥에 구운 것만 (S2r)
+  const houseFootprints: Footprint[] = [];
+  const hk = new Kit();
+  hk.footprints = houseFootprints;
+  hk.footprintRotY = RAIL_FRAME.heading;
+  hk.at([0, 0, 0], RAIL_FRAME.heading, () => {
+    houseFloor(hk);
+    baler(hk);
   });
+  const house = noCastShadow(hk.build('house-fixed'));
+  const walls = houseWalls(houseFootprints);
+  for (const w of walls) noCastShadow(w.group);
+  const roof = noCastShadow(houseRoof());
   const { main } = BALER_HOUSE;
   const houseCenter = railPx(mid(main.u0, main.u1), mid(main.w0, main.w1));
-  return { base: k.build('world'), walls: houseWalls(footprints), roof: houseRoof(), houseCenter, footprints };
+  return { base: k.build('world'), walls, roof, houseCenter, footprints, house, houseFootprints };
 }

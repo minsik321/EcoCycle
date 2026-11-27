@@ -42,6 +42,8 @@ export const FOOT_DROP = 0.34;
 export const TINE_HINGE_Y = -0.1;
 export const TINE_HINGE_R = 0.1;
 export const TINE_COUNT = 6;
+/** 흙받이 밑면 높이: 윗면(+0.05)이 적재함 바닥 철판 밑면(deckY − 0.07)보다 낮다 */
+export const FENDER_Y = T.deckY - 0.15;
 
 export function buildGrappleTruck(variant: number, lite: boolean): GrappleModel {
   const root = new Group();
@@ -82,7 +84,8 @@ export function buildGrappleTruck(variant: number, lite: boolean): GrappleModel 
   const DY = T.deckY;
   const SH = T.sideH;
   const PLATE = 0.3;
-  k.box(C.steel, [BL, 0.07, T.width - 0.04], [bx, DY - 0.07, 0], { r: 0.02, mat: 'metal' });
+  // 바닥 철판은 밝은 철판색의 무광(clay): 금속 재질(metalness 0.75)은 높은 옆판 안에서 비출 환경이 없어 까맣게 보였다 (S2r)
+  k.box(C.steelLight, [BL, 0.07, T.width - 0.04], [bx, DY - 0.07, 0], { r: 0.02, mat: 'clay' });
   k.box(C.dark, [BL, 0.09, T.width - 0.02], [bx, DY - 0.16, 0], { r: 0.02, mat: 'clay' });
   const posts = 4;
   for (const dz of [-1, 1]) {
@@ -103,7 +106,8 @@ export function buildGrappleTruck(variant: number, lite: boolean): GrappleModel 
   // 후미등, 번호판, 흙받이
   for (const dz of [-1, 1]) k.box(C.red, [0.04, 0.07, 0.14], [-front, 0.38, dz * (HALF_W - 0.18)], { r: 0.02, mat: 'glow', glow: 1.5 });
   k.box(C.white, [0.02, 0.09, 0.3], [-front - 0.005, 0.38, 0], { r: 0.01, mat: 'clay' });
-  for (const dz of [-1, 1]) k.box(C.dark, [0.9, 0.05, 0.26], [-0.95, WR * 2 + 0.05, dz * (HALF_W - 0.14)], { r: 0.02, mat: 'clay' });
+  // 흙받이 윗면은 적재함 바닥 아래(검은 받침 틀 안)에 둔다: 전에는 윗면이 바닥 윗면(DY)과 같은 높이라 빈 적재함 바닥에 검은 면이 비쳤다 (S2r, S2n 덤프와 같은 원인)
+  for (const dz of [-1, 1]) k.box(C.dark, [0.9, 0.05, 0.26], [-0.95, FENDER_Y, dz * (HALF_W - 0.14)], { r: 0.02, mat: 'clay' });
   // 크레인 받침(돌지 않는 아래 틀, 적재함 뒤끝 너머 차대 위)과 받침다리 빔 상자
   k.box(C.yellowDeep, [0.36, 0.2, T.width - 0.1], [CRANE.x, 0.36, 0], { r: r(0.04) });
   k.box(C.dark, [0.2, 0.06, T.width - 0.3], [CRANE.x, 0.3, 0], { r: r(0.02), mat: 'clay' });

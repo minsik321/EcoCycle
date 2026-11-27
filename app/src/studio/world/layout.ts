@@ -415,7 +415,8 @@ export const WATER_TANK = { u: 128, w: -30 } as const;
 /** 압축기가 내보내는 베일의 단면 폭(m → 월드). BALE보다 위에 놓인 압축기가 쓴다 */
 const BALE_SECTION_W = M(REAL_SIZE_M.bale.width);
 /** 압출 통로 안쪽 바닥 높이(받침대 윗면과 같다), 통로 지붕 높이: 베일 높이 + 틈 */
-export const BALER_TUNNEL = { floorY: 0.5, roofY: 0.5 + M(REAL_SIZE_M.bale.height) + 0.08 } as const;
+/** 압출 통로 높이: 바닥 0.3(0.6 m, S2t: 배출구 앞 바닥 철판으로 짧게 내려오게 0.5에서 낮췄다), 지붕은 베일 위 */
+export const BALER_TUNNEL = { floorY: 0.3, roofY: 0.3 + M(REAL_SIZE_M.bale.height) + 0.08 } as const;
 export const BALER = {
   x: 80 * SITE_SCALE,
   /** 몸체 반폭: 압출 통로가 베일 단면(BALE.w)에 벽 두께·틈을 더한 폭이 되게 (S2k: 전에는 0.62로 베일보다 컸다) */
@@ -593,22 +594,51 @@ const SE_XS = Array.from({ length: YARD_FLOW.seColumns }, (_, i) => 3.1 + i * PI
 const NW_LANE_Z = -13.47;
 const NW_XS = Array.from({ length: YARD_FLOW.nwColumns }, (_, i) => 12.2 + i * PITCH_X);
 
-/** 배출구 받침대: 남동 벽(w 66px)에서 마당 쪽으로 베일 세 개 길이. 새 베일이 나오면 앞 베일이 밀려 한 칸씩 나간다 */
+/**
+ * 배출구 바닥 철판(S2t, 전의 금속 받침대·레일 대신): 남동 벽(w 66px) 배출구에서 짧은 경사 철판이 통로 바닥 높이에서 땅까지 내려오고,
+ * 그 앞에 바닥에 깐 평평한 철판이 이어진다(베일 세 개 길이). 새 베일이 나오면 앞 베일이 철판 위로 밀려 한 칸씩 나간다
+ */
 const STAND_X = railYard(80, 0)[0];
 const STAND_OUTLET_Z = railYard(0, 66)[1];
 const STAND_PITCH = BALE.d + 0.04;
+/** 경사 철판이 끝나는 곳(배출구에서 베일 한 칸 남짓) */
+const PLATE_SLOPE_END = STAND_OUTLET_Z + STAND_PITCH + 0.05;
+/** 평평한 철판 윗면 높이(땅 위 얇은 판) */
+const PLATE_Y = 0.035;
 const STAND = {
   x: STAND_X,
-  /** 받침대 위 자리(베일 가운데 z): 끝(지게차가 집는 곳)이 0번 */
+  /** 철판 위 자리(베일 가운데 z): 끝(지게차가 집는 곳)이 0번, 2번(배출구 바로 앞)은 경사 철판 위 */
   slots: [0, 1, 2].map((k) => STAND_OUTLET_Z + 0.05 + (2.5 - k) * STAND_PITCH) as readonly number[],
   pitch: STAND_PITCH,
-  /** 받침대 윗면 높이 */
-  y: BALER_TUNNEL.floorY,
+  /** 평평한 철판 윗면 높이 (지게차가 집는 0·1번 자리) */
+  y: PLATE_Y,
+  /** 배출구(통로 바닥) 높이: 경사 철판이 여기서 시작한다 */
+  outletY: BALER_TUNNEL.floorY,
+  /** 경사 철판 끝 z (여기부터 평평한 철판) */
+  slopeEnd: PLATE_SLOPE_END,
+  /** 경사 철판 기울기(rad) */
+  slope: Math.atan2(BALER_TUNNEL.floorY - PLATE_Y, PLATE_SLOPE_END - STAND_OUTLET_Z),
   /** 배출구 안쪽(결속부 끝): 새 베일이 여기서 나온다 */
   fromZ: STAND_OUTLET_Z - 0.55,
   outletZ: STAND_OUTLET_Z,
   length: 3 * STAND_PITCH + 0.1,
 } as const;
+
+/** 철판 위 베일 가운데 z → 베일 바닥 높이와 기울기(경사 철판 위면 기울어 내려온다). 통로 안은 통로 바닥 높이 */
+export function plateAt(z: number, out: { y: number; tilt: number }): { y: number; tilt: number } {
+  if (z <= STAND.outletZ) {
+    out.y = STAND.outletY;
+    out.tilt = 0;
+  } else if (z < STAND.slopeEnd) {
+    const k = (z - STAND.outletZ) / (STAND.slopeEnd - STAND.outletZ);
+    out.y = STAND.outletY + (STAND.y - STAND.outletY) * k;
+    out.tilt = STAND.slope;
+  } else {
+    out.y = STAND.y;
+    out.tilt = 0;
+  }
+  return out;
+}
 /** 베일 저울: 배출구 오른쪽(마당 쪽, 레일 좌표 u 58, w 83px). 베일 두 개를 위아래로 겹쳐 올려 한 번에 잰다 (무게 숫자 없음) */
 const BALE_SCALE_POS = railYard(58, 83);
 const BALE_SCALE = { x: BALE_SCALE_POS[0], z: BALE_SCALE_POS[1], y: 0.16, size: BALE.d + 0.25 } as const;
@@ -994,13 +1024,13 @@ export const LOAD_SLOTS: readonly LoadSlot[] = [0, 1].flatMap((level) =>
   [-1, 1].flatMap((side) => Array.from({ length: LOAD_COLS }, (_, i) => ({ along: LOAD_ALONG0 + i * LOAD_PITCH, across: side * LOAD_ACROSS, level }))),
 );
 /**
- * 싣는 차례(LOAD_SLOTS 번호, 20개): 아래 단을 다 채운 뒤 위 단 (S2j 사용자 결정).
- * 서쪽 곁(트럭 로컬 −z, 북쪽을 보고 선 차의 서쪽) 아래 단 5개 → 차 앞을 돌아 동쪽 곁 아래 단 5개 → 그대로 동쪽 위 단 5개 → 다시 돌아 서쪽 위 단 5개.
- * 돌아가는 것은 두 번뿐이다. 서버가 실었다고 한 수(baleIds)가 이보다 적으면 앞에서부터 그만큼만 싣는다
+ * 싣는 차례(LOAD_SLOTS 번호, 20개): 자리마다 아래 단 → 위 단 (S2t 2026-11-27: 지게차가 북서에서 두 개(2단)를 한 번에 집어 한 자리에 함께 내려놓는다.
+ * 전에는 S2j 결정대로 아래 단 10개를 다 채운 뒤 위 단). 서쪽 곁(트럭 로컬 −z) 5자리 → 차 앞을 돌아 동쪽 곁 5자리. 돌아가는 것은 한 번뿐이다.
+ * 짝수 번째(아래 단)와 그다음(위 단)이 한 쌍이다. 서버가 실었다고 한 수(baleIds)가 이보다 적으면 앞에서부터 그만큼만 싣는다(홀수면 마지막은 아래 단 하나)
  */
 const slotIndex = (side: -1 | 1, level: number, col: number): number => level * 2 * LOAD_COLS + (side < 0 ? 0 : LOAD_COLS) + col;
 const COLS = Array.from({ length: LOAD_COLS }, (_, c) => c);
-export const LOAD_ORDER: readonly number[] = ([[-1, 0], [1, 0], [1, 1], [-1, 1]] as const).flatMap(([side, level]) => COLS.map((c) => slotIndex(side, level, c)));
+export const LOAD_ORDER: readonly number[] = ([-1, 1] as const).flatMap((side) => COLS.flatMap((c) => [slotIndex(side, 0, c), slotIndex(side, 1, c)]));
 /** 상차 차량의 적재함 바닥 높이 */
 export const LOAD_BED_Y = LOAD_TRUCK.deckY;
 
