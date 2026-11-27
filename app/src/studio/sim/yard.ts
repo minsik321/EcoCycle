@@ -236,6 +236,8 @@ const JAW_H1 = 0.52 * CS;
 const TOKEN_PATIENCE_SEC = 60;
 /** 경로 위 문(길·차례)을 못 잡았을 때 그 점보다 이만큼 앞에서 선다 */
 const GATE_BEFORE = 0.3;
+/** 북서 → 남동으로 돌아올 때 남동 길 동쪽 끝을 지나 이만큼 들어선 뒤 마당 차례를 놓는다 */
+const LANE_CLEAR_RUN = 2;
 const CLEAR = 0.02;
 const TURN_R = 1.45 * FS;
 /** 마당 차례 없이 쌓아도 되는 북서 열 (이 열부터 동쪽) */
@@ -350,6 +352,7 @@ export class Yard {
   private weighT = 0;
   private readonly boxA = newBox();
   private readonly lookPose: Pose = { x: 0, z: 0, heading: 0 };
+  private readonly boxNow = newBox();
   private readonly boxB = newBox();
   private readonly obstacles: LocalObstacle[] = [];
   private readonly loader: LoaderState = { present: false, parked: false, id: '', x: 0, z: 0, heading: 0, loaded: 0, want: 0, loading: false };
@@ -695,16 +698,42 @@ export class Yard {
       f.cross = false;
       f.legs = [];
       f.task = null;
-      f.path = null;
+      this.clearMotion(f);
       f.speed = 0;
       f.forkGoal = null;
+      f.wideGoal = null;
       f.blockedT = 0;
       f.idleT = 0;
+      // 쥔 남동 길도 놓는다 (끝내지 못한 상차가 길을 쥔 채 남지 않게)
+      if (this.laneHolder === f) this.laneHolder = null;
       this.token?.release(`forklift:${f.id}`);
+      this.backOffLoader(f);
     }
   }
 
   /** 상차 차량에 싣는 지게차가 있다 */
+  /**
+   * 상차를 끝낼 때 포크가 아직 상차 차량 위(적재함 옆선 안)에 있으면 먼저 곧게 뒤로 빠진다 (S2s: 그 자리에서 돌면 실린 베일을 쓸었다)
+   */
+  private backOffLoader(f: ForkliftSim): void {
+    const lo = this.loader;
+    if (!lo.present) return;
+    const tipX = f.x + Math.cos(f.heading) * FORK_TIP;
+    const tipZ = f.z - Math.sin(f.heading) * FORK_TIP;
+    const dx = tipX - lo.x;
+    const dz = tipZ - lo.z;
+    const along = dx * Math.cos(lo.heading) - dz * Math.sin(lo.heading);
+    const across = dx * Math.sin(lo.heading) + dz * Math.cos(lo.heading);
+    if (Math.abs(across) > LOAD_TRUCK.width / 2 + 0.3 || Math.abs(along) > LOAD_TRUCK.length / 2 + 0.3) return;
+    const back = FORK_TIP + 0.5;
+    f.legs = [
+      { kind: 'clamp', closed: false },
+      { kind: 'drive', to: [f.x - Math.cos(f.heading) * back, f.z + Math.sin(f.heading) * back], reverse: true },
+      { kind: 'forkTo', height: LOW_FORK },
+    ];
+    f.task = { kind: 'home' };
+  }
+
   loadingBusy(): boolean {
     return this.forklifts.some((f) => f.task?.kind === 'load');
   }
@@ -1055,7 +1084,15 @@ export class Yard {
     return n;
   }
 
+  /** 따라가던 경로를 버린다 (새 일을 맡거나 끝낼 때: 남은 경로를 새 다리가 이어 쓰지 않게) */
+  private clearMotion(f: ForkliftSim): void {
+    f.path = null;
+    f.route = null;
+    f.routePivot = false;
+  }
+
   private begin(f: ForkliftSim, task: Task, legs: Leg[]): void {
+    this.clearMotion(f);
     f.task = task;
     f.legs = legs;
     f.idleT = 0;
@@ -1298,6 +1335,9 @@ export class Yard {
         }
         b.owner = f.id;
         const y = b.y + 0.03;
+        // 북서 길의 동쪽 열(NW_FREE_FROM부터)과 돌려 잡기 자리는 트럭 길에서 떨어져 있다: 마당 차례는 차 곁으로 갈 때만 쥔다(S2s: 실제 속도로
+        // 상차 한 번이 길어져 내내 쥐면 트럭이 오래 기다린다). 서쪽 끝 열은 쏟는 자리 A로 가는 트럭 곁이라 쥔 채 집는다
+        more.push({ kind: 'token', take: best < NW_FREE_FROM });
         // 집을 높이까지만 든다(S2s #4): 길에서는 낮게, 칸 앞에 닿기 직전에 맞춘다
         this.nwLaneTo(more, at, YARD.nwXs[best]!, y);
         this.nwEnter(more, at, YARD.nwXs[best]!, NW_POCKET_Z, y, y);
@@ -1305,9 +1345,10 @@ export class Yard {
         // 칸에서 곧게 뒤로 빠진 뒤(아래 베일에 닿지 않게) 달리면서 포크를 내린다
         more.push({ kind: 'drive', to: [YARD.nwXs[best]!, YARD.nwLaneZ], reverse: true }, { kind: 'forkTo', height: LOW_FORK });
         at.z = YARD.nwLaneZ;
-        // 양보 자리(S2m): 북서 길은 트럭 길에서 떨어져 있다. 입고 트럭이 계근대에서 차례를 기다리면 여기서 마당 차례를 놓고
-        // 그 차가 섹터 앞에 들어설 때까지 베일을 든 채 기다린다. 기다리는 트럭이 없으면 서지 않고 지난다(S2s: 전에는 늘 놓았다 다시 잡아 섰다)
-        more.push({ kind: 'yield' });
+        // 양보 자리(S2m): 북서 길은 트럭 길에서 떨어져 있다. 서쪽 끝 열에서 차례를 쥐고 집었으면 입고 트럭이 기다릴 때만 놓았다 다시 잡고(yield),
+        // 동쪽 열이면 여기서 차례를 잡는다: 트럭이 기다리면 베일을 든 채 여기서 양보한다. 돌려 잡기 자리는 계근대로 가는 트럭 길 곁이라
+        // 거기서는 기다리지 않는다(S2s: 거기서 기다리면 트럭과 서로 막혔다)
+        more.push({ kind: 'yield' }, { kind: 'token', take: true });
         // 돌려 잡기: 북서 길에서 마당 쪽(+z)으로 둥글게 들어가 내려놓는다
         const [rx, rz] = YARD.regrip;
         const back: P2 = [rx, rz - FORK_REACH - REGRIP_BACK];
@@ -1527,14 +1568,17 @@ export class Yard {
    */
   private nwHomeRoute(f: ForkliftSim, legs: Leg[], cur: { x: number; z: number }, head: P2[], takeToken: boolean): void {
     const [c0, c1, c2] = YARD.crossing as readonly [P2, P2, P2];
-    const pts: P2[] = [...head, c2, c1, c0, [YARD.laneEnd, YARD.laneZ]];
+    // 남동 길 동쪽 끝에서 서서 돌지 않고 길로 둥글게 들어선다. 마당 차례는 끝(트럭 길 곁)에서 벗어난 뒤 놓는다
+    // (S2s: 끝에서 놓고 돌고 있으면 상차 자리에서 물러나는 차가 닿았다)
+    const into: P2 = [YARD.laneEnd - LANE_CLEAR_RUN, YARD.laneZ];
+    const pts: P2[] = [...head, c2, c1, c0, [YARD.laneEnd, YARD.laneZ], into];
     const h = head.length;
     const gates: RouteGate[] = [];
     if (takeToken) gates.push({ at: h, pass: this.passToken });
     gates.push({ at: h + 1, pass: this.passLane });
-    legs.push({ kind: 'route', pts, gates, events: [{ at: h + 3, fn: this.dropToken }] });
-    cur.x = YARD.laneEnd;
-    cur.z = YARD.laneZ;
+    legs.push({ kind: 'route', pts, gates, events: [{ at: h + 4, fn: this.dropToken }] });
+    cur.x = into[0];
+    cur.z = into[1];
     this.seGo(f, legs, cur, f.home[0], f.home[1], FACE_MINUS_Z, LOW_FORK);
     legs.push({ kind: 'lane', take: false });
   }
@@ -1556,6 +1600,10 @@ export class Yard {
       // 싣는 지게차는 상차 차량 곁에 붙는다(포크가 적재함 위로 간다)
       if (t.loader && f.task?.kind === 'load') continue;
       const size = truckSize(Boolean(t.loader));
+      // 지금 이미 그 차에 붙어 있으면(싣다가 상차를 끝낸 지게차 등) 벗어나는 움직임은 막지 않는다 (S2s: 서로 기다려 멈췄다)
+      setBox(b, t.x, t.z, t.heading, -size.length / 2, size.length / 2, size.width / 2 + CLEAR);
+      setBox(this.boxNow, f.x, f.z, f.heading, FORK_BACK, f.carrying ? LOAD_TIP : FORK_TIP, HALF_W + CLEAR);
+      if (boxesOverlap(this.boxNow, b)) continue;
       if (t.loader && this.loader.present) {
         // 상차 자리에 선 차(움직이지 않는다)는 실제 외곽선으로만 본다: 곁의 북서 길 동쪽 끝에서 도는 지게차를 막지 않게 (S2j)
         setBox(b, t.x, t.z, t.heading, -size.length / 2, size.length / 2, size.width / 2 + CLEAR);
