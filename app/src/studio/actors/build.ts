@@ -455,10 +455,10 @@ export function buildWorker(index: number, withTablet: boolean): WorkerModel {
   return { root, body, legL, legR, armL, armR, head };
 }
 
-/** 움직이는 베일 하나 (지게차가 나른다) */
-export function buildBale(): Group {
+/** 움직이는 베일 하나 (지게차가 나른다). 바탕 재고 벽과 같은 모양(props의 bale), lite는 low 단계 */
+export function buildBale(lite = false): Group {
   const k = new Kit('clay');
-  baleParts(k, 0, 0, 0, 0);
+  baleParts(k, 0, 0, 0, 0, lite);
   return k.build('bale');
 }
 

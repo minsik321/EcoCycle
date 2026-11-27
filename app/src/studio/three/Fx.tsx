@@ -239,25 +239,6 @@ export function SelectionBox({ director, focusKey }: { director: Director; focus
 export type PinElements = Record<string, HTMLElement | null>;
 
 /** HTML 핀의 위치를 매 프레임 화면 좌표로 써 넣는다 (대상이 없으면 숨긴다) */
-/**
- * 번호판 인식 장면의 핀: 계근대 위 차의 번호판(서버 값, 인식 전이면 "인식 중…")과 입차·출차 계근을 적는다.
- * 패널 조각은 3D 장면의 어느 차가 계근대에 섰는지 모르므로 핀을 옮기는 이곳에서 글자만 바꾼다 (값은 Director가 서버 값에서 받은 것)
- */
-function writePlate(el: HTMLElement, director: Director): void {
-  const s = director.plateScan;
-  const text = s.plate ?? '인식 중…';
-  const kind = s.out ? '출차 계근' : '입차 계근';
-  const plate = el.querySelector<HTMLElement>('[data-plate]');
-  const label = el.querySelector<HTMLElement>('[data-plate-kind]');
-  if (plate && plate.textContent !== text) plate.textContent = text;
-  if (label && label.textContent !== kind) label.textContent = kind;
-  const done = s.plate ? 'true' : 'false';
-  if (el.dataset.recognized !== done) {
-    el.dataset.recognized = done;
-    el.setAttribute('aria-label', `${kind} 번호판 ${s.plate ?? '인식 중'}`);
-  }
-}
-
 /** 핀을 가리는 패널(유리 패널·상단 바)의 자리를 다시 재는 간격(ms). 패널은 자주 움직이지 않는다 */
 const COVER_EVERY_MS = 400;
 /** 핀 상자(가리키는 점 위로): 폭의 반, 높이 */
@@ -324,8 +305,8 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
         el.style.visibility = 'hidden';
         continue;
       }
-      // 고른 핀 → 번호판 인식 → 가까운 핀 순으로 자리를 준다
-      const rank = el.getAttribute('aria-pressed') === 'true' ? 0 : key === 'plate:scan' ? 1 : 2;
+      // 고른 핀 → 가까운 핀 순으로 자리를 준다
+      const rank = el.getAttribute('aria-pressed') === 'true' ? 0 : 1;
       placed.push({ key, el, x, y, z: v.z, rank });
     }
     // 핀끼리 겹치면 뒤 차례의 핀을 숨긴다 (겹친 알약이 서로 가려 읽히지 않게)
@@ -340,7 +321,6 @@ export function PinLayer({ director, pins }: { director: Director; pins: Mutable
       }
       boxes.push(box);
       p.el.style.visibility = 'visible';
-      if (p.key === 'plate:scan') writePlate(p.el, director);
       p.el.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0) translate(-50%, -100%)`;
       p.el.style.zIndex = String(Math.round((1 - p.z) * 100000));
     }

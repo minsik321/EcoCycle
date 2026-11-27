@@ -349,15 +349,15 @@ export function Forklifts({ director, onSelect, blobs = false }: ActorProps) {
 }
 
 /** 베일은 모두 한 지오메트리의 인스턴스다: 칸 수 + 여유만큼 만들어 두고, 쓰지 않는 것은 크기 0으로 접는다. 좌표는 마당 좌표계 */
-export function Bales({ director, onSelect }: ActorProps) {
+export function Bales({ director, onSelect, lite = false }: ActorProps & { lite?: boolean }) {
   const source = useMemo(() => {
-    const group = buildBale();
+    const group = buildBale(lite);
     const meshes: Mesh[] = [];
     group.traverse((o) => {
       if ((o as Mesh).isMesh) meshes.push(o as Mesh);
     });
     return { group, meshes };
-  }, []);
+  }, [lite]);
   const refs = useRef<Array<InstancedMesh | null>>([]);
   const tmp = useMemo(() => ({ m: new Matrix4(), q: new Quaternion(), p: new Vector3(), s: new Vector3(1, 1, 1), zero: new Vector3(0, 0, 0), up: new Vector3(0, 1, 0) }), []);
   // 첫 장 전에 모든 인스턴스를 접어 둔다 (기본 행렬은 원점에 크기 1이라 그대로 두면 한 장 동안 원점에 보인다)

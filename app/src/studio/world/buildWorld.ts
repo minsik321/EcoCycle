@@ -25,7 +25,6 @@ import {
   OFFICE,
   PILES,
   PLATEAU,
-  PLATE_CAMERA,
   RAIL,
   RAIL_FRAME,
   RAIL_LEN,
@@ -49,7 +48,7 @@ import {
   siteHeading,
   worldToPx,
 } from './layout';
-import { cone, lamp, pallet } from './props';
+import { bale, cone, lamp, pallet } from './props';
 
 export { inside } from './layout';
 
@@ -515,15 +514,6 @@ function weighbridge(k: Kit): void {
   });
   const [cx, cz] = sitePx(498, 252);
   cone(k, cx, cz, 1.6);
-  // 번호판 인식 카메라 기둥 (서남 끝): 기둥 + 팔 + 카메라 상자 + 작은 등
-  const { at, heading } = PLATE_CAMERA;
-  k.at([at[0], TOP, at[1]], heading, () => {
-    k.cyl(C.steel, 0.06, 2.6, [0, 0, 0], { seg: 10, mat: 'metal' });
-    k.box(C.steel, [0.6, 0.06, 0.06], [0.28, 2.55, 0], { r: 0.01, mat: 'metal' });
-    k.box(C.wall, [0.34, 0.2, 0.2], [0.6, 2.42, 0], { r: 0.05 });
-    k.cyl(C.dark, 0.06, 0.05, [0.79, 2.52, 0], { axis: 'x', seg: 12 });
-    k.box('#9fd3ff', [0.02, 0.05, 0.12], [0.8, 2.48, 0], { r: 0, mat: 'glow', glow: 1.6 });
-  });
 }
 
 // ── 압축기 건물·레일·압축기 (레일 좌표계) ─────────────────────────────
@@ -761,37 +751,25 @@ function standAndScale(k: Kit): void {
 
 // ── 베일 블록: 북서 재고 뒤쪽, 남동 북동 날개, 북쪽 숲 경계 줄 (같은 방향·같은 간격, 4~5단) ──
 
-/** 단순한 베일 하나 (합친 메시용: 상자 + 결속 끈 둘) */
-function staticBale(k: Kit, x: number, y: number, z: number, rot: number, tone: string): void {
-  k.at([x, y, z], rot, () => {
-    k.box(tone, [BALE.d, BALE.h - 0.01, BALE.w], [0, 0, 0], { r: 0 });
-    if (!LITE) for (const dx of [-0.28, 0.28]) k.box(C.dark, [0.026, BALE.h + 0.004, BALE.w + 0.012], [dx, -0.005, 0], { r: 0 });
-  });
-}
 
-const TONES = [C.kraft, C.kraftLight, C.paperGrey, C.kraftDark, C.kraftLight, C.paper];
-const tone = (n: number): string => TONES[((n % TONES.length) + TONES.length) % TONES.length]!;
-
-/** 마당 좌표의 격자(같은 방향·간격)로 다각형 안을 채운다. keep(x, z)이 false면 비운다. 블록(4열)마다 4단 또는 5단 */
-/** 바탕 베일 칸(layout의 staticBaleCells)을 층마다 쌓는다 */
-function baleBlocks(k: Kit, cells: readonly StaticBaleCell[], seed: number): void {
-  const rnd = random(seed);
+/** 바탕 베일 칸(layout의 staticBaleCells)을 층마다 쌓는다. 모양은 지게차가 옮기는 베일과 같다(props의 bale) */
+function baleBlocks(k: Kit, cells: readonly StaticBaleCell[]): void {
   for (const c of cells) {
     const [wx, wz] = yardPoint(c.x, c.z);
-    for (let l = 0; l < c.levels; l += 1) staticBale(k, wx, TOP + 0.06 + l * BALE.h, wz, YARD_FRAME.rotY - Math.PI / 2, tone(c.i * 3 + c.j * 5 + l + Math.floor(rnd() * 2)));
+    for (let l = 0; l < c.levels; l += 1) bale(k, wx, TOP + 0.06 + l * BALE.h, wz, YARD_FRAME.rotY - Math.PI / 2, LITE);
   }
 }
 
 function bales(k: Kit): void {
-  baleBlocks(k, staticBaleCells('nw'), 11);
-  baleBlocks(k, staticBaleCells('se'), 23);
+  baleBlocks(k, staticBaleCells('nw'));
+  baleBlocks(k, staticBaleCells('se'));
   // 북쪽 그물망 곁 숲 경계 줄 (3단)
   const [a, b] = NORTH_ROW_PX.map(([x, y]) => sitePx(x, y));
   const len = Math.hypot(b![0] - a![0], b![1] - a![1]);
   const rot = Math.atan2(-(b![1] - a![1]), b![0] - a![0]);
   for (let s = 0.5; s < len; s += BALE.d + BALE_GAP) {
     const p: P2 = [a![0] + ((b![0] - a![0]) * s) / len, a![1] + ((b![1] - a![1]) * s) / len];
-    for (let l = 0; l < 3; l += 1) staticBale(k, p[0], TOP + 0.06 + l * BALE.h, p[1], rot, tone(Math.round(s * 3) + l));
+    for (let l = 0; l < 3; l += 1) bale(k, p[0], TOP + 0.06 + l * BALE.h, p[1], rot, LITE);
   }
 }
 

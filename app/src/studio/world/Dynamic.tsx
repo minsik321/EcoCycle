@@ -11,7 +11,7 @@ import type { P2 } from '../sim/paths';
 import { C } from '../theme';
 import { Kit, MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { useClockWaker } from '../three/motion';
-import { BALER, PILES, PLATE_CAMERA, PILE_MAX_H, PLATEAU, RAIL, RAIL_FRAME, RAIL_LEN, RAIL_SLOPE, SITE, TIP, YARD_FRAME, centroid, railAt, railY, sitePx } from './layout';
+import { BALER, PILES, PILE_MAX_H, PLATEAU, RAIL, RAIL_FRAME, RAIL_LEN, RAIL_SLOPE, SITE, TIP, YARD_FRAME, centroid, railAt, railY, sitePx } from './layout';
 import { buildFloor, disposeFloor } from '../three/floorTexture';
 import { bakeGroundShadow, disposeBaked } from '../three/bakedShadow';
 import { buildWorld, edgeDistance, inside } from './buildWorld';
@@ -358,56 +358,6 @@ export function BalerParts({ director, status }: { director: Director; status: D
         ))}
       </group>
     </group>
-  );
-}
-
-// ── 번호판 인식 장면 ──────────────────────────────────────────────────
-
-const SCAN_BEAM = new MeshBasicMaterial({ color: '#8fd0ff', transparent: true, opacity: 0.28, depthWrite: false, toneMapped: false });
-const SCAN_SPOT = new MeshBasicMaterial({ color: '#bfe6ff', transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false });
-
-/**
- * 계근대 위에 선 차의 번호판을 카메라 기둥이 비추는 빛줄기와 번호판 위 밝은 테 (입차·출차 계근 때마다).
- * 번호판 글자는 서버 값만 패널 쪽 표시(핀)에 적는다. 움직임은 월드 시계(director.t)를 따른다(끊기면 멈춘다)
- */
-export function PlateScanFx({ director }: { director: Director }) {
-  const beam = useRef<Mesh>(null);
-  const spot = useRef<Mesh>(null);
-  const head = useMemo(() => {
-    const [x, z] = PLATE_CAMERA.at;
-    const h = PLATE_CAMERA.heading;
-    return new Vector3(x + Math.cos(h) * 0.8, 2.5, z - Math.sin(h) * 0.8);
-  }, []);
-  const tmp = useMemo(() => ({ to: new Vector3(), mid: new Vector3(), up: new Vector3(0, 1, 0), q: new Quaternion(), d: new Vector3() }), []);
-  useFrame(() => {
-    const s = director.plateScan;
-    const show = s.active && s.t > 0.2;
-    if (beam.current) beam.current.visible = show;
-    if (spot.current) spot.current.visible = show;
-    if (!show || !beam.current || !spot.current) return;
-    tmp.to.set(s.x, 0.55, s.z);
-    tmp.d.subVectors(tmp.to, head);
-    const len = tmp.d.length();
-    tmp.mid.addVectors(head, tmp.to).multiplyScalar(0.5);
-    beam.current.position.copy(tmp.mid);
-    tmp.q.setFromUnitVectors(tmp.up, tmp.d.normalize());
-    beam.current.quaternion.copy(tmp.q);
-    // 인식 전에는 빛줄기가 훑고(깜빡임), 서버가 번호판을 주면 고정된다
-    const sweep = s.plate ? 1 : 0.6 + 0.4 * Math.sin(director.t * 9);
-    beam.current.scale.set(sweep, len, sweep);
-    spot.current.position.copy(tmp.to);
-    spot.current.lookAt(head);
-    (spot.current.material as MeshBasicMaterial).opacity = s.plate ? 0.7 : 0.3 + 0.3 * Math.abs(Math.sin(director.t * 6));
-  });
-  return (
-    <>
-      <mesh ref={beam} material={SCAN_BEAM} visible={false}>
-        <cylinderGeometry args={[0.32, 0.04, 1, 16, 1, true]} />
-      </mesh>
-      <mesh ref={spot} material={SCAN_SPOT.clone()} visible={false}>
-        <planeGeometry args={[0.7, 0.32]} />
-      </mesh>
-    </>
   );
 }
 
