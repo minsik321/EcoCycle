@@ -35,6 +35,11 @@ function toTruck(t: TruckSim, x: number, z: number): Local {
 const onBed = (l: Local): boolean =>
   l.along - BALE.d / 2 >= LOAD_BED_REAR - EPS && l.along + BALE.d / 2 <= LOAD_BED_REAR + LOAD_TRUCK.bedLength + EPS && Math.abs(l.across) + BALE.w / 2 <= LOAD_TRUCK.bedWidth / 2 + EPS;
 
+/** 입차 줄(도로·경사로·입차 계근)에 선 차를 빼고, 상차 자리로 가거나 싣거나 싣고 나가는 상차 차량.
+ * S2s: 지게차가 실제 속도라 상차가 길어져 다음 상차 차량이 앞 차가 나가기 전에 들어와 줄 선다(그 차를 보면 안 된다) */
+const QUEUE_PHASES = new Set(['road', 'roadHold', 'toScale', 'reverseIn', 'atScale']);
+const loaderTruck = (d: Director): TruckSim | null => d.trucks.find((x) => x.active && x.outbound && !QUEUE_PHASES.has(x.phase)) ?? null;
+
 function runDemo(seconds: number, each: (d: Director, t: number) => void): Director {
   const d = new Director();
   for (let i = 0; i * DT < seconds; i += 1) {
@@ -58,7 +63,7 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
     let placements = 0;
     let checkedBales = 0;
     runDemo(1300, (d, t) => {
-      const out = d.trucks.find((x) => x.active && x.outbound) ?? null;
+      const out = loaderTruck(d);
       const loaded = d.bales.filter((b) => b.active && b.state === 'loaded');
       if (out !== truck) {
         lastLoaded = loaded.length;
@@ -77,6 +82,8 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
       }
       // #10: 놓는 순간 베일은 적재함 안, 집게 끝도 차 외곽선 안, 지게차 몸체(마스트)는 차 밖
       if (d.yard.stats.loadedOut > lastOut) {
+        // 한 번에 두 개(2단)를 놓으면 둘로 센다 (S2t)
+        const placedNow = d.yard.stats.loadedOut - lastOut;
         lastOut = d.yard.stats.loadedOut;
         const f = d.forklifts.find((g) => g.task?.kind === 'load')!;
         const placed = loaded.reduce<BaleSim | null>((best, b) => (best && Math.hypot(best.x - f.x, best.z - f.z) < Math.hypot(b.x - f.x, b.z - f.z) ? best : b), null)!;
@@ -85,7 +92,7 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
         expect(Math.abs(tip.across)).toBeLessThanOrEqual(LOAD_TRUCK.width / 2 + EPS);
         const front = toTruck(out, f.x + Math.cos(f.heading) * BODY_FRONT, f.z - Math.sin(f.heading) * BODY_FRONT);
         expect(Math.abs(front.across), `t=${t.toFixed(1)} 지게차가 적재함 옆선 안으로 들어왔다`).toBeGreaterThanOrEqual(LOAD_TRUCK.width / 2 - 0.02);
-        placements += 1;
+        placements += placedNow;
       }
       // 상차 자리를 떠나는 순간: 서버가 실었다고 한 수(최대 20)를 다 실었다
       if (out.phase === 'loadBack' && !left.some((x) => x.id === out.id)) left.push({ id: out.id, loaded: loaded.length, want: Math.min(out.want, LOAD_ORDER.length) });
@@ -105,7 +112,7 @@ describe('상차 트럭(25톤 카고)과 지게차 상차 (S2j)', () => {
     let departures = 0;
     let prevPhase = '';
     runDemo(1300, (d, t) => {
-      const out = d.trucks.find((x) => x.active && x.outbound);
+      const out = loaderTruck(d);
       if (!out) {
         prevPhase = '';
         return;

@@ -274,7 +274,8 @@ describe('Director: 서버 단계를 움직임으로 옮긴다', () => {
       d.sync(input({ vehicles: [out('loading', ids.slice(0, i), at)], bales: [...shipped(ids.slice(0, i), at), bale('X', 'created', T0 - 900_000)] }), at);
       run(d, 9);
     }
-    run(d, 70);
+    // 실제 축척 지게차(S2s)로 한 개씩 세 번(서버가 9초마다 하나씩 늘림: 두 개 운반을 쓸 수 없다) 싣는 시간 (전에는 70초)
+    run(d, 130);
     expect(truck.sides).toBeGreaterThan(0.9);
     expect(d.bales.filter((b) => b.active && b.state === 'loaded')).toHaveLength(3);
     expect(d.yard.audit().nwStacked).toBe(nw0 - 3);

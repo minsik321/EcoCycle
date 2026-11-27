@@ -12,14 +12,25 @@ export const YARD_FLOW = {
   /** 처음 장면을 열 때 이미 쌓여 있는 재고(서버 베일이 아닌 바탕 재고)의 비율: 남동 열, 북서 열 */
   seStartColumns: 8,
   nwStartColumns: 9,
+  /**
+   * 저울(S2t): 베일은 두 개를 2단으로 쌓아 한 번에 잰다. 저울에 한 개를 올린 뒤 이 시간(초, 월드 시계) 안에 다음 베일이 배출구 철판에
+   * 나오지 않으면 한 개만 재서 옮긴다(베일 한 개가 나오는 주기 정도). 화면 연출의 가정이고 서버 무게 기록과는 상관없다
+   */
+  singleWaitSec: 12,
   /** 남동에 빈 열이 이만큼보다 적으면 가장 오래된 줄을 북서로 옮긴다 */
   seFreeColumnsMin: 3,
-  /** 지게차 속도·가속·회전·포크 오르내림 (m/s, m/s², rad/s, m/s) */
-  driveMps: 5.6,
-  reverseMps: 3.6,
-  accelMps2: 5.0,
-  turnRadPerSec: 6.2,
-  liftMps: 2.0,
+  /**
+   * 지게차(3톤급) 실제 축척 한계(S2s 2026-11-27 메인 승인): 앞 4.5 m/s(약 16 km/h), 후진 2.5 m/s, 가속 2 m/s², 포크 오르내림 0.5 m/s.
+   * 장면은 studio/sim/forkRoute.ts에서 월드 단위(1단위 = 2 m)로 바꿔 쓰고, 이 값을 넘어 빨리 돌리지 않는다(전에는 상차 끝에 2.2배).
+   * 모서리는 회전 반경(cornerRadiusM)으로 둥글리고 옆 가속(cornerAccelMps2) 안으로 줄인다. 제자리 돌기는 turnRadPerSec(rad/s)
+   */
+  driveMps: 4.5,
+  reverseMps: 2.5,
+  accelMps2: 2.0,
+  liftMps: 0.5,
+  cornerRadiusM: 2.2,
+  cornerAccelMps2: 2.5,
+  turnRadPerSec: 2.4,
 } as const;
 
 /** 장면이 쌓을 수 있는 칸 수 (남동 + 북서). 패널이 "마당 N칸"을 적을 때도 이 값을 쓴다 */
