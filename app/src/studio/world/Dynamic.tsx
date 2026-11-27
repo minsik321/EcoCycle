@@ -11,16 +11,15 @@ import type { P2 } from '../sim/paths';
 import { C } from '../theme';
 import { Kit, MAT, chunkGeometry, disposeTree } from '../three/kit';
 import { useClockWaker } from '../three/motion';
-import { BALER, PILES, PLATE_CAMERA, PILE_MAX_H, PLATEAU, RAIL, RAIL_FRAME, RAIL_LEN, RAIL_SLOPE, SITE, TIP, YARD_FRAME, centroid, railAt, railY, sitePx } from './layout';
+import { BALER, PILES, PILE_MAX_H, PLATEAU, RAIL, RAIL_FRAME, RAIL_LEN, RAIL_SLOPE, SITE, TIP, YARD_FRAME, centroid, railAt, railY, sitePx } from './layout';
 import { buildFloor, disposeFloor } from '../three/floorTexture';
 import { bakeGroundShadow, disposeBaked } from '../three/bakedShadow';
 import { buildWorld, edgeDistance, inside } from './buildWorld';
+import { applyWall, roofNoShadow, roofShown, wallParts, wallShown } from './houseHide';
 
 // 월드의 고정물과, 기기 값에 따라 움직이는 부분(벨트·램·더미). 입구는 열린 경사로다(차가 멈추지 않고 그대로 지난다).
 
 const HIT = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
-/** 압축기 건물의 파란 지붕을 걷는 카메라 거리 (부지 전체에서는 사진처럼 덮여 보이고, 구역 거리부터는 안이 보인다) */
-const ROOF_HIDE_DIST = 75;
 /** 카메라가 이보다 낮으면 땅에서 보는 화면으로 본다(m). 구역(mid)·대상(close) 보기는 이보다 높다 */
 const GROUND_VIEW_Y = 10;
 
@@ -52,6 +51,11 @@ export function World({ baked = false }: { baked?: boolean }) {
     if (shadow) disposeBaked(shadow);
   }, [shadow]);
   const camera = useThree((s) => s.camera);
+  // 벽·지붕 걷기 (houseHide: 걷힌 벽은 그림자만 그리고, 지붕은 그림자를 드리우지 않으며, 문턱에 여유를 둔다)
+  const house = useMemo(() => {
+    roofNoShadow(world.roof);
+    return { walls: world.walls.map((w) => ({ wall: w, parts: wallParts(w.group), shown: true, init: false })), roof: true };
+  }, [world]);
   useEffect(
     () => () => {
       disposeTree(world.base);
@@ -67,8 +71,15 @@ export function World({ baked = false }: { baked?: boolean }) {
     const len = Math.hypot(dx, dz) || 1;
     // 사람 눈높이(사진 방향 화면 등)에서는 건물을 밖에서 본 그대로 둔다: 벽·지붕(물탱크)을 걷지 않는다
     const ground = camera.position.y < GROUND_VIEW_Y;
-    for (const wall of world.walls) wall.group.visible = ground || (wall.nx * dx + wall.nz * dz) / len < 0.18;
-    world.roof.visible = ground || Math.hypot(dx, camera.position.y, dz) > ROOF_HIDE_DIST;
+    for (const w of house.walls) {
+      const shown = ground || wallShown(w.shown, (w.wall.nx * dx + w.wall.nz * dz) / len);
+      if (shown === w.shown && w.init) continue;
+      w.shown = shown;
+      w.init = true;
+      applyWall(w.parts, shown, !baked);
+    }
+    house.roof = ground || roofShown(house.roof, Math.hypot(dx, camera.position.y, dz));
+    world.roof.visible = house.roof;
   });
   return (
     <>
@@ -358,56 +369,6 @@ export function BalerParts({ director, status }: { director: Director; status: D
         ))}
       </group>
     </group>
-  );
-}
-
-// ── 번호판 인식 장면 ──────────────────────────────────────────────────
-
-const SCAN_BEAM = new MeshBasicMaterial({ color: '#8fd0ff', transparent: true, opacity: 0.28, depthWrite: false, toneMapped: false });
-const SCAN_SPOT = new MeshBasicMaterial({ color: '#bfe6ff', transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false });
-
-/**
- * 계근대 위에 선 차의 번호판을 카메라 기둥이 비추는 빛줄기와 번호판 위 밝은 테 (입차·출차 계근 때마다).
- * 번호판 글자는 서버 값만 패널 쪽 표시(핀)에 적는다. 움직임은 월드 시계(director.t)를 따른다(끊기면 멈춘다)
- */
-export function PlateScanFx({ director }: { director: Director }) {
-  const beam = useRef<Mesh>(null);
-  const spot = useRef<Mesh>(null);
-  const head = useMemo(() => {
-    const [x, z] = PLATE_CAMERA.at;
-    const h = PLATE_CAMERA.heading;
-    return new Vector3(x + Math.cos(h) * 0.8, 2.5, z - Math.sin(h) * 0.8);
-  }, []);
-  const tmp = useMemo(() => ({ to: new Vector3(), mid: new Vector3(), up: new Vector3(0, 1, 0), q: new Quaternion(), d: new Vector3() }), []);
-  useFrame(() => {
-    const s = director.plateScan;
-    const show = s.active && s.t > 0.2;
-    if (beam.current) beam.current.visible = show;
-    if (spot.current) spot.current.visible = show;
-    if (!show || !beam.current || !spot.current) return;
-    tmp.to.set(s.x, 0.55, s.z);
-    tmp.d.subVectors(tmp.to, head);
-    const len = tmp.d.length();
-    tmp.mid.addVectors(head, tmp.to).multiplyScalar(0.5);
-    beam.current.position.copy(tmp.mid);
-    tmp.q.setFromUnitVectors(tmp.up, tmp.d.normalize());
-    beam.current.quaternion.copy(tmp.q);
-    // 인식 전에는 빛줄기가 훑고(깜빡임), 서버가 번호판을 주면 고정된다
-    const sweep = s.plate ? 1 : 0.6 + 0.4 * Math.sin(director.t * 9);
-    beam.current.scale.set(sweep, len, sweep);
-    spot.current.position.copy(tmp.to);
-    spot.current.lookAt(head);
-    (spot.current.material as MeshBasicMaterial).opacity = s.plate ? 0.7 : 0.3 + 0.3 * Math.abs(Math.sin(director.t * 6));
-  });
-  return (
-    <>
-      <mesh ref={beam} material={SCAN_BEAM} visible={false}>
-        <cylinderGeometry args={[0.32, 0.04, 1, 16, 1, true]} />
-      </mesh>
-      <mesh ref={spot} material={SCAN_SPOT.clone()} visible={false}>
-        <planeGeometry args={[0.7, 0.32]} />
-      </mesh>
-    </>
   );
 }
 

@@ -7,7 +7,6 @@ import {
   HOLD,
   HOLD_REVERSE,
   HOLD_TO_SCALE,
-  PLATE_CAMERA,
   QUEUE,
   RAIL,
   RAIL_FRAME,
@@ -1052,14 +1051,6 @@ export class Director {
       out.x = t.x;
       out.y = t.y + (kind === 'pin' ? 2.7 + t.bedTilt * 1.1 : 0.8);
       out.z = t.z;
-      return true;
-    }
-    if (type === 'plate') {
-      // 번호판 인식 장면: 카메라 기둥 위
-      if (!this.plateScan.active) return false;
-      out.x = PLATE_CAMERA.at[0];
-      out.y = kind === 'pin' ? 3.1 : 1.2;
-      out.z = PLATE_CAMERA.at[1];
       return true;
     }
     if (type === 'bale') {

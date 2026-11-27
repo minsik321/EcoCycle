@@ -592,15 +592,15 @@ describe('참고 화면에 맞춘 화면 구성', () => {
     expect(within(pin).getByText(/12가 3456/)).toBeInTheDocument();
   });
 
-  it('장면 핀·패널에 "예시" 표시가 없다(앱의 "예시 데이터" 표시는 상단 바가 맡는다). 번호판 인식 핀은 입력 칸 없이 서버 번호판만 적는다', () => {
+  it('장면 핀·패널에 "예시" 표시가 없다(앱의 "예시 데이터" 표시는 상단 바가 맡는다). 번호판 인식 안내 핀(입차 계근 · 인식 중…)은 없다(S2o)', () => {
     render(view({ data: input({ vehicles: [vehicle('v1', 'identified', 'sector-a')] }) }));
     const pins = document.querySelector('.st-pins')!;
     // (회사 이름 "예시자원"은 시험용 서버 값이다) 서버 값이 없는 "예시" 핀(상차 예시, 고정 재고 예시)은 없다
     expect(pins.querySelector('.st-pin-example, [aria-label$="예시"]')).toBeNull();
     expect(pins.textContent).not.toMatch(/고정 재고|상차 차량\s*예시/);
-    const scan = screen.getByLabelText('번호판 인식');
-    expect(scan.querySelector('input')).toBeNull();
-    expect(scan.textContent).toMatch(/인식 중/);
+    expect(screen.queryByLabelText('번호판 인식')).toBeNull();
+    expect(pins.textContent).not.toMatch(/인식 중|입차 계근|출차 계근/);
+    expect(pins.querySelector('input')).toBeNull();
   });
 
   it('상세 패널은 4~5줄만 바로 보이고 나머지는 "자세히" 안에 있다', async () => {

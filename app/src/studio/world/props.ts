@@ -46,16 +46,20 @@ export function cone(k: Kit, x: number, z: number, s = 1): void {
   k.cyl(C.white, [0.047 * s, 0.062 * s], 0.07 * s, [x, 0.06 + 0.14 * s, z], { seg: 12 });
 }
 
-/** 결속된 베일 한 덩이. (x, y, z)는 바닥 중심, 긴 쪽이 로컬 X */
-export function bale(k: Kit, x: number, y: number, z: number, rotY = 0): void {
+/**
+ * 베일 하나. 장면의 모든 베일(지게차가 옮기는 서버 베일·이름 없는 재고·상차 차량에 실린 베일·바탕 재고 벽)이 이 모양 하나를 쓴다 (S2o):
+ * 크라프트 몸통 + 눌린 종이 층 넷 + 흰·회색 종이 조각 둘 + 결속 끈 셋. lite(low 단계)는 같은 부품·크기·색을 둥글리지 않은 상자로 (삼각형 수만 줄인다).
+ * 둥글림은 몸통만 한다(가는 층·끈의 둥글림은 보이지 않고 바탕 재고 수백 개의 삼각형만 늘린다). (x, y, z)는 바닥 중심, 긴 쪽이 로컬 X
+ */
+export function bale(k: Kit, x: number, y: number, z: number, rotY = 0, lite = false): void {
   const { w, h, d } = BALE;
   k.at([x, y, z], rotY, () => {
-    k.box(C.kraft, [d, h, w], [0, 0, 0], { r: 0.06, seg: 3 });
+    k.box(C.kraft, [d, h, w], [0, 0, 0], lite ? { r: 0 } : { r: 0.06, seg: 2 });
     // 눌린 종이 층
-    for (let i = 1; i < 5; i += 1) k.box(i % 2 ? C.kraftDark : C.kraftLight, [d + 0.012, 0.022, w + 0.012], [0, (h * i) / 5 - 0.01, 0], { r: 0.01 });
-    k.box(C.paper, [d * 0.17, 0.05, w + 0.016], [d * 0.19, h * 0.52, 0], { r: 0.012 });
-    k.box(C.paperGrey, [d * 0.21, 0.045, w + 0.016], [-d * 0.25, h * 0.3, 0], { r: 0.012 });
+    for (let i = 1; i < 5; i += 1) k.box(i % 2 ? C.kraftDark : C.kraftLight, [d + 0.012, 0.022, w + 0.012], [0, (h * i) / 5 - 0.01, 0], { r: 0 });
+    k.box(C.paper, [d * 0.17, 0.05, w + 0.016], [d * 0.19, h * 0.52, 0], { r: 0 });
+    k.box(C.paperGrey, [d * 0.21, 0.045, w + 0.016], [-d * 0.25, h * 0.3, 0], { r: 0 });
     // 결속 끈
-    for (const dx of [-0.32, 0, 0.32]) k.box(C.dark, [0.028, h + 0.02, w + 0.02], [dx * d, -0.01, 0], { r: 0.008 });
+    for (const dx of [-0.32, 0, 0.32]) k.box(C.dark, [0.028, h + 0.02, w + 0.02], [dx * d, -0.01, 0], { r: 0 });
   });
 }

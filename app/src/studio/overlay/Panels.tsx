@@ -1225,17 +1225,6 @@ export function Pins({ data, disconnected, selection, onSelect, pins, yardFull =
             </button>
           );
         })}
-      {/* 번호판 인식 장면: 계근대 위 차를 카메라 기둥이 비출 때만 보인다. 글자는 서버 번호판(인식 전 "인식 중…"), 입력 칸 없음 */}
-      <span key="plate:scan" ref={bind('plate:scan')} className="st-pin st-pin-vehicle st-pin-plate st-pin-label" role="status" aria-label="번호판 인식" style={{ visibility: 'hidden' }}>
-        <span className="st-pin-card">
-          <span className="st-pin-text">
-            <small data-plate-kind>입차 계근</small>
-            <strong className="st-plate" data-plate>
-              인식 중…
-            </strong>
-          </span>
-        </span>
-      </span>
       {Array.from({ length: YARD_FLOW.forkliftCount }, (_, i) => {
         const key = `forklift:${i + 1}`;
         return (
