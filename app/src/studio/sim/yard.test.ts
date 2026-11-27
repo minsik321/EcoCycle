@@ -108,7 +108,9 @@ describe('베일 적치: 받침대 → 저울 → 남동 → 북서', () => {
     expect(r.maxOnStand).toBeLessThanOrEqual(3);
     expect(r.maxOnScale).toBeLessThanOrEqual(2);
     expect(d.yard.stats.weighed).toBeGreaterThanOrEqual(8);
-    expect(d.yard.stats.stored).toBe(d.yard.stats.weighed * 2);
+    // 한 번 잴 때 두 개(2단), 다음 베일이 singleWaitSec 안에 안 오면 한 개 (S2t)
+    expect(d.yard.stats.stored).toBe(d.yard.stats.weighed * 2 - d.yard.stats.singles);
+    expect(d.yard.stats.singles).toBeLessThan(d.yard.stats.weighed);
   });
 
   it('남동이 차면 오래된 줄부터 줄 단위로 북서로 옮긴다', () => {

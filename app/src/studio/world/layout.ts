@@ -1024,13 +1024,13 @@ export const LOAD_SLOTS: readonly LoadSlot[] = [0, 1].flatMap((level) =>
   [-1, 1].flatMap((side) => Array.from({ length: LOAD_COLS }, (_, i) => ({ along: LOAD_ALONG0 + i * LOAD_PITCH, across: side * LOAD_ACROSS, level }))),
 );
 /**
- * 싣는 차례(LOAD_SLOTS 번호, 20개): 아래 단을 다 채운 뒤 위 단 (S2j 사용자 결정).
- * 서쪽 곁(트럭 로컬 −z, 북쪽을 보고 선 차의 서쪽) 아래 단 5개 → 차 앞을 돌아 동쪽 곁 아래 단 5개 → 그대로 동쪽 위 단 5개 → 다시 돌아 서쪽 위 단 5개.
- * 돌아가는 것은 두 번뿐이다. 서버가 실었다고 한 수(baleIds)가 이보다 적으면 앞에서부터 그만큼만 싣는다
+ * 싣는 차례(LOAD_SLOTS 번호, 20개): 자리마다 아래 단 → 위 단 (S2t 2026-11-27: 지게차가 북서에서 두 개(2단)를 한 번에 집어 한 자리에 함께 내려놓는다.
+ * 전에는 S2j 결정대로 아래 단 10개를 다 채운 뒤 위 단). 서쪽 곁(트럭 로컬 −z) 5자리 → 차 앞을 돌아 동쪽 곁 5자리. 돌아가는 것은 한 번뿐이다.
+ * 짝수 번째(아래 단)와 그다음(위 단)이 한 쌍이다. 서버가 실었다고 한 수(baleIds)가 이보다 적으면 앞에서부터 그만큼만 싣는다(홀수면 마지막은 아래 단 하나)
  */
 const slotIndex = (side: -1 | 1, level: number, col: number): number => level * 2 * LOAD_COLS + (side < 0 ? 0 : LOAD_COLS) + col;
 const COLS = Array.from({ length: LOAD_COLS }, (_, c) => c);
-export const LOAD_ORDER: readonly number[] = ([[-1, 0], [1, 0], [1, 1], [-1, 1]] as const).flatMap(([side, level]) => COLS.map((c) => slotIndex(side, level, c)));
+export const LOAD_ORDER: readonly number[] = ([-1, 1] as const).flatMap((side) => COLS.flatMap((c) => [slotIndex(side, 0, c), slotIndex(side, 1, c)]));
 /** 상차 차량의 적재함 바닥 높이 */
 export const LOAD_BED_Y = LOAD_TRUCK.deckY;
 

@@ -2,6 +2,7 @@ import { TANK_IDS } from '@ecocycle/shared';
 import type { Group } from 'three';
 import { C } from '../theme';
 import { Kit } from '../three/kit';
+import { balePlate } from './balePlate';
 import type { Footprint, Vec3 } from '../three/kit';
 import type { P2 } from '../sim/paths';
 import type { StaticBaleCell } from './layout';
@@ -717,44 +718,7 @@ function houseRoof(): Group {
   return k.build('house-roof');
 }
 
-// ── 배출 받침대·베일 저울 (마당 좌표계) ────────────────────────────────
-
-function standAndScale(k: Kit): void {
-  const { stand, scale } = YARD;
-  k.at([YARD_FRAME.x, TOP, YARD_FRAME.z], YARD_FRAME.rotY, () => {
-    // 바닥 철판(S2t, 레일·받침대 없음): 배출구 통로 바닥에서 짧은 경사 철판이 땅으로 내려오고, 그 앞에 바닥에 깐 평평한 철판
-    const z0 = stand.outletZ;
-    const zs = stand.slopeEnd;
-    const z1 = stand.outletZ + stand.length;
-    const w = BALE.w + 0.5;
-    const th = 0.03;
-    // 평평한 철판 (땅 위 얇은 판, 윗면 stand.y) + 줄무늬 미끄럼막이
-    k.box(C.steel, [w, stand.y, z1 - zs], [stand.x, 0, mid(zs, z1)], { r: 0.005, mat: 'metal' });
-    for (let z = zs + 0.18; z < z1 - 0.1; z += 0.3) k.box(C.steelLight, [w - 0.16, 0.008, 0.05], [stand.x, stand.y, z], { r: 0, mat: 'metal' });
-    // 경사 철판: 배출구 높이(outletY)에서 평평한 철판까지 비스듬한 판 하나 + 밑을 받치는 삼각 옆판
-    const run = zs - z0;
-    const len = Math.hypot(run, stand.outletY - stand.y);
-    k.box(C.steel, [w, th, len + 0.02], [stand.x, mid(stand.outletY, stand.y) - th, mid(z0, zs)], { r: 0.005, rot: [stand.slope, 0, 0], mat: 'metal' });
-    for (const dx of [-1, 1]) k.box(C.dark, [0.04, stand.outletY - 0.02, run * 0.5], [stand.x + dx * (w / 2 - 0.03), 0, z0 + run * 0.25], { r: 0.005, mat: 'metal' });
-    // 가장자리 노랑 띠 (양옆) + 끝 낮은 멈춤 턱
-    for (const dx of [-1, 1]) k.box(C.yellow, [0.06, 0.012, z1 - zs], [stand.x + dx * (w / 2 - 0.03), stand.y, mid(zs, z1)], { r: 0 });
-    k.box(C.yellow, [w, 0.08, 0.06], [stand.x, 0, z1 + 0.03], { r: 0.02 });
-    // 베일 저울: 낮은 판 + 노란 테두리 + 표시 기둥(숫자 없음)
-    const s = scale.size;
-    k.box(C.dark, [s, scale.y, s], [scale.x, 0, scale.z], { r: 0.02, mat: 'metal' });
-    k.box(C.steelLight, [s - 0.12, 0.02, s - 0.12], [scale.x, scale.y - 0.01, scale.z], { r: 0, mat: 'metal' });
-    for (const [dx, dz, w, d] of [
-      [0, s / 2, s + 0.08, 0.06],
-      [0, -s / 2, s + 0.08, 0.06],
-      [s / 2, 0, 0.06, s + 0.08],
-      [-s / 2, 0, 0.06, s + 0.08],
-    ] as const) {
-      k.box(C.yellow, [w, 0.05, d], [scale.x + dx, scale.y - 0.02, scale.z + dz], { r: 0.01 });
-    }
-    k.cyl(C.steel, 0.04, 1.1, [scale.x - s / 2 - 0.25, 0, scale.z - s / 2], { seg: 8, mat: 'metal' });
-    k.box(C.wall, [0.2, 0.28, 0.1], [scale.x - s / 2 - 0.25, 1.1, scale.z - s / 2], { r: 0.03 });
-  });
-}
+// 배출구 바닥 철판·베일 저울은 balePlate.ts (S2t)
 
 // ── 베일 블록: 북서 재고 뒤쪽, 남동 북동 날개, 북쪽 숲 경계 줄 (같은 방향·같은 간격, 4~5단) ──
 
@@ -867,7 +831,7 @@ export function buildWorld(lite = false): World {
   debris(k);
   bales(k);
   yardMarks(k);
-  standAndScale(k);
+  balePlate(k, TOP);
   utilities(k);
   k.at([0, 0, 0], RAIL_FRAME.heading, () => {
     houseFloor(k);

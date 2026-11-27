@@ -241,9 +241,15 @@ describe('사진 → 월드 변환 (sitePx)', () => {
     for (let i = 1; i < cols.length; i += 1) expect((cols[i]! - cols[i - 1]! - BALE.d) * M_PER_UNIT).toBeCloseTo(0.26, 2);
     expect((LOAD_BED_REAR + LOAD_TRUCK.bedLength - cols[4]! - BALE.d / 2) * M_PER_UNIT).toBeCloseTo(0.52, 2);
     expect((cols[0]! - BALE.d / 2 - LOAD_BED_REAR) * M_PER_UNIT).toBeCloseTo(1.04, 2);
-    // 아래 단 10개를 다 채운 뒤 위 단 10개 (위아래 단이 5개씩 같은 자리, S2j 사용자 결정)
-    expect(LOAD_ORDER.slice(0, 10).every((i) => LOAD_SLOTS[i]!.level === 0)).toBe(true);
-    expect(LOAD_ORDER.slice(10).every((i) => LOAD_SLOTS[i]!.level === 1)).toBe(true);
+    // 자리마다 아래 단 → 바로 그 위 단 (S2t: 지게차가 두 개(2단)를 한 번에 내려놓는다). 서쪽 곁 5자리 다음 동쪽 곁 5자리 (차 앞을 한 번만 돈다)
+    expect(new Set(LOAD_ORDER).size).toBe(20);
+    for (let k = 0; k < LOAD_ORDER.length; k += 2) {
+      const lo = LOAD_SLOTS[LOAD_ORDER[k]!]!;
+      const hi = LOAD_SLOTS[LOAD_ORDER[k + 1]!]!;
+      expect([lo.level, hi.level]).toEqual([0, 1]);
+      expect([hi.along, hi.across]).toEqual([lo.along, lo.across]);
+      expect(Math.sign(lo.across)).toBe(k < 10 ? -1 : 1);
+    }
   });
 
   it('지게차(S2k): 몸체 폭 1.2 m(3톤급), 베일 클램프 판 사이는 베일 폭(1.1 m)보다 넓고 판 길이는 베일 길이의 0.65 이상', () => {
@@ -261,7 +267,11 @@ describe('사진 → 월드 변환 (sitePx)', () => {
     expect(inner).toBeLessThan(BALE.w * 1.3);
     expect(BALER_TUNNEL.roofY - BALER_TUNNEL.floorY).toBeGreaterThan(BALE.h);
     expect(BALER_TUNNEL.roofY - BALER_TUNNEL.floorY).toBeLessThan(BALE.h * 1.25);
-    expect(YARD.stand.y).toBe(BALER_TUNNEL.floorY);
+    // 배출구 바닥 철판(S2t): 경사 철판은 통로 바닥 높이에서 시작해 바닥에 깐 얇은 철판으로 내려온다 (레일 받침대 없음)
+    expect(YARD.stand.outletY).toBe(BALER_TUNNEL.floorY);
+    expect(YARD.stand.y).toBeLessThan(0.05);
+    expect(YARD.stand.slope).toBeGreaterThan(0.15);
+    expect(YARD.stand.slope).toBeLessThan(0.45);
     expect(YARD.scale.size).toBeGreaterThan(BALE.d);
     expect(YARD.scale.size).toBeLessThan(BALE.d * 1.5);
   });
