@@ -37,7 +37,7 @@ import {
   truckToTip,
   yardToWorld,
 } from '../world/layout';
-import { FRESH_MS, advance, follow, mover } from './mover';
+import { FRESH_MS, advance, follow, followOn, mover } from './mover';
 import type { Mover } from './mover';
 import { angleDelta, roundedPath, samplePath } from './paths';
 import type { P2, Path, Pose } from './paths';
@@ -211,6 +211,11 @@ const BEFORE_SCALE: ReadonlySet<TruckPhase> = new Set<TruckPhase>(['road', 'road
 const TRUCK_POOL = 8;
 /** 출차해 나가는 차가 길에서 이만큼(초) 막혀 있으면 뺀다 */
 const LEAVE_STUCK_SEC = 6;
+/**
+ * 출차 계근을 마친 차는 서버의 출차(departed)를 계근대 위에서 기다린다(출차 계근 중 = 계근대 위): 출입문 앞 대기 자리에 서서
+ * 기다리지 않고 계근대에서 도로 끝까지 한 번에 나가게 (S2p). 출차가 이만큼 넘게 안 오면 예전처럼 대기 자리로 내려가 기다린다
+ */
+const EXIT_WAIT_ON_SCALE_SEC = 40;
 const LUMP_POOL = 12;
 
 /** 경로 위에서 사진의 한 점(px)에 가장 가까운 곳까지의 거리 */
@@ -906,6 +911,8 @@ export class Director {
           t.weighT += dt;
           if (t.plate) t.plateT += dt;
           if (t.weighT < WEIGH_SEC || (t.plate !== null && t.plateT < PLATE_SHOW_SEC)) break;
+          // 출차(departed)를 계근대 위에서 기다린다: 받으면 계근대에서 도로 끝까지 한 번에 나간다 (S2p)
+          if (!t.leaving && t.weighT < EXIT_WAIT_ON_SCALE_SEC) break;
           // 동쪽을 보고 쟀다: 후진으로 서쪽에 내려와 경사로 위에서 나갈 채비를 한다 (계근대 동쪽 끝은 옹벽).
           // 서버가 출차(departed)를 주면 그때 회사 밖으로 빠진다(sync)
           t.phase = 'reverseOut';
@@ -918,12 +925,18 @@ export class Director {
           }
           break;
         case 'toExit':
-          if (advance(t, dt, TRUCK_SPEED * 0.8, TRUCK_ACCEL, this.truckBlocked(t))) {
-            t.phase = 'exitHold';
-            t.path = null;
-            // 계근대는 비웠다: 다음 차가 출차 계근을 할 수 있다 (경사로는 이 차가 막고 있어 들어오는 차는 canEnter가 기다리게 한다)
+          // 이미 출차했으면 대기 자리에서 서지 않고 그대로 경사로를 내려간다 (S2p: 출입문 앞 멈칫 없음)
+          if (advance(t, dt, TRUCK_SPEED * 0.8, TRUCK_ACCEL, this.truckBlocked(t), t.leaving)) {
             this.yardToken.release(t.id);
             this.scaleToken.release(t.id);
+            if (t.leaving) {
+              t.phase = 'leave';
+              followOn(t, PATH_LEAVE);
+              break;
+            }
+            // 계근대는 비웠다(위): 다음 차가 출차 계근을 할 수 있다 (경사로는 이 차가 막고 있어 들어오는 차는 canEnter가 기다리게 한다)
+            t.phase = 'exitHold';
+            t.path = null;
           }
           break;
         case 'exitHold':
@@ -934,8 +947,8 @@ export class Director {
           }
           break;
         case 'leave':
-          // 경사로를 내려가는 동안은 계근대 속도, 도로에 서면 도로 속도. 길 끝(사진 남서쪽 밖)에 닿으면 빠진다
-          if (advance(t, dt, t.s < LEAVE_CLEAR_S ? TRUCK_SPEED * 0.8 : ROAD_SPEED, TRUCK_ACCEL, this.truckBlocked(t))) this.finish(t);
+          // 경사로를 내려가는 동안은 계근대 속도, 도로에 서면 도로 속도. 길 끝(사진 남서쪽 밖)에 닿으면 서지 않고 달리던 채로 빠진다
+          if (advance(t, dt, t.s < LEAVE_CLEAR_S ? TRUCK_SPEED * 0.8 : ROAD_SPEED, TRUCK_ACCEL, this.truckBlocked(t), true)) this.finish(t);
           break;
       }
       // 나가는 차가 길에서 오래 막혔다(서로 막힘): 회사 밖 차라 기다리게 두지 않고 뺀다 (드문 경우의 안전판, LEAVE_STUCK_SEC)
